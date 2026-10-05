@@ -37,11 +37,10 @@ CREATE INDEX IF NOT EXISTS idx_follow_ups_date_open  ON follow_ups (follow_up_da
 -- Canonical: db/functions/lead_auto_create_followup.sql.  Do NOT re-add (§71). Trigger wiring stays.
 -- -------------------------------------------------------------------------
 
-DROP TRIGGER IF EXISTS trg_lead_auto_followup ON public.leads;
-CREATE TRIGGER trg_lead_auto_followup
-  AFTER INSERT ON public.leads
-  FOR EACH ROW
-  EXECUTE FUNCTION public.lead_auto_create_followup();
+-- Phase 330: the trg_lead_auto_followup trigger DDL was REMOVED from this file. Its canonical definition (with
+-- WHEN (NOT public.lead_is_self_import(...)) so CSV self-imports stay quiet) now lives ONLY in
+-- supabase_phase330_csv_upload_quiet_imports.sql. Re-running this old file used to DROP + re-create
+-- the trigger WITHOUT the WHEN clause and silently turn quiet imports back into a push/follow-up flood.
 
 -- ─── 3. RLS update — admin/co_owner can read lead-linked follow-ups
 DROP POLICY IF EXISTS "fu_admin_all" ON public.follow_ups;

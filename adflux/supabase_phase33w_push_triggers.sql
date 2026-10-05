@@ -86,10 +86,10 @@ BEGIN
   RETURN NEW;
 END $$;
 
-DROP TRIGGER IF EXISTS tg_push_lead_assign ON leads;
-CREATE TRIGGER tg_push_lead_assign
-  AFTER INSERT OR UPDATE OF assigned_to ON leads
-  FOR EACH ROW EXECUTE FUNCTION public.tg_push_on_lead_assign();
+-- Phase 330: the tg_push_lead_assign trigger DDL was REMOVED from this file. Its canonical definition (with
+-- WHEN (NOT public.lead_is_self_import(...)) so CSV self-imports stay quiet) now lives ONLY in
+-- supabase_phase330_csv_upload_quiet_imports.sql. Re-running this old file used to DROP + re-create
+-- the trigger WITHOUT the WHEN clause and silently turn quiet imports back into a push/follow-up flood.
 
 -- ─── 4. Trigger: payment approved ────────────────────────────────
 -- Fires when a payment row transitions to approval_status = 'approved'.

@@ -1,3 +1,5 @@
+-- !! SUPERSEDED for team_dashboard_bundle (Phase 330): the canonical, current definition is
+--    db/functions/team_dashboard_bundle.sql. Do NOT re-run the bundle function from this file.
 -- ============================================================================
 -- supabase_phase323_dashboard_agg_rpcs.sql
 -- Phase 323 perf backlog — server-side GROUP BY RPCs for the 5 dashboard

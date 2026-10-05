@@ -438,8 +438,11 @@ export default function TeamDashboardV2() {
           .gte('duration_seconds', 10)
           .or('direction.is.null,direction.neq.missed')
           .not('lead_id', 'is', null),
+        // Phase 330 — CSV imports are not "added today" (mirrors the stored counter
+        // trigger, useDaySummary and team_dashboard_bundle.new_leads_count).
         supabase.from('leads')
           .select('id', { count: 'exact', head: true })
+          .is('import_id', null)
           .gte('created_at', startOfDay)
           .lt ('created_at', endOfDay),
         // Phase 18 — only count won quotes for "pipeline added today",

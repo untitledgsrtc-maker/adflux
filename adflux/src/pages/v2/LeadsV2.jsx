@@ -491,7 +491,12 @@ export default function LeadsV2() {
     const headers = ['name','company','phone','email','stage','segment','source','city','industry','assigned','heat','last_contact_at','expected_value','created_at']
     const escape = (v) => {
       if (v == null) return ''
-      const s = String(v)
+      let s = String(v)
+      // Phase 330 — spreadsheet formula injection: reps can now bulk-upload external CSV text
+      // (names/notes) that later lands in this export. A leading = + - @ (or tab/CR) is read as a
+      // formula by Excel/Sheets; a leading apostrophe makes it plain text.
+      // Plain phone-like values (legacy "+91 98765 43210") are left alone.
+      if (/^[=+\-@\t\r]/.test(s) && !/^\+?[\d\s().-]+$/.test(s)) s = "'" + s
       if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
       return s
     }
@@ -853,7 +858,7 @@ export default function LeadsV2() {
             {isAdmin ? 'Leads' : 'My Leads'}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {/* Phase 268 — top Export button (admin/co_owner). Same handler as the
               one in the bottom pagination bar (Phase 62.8.1), surfaced up here so
               it's findable without scrolling past a long list. Exports selected
@@ -870,11 +875,16 @@ export default function LeadsV2() {
               <span>Export CSV{selected.size > 0 ? ` (${selected.size})` : ''}</span>
             </button>
           )}
-          {isPrivileged && (
+          {/* Phase 330 — sales + telecaller reps can upload a CSV of THEIR OWN
+              leads (quiet import, own list only). Hidden in the read-only team
+              view (a viewer must not be offered a write) and for agency (their
+              role is neither sales nor telecaller). */}
+          {(isPrivileged
+            || (!teamViewing && ['sales', 'telecaller'].includes(profile?.role))) && (
             <button
               className="lead-btn"
               onClick={() => navigate('/leads/upload')}
-              title="Upload from Cronberry / Excel"
+              title={isPrivileged ? 'Upload from Cronberry / Excel' : 'Upload a CSV of your own leads'}
             >
               <Upload size={14} />
               <span>Upload CSV</span>

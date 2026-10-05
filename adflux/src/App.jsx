@@ -277,6 +277,18 @@ function RequireNonAgency({ children }) {
   return children
 }
 
+/* Phase 330 — CSV lead upload guard. admin/co_owner (as before) plus sales and
+   telecaller reps uploading THEIR OWN leads. Agency never owns leads (§214/§281)
+   and every other role bounces to the leads list. Only /leads/upload uses it. */
+function RequireLeadUpload({ children }) {
+  const { isPrivileged, isAgency, profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  const role = profile?.role
+  const ok = isPrivileged || (!isAgency && (role === 'sales' || role === 'telecaller'))
+  if (!ok) return <Navigate to="/leads" replace />
+  return children
+}
+
 // Phase 230 — Operations module route guard. Only the two ops roles
 // (plus admin/co_owner for oversight) may reach /ops; everyone else
 // bounces to their own dashboard. Additive — no existing guard changed.
@@ -437,7 +449,7 @@ export default function App() {
               the gated team_dashboard_bundle RPC (no broad RLS); she stays
               own-only everywhere else. */}
           <Route path="/team-dashboard"            element={<RequireTeamView><TeamDashboardV2 /></RequireTeamView>} />
-          <Route path="/leads/upload"              element={<RequirePrivileged><LeadUploadV2 /></RequirePrivileged>} />
+          <Route path="/leads/upload"              element={<RequireLeadUpload><LeadUploadV2 /></RequireLeadUpload>} />
           {/* Campaign module (admin, token-free). Specific /campaigns/* before /campaigns. */}
           <Route path="/campaigns/qr"              element={<RequirePrivileged><CampaignQrV2 /></RequirePrivileged>} />
           <Route path="/campaigns/clients"         element={<RequirePrivileged><CampaignClientQrV2 /></RequirePrivileged>} />

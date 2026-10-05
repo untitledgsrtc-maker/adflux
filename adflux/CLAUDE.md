@@ -20082,10 +20082,67 @@ Empty box = leave unchanged. "Apply to all N" writes ONE `onChange` over every c
 Step2Campaign is rendered only by WizardShell (private LED quote, create + edit + renew + copy-last) inside V2AppShell (ConfirmDialogViewport mounted). Other Media and both Govt wizards untouched.
 Pre-existing, left (section 16): the per-row duration pills still use the `#fbc42d` fallback and are under 36px tall.
 
+
 ### Selected-cities scope (follow-up, same day)
 Owner: "selected city bulk changes also needed." While the Bulk panel is open (2+ cities) each city row shows a tick box. Tick some -> the panel reads "Applies to K selected cities"
 and Apply changes ONLY those; tick none -> all N cities (the default above, unchanged). "Select all" / "Clear ticks" buttons; removing a city drops its tick; the confirm box and the
 "Done" note name the scope ("the 3 selected" vs "all 8"). Same price rule, same re-entrancy latch, same slots-reason handling. The ticks are local to the screen (not saved on the quote).
+
+## 320 · Phase 330 — CSV lead upload for sales + telecaller reps, QUIET imports (2026-10-05)
+
+Owner: "anyone can upload CSV for leads." Decisions (AskUserQuestion): who = sales + telecaller + admin/co_owner (agency never owns leads, §214/§281);
+behaviour = QUIET (no per-lead push, no auto follow-up, not counted in "Leads today"); 500 leads per file; CSV only (xlsx rejected with a how-to).
+Built DB-first, dry-run on the LIVE DB inside rolled-back transactions (also AS the rep role under RLS), then a 3-lens adversarial review + a final
+sales-module-guardian pass. Phase-number note (section 52): "Phase 330" is this batch's label; disambiguate by SHA.
+
+### How "quiet" works (no frozen function body touched)
+`public.lead_is_self_import(import_id, created_by, assigned_to, telecaller_id)` = a pure NULL-safe boolean: import_id set AND created_by = COALESCE(telecaller_id, assigned_to)
+(the section 113 TC-first owner) — "a user bulk-importing into their OWN list". Three triggers on `public.leads` gained `WHEN (NOT lead_is_self_import(...))`:
+`trg_lead_auto_followup`, `trg_lead_after_insert_bump_counter`, `tg_push_lead_assign`. Their FUNCTIONS are byte-unchanged; only the trigger definitions changed.
+Admin/co_owner imports for someone else (created_by <> owner) and one-by-one leads (import_id NULL) stay LOUD exactly as before (proven live: single lead +1 follow-up/+1 counter/+1 push,
+admin import for a rep +1/+1/+1, rep self-import 0/0/0). `compute_daily_score` / TA / salary never read the counter or follow_ups -> no pay effect.
+
+### Files
+SQL (owner RUNS, in this order, then done — all idempotent):
+1. `db/functions/lead_is_self_import.sql` — the rule (canonical, section 72). MUST stay executable by PUBLIC (it runs inside the WHEN as every inserting role).
+2. `db/functions/recompute_daily_new_leads.sql` — the delete-heal now ignores self-imports (else deleting any lead the same day re-inflated the counter). REVOKE now covers anon + authenticated.
+3. `supabase_phase330_csv_upload_quiet_imports.sql` — Part 0 preflight (fails closed if live triggers differ), `lead_imports_own_update` policy (a rep can finish their OWN audit row; B-rep update = 0 rows),
+   the 3 WHEN triggers (`SET LOCAL lock_timeout='3s'` — RUN OFF-PEAK, brief lock on hot `leads`), `lead_import_quiet_ready()` readiness probe (SECURITY DEFINER, authenticated + service_role only).
+4. `db/functions/team_dashboard_bundle.sql` — captured from the LIVE function (it carries the Phase 323 M21 `chase` arm) + `AND import_id IS NULL` on `new_leads_count`.
+   Function-only; keeps the live ACL. The 193 / 316 / 323 copies now carry a SUPERSEDED pointer — re-running them reverts it (193/316 also drop M21; 193 deadlocks on gps_pings, section 200).
+Old trigger DDL REMOVED (pointer comments) from `supabase_phase12_m1_m7_foundation.sql`, `supabase_phase33d4_auto_lead_followup.sql`, `supabase_phase33w_push_triggers.sql`, and the recompute body from
+`supabase_phase113_3_new_leads_counter_delete_heal.sql` — re-running an old file can no longer strip the WHEN clauses (the section 33 revert trap).
+Frontend (JS-only, reaches the APK on next open, no rebuild):
+- `LeadUploadV2.jsx` — `selfMode = !isPrivileged && role in (sales, telecaller)`. Rep flow: pick CSV -> column check (exact-match-first mapping, one column can't serve two fields) -> per-row check chips
+  (ready / no name / bad mobile / repeated) -> "Add N leads to my list". Every row: stage New, assigned_to = me (telecaller also telecaller_id = me), source 'Excel', created_by = me, import_id set; NO lead_activities, no
+  Cronberry classification. Phone -> last 10 digits (+91 / 91 / leading 0 handled; must start 6-9). 25-row batches with a per-row fallback; a lost-response batch is detected before retrying; two systematic-failure batches
+  stop the upload. Own-list dedupe pages `.order('id')` over created_by/assigned_to/telecaller_id and ABORTS on a read error. Re-entrancy latch `importingRef` (section 47). Readiness RPC checked at page open AND again right
+  before the first insert (a stale open page can't flood after an old SQL re-run). Caps: 500 rows, 2 MB, semicolon/tab files and .xlsx get a plain-language error. Access gate moved BELOW all hooks (was a rules-of-hooks bug).
+  The admin path (commitImport + admin mapping/options UI) is unchanged except the BOM strip, the name-in-column-0 preview fix (`!columnMap.name` was falsy at index 0), the input reset, and users loading for admins only.
+- `LeadsV2.jsx` — Upload CSV button for sales/telecaller (hidden in the read-only team view); CSV EXPORT escape now prefixes `'` on cells starting `= + - @` (not phone-like values) — formula injection, widened by this feature.
+- `App.jsx` — `RequireLeadUpload` guard on `/leads/upload` (admin/co_owner + sales/telecaller, never agency).
+- `useDaySummary.js` + `TeamDashboardV2.jsx` — "new leads today" counts add `import_id IS NULL`. DECISION: this drops ALL imports (also admin Cronberry loads) from those two live counts, because PostgREST can't express the
+  created_by = owner test; the stored counter (trigger/delete-heal) uses the exact rule. Admin bulk loads are not "added today" either.
+
+### Verified (live DB, all rolled back)
+AS the rep role under RLS: lead_imports insert + 3-lead batch insert OK, own-update 1 row, other rep update/read 0, forged assigned_to = RLS blocked, cross-rep duplicate phone rejected with the owner's name
+("This phone is already in an open lead ... with Aayushi parmar"), telecaller self-import OK, stage New / heat cold, 0 follow-ups / 0 tasks / 0 activities / counter 0 / push 0. `lead_import_quiet_ready()` true after apply.
+
+### Contracts / foot-guns (do NOT regress)
+- ONE definition of "self import" (the helper). It feeds the 3 WHEN clauses, the delete-heal, and (as import_id IS NULL) the live counts — change the rule -> change all of them.
+- The helper is NULL-safe on purpose (`COALESCE(..., false)`): both owners NULL would otherwise make `WHEN (NOT NULL)` silently mute the triggers for an ownerless admin import.
+- A page that gates on a DB feature must re-check it right before the write, not only at mount.
+- ACCEPTED (documented, no money effect): `leads.import_id` / `created_by` are client-supplied (no FK), so any rep can make one of their own leads "quiet" via the API. Pay/score never read the counter or follow_ups.
+- OWNER-AWARE, not built: self-imported leads sit in the rep's OPEN count, so round-robin (`assign_lead_round_robin`, fewest open leads) will starve that rep of new inbound leads while 500 imported leads stay open.
+  If unwanted, exclude import-tagged leads from that load count (separate guarded change).
+- Dormant: `generate_lead_tasks` would raise a `new_untouched` push per task for New leads older than 48h — not live (TodayTasksPanel hidden for sales since Phase 123); re-check if that hide is ever lifted.
+- Pre-existing, noted not changed: `team_dashboard_bundle` ACL includes anon (the function self-gates by role, fail-closed).
+
+### Run-state
+Code reviewed + committed. SQL is NOT applied to the live DB until the owner says go; the page fails closed ("not switched on") until then — so apply the SQL BEFORE pushing, or reps see a dead Upload button.
+Smoke after apply: a rep opens /leads -> Upload CSV -> pick a 5-row file -> 5 leads appear in My Leads, no push, no "new lead" follow-ups, "Leads today" unchanged; a duplicate of another rep's number
+shows under Errors with that rep's name. Test one real phone (file picker + 5 leads) before telling the team.
+
 
 ## 321 · Phase 332 (sort fix) — /quotes opens newest-first again; the SORT is no longer remembered (2026-10-05)
 
@@ -20104,6 +20161,7 @@ Stale `quotesv2.sortField` keys left in a phone's sessionStorage are never read 
 ### Lesson (apply to LeadsV2 / any list that uses usePersistedState)
 Persist FILTERS across Back, never a pure view preference like sort order: a stuck sort is invisible to the user and reads as "the app changed." If a list adds
 persisted state, ask "would the owner be surprised to find this still set tomorrow?" before persisting. (LeadsV2 has no sort control, so it is not affected.)
+
 
 ## 322 · Phase 333 — auto follow-ups went to the lead's CREATOR, not the telecaller who owns it (Dhara's "Unknown lead") (2026-10-05)
 
@@ -20139,3 +20197,4 @@ Also noted: `generate_lead_tasks` filters `l.assigned_to = p_user_id` only (tele
 
 ### Owner run order
 1) the four `db/functions/*.sql` above  2) `supabase_phase333_cadence_owner_heal.sql`  3) reload Dhara's Follow-ups: the "Unknown lead" cards are gone; Brijesh's queue drops by ~770.
+

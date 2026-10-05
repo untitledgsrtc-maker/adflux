@@ -173,9 +173,14 @@ export default function useDaySummary({ dateISO } = {}) {
           .not('lead_id', 'is', null),
 
         // 4) leads created by this rep today
+        // Phase 330 — CSV self-imports are "quiet": the daily counter trigger
+        // skips them (lead_is_self_import), so the live count must skip them
+        // too (import_id IS NULL) or the report would disagree with the
+        // dashboard. One-by-one leads have import_id NULL -> unchanged.
         supabase.from('leads')
           .select('id', { count: 'exact', head: true })
           .eq('created_by', profile.id)
+          .is('import_id', null)
           .gte('created_at', startISO)
           .lte('created_at', endISO),
 

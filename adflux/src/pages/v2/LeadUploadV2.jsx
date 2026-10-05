@@ -12,12 +12,21 @@
 //   5. Create lead + 1 lead_activities row from the parsed data
 //   6. Optional: 90-day cutoff — older rows imported as Lost/Stale
 //
-// Admin-only. Live progress bar. Audit row in lead_imports.
+// Admin / co_owner: full import (Cronberry parse, owner pickers, cutoff).
+//
+// Phase 330 — sales + telecaller reps can ALSO upload a CSV, but ONLY of their
+// own leads ("self mode"): every row lands in the uploader's own list, stage
+// New, quiet (no per-lead push / auto follow-up / "Leads today" count — the
+// three leads triggers carry WHEN (NOT lead_is_self_import(...))). 500 leads
+// per file, CSV only. The admin import (commitImport + its mapping/options UI) is unchanged;
+// the only shared-path differences are: UTF-8 BOM strip, the name-in-column-0 preview fix, the
+// file input resetting after a pick, and the users list loading for admins only.
+// Live progress bar. Audit row in lead_imports.
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Upload, AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2,
+  ArrowLeft, Upload, AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, Copy,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -124,20 +133,71 @@ function detectColumn(header, target) {
   return HEADER_ALIASES[target].some(a => norm === a || norm.includes(a))
 }
 
-function buildColumnMap(headers) {
+// preferExact (Phase 330, self mode only): try an exact header match first so
+// "Company Name" before "Name" can't steal the Name column. Admin path passes
+// nothing -> identical to before.
+function buildColumnMap(headers, preferExact = false) {
   const map = {}
-  for (const target of Object.keys(HEADER_ALIASES)) {
-    const idx = headers.findIndex(h => detectColumn(h, target))
-    if (idx >= 0) map[target] = idx
+  if (!preferExact) {
+    for (const target of Object.keys(HEADER_ALIASES)) {
+      const idx = headers.findIndex(h => detectColumn(h, target))
+      if (idx >= 0) map[target] = idx
+    }
+    return map
+  }
+  // Self mode: exact matches first, then loose matches — and one column can only
+  // serve ONE target ("Contact Number" must not become both Name and Mobile).
+  const claimed = new Set()
+  const targets = Object.keys(HEADER_ALIASES)
+  for (const target of targets) {
+    const idx = headers.findIndex((h, i) => !claimed.has(i)
+      && HEADER_ALIASES[target].includes((h || '').toLowerCase().trim()))
+    if (idx >= 0) { map[target] = idx; claimed.add(idx) }
+  }
+  for (const target of targets) {
+    if (map[target] !== undefined) continue
+    const idx = headers.findIndex((h, i) => !claimed.has(i) && detectColumn(h, target))
+    if (idx >= 0) { map[target] = idx; claimed.add(idx) }
   }
   return map
 }
+
+/* ─── Phase 330 — self-mode helpers ─── */
+const SELF_MAX_ROWS = 500          // owner decision 2026-10-05
+const SELF_MAX_BYTES = 2 * 1024 * 1024
+const SELF_BATCH = 25
+const SELF_SOURCE = 'Excel'        // same free-text source the admin import uses
+
+// Indian mobile -> exactly 10 digits starting 6-9, else null. Handles
+// "+91 98765 43210", "919876543210", "09876543210", "98765-43210".
+function normalizeMobile10(raw) {
+  if (raw === null || raw === undefined) return null
+  let d = String(raw).replace(/\D/g, '')
+  if (d.length === 12 && d.startsWith('91')) d = d.slice(2)
+  else if (d.length === 11 && d.startsWith('0')) d = d.slice(1)
+  return /^[6-9]\d{9}$/.test(d) ? d : null
+}
+
+const SELF_EXAMPLE_CSV =
+  'name,phone,email,company,city,notes\n' +
+  'Rajesh Patel,9876543210,rajesh@example.com,Patel Traders,Vadodara,Met at expo\n' +
+  'Meena Shah,9898012345,,Shah Textiles,Surat,Wants LED rates'
 
 /* ─── Component ─── */
 export default function LeadUploadV2() {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
+  // Phase 330 — a sales / telecaller rep uploading their OWN leads. Agency and
+  // every other role fall through to the access-denied panel (route guard
+  // RequireLeadUpload keeps them out too; this is the second lock).
+  const selfMode  = !isPrivileged && ['sales', 'telecaller'].includes(profile?.role)
+  const canUpload = isPrivileged || selfMode
+  // Segments this rep may create (DB trg_leads_segment_access_ins is strict on
+  // users.segment_access — no manager exemption — so mirror it exactly).
+  const segAccess  = profile?.segment_access || 'ALL'
+  const selfCanPriv = segAccess === 'ALL' || segAccess === 'PRIVATE'
+  const selfCanGovt = segAccess === 'ALL' || segAccess === 'GOVERNMENT'
 
   const [file, setFile]                 = useState(null)
   const [parsing, setParsing]           = useState(false)
@@ -162,49 +222,78 @@ export default function LeadUploadV2() {
   const [importing, setImporting]       = useState(false)
   const [progress, setProgress]         = useState({ done: 0, total: 0 })
   const [result, setResult]             = useState(null)
-
-  if (!isPrivileged) {
-    return (
-      <div className="v2d-leads">
-        <div style={{
-          background: 'rgba(248,113,113,.10)',
-          border: '1px solid rgba(248,113,113,.28)',
-          color: '#f87171',
-          borderRadius: 12, padding: '14px 18px', fontSize: 13,
-        }}>
-          ⚠ Admin or co-owner access required to import leads.
-        </div>
-      </div>
-    )
-  }
+  // Phase 330 — synchronous re-entrancy latch (§47): a WebView ghost-click can
+  // fire the import button several times in one tick; `importing` STATE flips
+  // only after a render, so a second tap would start a second 500-row import.
+  const importingRef = useRef(false)
+  // Phase 330 — null = checking, true = quiet-import SQL is live, false = not yet.
+  const [quietReady, setQuietReady] = useState(null)
 
   /* ─── File parse ─── */
   async function handleFile(f) {
     if (!f) return
+    // Phase 330 — self mode: friendly guards BEFORE reading the file.
+    if (selfMode) {
+      if (/\.xlsx?$/i.test(f.name || '')) {
+        toastError(null, 'Excel files are not supported yet. In Excel choose File → Save As → CSV UTF-8, then pick that file.')
+        return
+      }
+      if (f.size > SELF_MAX_BYTES) {
+        toastError(null, 'That file is larger than 2 MB. Split it into smaller files (500 leads each) and upload them one by one.')
+        return
+      }
+    }
     setFile(f)
     setParsing(true)
     setResult(null)
     setRows([])
     try {
-      const text = await f.text()
+      // Phase 330 — strip the UTF-8 BOM Excel adds, or the first header
+      // ("name") reads as "﻿name" and never maps.
+      const text = (await f.text()).replace(/^﻿/, '')
       const all = parseCsv(text)
       if (all.length < 2) throw new Error('File has no data rows.')
       const hdrs = all[0].map(h => String(h || '').trim())
       const data = all.slice(1)
+      if (selfMode && hdrs.length === 1 && /[;\t|]/.test(hdrs[0])) {
+        throw new Error('This file separates columns with ; or tabs. Save it as "CSV UTF-8 (comma delimited)" and pick it again.')
+      }
+      if (selfMode && data.length > SELF_MAX_ROWS) {
+        throw new Error(`This file has ${data.length} leads. The limit is ${SELF_MAX_ROWS} per file — split it and upload again.`)
+      }
       setHeaders(hdrs)
-      setColumnMap(buildColumnMap(hdrs))
+      setColumnMap(buildColumnMap(hdrs, selfMode))
       setRows(data)
     } catch (e) {
       // Phase 34a — was browser alert(); now surfaces in the v2 toast
       // viewport so the rep can keep working while reading the error.
       toastError(e, 'Could not parse file.')
+      setFile(null)
     } finally {
       setParsing(false)
     }
   }
 
+  /* ─── Phase 330 — is the quiet-import SQL live? (self mode only) ───
+     true = ready · false = the SQL has not been run (admin must) · 'error' = the
+     check itself failed (weak network) -> the rep can retry. */
+  function checkQuiet() {
+    setQuietReady(null)
+    supabase.rpc('lead_import_quiet_ready').then(({ data, error }) => {
+      if (!error) setQuietReady(data === true)
+      else setQuietReady(/PGRST202|42883|Could not find|does not exist/i.test(`${error.code} ${error.message}`) ? false : 'error')
+    }, () => setQuietReady('error'))
+  }
+  useEffect(() => {
+    if (selfMode) checkQuiet()
+    // eslint-disable-next-line
+  }, [selfMode])
+
   /* ─── Load users for assignee picker + telecaller name lookup ─── */
   useEffect(() => {
+    // Phase 330 — reps don't need the user list (no owner picker, no Cronberry
+    // telecaller lookup in self mode) -> skip the query entirely.
+    if (!isPrivileged) return
     supabase
       .from('users')
       // Phase 99.B — added `role` so the new "Default telecaller"
@@ -225,7 +314,11 @@ export default function LeadUploadV2() {
 
   /* ─── Preview ─── */
   const preview = useMemo(() => {
-    if (!rows.length || !columnMap.name) return []
+    // Phase 330 — was `!columnMap.name`: the column INDEX is a Number, so a
+    // file whose Name is the FIRST column (index 0, the common case) read as
+    // "not mapped" and the preview stayed empty (same falsy-0 trap Phase 27
+    // fixed in commitImport). typeof check = 0 counts as mapped.
+    if (selfMode || !rows.length || typeof columnMap.name !== 'number') return []
     const cutoffMs = cutoffDays > 0 ? Date.now() - cutoffDays * 24 * 60 * 60 * 1000 : null
     return rows.slice(0, 10).map(r => {
       const name = String(r[columnMap.name] || '').trim()
@@ -255,7 +348,232 @@ export default function LeadUploadV2() {
 
       return { name, phone, email, company, city, source, remarks, parsed, stage, lost_reason, isNurture, telecaller }
     })
-  }, [rows, columnMap, cutoffDays, staleAsLost, userByName])
+  }, [rows, columnMap, cutoffDays, staleAsLost, userByName, selfMode])
+
+  /* ─── Phase 330 — self mode: parse + check EVERY row once (<= 500) ───
+     Drives the preview table and the "Import N leads" button, so the rep sees
+     exactly what will be imported / skipped before pressing the button. */
+  const selfCheck = useMemo(() => {
+    if (!selfMode || !rows.length || typeof columnMap.name !== 'number') return null
+    const cell = (r, key) => (columnMap[key] !== undefined ? String(r[columnMap[key]] ?? '').trim() : '')
+    const seen = new Set()
+    const items = []
+    let ready = 0, noName = 0, badPhone = 0, dupInFile = 0
+    rows.forEach((r, i) => {
+      const name = cell(r, 'name')
+      const phone = normalizeMobile10(columnMap.phone !== undefined ? r[columnMap.phone] : null)
+      let status = 'ok'
+      if (!name) { status = 'noName'; noName++ }
+      else if (!phone) { status = 'badPhone'; badPhone++ }
+      else if (seen.has(phone)) { status = 'dupInFile'; dupInFile++ }
+      else { seen.add(phone); ready++ }
+      items.push({
+        row: i + 2, status, name, phone,
+        company: cell(r, 'company') || null,
+        email: cell(r, 'email') || null,
+        city: cell(r, 'city') || null,
+        notes: cell(r, 'remarks') || null,
+      })
+    })
+    // Same column for Name and Mobile, or a Name column full of phone numbers =
+    // the mapping is wrong; block the import instead of creating phone-named leads.
+    const filled = items.filter(it => it.name)
+    const phoneish = filled.filter(it => /^[+\d][\d\s().-]{7,}$/.test(it.name)).length
+    let problem = null
+    if (columnMap.name === columnMap.phone) problem = 'The Name and Mobile boxes point at the same column. Pick the right column for each.'
+    else if (filled.length >= 3 && phoneish / filled.length > 0.5) problem = 'The Name column looks like phone numbers. Pick the column that holds the customer name.'
+    return { items, ready, noName, badPhone, dupInFile, problem }
+  }, [selfMode, rows, columnMap])
+
+  const selfSegmentOk = selfCanPriv || selfCanGovt
+
+  /* ─── Phase 330 — self-mode import ───
+     Every row -> THIS rep's own list: assigned_to = me (telecaller also
+     telecaller_id = me, §113), stage New, created_by = me, import_id set =
+     the three quiet triggers skip it (lead_is_self_import). No lead_activities,
+     no remarks classification, no stale/lost logic — a rep's own contacts all
+     start as fresh New leads. Batches of 25 (one request each) with a per-row
+     fallback so one rejected phone never loses its 24 neighbours. */
+  async function commitSelfImport() {
+    if (importingRef.current || importing) return
+    if (!selfCheck || !selfCheck.ready) {
+      pushToast('Nothing to import — no row has a name and a valid 10-digit mobile number.', 'warning')
+      return
+    }
+    if (selfCheck.problem) { pushToast(selfCheck.problem, 'warning'); return }
+    if (quietReady !== true) {
+      pushToast('Upload is not switched on yet. Please ask the admin.', 'warning')
+      return
+    }
+    if (!selfSegmentOk) {
+      pushToast('Your account is not allowed to add leads. Please ask the admin.', 'warning')
+      return
+    }
+    importingRef.current = true
+    setImporting(true)
+    setProgress({ done: 0, total: selfCheck.items.length })
+    try {
+      // Re-check right before the first insert: the readiness probe ran once at page
+      // open; if an old phase SQL file was re-run since, the quiet triggers could be
+      // gone and 500 inserts would flood this rep with alerts + follow-ups.
+      const { data: qr, error: qe } = await supabase.rpc('lead_import_quiet_ready')
+      if (qe || qr !== true) {
+        setQuietReady(qe ? 'error' : false)
+        pushToast(qe ? 'Could not confirm the setup. Check your internet and try again.'
+                     : 'Upload is not switched on right now. Please ask the admin.', 'warning')
+        return
+      }
+      const segment = (defaultSegment === 'GOVERNMENT' && selfCanGovt) ? 'GOVERNMENT'
+                    : (selfCanPriv ? 'PRIVATE' : 'GOVERNMENT')
+
+      // Audit row first (Phase 34a: abort if it didn't land — no orphan leads).
+      const { data: importRow, error: impErr } = await supabase
+        .from('lead_imports')
+        .insert([{
+          file_name: file?.name || 'unknown',
+          uploaded_by: profile.id,
+          total_rows: rows.length,
+          default_assignee_id: profile.id,
+          default_segment: segment,
+          status: 'processing',
+        }])
+        .select()
+        .single()
+      if (impErr || !importRow?.id) {
+        toastError(impErr, 'Could not start the upload. No leads were added.')
+        return
+      }
+      const importId = importRow.id
+
+      // Phones this rep already owns (created, assigned or telecaller-owned; paged
+      // with a stable order — PostgREST caps one request at ~1000 rows, §66).
+      // Compared on the LAST 10 DIGITS so "+91 98…" and "98…" are the same number.
+      // A failed read stops the import: carrying on with a partial list would let
+      // already-owned numbers through as duplicates.
+      const own = new Set()
+      for (let from = 0; from < 20000; from += 1000) {
+        const { data: ex, error: exErr } = await supabase
+          .from('leads')
+          .select('phone')
+          .or(`created_by.eq.${profile.id},assigned_to.eq.${profile.id},telecaller_id.eq.${profile.id}`)
+          .order('id')
+          .range(from, from + 999)
+        if (exErr) {
+          await supabase.from('lead_imports').update({ status: 'failed', completed_at: new Date().toISOString() }).eq('id', importId)
+          toastError(exErr, 'Could not check your existing leads. Nothing was added — please try again.')
+          return
+        }
+        ;(ex || []).forEach(x => { const p = normalizeMobile10(x.phone); if (p) own.add(p) })
+        if (!ex || ex.length < 1000) break
+      }
+
+      let imported = 0, dupes = 0
+      const skipped = selfCheck.noName
+      const skippedPhone = selfCheck.badPhone
+      const errors = []
+      const toInsert = []
+      for (const it of selfCheck.items) {
+        if (it.status === 'dupInFile') { dupes++; continue }
+        if (it.status !== 'ok') continue
+        if (own.has(it.phone)) { dupes++; continue }
+        toInsert.push({
+          source: SELF_SOURCE,
+          name: it.name,
+          company: it.company,
+          phone: it.phone,
+          email: it.email,
+          city: it.city,
+          segment,
+          stage: 'New',
+          assigned_to: profile.id,
+          telecaller_id: profile.role === 'telecaller' ? profile.id : null,
+          notes: it.notes,
+          import_id: importId,
+          created_by: profile.id,
+          _row: it.row,
+        })
+      }
+
+      let done = selfCheck.items.length - toInsert.length
+      const strip = ({ _row, ...lead }) => lead
+      // "This phone is already in an open lead ..." (leads_block_dup_phone) is the
+      // normal reason one row is refused; anything else is a systematic problem.
+      const isDupMsg = (m) => /already in an open lead|already exists|duplicate/i.test(m || '')
+      let sysFailBatches = 0
+      let stoppedAt = -1
+      for (let i = 0; i < toInsert.length; i += SELF_BATCH) {
+        const batch = toInsert.slice(i, i + SELF_BATCH)
+        const { error: bErr } = await supabase.from('leads').insert(batch.map(strip))
+        if (!bErr) {
+          imported += batch.length
+          sysFailBatches = 0
+        } else {
+          // The batch is one atomic request. A lost response can hide a batch that
+          // actually landed, so first ask which of these numbers are already in this
+          // upload before retrying anything (else they'd be reported as duplicates).
+          let remaining = batch
+          const { data: landed } = await supabase.from('leads').select('phone')
+            .eq('import_id', importId).in('phone', batch.map(r => r.phone))
+          if (landed && landed.length) {
+            const have = new Set(landed.map(x => x.phone))
+            imported += batch.filter(r => have.has(r.phone)).length
+            remaining = batch.filter(r => !have.has(r.phone))
+          }
+          // One bad row (usually "already in someone's list") fails the whole
+          // batch -> retry row by row so the rest still land.
+          let okInBatch = 0, nonDupErr = null
+          for (const row of remaining) {
+            const { error: rErr } = await supabase.from('leads').insert([strip(row)])
+            if (rErr) {
+              errors.push({ row: row._row, error: rErr.message })
+              if (!isDupMsg(rErr.message)) nonDupErr = rErr.message
+            } else { imported++; okInBatch++ }
+          }
+          // Two whole batches in a row that failed for a non-duplicate reason (RLS,
+          // segment, network): stop instead of hammering ~500 single requests.
+          sysFailBatches = (okInBatch === 0 && nonDupErr) ? sysFailBatches + 1 : 0
+          if (sysFailBatches >= 2) { stoppedAt = i + SELF_BATCH; break }
+        }
+        done += batch.length
+        setProgress({ done: Math.min(done, selfCheck.items.length), total: selfCheck.items.length })
+      }
+      if (stoppedAt >= 0) {
+        for (const row of toInsert.slice(stoppedAt)) {
+          errors.push({ row: row._row, error: 'Not added — the upload stopped after repeated errors. Try again.' })
+        }
+        pushToast('Upload stopped after repeated errors. See the summary below.', 'warning')
+      }
+
+      const { error: finErr } = await supabase.from('lead_imports').update({
+        imported_count: imported,
+        skipped_count: skipped + skippedPhone,
+        duplicate_count: dupes,
+        errors: errors.length ? errors : null,
+        status: (imported === 0 && errors.length > 0) ? 'failed' : 'completed',
+        completed_at: new Date().toISOString(),
+      }).eq('id', importId)
+      if (finErr) toastError(finErr, 'Upload finished but the record could not be closed.')
+
+      setProgress({ done: selfCheck.items.length, total: selfCheck.items.length })
+      setResult({ imported, skipped, skippedPhone, dupes, errors })
+      if (imported > 0) toastSuccess(`Added ${imported} lead${imported === 1 ? '' : 's'} to your list.`)
+      else pushToast('No leads were added. See the summary below.', 'warning')
+    } catch (e) {
+      toastError(e, 'Upload stopped unexpectedly. Check My Leads before trying again.')
+    } finally {
+      importingRef.current = false
+      setImporting(false)
+    }
+  }
+
+  async function copyExample() {
+    try {
+      await navigator.clipboard.writeText(SELF_EXAMPLE_CSV)
+      toastSuccess('Example copied. Paste it into a new file in Excel / Sheets.')
+    } catch {
+      pushToast('Could not copy. Select the example text and copy it by hand.', 'warning')
+    }
+  }
 
   /* ─── Import ─── */
   async function commitImport() {
@@ -455,6 +773,26 @@ export default function LeadUploadV2() {
   // aesthetic since both share the same tokens.css source.
   const stepIdx = !rows.length && !result ? 0 : result ? 3 : 2
 
+  // Phase 330 — access gate moved BELOW every hook (was an early return above
+  // the useEffect/useMemo calls = rules-of-hooks violation). Same message for
+  // roles that may not import; Lucide icon instead of the old emoji.
+  if (!canUpload) {
+    return (
+      <div className="v2d-leads">
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: 'var(--danger-soft, rgba(239,68,68,.12))',
+          border: '1px solid var(--danger, #EF4444)',
+          color: 'var(--danger, #EF4444)',
+          borderRadius: 12, padding: '14px 18px', fontSize: 13,
+        }}>
+          <AlertTriangle size={16} />
+          <span>Only sales, telecaller, admin and co-owner users can import leads.</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="lead-root">
       <button
@@ -467,13 +805,45 @@ export default function LeadUploadV2() {
 
       <div className="lead-page-head">
         <div>
-          <div className="lead-page-eyebrow">Bulk import · admin only</div>
-          <div className="lead-page-title">Upload CSV</div>
+          <div className="lead-page-eyebrow">
+            {selfMode ? 'Bulk import · your own leads' : 'Bulk import · admin only'}
+          </div>
+          <div className="lead-page-title">{selfMode ? 'Upload leads (CSV)' : 'Upload CSV'}</div>
           <div className="lead-page-sub">
-            Cronberry / Excel exports · auto-classifies stage from Remarks
+            {selfMode
+              ? `Add many of your own contacts at once · up to ${SELF_MAX_ROWS} per file · they go quietly into your list (no alerts, no follow-ups created)`
+              : 'Cronberry / Excel exports · auto-classifies stage from Remarks'}
           </div>
         </div>
       </div>
+
+      {/* Phase 330 — the quiet-import SQL has not been run yet: refuse instead
+          of letting reps flood themselves with one alert + follow-up per lead. */}
+      {selfMode && quietReady === 'error' && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap',
+          background: 'var(--warning-soft, rgba(245,158,11,.12))',
+          border: '1px solid var(--warning, #F59E0B)',
+          color: 'var(--warning, #F59E0B)',
+          borderRadius: 12, padding: '12px 16px', fontSize: 13,
+        }}>
+          <AlertTriangle size={16} />
+          <span>Could not check the connection. Check your internet and try again.</span>
+          <button className="v2d-ghost v2d-ghost--btn" onClick={checkQuiet}>Try again</button>
+        </div>
+      )}
+      {selfMode && quietReady === false && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
+          background: 'var(--warning-soft, rgba(245,158,11,.12))',
+          border: '1px solid var(--warning, #F59E0B)',
+          color: 'var(--warning, #F59E0B)',
+          borderRadius: 12, padding: '12px 16px', fontSize: 13,
+        }}>
+          <AlertTriangle size={16} />
+          <span>Lead upload is not switched on yet. Please ask the admin to finish the setup.</span>
+        </div>
+      )}
 
       {/* Step strip from design */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 18, alignItems: 'center' }}>
@@ -497,10 +867,13 @@ export default function LeadUploadV2() {
       {!rows.length && !result && (
         <div className="v2d-panel" style={{ padding: 28, textAlign: 'center' }}>
           <FileSpreadsheet size={22} style={{ color: 'var(--v2-yellow, #FFE600)', margin: '0 auto 12px' }} />
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Drop file or click to browse</div>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+            {selfMode ? 'Choose your CSV file' : 'Drop file or click to browse'}
+          </div>
           <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginBottom: 16 }}>
-            Accepts .csv files. For .xlsx, save as CSV in Excel first.
-            Cronberry's "Download Data" exports CSV directly.
+            {selfMode
+              ? 'CSV files only. In Excel or Google Sheets choose File → Save As → CSV UTF-8. Each row needs a name and a 10-digit mobile number.'
+              : 'Accepts .csv files. For .xlsx, save as CSV in Excel first. Cronberry\'s "Download Data" exports CSV directly.'}
           </div>
           <label className="v2d-cta" style={{ display: 'inline-flex', cursor: parsing ? 'wait' : 'pointer' }}>
             {parsing ? (
@@ -510,17 +883,189 @@ export default function LeadUploadV2() {
             )}
             <input
               type="file"
-              accept=".csv,text/csv"
+              accept={selfMode
+                ? '.csv,text/csv,text/comma-separated-values,application/csv,application/vnd.ms-excel,text/plain'
+                : '.csv,text/csv'}
               style={{ display: 'none' }}
               disabled={parsing}
-              onChange={e => handleFile(e.target.files?.[0])}
+              onChange={e => { handleFile(e.target.files?.[0]); e.target.value = '' }}
             />
           </label>
+
+          {selfMode && (
+            <div style={{ marginTop: 22, textAlign: 'left', maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Example file (first row = column names)</div>
+              <pre style={{
+                margin: 0, padding: 12, fontSize: 11, lineHeight: 1.5,
+                background: 'var(--v2-bg-2, var(--surface-2))',
+                border: '1px solid var(--v2-line, var(--border))',
+                borderRadius: 10, overflowX: 'auto', whiteSpace: 'pre',
+                color: 'var(--v2-ink-1, var(--text))',
+              }}>{SELF_EXAMPLE_CSV}</pre>
+              <button
+                className="v2d-ghost v2d-ghost--btn"
+                onClick={copyExample}
+                style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <Copy size={14} /> Copy example
+              </button>
+            </div>
+          )}
         </div>
       )}
 
+      {/* Phase 330 — self mode: map → check → import (admin block below is untouched) */}
+      {selfMode && rows.length > 0 && !result && (
+        <>
+          <div className="v2d-panel" style={{ padding: 18, marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+              Check your columns · {rows.length} {rows.length === 1 ? 'row' : 'rows'} in {file?.name}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginBottom: 12 }}>
+              We matched the columns automatically. Change a box only if it is wrong.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+              {[['name', 'Name *'], ['phone', 'Mobile *'], ['email', 'Email'],
+                ['company', 'Company'], ['city', 'City'], ['remarks', 'Notes']].map(([target, label]) => (
+                <div key={target} className="fg" style={{ marginBottom: 0 }}>
+                  <label>{label}</label>
+                  <select
+                    value={columnMap[target] ?? ''}
+                    onChange={e => setColumnMap(m => ({
+                      ...m,
+                      [target]: e.target.value === '' ? undefined : Number(e.target.value),
+                    }))}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">— none —</option>
+                    {headers.map((h, i) => (
+                      <option key={i} value={i}>{h || `Column ${i + 1}`}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="v2d-panel" style={{ padding: 18, marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Where these leads go</div>
+            {selfCanPriv && selfCanGovt ? (
+              <div className="fg" style={{ marginBottom: 8, maxWidth: 260 }}>
+                <label>Add them as</label>
+                <select value={defaultSegment} onChange={e => setDefaultSegment(e.target.value)} style={{ width: '100%' }}>
+                  <option value="PRIVATE">PRIVATE</option>
+                  <option value="GOVERNMENT">GOVERNMENT</option>
+                </select>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, marginBottom: 8 }}>
+                Added as <strong>{selfCanGovt && !selfCanPriv ? 'GOVERNMENT' : 'PRIVATE'}</strong> leads (your account's segment).
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>
+              Every lead goes into <strong>your own list</strong> as <strong>New</strong>. No alerts are sent and no
+              follow-up is created until you start working a lead. Numbers already in your list are skipped.
+            </div>
+          </div>
+
+          {selfCheck ? (
+            <div className="v2d-panel" style={{ padding: 18, marginBottom: 14 }}>
+              {selfCheck.problem && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
+                  background: 'var(--danger-soft, rgba(239,68,68,.12))',
+                  border: '1px solid var(--danger, #EF4444)',
+                  color: 'var(--danger, #EF4444)',
+                  borderRadius: 10, padding: '10px 12px', fontSize: 12,
+                }}>
+                  <AlertTriangle size={14} /> <span>{selfCheck.problem}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {[
+                  { n: selfCheck.ready,     label: 'ready to import',            tone: 'success' },
+                  { n: selfCheck.noName,    label: 'without a name',             tone: 'warning' },
+                  { n: selfCheck.badPhone,  label: 'without a valid 10-digit mobile', tone: 'warning' },
+                  { n: selfCheck.dupInFile, label: 'repeated in this file',      tone: 'warning' },
+                ].filter(c => c.n > 0).map(c => (
+                  <span key={c.label} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                    background: `var(--${c.tone}-soft, rgba(245,158,11,.12))`,
+                    color: `var(--${c.tone}, #F59E0B)`,
+                  }}>
+                    <span style={{ fontFamily: 'var(--v2-display)' }}>{c.n}</span> {c.label}
+                  </span>
+                ))}
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="v2d-q-table">
+                  <thead>
+                    <tr><th>Row</th><th>Name</th><th>Mobile</th><th>Company</th><th>City</th><th>Check</th></tr>
+                  </thead>
+                  <tbody>
+                    {selfCheck.items.slice(0, 10).map(it => (
+                      <tr key={it.row}>
+                        <td style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>{it.row}</td>
+                        <td><strong>{it.name || '—'}</strong></td>
+                        <td style={{ fontSize: 12 }}>{it.phone || '—'}</td>
+                        <td style={{ fontSize: 12 }}>{it.company || '—'}</td>
+                        <td style={{ fontSize: 12 }}>{it.city || '—'}</td>
+                        <td>
+                          <span style={{
+                            display: 'inline-block', padding: '2px 8px', borderRadius: 999,
+                            fontSize: 11, fontWeight: 600,
+                            background: it.status === 'ok' ? 'var(--success-soft, rgba(16,185,129,.12))' : 'var(--warning-soft, rgba(245,158,11,.12))',
+                            color: it.status === 'ok' ? 'var(--success, #10B981)' : 'var(--warning, #F59E0B)',
+                          }}>
+                            {it.status === 'ok' ? 'OK'
+                              : it.status === 'noName' ? 'No name'
+                              : it.status === 'badPhone' ? 'Bad mobile'
+                              : 'Repeated'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {selfCheck.items.length > 10 && (
+                <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 8 }}>
+                  Showing the first 10 of {selfCheck.items.length} rows. The checks above cover every row.
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="v2d-panel" style={{ padding: 18, marginBottom: 14, fontSize: 12, color: 'var(--v2-ink-2)' }}>
+              Choose which column holds the <strong>Name</strong> to see your preview.
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <button
+              className="v2d-ghost v2d-ghost--btn"
+              onClick={() => { setRows([]); setFile(null); setColumnMap({}) }}
+              disabled={importing}
+            >
+              Start over
+            </button>
+            <button
+              className="v2d-cta"
+              onClick={commitSelfImport}
+              disabled={importing || !selfCheck || !selfCheck.ready || !!selfCheck.problem || quietReady !== true}
+            >
+              {importing ? (
+                <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Adding {progress.done}/{progress.total}…</>
+              ) : (
+                <><Upload size={14} /> Add {selfCheck?.ready || 0} leads to my list</>
+              )}
+            </button>
+          </div>
+        </>
+      )}
+
       {/* Column mapping + preview */}
-      {rows.length > 0 && !result && (
+      {!selfMode && rows.length > 0 && !result && (
         <>
           <div className="v2d-panel" style={{ padding: 18, marginBottom: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>
@@ -742,6 +1287,11 @@ export default function LeadUploadV2() {
               <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Errors</div>
             </div>
           </div>
+          {selfMode && result.errors.length > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 4 }}>
+              A number listed under Errors is usually already in an open lead — the message says whose it is.
+            </div>
+          )}
           {result.errors.length > 0 && (
             <details style={{ textAlign: 'left', marginTop: 12, fontSize: 12 }}>
               <summary style={{ cursor: 'pointer', color: '#f87171' }}>View {result.errors.length} errors</summary>

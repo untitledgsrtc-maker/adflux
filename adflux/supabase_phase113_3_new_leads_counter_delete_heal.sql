@@ -45,34 +45,11 @@
 -- action), never on the rep insert/save hot path.
 
 -- ── 1. Recompute helper (cannot inflate — counts real rows) ──────────
-CREATE OR REPLACE FUNCTION public.recompute_daily_new_leads(p_user uuid, p_date date)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $function$
-DECLARE
-  v_count int;
-BEGIN
-  SELECT count(*)
-    INTO v_count
-    FROM public.leads
-   WHERE created_by      = p_user
-     AND created_at::date = p_date;
-
-  INSERT INTO public.work_sessions (user_id, work_date, daily_counters)
-  VALUES (p_user, p_date, jsonb_build_object('new_leads', v_count))
-  ON CONFLICT (user_id, work_date) DO UPDATE
-    SET daily_counters = jsonb_set(
-          COALESCE(public.work_sessions.daily_counters, '{}'::jsonb),
-          '{new_leads}',
-          to_jsonb(v_count)
-        );
-END
-$function$;
-
--- Internal helper only — keep it off the public RPC surface (mirror 103.E.1).
-REVOKE EXECUTE ON FUNCTION public.recompute_daily_new_leads(uuid, date) FROM PUBLIC;
+-- Phase 330: the body of recompute_daily_new_leads(uuid,date) MOVED to the canonical file
+--   db/functions/recompute_daily_new_leads.sql  (CLAUDE.md §72 - one home per function).
+--   It now ignores self-imports (lead_is_self_import). Do NOT re-create it here: re-running this
+--   old file must never revert that. The function must already exist when this file runs
+--   (it does on the live DB); the trigger function + trigger + heal below still call it.
 
 -- ── 2. Self-heal on DELETE ───────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.lead_new_leads_recount_on_delete()

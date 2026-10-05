@@ -1,29 +1,17 @@
--- !! SUPERSEDED for team_dashboard_bundle (Phase 330): the canonical, current definition is
---    db/functions/team_dashboard_bundle.sql. Do NOT re-run the bundle function from this file.
--- supabase_phase316_team_bundle_fn.sql
--- Phase 316 — FUNCTION-ONLY update of team_dashboard_bundle (the overdue_fu fix).
+-- db/functions/team_dashboard_bundle.sql  —  CANONICAL home (CLAUDE.md §72). Phase 330.
 --
--- WHY THIS FILE (not re-running supabase_phase193_team_dashboard_gated.sql):
--- phase193 also DROP/CREATEs RLS policies on public.gps_pings — a HOT table reps
--- write to every few seconds. `DROP POLICY ... ON gps_pings` needs an exclusive
--- lock and DEADLOCKS against the live GPS inserts during business hours (the
--- 40P01 you hit). This file replaces ONLY the function, which locks just the
--- function (pg_proc) — safe to run anytime, no gps_pings contention.
+-- Captured 2026-10-05 from the LIVE function (pg_get_functiondef), which already carried the Phase
+-- 323 M21 `chase` arm. The ONLY change vs live: `new_leads_count` now adds `AND import_id IS NULL`
+-- so CSV imports are not counted in the team-viewer's "New leads added today" (same rule as the
+-- stored counter, useDaySummary and the admin TeamDashboardV2 query).
 --
--- Just paste + Run once. It's a CREATE OR REPLACE — idempotent, re-runnable.
--- The only change vs live: overdue_fu now excludes Lost + parked-Nurture rows so
--- the team-viewer (Jayna) overdue count matches the follow-ups list (§316).
+-- !! This SUPERSEDES the older copies in supabase_phase193_team_dashboard_gated.sql,
+--    supabase_phase316_team_bundle_fn.sql and supabase_phase323_dashboard_agg_rpcs.sql. Re-running
+--    ANY of those reverts this (193/316 also drop the M21 chase arm). Run THIS file only.
+-- Function-only CREATE OR REPLACE: keeps the live ACL, takes no lock on gps_pings (a re-run of the
+-- full 193 file deadlocked on it, §200).
 
-CREATE OR REPLACE FUNCTION public.team_dashboard_bundle(
-  p_start_of_day timestamptz,
-  p_end_of_day   timestamptz,
-  p_period_start date,
-  p_period_end   date,
-  p_today        date,
-  p_cb_floor     date,
-  p_month_start  timestamptz,
-  p_month_end    timestamptz
-)
+CREATE OR REPLACE FUNCTION public.team_dashboard_bundle(p_start_of_day timestamp with time zone, p_end_of_day timestamp with time zone, p_period_start date, p_period_end date, p_today date, p_cb_floor date, p_month_start timestamp with time zone, p_month_end timestamp with time zone)
  RETURNS jsonb
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
@@ -32,31 +20,28 @@ AS $function$
 DECLARE
   v_out jsonb;
 BEGIN
-  -- GATE: viewer or admin ONLY (co_owner excluded — Vishal is govt-scoped, §42);
-  -- else empty object (no data leak).
-  -- COALESCE(..., false) around the IN so a NULL role fails CLOSED — a bare
-  -- `NULL IN (...)` yields NULL, and `false OR NULL` → NULL → PL/pgSQL IF treats
-  -- NULL as false → the RETURN would be SKIPPED and the full bundle leak. This is
-  -- the §41/§97.2 3VL trap; is_team_viewer() is already COALESCE'd to false.
+  -- GATE (UNCHANGED, §41/§97.2/§316): viewer or admin ONLY (co_owner excluded —
+  -- Vishal is govt-scoped, §42). COALESCE around the IN so a NULL role fails
+  -- CLOSED (bare NULL IN (...) yields NULL → false OR NULL → NULL → IF treats
+  -- NULL as false → RETURN skipped → full bundle leak). is_team_viewer() is
+  -- already COALESCE'd to false.
   IF NOT (public.is_team_viewer()
-          OR COALESCE(public.get_my_role() = 'admin', false)) THEN   -- admin only, NOT co_owner (Vishal is govt-scoped, §42)
+          OR COALESCE(public.get_my_role() = 'admin', false)) THEN
     RETURN '{}'::jsonb;
   END IF;
 
   SELECT jsonb_build_object(
 
-    -- 1) reps  (users grid — sales/sales_manager/telecaller, active, by name)
     'reps', COALESCE((
       SELECT jsonb_agg(to_jsonb(r) ORDER BY r.name)
       FROM (
-        SELECT id, name, team_role, city, daily_targets, is_active, profile_image_url, app_version  -- Phase 208
+        SELECT id, name, team_role, city, daily_targets, is_active, profile_image_url, app_version
         FROM public.users
         WHERE team_role IN ('sales','sales_manager','telecaller')
           AND is_active = true
       ) r
     ), '[]'::jsonb),
 
-    -- 2) sessions  (work_sessions for the day)
     'sessions', COALESCE((
       SELECT jsonb_agg(to_jsonb(s))
       FROM (
@@ -67,7 +52,6 @@ BEGIN
       ) s
     ), '[]'::jsonb),
 
-    -- 3) calls  (lead-tied, >=10s, non-missed, in window)
     'calls', COALESCE((
       SELECT jsonb_agg(to_jsonb(c))
       FROM (
@@ -80,13 +64,14 @@ BEGIN
       ) c
     ), '[]'::jsonb),
 
-    -- 4) new_leads_count  (leads created in window — count only)
+    -- Phase 330: CSV imports are not "added today" (import_id IS NULL), matching the stored
+    -- counter trigger, useDaySummary and TeamDashboardV2's admin query.
     'new_leads_count', (
       SELECT count(*) FROM public.leads
       WHERE created_at >= p_start_of_day AND created_at < p_end_of_day
+        AND import_id IS NULL
     ),
 
-    -- 5) pipeline  (won quotes created in window)
     'pipeline', COALESCE((
       SELECT jsonb_agg(to_jsonb(q))
       FROM (
@@ -97,7 +82,6 @@ BEGIN
       ) q
     ), '[]'::jsonb),
 
-    -- 6) voice  (voice_logs in window)
     'voice', COALESCE((
       SELECT jsonb_agg(to_jsonb(v))
       FROM (
@@ -106,7 +90,6 @@ BEGIN
       ) v
     ), '[]'::jsonb),
 
-    -- 7) pings  (latest ping per rep in window — mirrors latest_ping_per_user)
     'pings', COALESCE((
       SELECT jsonb_agg(to_jsonb(pg))
       FROM (
@@ -117,7 +100,6 @@ BEGIN
       ) pg
     ), '[]'::jsonb),
 
-    -- 8) policy  (active daily_targets rows)
     'policy', COALESCE((
       SELECT jsonb_agg(to_jsonb(dt))
       FROM (
@@ -127,7 +109,6 @@ BEGIN
       ) dt
     ), '[]'::jsonb),
 
-    -- 9) fu  (follow-ups: done-in-window OR open-dated-in-window)
     'fu', COALESCE((
       SELECT jsonb_agg(to_jsonb(f))
       FROM (
@@ -138,52 +119,31 @@ BEGIN
       ) f
     ), '[]'::jsonb),
 
-    -- 10) quote_sent  (all status='sent' quotes; chased client-side)
-    'quote_sent', COALESCE((
-      SELECT jsonb_agg(to_jsonb(q))
-      FROM (
-        SELECT id, created_by, status, updated_at, total_amount
-        FROM public.quotes WHERE status = 'sent'
-      ) q
-    ), '[]'::jsonb),
+    -- 10) quote_sent  — M21: EMPTIED. Per-rep quote-chase now comes pre-aggregated
+    --     in the `chase` arm (team_chase_counts). Was: jsonb_agg every status='sent'
+    --     quote (O(all sent quotes)). Kept as '[]' so an old cached frontend that
+    --     still reads b.quote_sent degrades cleanly (it uses team_chase_counts for
+    --     the viewer regardless — chaseFromRpc → skips the arm consumer).
+    'quote_sent', '[]'::jsonb,
 
-    -- 11) quote_won  (all status='won' quotes; joined to payments client-side)
-    'quote_won', COALESCE((
-      SELECT jsonb_agg(to_jsonb(q))
-      FROM (
-        SELECT id, created_by, status, total_amount
-        FROM public.quotes WHERE status = 'won'
-      ) q
-    ), '[]'::jsonb),
+    -- 11) quote_won   — M21: EMPTIED (was jsonb_agg every status='won' quote).
+    'quote_won', '[]'::jsonb,
 
-    -- 12) payments  (all rows; summed per quote_id client-side)
-    'payments', COALESCE((
-      SELECT jsonb_agg(to_jsonb(p))
-      FROM (
-        SELECT quote_id, amount_received, approval_status
-        FROM public.payments
-      ) p
-    ), '[]'::jsonb),
+    -- 12) payments    — M21: EMPTIED (was jsonb_agg the WHOLE payments table,
+    --     O(all payments) — the biggest download on this hot page).
+    'payments', '[]'::jsonb,
 
-    -- 13) overdue_fu  (open follow-ups past today — always-now, not windowed)
     'overdue_fu', COALESCE((
       SELECT jsonb_agg(to_jsonb(o))
       FROM (
         SELECT f.assigned_to FROM public.follow_ups f
         LEFT JOIN public.leads l ON l.id = f.lead_id
         WHERE f.follow_up_date < p_today AND f.is_done = false
-          -- Phase 316 — match keepInFollowupQueue (§71): hide parked-Nurture +
-          -- Lost rows so the card count == the FollowUpsV2 list (§133/§163).
           AND COALESCE(l.stage, '') <> 'Lost'
-          -- COALESCE(...,false): a lead_id-NULL row (e.g. payment-collection
-          -- follow-ups) has l.stage NULL → the Nurture test is NULL → keep it,
-          -- matching the JS keepInFollowupQueue (undefined stage → true). Without
-          -- this, NULL→false→row silently dropped → count-vs-list mismatch returns.
           AND NOT COALESCE(l.stage = 'Nurture' AND COALESCE(f.cadence_type, '') <> 'nurture', false)
       ) o
     ), '[]'::jsonb),
 
-    -- 14) act_geo  (geo-tagged meeting/site_visit pins, last 90d, latest 500)
     'act_geo', COALESCE((
       SELECT jsonb_agg(to_jsonb(a) ORDER BY a.created_at DESC)
       FROM (
@@ -199,7 +159,6 @@ BEGIN
       ) a
     ), '[]'::jsonb),
 
-    -- 15) qualified  (TC positive-outcome calls in window)
     'qualified', COALESCE((
       SELECT jsonb_agg(to_jsonb(qa))
       FROM (
@@ -209,7 +168,6 @@ BEGIN
       ) qa
     ), '[]'::jsonb),
 
-    -- 16) callbacks  (open callbacks due: cb_floor..today)
     'callbacks', COALESCE((
       SELECT jsonb_agg(to_jsonb(cb))
       FROM (
@@ -219,7 +177,6 @@ BEGIN
       ) cb
     ), '[]'::jsonb),
 
-    -- 17) month_quotes  (quotes created this calendar month, per created_by)
     'month_quotes', COALESCE((
       SELECT jsonb_agg(to_jsonb(mq))
       FROM (
@@ -228,7 +185,6 @@ BEGIN
       ) mq
     ), '[]'::jsonb),
 
-    -- 18) month_won  (quotes won this calendar month, per created_by)
     'month_won', COALESCE((
       SELECT jsonb_agg(to_jsonb(mw))
       FROM (
@@ -238,8 +194,6 @@ BEGIN
       ) mw
     ), '[]'::jsonb),
 
-    -- 19) push_subs  (freshest push row per rep — for the Push/Online pills;
-    --     only user_id + last_seen_at, never the endpoint/keys)
     'push_subs', COALESCE((
       SELECT jsonb_agg(to_jsonb(ps))
       FROM (
@@ -249,7 +203,6 @@ BEGIN
       ) ps
     ), '[]'::jsonb),
 
-    -- 20) gps_off  (OPEN gps-off events per rep — for the GPS on/off pill)
     'gps_off', COALESCE((
       SELECT jsonb_agg(to_jsonb(go))
       FROM (
@@ -257,6 +210,16 @@ BEGIN
         FROM public.gps_off_events
         WHERE toggled_on_at IS NULL
       ) go
+    ), '[]'::jsonb),
+
+    -- 21) chase  — M21 NEW: per-rep quote-chase + pay-chase, aggregated server-side.
+    --     DELEGATES to team_chase_counts(p_period_end) so the chase logic has ONE
+    --     definition (shared with the admin path — M17/H7). Both functions are
+    --     SECURITY DEFINER; the inner gate (is_team_viewer() OR NULL OR admin)
+    --     re-passes for the same caller the outer gate already validated. O(reps).
+    'chase', COALESCE((
+      SELECT jsonb_agg(to_jsonb(c))
+      FROM public.team_chase_counts(p_period_end) c
     ), '[]'::jsonb)
 
   ) INTO v_out;
@@ -264,10 +227,9 @@ BEGIN
   RETURN v_out;
 END $function$;
 
-GRANT EXECUTE ON FUNCTION public.team_dashboard_bundle(
-  timestamptz, timestamptz, date, date, date, date, timestamptz, timestamptz
-) TO authenticated;
+NOTIFY pgrst, 'reload schema';
 
-
--- VERIFY: the fix is present in the live function
--- SELECT pg_get_functiondef('public.team_dashboard_bundle(timestamptz,timestamptz,date,date,date,date,timestamptz,timestamptz)'::regprocedure) LIKE '%NOT COALESCE(l.stage%' AS overdue_fu_fixed;
+-- VERIFY (expect t): the live function carries the import filter AND the M21 chase arm.
+SELECT pg_get_functiondef(p.oid) LIKE '%import_id IS NULL%' AS has_import_filter,
+       pg_get_functiondef(p.oid) LIKE '%chase%'           AS has_m21_chase_arm
+FROM pg_proc p WHERE p.proname='team_dashboard_bundle' AND p.pronamespace='public'::regnamespace;

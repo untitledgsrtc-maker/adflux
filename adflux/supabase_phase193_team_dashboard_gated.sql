@@ -1,3 +1,5 @@
+-- !! SUPERSEDED for team_dashboard_bundle (Phase 330): the canonical, current definition is
+--    db/functions/team_dashboard_bundle.sql. Do NOT re-run the bundle function from this file.
 -- ============================================================================
 -- Phase 193 — REAL /team-dashboard for a per-user viewer, via ONE gated RPC
 -- ============================================================================

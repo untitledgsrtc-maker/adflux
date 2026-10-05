@@ -345,11 +345,10 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_lead_after_insert_bump_counter ON public.leads;
-CREATE TRIGGER trg_lead_after_insert_bump_counter
-  AFTER INSERT ON public.leads
-  FOR EACH ROW
-  EXECUTE FUNCTION public.lead_after_insert_bump_counter();
+-- Phase 330: the trg_lead_after_insert_bump_counter trigger DDL was REMOVED from this file. Its canonical definition (with
+-- WHEN (NOT public.lead_is_self_import(...)) so CSV self-imports stay quiet) now lives ONLY in
+-- supabase_phase330_csv_upload_quiet_imports.sql. Re-running this old file used to DROP + re-create
+-- the trigger WITHOUT the WHEN clause and silently turn quiet imports back into a push/follow-up flood.
 
 -- 8.5 work_sessions.updated_at touch.
 CREATE OR REPLACE FUNCTION public.touch_updated_at()
