@@ -60,7 +60,8 @@ BEGIN
      AND is_done = false AND sequence < NEW.sequence;
   SELECT * INTO v_lead FROM public.leads WHERE id = NEW.lead_id;
   IF v_lead.cadence_paused THEN RETURN NEW; END IF;
-  v_owner := COALESCE(v_lead.assigned_to, v_lead.created_by);
+  -- Phase 333: assigned_to, THEN telecaller_id, THEN created_by (a TC-owned lead has assigned_to NULL).
+  v_owner := COALESCE(v_lead.assigned_to, v_lead.telecaller_id, v_lead.created_by);
   IF v_owner IS NULL THEN RETURN NEW; END IF;
   IF NEW.cadence_type = 'quote_chase' AND NEW.sequence = 8   -- §278: last chase (was seq 3 → now 8 after the quote_chase array was extended to 8 FUs)
      AND v_lead.stage = 'QuoteSent'
@@ -85,6 +86,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%auto-skipped: later FU done%'            AS earlier_fu_close,
 --   pg_get_functiondef(p.oid) LIKE '%quote_chase'' AND NEW.sequence = 8%'     AS quotesent_destage_gate,  -- §278: seq 3 → 8
 --   pg_get_functiondef(p.oid) LIKE '%spawn_nurture_followup%'                 AS nurture_respawn,
---   pg_get_functiondef(p.oid) NOT LIKE '%lost_nurture%'                       AS no_lost_nurture_respawn
+--   pg_get_functiondef(p.oid) NOT LIKE '%lost_nurture%'                       AS no_lost_nurture_respawn,
+--   pg_get_functiondef(p.oid) LIKE '%assigned_to, v_lead.telecaller_id, v_lead.created_by%' AS p333_tc_owner
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'followup_after_done';

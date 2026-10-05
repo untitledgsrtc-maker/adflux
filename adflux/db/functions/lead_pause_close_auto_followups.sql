@@ -54,7 +54,8 @@ BEGIN
     -- +30 days (next workday), never earlier. Skip when an open nurture
     -- row already exists (idempotent re-toggle safe).
     IF NEW.stage = 'Nurture' THEN
-      v_owner := COALESCE(NEW.assigned_to, NEW.created_by);
+      -- Phase 333: assigned_to, THEN telecaller_id, THEN created_by (a TC-owned lead has assigned_to NULL).
+      v_owner := COALESCE(NEW.assigned_to, NEW.telecaller_id, NEW.created_by);
       IF v_owner IS NOT NULL AND NOT EXISTS (
         SELECT 1 FROM public.follow_ups
          WHERE lead_id = NEW.id AND is_done = false AND cadence_type = 'nurture'
@@ -74,6 +75,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%OLD.cadence_paused IS DISTINCT FROM TRUE%' AS pause_on_edge,
 --   pg_get_functiondef(p.oid) LIKE '%PHASE-129%'                                AS resume_branch,
 --   pg_get_functiondef(p.oid) LIKE '%NEW.stage = ''Nurture''%'                 AS resume_nurture_only,
---   pg_get_functiondef(p.oid) LIKE '%spawn_nurture_followup%'                  AS resume_spawns_nurture
+--   pg_get_functiondef(p.oid) LIKE '%spawn_nurture_followup%'                  AS resume_spawns_nurture,
+--   pg_get_functiondef(p.oid) LIKE '%NEW.assigned_to, NEW.telecaller_id, NEW.created_by%' AS p333_tc_owner
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'lead_pause_close_auto_followups';

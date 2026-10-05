@@ -20104,3 +20104,38 @@ Stale `quotesv2.sortField` keys left in a phone's sessionStorage are never read 
 ### Lesson (apply to LeadsV2 / any list that uses usePersistedState)
 Persist FILTERS across Back, never a pure view preference like sort order: a stuck sort is invisible to the user and reads as "the app changed." If a list adds
 persisted state, ask "would the owner be surprised to find this still set tomorrow?" before persisting. (LeadsV2 has no sort control, so it is not affected.)
+
+## 322 · Phase 333 — auto follow-ups went to the lead's CREATOR, not the telecaller who owns it (Dhara's "Unknown lead") (2026-10-05)
+
+Owner: Dhara (telecaller) saw her Follow-ups full of "Unknown lead · AUTO · Follow-up 4 of 9" cards and "Lead not found or RLS denied" on opening one.
+Label note (section 52): "Phase 333" = this batch; the /quotes sort fix is "Phase 332" (section 321). Disambiguate by SHA.
+
+### Root cause (4 functions, one wrong expression)
+A telecaller-owned lead has `assigned_to` NULL and the owner in `telecaller_id` (section 99.C). The cadence engine resolved the follow-up owner as
+`COALESCE(assigned_to, created_by)` -> the ORIGINAL CREATOR got every auto follow-up (Dhara after her lead moved to Sneha; Brijesh for every import he assigned to a telecaller).
+The creator then cannot read the lead under RLS -> "Unknown lead". Live size: 980 open auto follow-ups on 613 leads (Brijesh 399, Jayna 69, Dhara 42, Abhinav 27 ...).
+Fixed to `COALESCE(assigned_to, telecaller_id, created_by)` in the four section-72 canonicals: `lead_stage_change_cadence`, `lead_auto_create_followup`, `followup_after_done`,
+`lead_pause_close_auto_followups`. `assigned_to` stays first so every lead that already worked is byte-identical. VERIFY tripwire `p333_tc_owner` added to all four.
+
+### The heal (`supabase_phase333_cadence_owner_heal.sql`, owner RUNS AFTER the four functions)
+Open AUTO rows only (manual follow-ups never touched). PART 1b backs every affected row up to `_bak_followups_p333` (undo recipe in the file). PART 2 CLOSES the overdue
+lead_intro / legacy rows with the section-175 marker `[closed: auto - cadence was on the wrong owner (Phase 333)]` (section 131 precedent: no respawn branch, no stage change, no push).
+PART 3 RE-POINTS the rest to `telecaller_id` (assigned_to-only update fires no trigger -> silent). Live preview: 560 re-pointed, 420 stale closed.
+New owners: Sneha 427 (1 overdue), Dhara 110 (64 overdue: real quote-chase / nurture on her own leads), Rima 14, Aayushi 9. Idempotent.
+Rolled-back dry-run on the live DB: still_on_wrong_owner 0, dhara_unreadable_open 0, leads_both_owners_differ 0; live DB unchanged afterwards.
+
+### Contracts / foot-guns
+- Owner resolution for ANY cadence/follow-up code is `assigned_to -> telecaller_id -> created_by`. Never `COALESCE(assigned_to, created_by)`.
+- The cadence respawn trap still holds (sections 60/134): never close quote_chase / nurture rows via is_done in a heal -> the respawn re-leaks them.
+- `lead_intro` cadence restarts only when a lead returns from Nurture/Lost (New->Working spawns nothing); the creation-time intro is the legacy `lead_auto_create_followup`.
+- 0 of ~9,900 leads have BOTH owner columns set to different people today, so telecaller-first (inbox, nurture revisit) and assigned_to-first (engine) agree. Re-check with the
+  `leads_both_owners_differ` line in the heal's VERIFY if that ever stops being 0.
+
+### OPEN (guardian P2, NOT fixed here - its own guarded change)
+`lead_activity_aftermath` (supabase_phase88_4_trigger_consolidation.sql, LIVE, runs on every activity insert) has the same defect: owner `COALESCE(v_lead.assigned_to, NEW.created_by)`;
+a non-owner logging a next-action-date activity on a telecaller-owned lead creates the follow-up for themselves, and its UPDATE branch re-assigns the lead's oldest open follow-up to them
+(can partly undo the heal). Fix = add `v_lead.telecaller_id` as the middle term AND capture the function into `db/functions/lead_activity_aftermath.sql` (section 72); needs a guardian pass.
+Also noted: `generate_lead_tasks` filters `l.assigned_to = p_user_id` only (telecaller-owned leads never get smart tasks; dormant, panel hidden for sales).
+
+### Owner run order
+1) the four `db/functions/*.sql` above  2) `supabase_phase333_cadence_owner_heal.sql`  3) reload Dhara's Follow-ups: the "Unknown lead" cards are gone; Brijesh's queue drops by ~770.

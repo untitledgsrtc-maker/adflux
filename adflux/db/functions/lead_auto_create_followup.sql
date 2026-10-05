@@ -9,7 +9,7 @@
 --    auto-schedules a first follow-up tomorrow 10:00 (note 'Auto-scheduled: follow up
 --    with new lead', auto_generated=true). The "first contact tomorrow" prompt.
 --
--- 🔒 LOCKED: only stage IN ('New','Working') + a non-null owner (assigned_to ?? created_by)
+-- 🔒 LOCKED: only stage IN ('New','Working') + a non-null owner (assigned_to ?? telecaller_id ?? created_by - Phase 333)
 --    get a row. note prefix 'Auto-scheduled:' is what cancel_lead_cadence's legacy-row
 --    close + isSystemClose key off — keep it. auto_generated=true.
 --
@@ -30,10 +30,11 @@ AS $function$
 DECLARE
   v_owner uuid;
 BEGIN
-  -- Owner of the follow-up: prefer assigned_to (the rep who will
-  -- action it), fall back to created_by (the person who entered the
-  -- lead). One of these is always non-null for sales-created leads.
-  v_owner := COALESCE(NEW.assigned_to, NEW.created_by);
+  -- Owner of the follow-up: assigned_to (the sales rep who will action it), else
+  -- telecaller_id (a telecaller-owned lead), else created_by (the person who entered
+  -- the lead). One of these is always non-null for sales-created leads.
+  -- Phase 333: assigned_to, THEN telecaller_id, THEN created_by (a TC-owned lead has assigned_to NULL).
+  v_owner := COALESCE(NEW.assigned_to, NEW.telecaller_id, NEW.created_by);
   IF v_owner IS NULL THEN
     -- No owner = no actionable follow-up (e.g. legacy import). Skip.
     RETURN NEW;
@@ -68,6 +69,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%Auto-scheduled: follow up with new lead%' AS note_marker,
 --   pg_get_functiondef(p.oid) LIKE '%stage NOT IN (''New'', ''Working'')%'      AS active_stage_gate,
 --   pg_get_functiondef(p.oid) LIKE '%CURRENT_DATE + INTERVAL ''1 day''%'         AS tomorrow,
---   pg_get_functiondef(p.oid) LIKE '%auto_generated%'                           AS auto_generated_flag
+--   pg_get_functiondef(p.oid) LIKE '%auto_generated%'                           AS auto_generated_flag,
+--   pg_get_functiondef(p.oid) LIKE '%NEW.assigned_to, NEW.telecaller_id, NEW.created_by%' AS p333_tc_owner
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'lead_auto_create_followup';

@@ -50,7 +50,10 @@ CREATE OR REPLACE FUNCTION public.lead_stage_change_cadence()
  SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_owner uuid := COALESCE(NEW.assigned_to, NEW.created_by);
+  -- Phase 333: owner = assigned_to, THEN telecaller_id, THEN created_by (see header). A telecaller-
+  -- owned lead has assigned_to NULL; falling straight to created_by gave every cadence follow-up to
+  -- the ORIGINAL CREATOR (admin importer / the TC it was reassigned away from).
+  v_owner uuid := COALESCE(NEW.assigned_to, NEW.telecaller_id, NEW.created_by);
 BEGIN
   IF NEW.stage = OLD.stage THEN RETURN NEW; END IF;
   IF v_owner IS NULL THEN RETURN NEW; END IF;
@@ -94,7 +97,7 @@ END $function$;
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only. All six must be TRUE.
+-- VERIFY / TRIPWIRE — read-only. All seven must be TRUE.
 -- ============================================================================
 -- SELECT
 --   pg_get_functiondef(p.oid) LIKE '%cancel_lead_cadence%'                AS has_cancels,
@@ -102,6 +105,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%IF NEW.cadence_paused THEN RETURN NEW%' AS spawns_pause_gated,
 --   pg_get_functiondef(p.oid) LIKE '%spawn_quote_chase_cadence%'          AS quote_chase_spawn,
 --   pg_get_functiondef(p.oid) LIKE '%lost_nurture%'                       AS lost_nurture_branch,
---   pg_get_functiondef(p.oid) LIKE '%spawn_lead_intro_cadence%'           AS lead_intro_spawn
+--   pg_get_functiondef(p.oid) LIKE '%spawn_lead_intro_cadence%'           AS lead_intro_spawn,
+--   pg_get_functiondef(p.oid) LIKE '%NEW.assigned_to, NEW.telecaller_id, NEW.created_by%' AS p333_tc_owner
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'lead_stage_change_cadence';
