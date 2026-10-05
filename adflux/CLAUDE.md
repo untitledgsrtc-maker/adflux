@@ -19788,3 +19788,36 @@ resolves to a lead, so a rare duplicate call row is possible; (P3) more >=10s ca
 score can rise slightly (the score counts activity rows - nothing double-counts, and a bare call still creates no
 score). Dedup, direction rules and duration capture are untouched. Verify in a week: `call_logs` rows with
 `lead_id IS NULL` AND a phone that matches a lead should stop appearing.
+
+
+---
+
+## 309 · Leave-score fix BUILT (not yet applied) + the CLI can run SQL directly (2026-10-05)
+
+### New capability - read this first
+`supabase db query --linked -f <file.sql>` (or an inline query) runs SQL against the live project using the Mac's
+logged-in Supabase CLI (project-ref `kompjctmisnitjpbjalh` in `supabase/.temp/project-ref`). Output is JSON (`-o table` is
+NOT valid). It caught two real UNION column-count bugs in my shadow file that the repo checker cannot. Use it for READ-ONLY
+checks and for `BEGIN; <ddl>; ROLLBACK;` syntax dry-runs. A write still needs the owner's explicit OK (money functions).
+Edge functions deploy with `supabase functions deploy <name> --project-ref kompjctmisnitjpbjalh`.
+
+### The change (`db/functions/compute_daily_score.sql`, the section 72 canonical)
+After the role lookup: `IF v_role IN ('operation_executive','operation_head','hr','accounts','office_staff','staff') THEN
+RETURN`. Those roles never get a score row from this function. Before: any caller (leave approve/reject, the Sales-Head path,
+`ops_approve_leave`) wrote a NON-excluded score-0 row for an ops tech (overwriting the uptime score from the p4 trigger) or for
+hr/accounts (who have no score rows by design, so 0 counted days = full salary) -> monthly average 0 -> variable wiped.
+Sales / telecaller / agency / admin fall through unchanged. New 7th tripwire `has_bops_early_return`.
+
+### Shadow result (`supabase_leave_score_shadow.sql`, read-only, run against live 5 Oct 2026)
+- Nightly job `recompute_all_scores_today` scores ONLY `role IN ('sales','agency','telecaller')` and runs 23:45 IST
+  (`untitled-recompute-scores-nightly`, phase34z66). **The section 239 H9 note "there is NO score-recompute cron" was WRONG.**
+- Current month (Oct 2026): 0 damaged rows for anyone. Gohil Oct avg 43.8 (zero variable), Gulshan 79.9 (full), Dixita head 51.1.
+- Only flagged rows: Dixita **Aug 2026**, 2 counted days (17 Aug, 19 Aug, score 0). Those were written by the nightly job back
+  when she was a SALES rep (140 rows since 2 May); she is operation_head now. Not damage from this bug. No salary payout is
+  recorded for her at all. Variable Aug = 0 of 7,500 today; clearing those two days would make it the full 7,500. That is a
+  pay decision for the owner (NOT touched; the heal block in the shadow file is current-month-only and commented).
+- Dry run: the new function body compiled inside `BEGIN; ... ROLLBACK;` and the live function was confirmed unchanged.
+
+### Status
+Built + shadow-verified + dry-run OK. NOT applied: waiting for the owner's OK (section 71 rule 3). Apply = run the canonical
+file (CREATE OR REPLACE; no data change), then its VERIFY (all 7 TRUE).

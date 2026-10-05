@@ -44,6 +44,10 @@
 --                             exclusions ('Meeting scheduled%' + auto-check-in)
 --                             AND dedupes by lead (a revisit = 1 meeting).
 --
+--      • B-ops (5 Oct 2026) — operation_executive / operation_head / hr / accounts /
+--                             office_staff / staff RETURN before any write (never scored
+--                             by this fn; ops pay = the p4 uptime trigger only).
+--
 -- OWNER DECISION (do NOT "fix" without his sign-off): the CALL branch counts a
 --    call on  outcome IS NOT NULL OR ≥10s  — looser than the ≥10s-only counter.
 --    Tightening it to ≥10s-only would lower some reps' scores/pay. Owner said
@@ -108,6 +112,19 @@ BEGIN
     INTO v_role, v_targets
     FROM users
    WHERE id = p_user_id;
+
+  -- B-ops (owner 2026-10-05, CLAUDE.md 304 #3): roles that are NOT meeting/call
+  -- scored never get a score row from this function. Without this, ANY caller
+  -- (leave approve/reject, the Sales-Head path, ops_approve_leave, the nightly
+  -- recompute) wrote a NON-excluded score-0 row for an ops tech - overwriting
+  -- the uptime score the p4 trigger put there - or for hr/accounts/office staff,
+  -- who have no score rows by design (0 counted days = full salary). Either way
+  -- the monthly average became 0 -> variable wiped. Ops pay is written ONLY by
+  -- the ops_uptime_to_daily_performance trigger. Sales/telecaller/agency/admin
+  -- are unchanged (they fall through).
+  IF v_role IN ('operation_executive', 'operation_head', 'hr', 'accounts', 'office_staff', 'staff') THEN
+    RETURN;
+  END IF;
 
   IF v_role = 'telecaller' THEN
     -- Phase 113 (#1) — read the SAME target the rep's screen shows: the
@@ -197,7 +214,7 @@ GRANT EXECUTE ON FUNCTION public.compute_daily_score(uuid, date) TO authenticate
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All six must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All seven must be TRUE.
 -- A FALSE means an older copy of compute_daily_score was re-run and stripped a
 -- locked fix → re-run this file to restore the canonical version.
 -- ============================================================================
@@ -207,6 +224,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%duration_seconds >= 10%'             AS has_110_call_gate,
 --   pg_get_functiondef(p.oid) LIKE '%Meeting scheduled%'                  AS has_33_sched_excl,
 --   pg_get_functiondef(p.oid) LIKE '%auto-check-in%'                      AS has_33_autocheckin_excl,
---   pg_get_functiondef(p.oid) LIKE '%COUNT(DISTINCT COALESCE(la.lead_id%' AS has_127_lead_dedup
+--   pg_get_functiondef(p.oid) LIKE '%COUNT(DISTINCT COALESCE(la.lead_id%' AS has_127_lead_dedup,
+--   pg_get_functiondef(p.oid) LIKE '%IF v_role IN (''operation_executive''%' AS has_bops_early_return
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'compute_daily_score';
