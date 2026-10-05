@@ -50,6 +50,8 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulk, setBulk] = useState({ offered_rate: '', duration_months: '', slot_seconds: '', slots_per_day: '', reason: '' })
   const [bulkNote, setBulkNote] = useState('')
+  // Phase 331.1 — tick rows to bulk-edit only those; nothing ticked = all cities.
+  const [picked, setPicked] = useState(() => new Set())
   // Re-entrancy latch (section 47): a double tap on Apply must not run the
   // confirm + write twice, and the second tap must not replace the "Done" note.
   const applyingRef = useRef(false)
@@ -106,6 +108,11 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
 
   function removeCity(cityId) {
     onChange(selectedCities.filter(sc => sc.city.id !== cityId))
+    // Drop its tick too, so re-adding the city later doesn't come back pre-ticked.
+    setPicked(prev => {
+      if (!prev.has(cityId)) return prev
+      const next = new Set(prev); next.delete(cityId); return next
+    })
   }
 
   function updateEntry(cityId, field, value) {
@@ -140,6 +147,20 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
   // only the last write would survive). Same rules as the per-row inputs:
   // total = rate x screens x months (calcTotal), duration clamped 1-12,
   // slots/day != 100 needs a reason. Slot seconds / slots-per-day stay metadata.
+  // Ticked ids that still exist in the quote (a removed city drops out silently).
+  const pickedCount = selectedCities.filter(sc => picked.has(sc.city.id)).length
+  const bulkAll = pickedCount === 0
+  const bulkCount = bulkAll ? selectedCities.length : pickedCount
+
+  function togglePicked(cityId) {
+    setPicked(prev => {
+      const next = new Set(prev)
+      if (next.has(cityId)) next.delete(cityId); else next.add(cityId)
+      return next
+    })
+    setBulkNote('')
+  }
+
   async function applyBulk() {
     if (applyingRef.current) return
     const hasRate  = bulk.offered_rate !== ''
@@ -169,7 +190,8 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       setBulkNote(`Give a reason — slots/day is not ${DEFAULT_SLOTS_PER_DAY}.`)
       return
     }
-    const n = selectedCities.length
+    const n = bulkCount
+    const scopeWord = bulkAll ? `all ${n}` : `the ${n} selected`
     // Rate / duration / slots overwrite what the rep may have set city by city
     // (rate + duration also change every total) -> ask first. No undo in the wizard.
     applyingRef.current = true
@@ -180,15 +202,17 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       if (dur !== null) parts.push(`${dur} month${dur === 1 ? '' : 's'}`)
       if (slots !== null) parts.push(`${slots} slots/day`)
       const ok = await confirmDialog({
-        title: `Change all ${n} cities?`,
-        message: `Set ${parts.join(' and ')} on all ${n} cities. This replaces each city's current value${(rate !== null || dur !== null) ? ' and recalculates every total' : ''}.`,
-        confirmLabel: 'Apply to all',
+        title: `Change ${scopeWord} ${n === 1 ? 'city' : 'cities'}?`,
+        message: `Set ${parts.join(' and ')} on ${scopeWord} ${n === 1 ? 'city' : 'cities'}. This replaces each city's current value${(rate !== null || dur !== null) ? ' and recalculates every total' : ''}.`,
+        confirmLabel: bulkAll ? 'Apply to all' : 'Apply to selected',
         cancelLabel: 'Cancel',
       })
       if (!ok) return
     }
     onChange(
       selectedCities.map(sc => {
+        // Only the targeted cities change; the rest are returned untouched.
+        if (!bulkAll && !picked.has(sc.city.id)) return sc
         const u = { ...sc }
         if (rate !== null)  u.offered_rate = rate
         if (dur !== null)   u.duration_months = dur
@@ -205,7 +229,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
     )
     setBulk({ offered_rate: '', duration_months: '', slot_seconds: '', slots_per_day: '', reason: '' })
     setError('')
-    setBulkNote(`Done — applied to all ${n} cities.`)
+    setBulkNote(`Done — applied to ${scopeWord} ${n === 1 ? 'city' : 'cities'}.`)
     } finally {
       applyingRef.current = false
     }
@@ -263,8 +287,32 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
               {bulkOpen && (
                 <>
                   <p className="ccr-station" style={{ margin: 0 }}>
-                    Fill only the boxes you want to change. Empty boxes stay as they are. Applies to every city below.
+                    Fill only the boxes you want to change. Empty boxes stay as they are.
                   </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12 }}>
+                    <strong style={{ color: bulkAll ? 'var(--text)' : 'var(--accent)' }}>
+                      {bulkAll
+                        ? `Applies to ALL ${selectedCities.length} cities`
+                        : `Applies to ${pickedCount} selected ${pickedCount === 1 ? 'city' : 'cities'}`}
+                    </strong>
+                    <span style={{ color: 'var(--text-muted)' }}>· tick cities below to pick only some</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => { setPicked(new Set(selectedCities.map(sc => sc.city.id))); setBulkNote('') }}
+                    >
+                      Select all
+                    </button>
+                    {pickedCount > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => { setPicked(new Set()); setBulkNote('') }}
+                      >
+                        Clear ticks
+                      </button>
+                    )}
+                  </div>
                   <div className="campaign-city-controls">
                     <div className="ccr-field">
                       <label className="ccr-label ccr-label--accent">Offered (₹)</label>
@@ -355,7 +403,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                     )}
 
                     <button type="button" className="btn btn-y btn-sm" onClick={applyBulk}>
-                      Apply to all {selectedCities.length}
+                      {bulkAll ? `Apply to all ${selectedCities.length}` : `Apply to ${pickedCount} selected`}
                     </button>
                   </div>
                   {bulkNote && (
@@ -373,13 +421,33 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
             return (
               <div key={sc.city.id} className="campaign-city-row">
                 <div className="campaign-city-name">
-                  <Monitor size={13} />
-                  <div>
-                    <p className="ccr-name">{sc.city.name}</p>
-                    {sc.city.station_name && (
-                      <p className="ccr-station">{sc.city.station_name}</p>
+                  {/* Bulk panel open: the whole name area is one tap target that
+                      ticks/unticks the city (an 18px box alone is too small on a phone). */}
+                  <label
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      cursor: bulkOpen && selectedCities.length > 1 ? 'pointer' : 'default',
+                      padding: bulkOpen && selectedCities.length > 1 ? '6px 0' : 0,
+                    }}
+                  >
+                    {bulkOpen && selectedCities.length > 1 && (
+                      <input
+                        type="checkbox"
+                        checked={picked.has(sc.city.id)}
+                        onChange={() => togglePicked(sc.city.id)}
+                        aria-label={`Select ${sc.city.name} for bulk edit`}
+                        title="Tick to include in bulk edit"
+                        style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer', flex: '0 0 auto' }}
+                      />
                     )}
-                  </div>
+                    <Monitor size={13} />
+                    <div>
+                      <p className="ccr-name">{sc.city.name}</p>
+                      {sc.city.station_name && (
+                        <p className="ccr-station">{sc.city.station_name}</p>
+                      )}
+                    </div>
+                  </label>
                 </div>
 
                 <div className="campaign-city-controls">

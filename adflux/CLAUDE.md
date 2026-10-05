@@ -20082,6 +20082,11 @@ Empty box = leave unchanged. "Apply to all N" writes ONE `onChange` over every c
 Step2Campaign is rendered only by WizardShell (private LED quote, create + edit + renew + copy-last) inside V2AppShell (ConfirmDialogViewport mounted). Other Media and both Govt wizards untouched.
 Pre-existing, left (section 16): the per-row duration pills still use the `#fbc42d` fallback and are under 36px tall.
 
+### Selected-cities scope (follow-up, same day)
+Owner: "selected city bulk changes also needed." While the Bulk panel is open (2+ cities) each city row shows a tick box. Tick some -> the panel reads "Applies to K selected cities"
+and Apply changes ONLY those; tick none -> all N cities (the default above, unchanged). "Select all" / "Clear ticks" buttons; removing a city drops its tick; the confirm box and the
+"Done" note name the scope ("the 3 selected" vs "all 8"). Same price rule, same re-entrancy latch, same slots-reason handling. The ticks are local to the screen (not saved on the quote).
+
 ## 321 · Phase 332 (sort fix) — /quotes opens newest-first again; the SORT is no longer remembered (2026-10-05)
 
 Owner (screenshot of /quotes): "why changed, why not according to dates, it was fine before." The list was sorted by Sales Rep, not date.
