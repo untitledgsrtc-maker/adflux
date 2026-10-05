@@ -1851,21 +1851,37 @@ export default function TeamDashboardV2() {
                     {pill('Online', onlineOk)}
                     {pill('Push',   pushOn, () => setPushTarget({ id: r.id, name: r.name }))}
                     {/* Phase 208 — installed app version (— until the rep opens
-                        the reporting build). Neutral chip: info, not health. */}
-                    <span
-                      title="Installed app version"
-                      style={{
-                        display: 'inline-flex', alignItems: 'center',
-                        padding: '3px 8px', borderRadius: 999,
-                        fontSize: 10, fontWeight: 600, letterSpacing: '.04em',
-                        textTransform: 'uppercase',
-                        border: '1px solid var(--v2-line, #334155)',
-                        background: 'var(--v2-bg-2, rgba(148,163,184,0.10))',
-                        color: 'var(--v2-ink-2, #94a3b8)',
-                      }}
-                    >
-                      {r.app_version ? (r.app_version === 'web' ? 'web' : `v${r.app_version}`) : '—'}
-                    </span>
+                        the reporting build). Neutral chip: info, not health.
+                        B9 — EXACT 'web' (browser/PWA) turns the chip amber:
+                        call capture is native-APK-only. app_version is
+                        last-writer-wins (a rep who uses BOTH the app and a
+                        browser flips it at each open — live data 5 Oct: Rima +
+                        Sneha show 'web' yet have thousands of APK capture rows),
+                        so this is a heads-up, NOT a verdict: amber + "not the
+                        app", never "calls not tracked". null/'—' stays neutral. */}
+                    {(() => {
+                      const webOnly = r.app_version === 'web'
+                      return (
+                        <span
+                          title={webOnly
+                            ? 'Last opened in a browser, not the Android app. Calls are only recorded while using the Untitled Advertising Android app (APK).'
+                            : 'Installed app version'}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center',
+                            padding: '3px 8px', borderRadius: 999,
+                            fontSize: 10, fontWeight: 600, letterSpacing: '.04em',
+                            textTransform: 'uppercase',
+                            border: webOnly ? '1px solid var(--warning, #F59E0B)' : '1px solid var(--v2-line, #334155)',
+                            background: webOnly ? 'var(--warning-soft, rgba(245,158,11,0.12))' : 'var(--v2-bg-2, rgba(148,163,184,0.10))',
+                            color: webOnly ? 'var(--warning, #F59E0B)' : 'var(--v2-ink-2, #94a3b8)',
+                          }}
+                        >
+                          {webOnly
+                            ? 'Browser - not the app'
+                            : (r.app_version ? `v${r.app_version}` : '—')}
+                        </span>
+                      )
+                    })()}
                   </div>
                 )
               })()}

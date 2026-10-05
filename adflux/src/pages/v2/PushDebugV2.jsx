@@ -93,6 +93,11 @@ export default function PushDebugV2() {
   // can self-enroll (Enable + permission + SW + subscription gates)
   // and view their own 6-gate status. Admin tooling is gated below.
   const isPrivileged = profile?.role === 'admin' || profile?.role === 'co_owner'
+  // B9 — call tracking is native-APK-only (device call log, incoming/missed,
+  // duration heal), so a home-screen shortcut is the WRONG advice for the
+  // roles that log calls. Other roles keep the PWA hint in Step 5.
+  const isCallTrackedRole = ['sales', 'telecaller', 'operation_executive', 'operation_head']
+    .includes(profile?.role)
 
   const [hasNotificationApi, setHasNotificationApi] = useState(false)
   const [hasPushApi,         setHasPushApi]         = useState(false)
@@ -465,7 +470,24 @@ export default function PushDebugV2() {
               </ol>
             </div>
 
-            {/* Step 5 — Install PWA */}
+            {/* Step 5 — field roles: use the APK (B9), not a home-screen shortcut */}
+            {isCallTrackedRole && (
+            <div>
+              <div style={{
+                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
+              }}>Step 5 · Use the Untitled Advertising Android app (APK)</div>
+              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                <li>A home-screen shortcut only opens the website — it cannot record your calls. Only the Android app reads your phone's call log</li>
+                <li>Install the <b>Untitled Advertising</b> Android app (APK): ask your manager for the file, or open <b>app.untitledad.in/apk</b> in {browserName}</li>
+                <li>Open the app and allow the <b>Phone</b> and <b>Call log</b> permissions when asked</li>
+                <li>Already using the app? Skip this step</li>
+              </ol>
+            </div>
+            )}
+
+            {/* Step 5 — Install PWA (roles that do not log calls) */}
+            {!isCallTrackedRole && (
             <div>
               <div style={{
                 fontSize: 11, fontWeight: 700, color: 'var(--text)',
@@ -478,6 +500,7 @@ export default function PushDebugV2() {
                 <li>Re-run "Send test push" below — installed PWAs have their own battery whitelist on most phones</li>
               </ol>
             </div>
+            )}
           </div>
         )}
 
