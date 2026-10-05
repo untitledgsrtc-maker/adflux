@@ -3494,7 +3494,7 @@ function DesignationsTab() {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState({
     name: '', auth_role: 'staff', team_role: 'designer',
-    default_monthly_salary: '', has_incentive: false,
+    has_incentive: false,
     default_variable_pct: 0,
     default_min_calls: 0, default_min_quotes: 0, default_min_followups: 0,
   })
@@ -3547,7 +3547,8 @@ function DesignationsTab() {
     const { error } = await supabase.from('designations').insert([{
       ...draft,
       name: draft.name.trim(),
-      default_monthly_salary: Number(draft.default_monthly_salary) || 0,
+      // Phase 328 - no salary rate card: a designation never carries a salary.
+      default_monthly_salary: 0,
       default_variable_pct: Number(draft.default_variable_pct) || 0,
       default_min_calls: Number(draft.default_min_calls) || 0,
       default_min_quotes: Number(draft.default_min_quotes) || 0,
@@ -3558,7 +3559,7 @@ function DesignationsTab() {
     if (!error) {
       setDraft({
         name: '', auth_role: 'staff', team_role: 'designer',
-        default_monthly_salary: '', has_incentive: false,
+        has_incentive: false,
         default_variable_pct: 0,
         default_min_calls: 0, default_min_quotes: 0, default_min_followups: 0,
       })
@@ -3573,7 +3574,7 @@ function DesignationsTab() {
       <div style={{ marginBottom: 16 }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 16, color: 'var(--text)' }}>Designations</h3>
         <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-          Master roster of roles. Each new hire picks one designation in the Create User wizard — salary, auth role, team role, and daily targets auto-fill from the row below. HR overrides per-user if needed.
+          Master roster of roles. Each new hire picks one designation in the Create User wizard — auth role, team role, incentive flag, daily targets and expense flags auto-fill from the row below. Salary is typed per person (HR enters it for every hire and offer); there is no salary rate card here.
         </p>
       </div>
 
@@ -3587,7 +3588,10 @@ function DesignationsTab() {
           <DesIn label="Name" v={draft.name} onChange={v => setDraft(d => ({ ...d, name: v }))} placeholder="e.g. Senior Designer" />
           <DesSel label="Auth role" v={draft.auth_role} onChange={v => setDraft(d => ({ ...d, auth_role: v }))} options={AUTH_ROLES.map(o => [o.v, o.label])} />
           <DesSel label="Team role" v={draft.team_role} onChange={v => setDraft(d => ({ ...d, team_role: v }))} options={TEAM_ROLES.map(t => [t, t])} />
-          <DesIn label="Monthly salary ₹" v={draft.default_monthly_salary} onChange={v => setDraft(d => ({ ...d, default_monthly_salary: v }))} type="number" placeholder="25000" />
+          <div>
+            <label style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 3 }}>Salary</label>
+            <div style={{ ...inputBase, width: '100%', color: 'var(--text-muted)', background: 'transparent', borderStyle: 'dashed' }}>Typed per person</div>
+          </div>
           <button
             type="button"
             onClick={add}
@@ -3654,13 +3658,12 @@ function DesignationsTab() {
               >
                 {TEAM_ROLES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-              <input
-                type="number"
-                defaultValue={r.default_monthly_salary}
-                onBlur={e => Number(e.target.value) !== r.default_monthly_salary && saveField(r, 'default_monthly_salary', Number(e.target.value))}
-                style={inputBase}
-                title="Monthly salary"
-              />
+              <div
+                style={{ ...inputBase, color: 'var(--text-muted)', background: 'transparent', borderStyle: 'dashed' }}
+                title="Salary is typed per person - a designation does not carry a salary"
+              >
+                Salary: typed per person
+              </div>
               <button onClick={() => toggleActive(r)} style={{ padding: '6px 10px', background: r.is_active ? 'var(--success-soft)' : 'var(--border)', color: r.is_active ? 'var(--success)' : 'var(--text-muted)', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                 {r.is_active ? 'Active' : 'Off'}
               </button>

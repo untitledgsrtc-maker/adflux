@@ -1,25 +1,79 @@
 // src/components/incentives/StaffModal.jsx
-import { useState, useEffect } from 'react'
-import { X, User } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, User, Loader2, AlertTriangle } from 'lucide-react'
 import { useIncentive } from '../../hooks/useIncentive'
 import { initials, formatCurrency } from '../../utils/formatters'
+import { confirmDialog } from '../v2/ConfirmDialog'
+
+// Phase 328 — this modal used to build its form from a snapshot taken when the
+// list loaded and then write salary + 5 other fields together, so it could
+// silently put back a salary that had been changed somewhere else. Now:
+//   1. on open it re-reads the person's CURRENT profile row,
+//   2. on save it sends ONLY the fields the user actually changed,
+//   3. a salary change asks for confirmation (it re-prices every month) and is
+//      written only if the stored salary is still the one this window loaded.
+const NUMERIC_FIELDS = ['monthly_salary', 'sales_multiplier', 'new_client_rate', 'renewal_rate', 'flat_bonus']
+
+// Two form values are "the same" when both are blank or both are the same number.
+function sameValue(a, b) {
+  const ab = String(a ?? '').trim() === ''
+  const bb = String(b ?? '').trim() === ''
+  if (ab || bb) return ab && bb
+  return Number(a) === Number(b)
+}
 
 export function StaffModal({ member, settings, onClose, onSaved }) {
-  const { updateProfile } = useIncentive()
+  const { updateProfile, fetchProfileForUser } = useIncentive()
 
-  const profile = member.staff_incentive_profiles?.[0] || {}
+  // The row the list handed in. It can be stale, so it is only the first paint
+  // and the fallback if the fresh read below fails.
+  const propProfile = member.staff_incentive_profiles?.[0] || {}
 
-  const [form, setForm]     = useState({
-    monthly_salary:   profile.monthly_salary    ?? '',
-    sales_multiplier: profile.sales_multiplier  ?? settings?.default_multiplier ?? 5,
-    new_client_rate:  profile.new_client_rate   ?? settings?.new_client_rate    ?? 0.05,
-    renewal_rate:     profile.renewal_rate      ?? settings?.renewal_rate       ?? 0.02,
-    flat_bonus:       profile.flat_bonus        ?? settings?.default_flat_bonus ?? settings?.flat_bonus ?? 10000,
-    join_date:        profile.join_date         ?? '',
-  })
+  // DB row -> form values. The SAME mapping builds the form AND the baseline it
+  // is compared with, so a column that is NULL in the database (shown here as
+  // the settings default) is never written back unless the user edits it.
+  function toForm(p) {
+    return {
+      monthly_salary:   p.monthly_salary    ?? '',
+      sales_multiplier: p.sales_multiplier  ?? settings?.default_multiplier ?? 5,
+      new_client_rate:  p.new_client_rate   ?? settings?.new_client_rate    ?? 0.05,
+      renewal_rate:     p.renewal_rate      ?? settings?.renewal_rate       ?? 0.02,
+      flat_bonus:       p.flat_bonus        ?? settings?.default_flat_bonus ?? settings?.flat_bonus ?? 10000,
+      join_date:        p.join_date         ?? '',
+    }
+  }
+
+  const [latest,    setLatest]    = useState(propProfile)       // row the form was built from
+  const [baseline,  setBaseline]  = useState(() => toForm(propProfile))
+  const [form, setForm]           = useState(() => toForm(propProfile))
+  // 'loading' = re-reading the current row · 'fresh' = form shows the live row ·
+  // 'stale' = the re-read failed, form shows the list's copy.
+  const [loadState, setLoadState] = useState('loading')
   const [errors,  setErrors]  = useState({})
   const [saving,  setSaving]  = useState(false)
   const [apiError, setApiError] = useState(null)
+  const savingRef = useRef(false)   // §47 synchronous latch
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      const userId = propProfile.user_id || member.id
+      if (!userId) { if (alive) setLoadState('stale'); return }
+      const { data, error } = await fetchProfileForUser(userId)
+      if (!alive) return
+      if (error || !data) { setLoadState('stale'); return }
+      const fresh = toForm(data)
+      setLatest(data)
+      setBaseline(fresh)
+      setForm(fresh)
+      setLoadState('fresh')
+    })()
+    return () => { alive = false }
+    // Runs once per open: the parent mounts a new modal for every Edit click.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const locked = loadState === 'loading'
 
   function set(k, v) {
     setForm(f => ({ ...f, [k]: v }))
@@ -53,27 +107,59 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
   }
 
   async function handleSave() {
+    if (savingRef.current || saving || locked) return
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
 
-    if (!profile.id) {
+    const profileId = latest.id || propProfile.id
+    if (!profileId) {
       setApiError('No incentive profile found. Add this member from the Team page first.')
       return
     }
 
-    setSaving(true)
-    const { error } = await updateProfile(profile.id, {
-      monthly_salary:   Number(form.monthly_salary),
-      sales_multiplier: Number(form.sales_multiplier),
-      new_client_rate:  Number(form.new_client_rate),
-      renewal_rate:     Number(form.renewal_rate),
-      flat_bonus:       Number(form.flat_bonus),
-      join_date:        form.join_date || null,
-    })
-    setSaving(false)
-    if (error) { setApiError(error.message); return }
-    onSaved?.()
-    onClose()
+    // Send ONLY what the user changed: an untouched field is never rewritten,
+    // so it cannot revert a value changed elsewhere since the list loaded.
+    const updates = {}
+    for (const k of NUMERIC_FIELDS) {
+      if (!sameValue(form[k], baseline[k])) updates[k] = Number(form[k])
+    }
+    if ((form.join_date || null) !== (baseline.join_date || null)) {
+      updates.join_date = form.join_date || null
+    }
+    if (Object.keys(updates).length === 0) {
+      onClose()          // nothing changed - nothing to write
+      return
+    }
+
+    savingRef.current = true
+    try {
+      const salaryChanged = Object.prototype.hasOwnProperty.call(updates, 'monthly_salary')
+      if (salaryChanged) {
+        const was = latest.monthly_salary
+        const ok = await confirmDialog({
+          title: 'Change salary?',
+          message: `This changes ${member.name}'s monthly salary from ${was == null ? 'not set' : formatCurrency(Number(was))} to ${formatCurrency(updates.monthly_salary)}. Salary is read live for every month, so this re-prices EVERY month already calculated, including months already paid. The amounts recorded as paid stay as they are, but "Pending" for those months will change. Continue?`,
+          confirmLabel: 'Change salary',
+          cancelLabel: 'Back',
+          danger: true,
+        })
+        if (!ok) return
+      }
+
+      setSaving(true)
+      const { error } = await updateProfile(
+        profileId,
+        updates,
+        // Salary is only written if it is still what this window loaded.
+        salaryChanged ? { expectedSalary: latest.monthly_salary } : undefined,
+      )
+      if (error) { setApiError(error.message); return }
+      onSaved?.()
+      onClose()
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
   }
 
   const salary    = Number(form.monthly_salary) || 0
@@ -97,6 +183,19 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
         </div>
 
         <div className="staff-modal-body">
+          {loadState === 'loading' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+              <Loader2 size={14} strokeWidth={1.6} style={{ animation: 'spin 1s linear infinite' }} />
+              Loading the latest saved values…
+            </div>
+          )}
+          {loadState === 'stale' && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--warning)' }}>
+              <AlertTriangle size={14} strokeWidth={1.6} style={{ flex: '0 0 auto', marginTop: 1 }} />
+              Could not re-read the latest saved values, so this shows the list's copy. A salary change is still checked against the database when you save.
+            </div>
+          )}
+
           <div className="staff-divider">Salary & Target</div>
 
           <div className="staff-form-row">
@@ -107,6 +206,7 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
                 type="number"
                 min="0"
                 value={form.monthly_salary}
+                disabled={locked}
                 onChange={e => set('monthly_salary', e.target.value)}
                 placeholder="e.g. 35000"
               />
@@ -121,6 +221,7 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
                 min="1"
                 step="0.5"
                 value={form.sales_multiplier}
+                disabled={locked}
                 onChange={e => set('sales_multiplier', e.target.value)}
               />
               {errors.sales_multiplier && <span className="staff-field-error">{errors.sales_multiplier}</span>}
@@ -146,6 +247,7 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
                 max="1"
                 step="0.005"
                 value={form.new_client_rate}
+                disabled={locked}
                 onChange={e => set('new_client_rate', e.target.value)}
               />
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
@@ -163,6 +265,7 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
                 max="1"
                 step="0.005"
                 value={form.renewal_rate}
+                disabled={locked}
                 onChange={e => set('renewal_rate', e.target.value)}
               />
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
@@ -180,6 +283,7 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
               min="0"
               step="1000"
               value={form.flat_bonus}
+              disabled={locked}
               onChange={e => set('flat_bonus', e.target.value)}
             />
           </div>
@@ -192,6 +296,7 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
               className="staff-input"
               type="date"
               value={form.join_date}
+              disabled={locked}
               onChange={e => set('join_date', e.target.value)}
             />
           </div>
@@ -205,7 +310,7 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
 
         <div className="staff-modal-footer">
           <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving || locked}>
             {saving ? 'Saving…' : 'Save Profile'}
           </button>
         </div>

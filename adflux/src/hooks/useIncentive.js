@@ -70,13 +70,38 @@ export function useIncentive() {
     return { data, error }
   }
 
-  const updateProfile = async (profileId, updates) => {
-    const { data, error } = await supabase
+  // Phase 328 — optional 3rd argument; every existing 2-argument call
+  // (StaffModal is the only caller today) behaves exactly as before.
+  //   opts.expectedSalary: when given AND `updates` contains monthly_salary,
+  //   the write only lands if the stored salary still equals that value. This
+  //   stops a stale open window from overwriting a salary that was changed
+  //   somewhere else (People tab, another admin) after the window loaded.
+  const updateProfile = async (profileId, updates, opts = {}) => {
+    const guardSalary =
+      opts.expectedSalary !== undefined &&
+      Object.prototype.hasOwnProperty.call(updates, 'monthly_salary')
+
+    let query = supabase
       .from('staff_incentive_profiles')
       .update(updates)
       .eq('id', profileId)
+    if (guardSalary) {
+      query = opts.expectedSalary === null
+        ? query.is('monthly_salary', null)
+        : query.eq('monthly_salary', opts.expectedSalary)
+    }
+    const { data, error } = await query
       .select('*, users(id, name, email, role, is_active)')
       .single()
+
+    // 0 rows matched the guard (PGRST116) = the salary moved, or the write
+    // was not permitted. Say so in plain words; nothing was changed.
+    if (guardSalary && error && error.code === 'PGRST116') {
+      return {
+        data: null,
+        error: new Error('Nothing was saved: this salary was changed somewhere else after you opened the window (or you are not allowed to edit it). Close this window, reopen it and check the current salary.'),
+      }
+    }
     if (!error) store.upsertProfile(data)
     return { data, error }
   }

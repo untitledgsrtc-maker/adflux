@@ -4,22 +4,24 @@
 //
 // Flow:
 //   1. HR picks designation from the master list.
-//   2. Form auto-fills auth role + team role + salary + targets +
-//      variable % + has_incentive (HR can override any field).
-//   3. Submit → INSERT into public.users + staff_incentive_profiles
-//      + daily_targets, all in one transaction-like sequence.
+//   2. Form auto-fills auth role + team role + targets + variable % +
+//      has_incentive (HR can override any field). SALARY IS NEVER
+//      PRE-FILLED (Phase 328): HR must type it for every hire; 0 is
+//      allowed only after an explicit confirm (commission-only people).
+//   3. Submit → admin_create_user RPC (auth.users + public.users), then
+//      an UPSERT of staff_incentive_profiles (always, so the person
+//      shows up in Incentives / Salary) + daily_targets.
 //   4. After success, show "Generate offer letter" button which
 //      routes to /hr/offer/:userId (Phase 50.3 renderer).
 //
-// Auth note: this page does NOT create an auth.users row. Owner
-// still invites the user via Supabase Auth → Users → Invite, then
-// the auth.uid lands when they accept the invite. We pre-create the
-// public.users row with email matching; the trigger that links
-// auth.uid → public.users.id wires it up on first sign-in.
+// Auth note (Phase 66): the admin_create_user RPC creates BOTH the
+// auth.users row (bcrypt password) and the public.users row, so the
+// person can sign in immediately with the email + password HR sets
+// here. No Supabase Studio invite step.
 //
 // Role gate: admin / co_owner / hr only.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { UserPlus, Save, AlertTriangle, CheckCircle2, ArrowLeft, Send } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -52,6 +54,12 @@ export default function HRNewUserV2() {
   const [loading,      setLoading]      = useState(true)
   const [saving,       setSaving]       = useState(false)
   const [createdUser,  setCreatedUser]  = useState(null)
+  // Phase 328 — outcome of the salary-profile write, shown on the success
+  // screen: { saved: number|null, error: string, note: string }.
+  const [salaryResult, setSalaryResult] = useState(null)
+  // Section 47 — synchronous latch (state alone is not enough against a
+  // WebView ghost-click firing handleSubmit several times in one tick).
+  const savingRef = useRef(false)
 
   const [form, setForm] = useState({
     designation_id:    '',
@@ -118,13 +126,15 @@ export default function HRNewUserV2() {
   }, [isAuthorized])
 
   // When designation picked, snap form defaults to the master row.
+  // Phase 328 — monthly_salary is deliberately NOT snapped: there is no
+  // salary rate card. The box stays empty until HR types the figure (and
+  // keeps whatever HR already typed if the designation is changed).
   useEffect(() => {
     if (!form.designation_id) return
     const d = designations.find(x => x.id === form.designation_id)
     if (!d) return
     setForm(f => ({
       ...f,
-      monthly_salary: d.default_monthly_salary || '',
       has_incentive:  d.has_incentive,
       variable_pct:   d.default_variable_pct || 0,
       min_calls:      d.default_min_calls || 0,
@@ -146,9 +156,21 @@ export default function HRNewUserV2() {
     [designations, form.designation_id]
   )
 
+  // Section 47 latch wrapper. The latch is taken synchronously before the first
+  // await (the confirm dialogs below) and released on EVERY exit path.
   async function handleSubmit(e) {
     e.preventDefault()
-    if (saving) return
+    if (savingRef.current || saving) return
+    savingRef.current = true
+    try {
+      await createMember()
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
+  }
+
+  async function createMember() {
     if (!form.name.trim() || !form.email.trim() || !pickedDesignation) {
       toastError(new Error('Missing fields'), 'Name, email and designation are required.')
       return
@@ -164,15 +186,45 @@ export default function HRNewUserV2() {
       return
     }
 
+    // Phase 328 — salary must be typed explicitly (no rate-card default).
+    // Blank / negative / not-a-number is rejected; 0 is allowed ONLY after a
+    // confirm (commission-only people). Full sentence goes in the toast
+    // message itself: toastError shows error.message, not the fallback.
+    const salaryRaw = String(form.monthly_salary ?? '').trim()
+    const salaryNum = Number(salaryRaw)
+    if (salaryRaw === '' || !Number.isFinite(salaryNum) || salaryNum < 0) {
+      pushToast('Type the monthly salary for this person. There is no default - type 0 only for commission-only people.', 'danger')
+      return
+    }
+    if (salaryNum === 0) {
+      // Money disclosure (B4 review): for an incentive person the profile keeps the
+      // incentive defaults, and the salary engine has no zero-salary guard - the
+      // earned-incentive threshold AND target are salary-based, so at salary 0 both
+      // are 0: incentive pays from the first rupee of sales and the flat bonus
+      // (10,000 by default) is paid on any sale. HR must see that before saying yes.
+      // (Disclosure only - no number is changed here. An engine-side zero-salary
+      // guard is a separate shadow-compared change, section 71 rule 3.)
+      const incentiveNote = form.has_incentive
+        ? ' This person has incentive switched on: with salary 0 the incentive starts paying from the FIRST rupee of sales, and the flat bonus (10,000 by default) is paid on any sale. Go back and type a real salary unless that is what you want.'
+        : ''
+      const zeroOk = await confirmDialog({
+        title: 'Salary is 0?',
+        message: 'Salary 0 means no fixed pay - only OK for commission-only people.' + incentiveNote + ' Continue?',
+        confirmLabel: 'Yes, salary 0',
+        cancelLabel: 'Back',
+      })
+      if (!zeroOk) return
+    }
+
     // Phase 183 — confirm the RESOLVED role before minting. The designation
     // dropdown lists every role in one flat list (Sales / Telecaller / Office
     // / Accounts) so a wrong pick is easy; this surfaces auth_role + team_role
     // + salary in plain words so HR catches it before the account exists.
     // (JAYNA ROHIT was created 'sales' from a mis-picked designation — the RPC
     // faithfully mints whatever is picked; there is no code path Telecaller→sales.)
-    const salaryTxt = form.monthly_salary && Number(form.monthly_salary) > 0
-      ? '₹' + Number(form.monthly_salary).toLocaleString('en-IN')
-      : 'not set'
+    const salaryTxt = salaryNum > 0
+      ? '₹' + salaryNum.toLocaleString('en-IN')
+      : (form.has_incentive ? '₹0 (no fixed pay, incentive from the first rupee)' : '₹0 (no fixed pay)')
     const ok = await confirmDialog({
       title: 'Create this member?',
       message: `Creating ${form.name.trim()} as role ${String(pickedDesignation.auth_role).toUpperCase()} · team ${pickedDesignation.team_role} · designation ${pickedDesignation.name} · salary ${salaryTxt}. Correct?`,
@@ -230,16 +282,59 @@ export default function HRNewUserV2() {
       team_role: pickedDesignation.team_role,
     }
 
-    // 2. INSERT staff_incentive_profile (so salary tab works).
-    if (form.monthly_salary && Number(form.monthly_salary) > 0) {
-      const { error: profErr } = await supabase
+    // 2. UPSERT staff_incentive_profile — ALWAYS, so the person shows up in
+    //    Incentives / Salary even when the salary is 0 (Phase 328).
+    //    Why upsert: for role 'sales' the users trigger
+    //    auto_create_incentive_profile has ALREADY inserted a salary-0 row, so
+    //    the old plain insert hit UNIQUE(user_id) and HR's typed salary was
+    //    silently dropped.
+    //    Rates: a person WITHOUT incentive (ops / accounts / HR / designers)
+    //    gets 0 for multiplier / new / renewal / bonus so the table defaults
+    //    (5x / 5% / 2% / 10,000) never attach to them. For incentive people
+    //    those 4 columns are NOT sent, so the trigger's incentive_settings
+    //    values (sales) or the table defaults (telecaller) stay as before.
+    //    Safety: if this email already had a profile with a salary > 0 (the RPC
+    //    reuses an existing login), that row is left untouched - never
+    //    overwritten silently.
+    const salaryOutcome = { saved: null, error: '', note: '' }
+    if (!userRow.id) {
+      salaryOutcome.error = 'the server did not return the new user id'
+    } else {
+      const { data: existingProf, error: exErr } = await supabase
         .from('staff_incentive_profiles')
-        .insert([{
-          user_id:         userRow.id,
-          monthly_salary:  Number(form.monthly_salary),
-          is_active:       true,
-        }])
-      if (profErr) console.warn('[hr-create] profile insert failed:', profErr.message)
+        .select('id, monthly_salary')
+        .eq('user_id', userRow.id)
+        .maybeSingle()
+      if (exErr) {
+        salaryOutcome.error = exErr.message
+      } else if (existingProf && Number(existingProf.monthly_salary) > 0) {
+        const keptSalary = Number(existingProf.monthly_salary)
+        salaryOutcome.saved = keptSalary
+        if (keptSalary !== salaryNum) {
+          salaryOutcome.note = `${userRow.name} already had a salary of ₹${keptSalary.toLocaleString('en-IN')} on file, so it was NOT changed. If it should change, edit it in People → Team.`
+        }
+      } else {
+        const profilePayload = {
+          user_id:        userRow.id,
+          monthly_salary: salaryNum,
+          is_active:      true,
+        }
+        if (!form.has_incentive) {
+          profilePayload.sales_multiplier = 0
+          profilePayload.new_client_rate  = 0
+          profilePayload.renewal_rate     = 0
+          profilePayload.flat_bonus       = 0
+        }
+        const { error: profErr } = await supabase
+          .from('staff_incentive_profiles')
+          .upsert([profilePayload], { onConflict: 'user_id' })
+        if (profErr) salaryOutcome.error = profErr.message
+        else salaryOutcome.saved = salaryNum
+      }
+    }
+    if (salaryOutcome.error) {
+      console.warn('[hr-create] salary profile write failed:', salaryOutcome.error)
+      pushToast(`Login created but salary not saved - set it in People → Team (or ask the admin). Reason: ${salaryOutcome.error}`, 'danger', { ttl: 0 })
     }
 
     // 3. INSERT daily_targets (only when at least one target is non-zero).
@@ -274,8 +369,13 @@ export default function HRNewUserV2() {
     }
 
     setSaving(false)
+    setSalaryResult(salaryOutcome)
     setCreatedUser(userRow)
-    toastSuccess(`Created ${userRow.name}. Generate offer letter next →`)
+    // No success toast when the salary failed: the red toast above (and the red
+    // banner on the next screen) must not be contradicted by a green one.
+    if (!salaryOutcome.error) {
+      toastSuccess(`Created ${userRow.name}. Generate offer letter next →`)
+    }
   }
 
   if (!isAuthorized) return null
@@ -301,9 +401,46 @@ export default function HRNewUserV2() {
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>
             Email: <strong>{createdUser.email}</strong> · Role: <strong>{createdUser.role}</strong> · Team: <strong>{createdUser.team_role}</strong>
+            {salaryResult?.saved != null && (
+              <> · Salary: <strong>₹{Number(salaryResult.saved).toLocaleString('en-IN')}</strong></>
+            )}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--warning, #F59E0B)', marginBottom: 18, padding: 10, background: 'rgba(245,158,11,.08)', borderRadius: 8 }}>
-            <strong>Next step:</strong> invite the user via Supabase Studio → Auth → Users → Invite. Use the same email. They sign in → their auth.uid links to this public.users row automatically.
+          {/* Phase 328 — a failed salary write must be impossible to miss
+              (the old code only console.warn()ed it). */}
+          {salaryResult?.error && (
+            <div
+              role="alert"
+              style={{
+                display: 'flex', gap: 8, alignItems: 'flex-start',
+                fontSize: 13, color: 'var(--text)', marginBottom: 14, padding: 12,
+                background: 'var(--danger-soft)',
+                border: '1px solid var(--danger)',
+                borderRadius: 'var(--radius)',
+              }}
+            >
+              <AlertTriangle size={16} strokeWidth={1.6} style={{ color: 'var(--danger)', flex: '0 0 auto', marginTop: 1 }} />
+              <div>
+                <strong>Login created but salary not saved.</strong> Set it in People → Team (or ask the admin) before payroll is run.
+                <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-muted)' }}>Reason: {salaryResult.error}</div>
+              </div>
+            </div>
+          )}
+          {salaryResult?.note && (
+            <div
+              style={{
+                display: 'flex', gap: 8, alignItems: 'flex-start',
+                fontSize: 13, color: 'var(--text)', marginBottom: 14, padding: 12,
+                background: 'var(--warning-soft)',
+                border: '1px solid var(--warning)',
+                borderRadius: 'var(--radius)',
+              }}
+            >
+              <AlertTriangle size={16} strokeWidth={1.6} style={{ color: 'var(--warning)', flex: '0 0 auto', marginTop: 1 }} />
+              <div>{salaryResult.note}</div>
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: 18, padding: 10, background: 'var(--success-soft)', borderRadius: 'var(--radius)' }}>
+            <strong>Next step:</strong> share the login. {createdUser.name} can sign in right now with <strong>{createdUser.email}</strong> and the password you set - no Supabase Studio invite is needed.
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button
@@ -315,7 +452,7 @@ export default function HRNewUserV2() {
             </button>
             <button
               type="button"
-              onClick={() => { setCreatedUser(null); setForm({
+              onClick={() => { setCreatedUser(null); setSalaryResult(null); setForm({
                 designation_id: '', name: '', email: '', password: '', phone: '', city: 'Vadodara',
                 segment_access: 'PRIVATE', manager_id: '',
                 join_date: new Date().toISOString().slice(0, 10),
@@ -414,9 +551,9 @@ export default function HRNewUserV2() {
           </select>
         </Card>
 
-        <Card title="Compensation + targets" sub="Pre-filled from designation defaults. Override per-user if needed.">
+        <Card title="Compensation + targets" sub="Salary has no default: type it for every hire (0 only for commission-only people). Targets, incentive and expense flags are pre-filled from the designation - change them per person if needed.">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-            <FormField label="Monthly salary ₹" v={form.monthly_salary} onChange={v => set('monthly_salary', v)} type="number" placeholder="25000" />
+            <FormField label="Monthly salary ₹ *" v={form.monthly_salary} onChange={v => set('monthly_salary', v)} type="number" required placeholder="Type salary" />
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', fontSize: 13 }}>
               <input type="checkbox" checked={form.has_incentive} onChange={e => set('has_incentive', e.target.checked)} />
               Has incentive

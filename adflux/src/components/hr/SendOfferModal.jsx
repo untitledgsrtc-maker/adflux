@@ -81,7 +81,7 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
   useEffect(() => {
     let alive = true
     supabase.from('designations')
-      .select('id, name, auth_role, team_role, default_monthly_salary, has_incentive')
+      .select('id, name, auth_role, team_role, has_incentive')
       .eq('is_active', true)
       .order('display_order')
       .then(({ data }) => { if (alive && data) setDesignations(data) })
@@ -101,16 +101,15 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
     setErrors(e => ({ ...e, [field]: '' }))
   }
 
-  // On designation pick → snap position + salary from the master row.
+  // On designation pick → snap the position label from the master row.
+  // Phase 328 — salary is NOT snapped (no salary rate card): HR types the
+  // figure for every offer; validate() below rejects a blank / zero salary.
   function pickDesignation(id) {
     const d = designations.find(x => x.id === id)
     setForm(f => ({
       ...f,
       designation_id: id,
       position: d ? d.name : f.position,
-      fixed_salary_monthly: d && d.default_monthly_salary
-        ? String(d.default_monthly_salary)
-        : f.fixed_salary_monthly,
     }))
     setErrors(e => ({ ...e, designation_id: '', position: '' }))
   }
@@ -337,7 +336,7 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
           </Field>
 
           <Field label="Designation" required error={errors.designation_id}
-            hint="Salary auto-fills from the role. Commission shows only for roles that earn it.">
+            hint="Type the salary below for every offer. Commission shows only for roles that earn it.">
             <select
               value={form.designation_id}
               onChange={e => pickDesignation(e.target.value)}

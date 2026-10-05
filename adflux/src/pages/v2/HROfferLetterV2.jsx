@@ -90,7 +90,7 @@ export default function HROfferLetterV2() {
           .select('user_id, monthly_salary')
           .eq('user_id', userId).maybeSingle(),
         supabase.from('designations')
-          .select('id, name, auth_role, team_role, default_monthly_salary, has_incentive, default_variable_pct, display_order, is_active')
+          .select('id, name, auth_role, team_role, has_incentive, default_variable_pct, display_order, is_active')
           .eq('is_active', true)
           .order('display_order'),
       ])
@@ -108,12 +108,22 @@ export default function HROfferLetterV2() {
       setDesignations(ds || [])
 
       // Default-pick designation by team_role match.
+      // Phase 328 — salary comes ONLY from the person's own saved profile
+      // (pf) or stays blank for HR to type. The designations rate card is no
+      // longer a salary default.
+      // B4 review: seed ONLY from a POSITIVE saved salary. A salary-0 profile
+      // (the old sales-trigger placeholder, or any row a plain insert silently
+      // dropped) must NOT pre-fill "0" - that would pass the blank-box guard in
+      // handleDownload and print "Rs 0" on the letter. Blank forces HR to type it.
       const defaultDes = (ds || []).find(x => x.team_role === u.team_role)
+      const savedSalary = Number(pf?.monthly_salary)
       setForm(f => ({
         ...f,
         designation_id:   defaultDes?.id || '',
         city:             u.city || 'Vadodara',
-        monthly_salary:   (pf?.monthly_salary ?? defaultDes?.default_monthly_salary ?? '').toString(),
+        monthly_salary:   Number.isFinite(savedSalary) && savedSalary > 0
+                            ? String(pf.monthly_salary)
+                            : '',
       }))
       setLoading(false)
     })()
@@ -135,6 +145,17 @@ export default function HROfferLetterV2() {
     }
     if (!form.fathers_name.trim() || !form.address_line1.trim() || !form.city.trim() || !form.pincode.trim()) {
       toastError(new Error('Address incomplete'), "Father's name, address line 1, city and pincode are required.")
+      return
+    }
+    // Phase 328 — salary is no longer pre-filled from the designation rate
+    // card, so a blank box must not silently print "Rs 0" on the letter.
+    // An explicit 0 (commission-only person) is still allowed.
+    // B4 review: also reject a negative or non-numeric value (a negative used to
+    // pass this guard and print on the letter).
+    const salaryTyped = String(form.monthly_salary ?? '').trim()
+    const salaryNumOffer = Number(salaryTyped)
+    if (salaryTyped === '' || !Number.isFinite(salaryNumOffer) || salaryNumOffer < 0) {
+      toastError(new Error('Type the monthly salary (0 or more) before downloading the offer letter.'))
       return
     }
     setGenerating(true)
@@ -258,13 +279,9 @@ export default function HROfferLetterV2() {
           <select
             value={form.designation_id}
             onChange={e => {
-              const id = e.target.value
-              const d = designations.find(x => x.id === id)
-              setForm(f => ({
-                ...f,
-                designation_id: id,
-                monthly_salary: d?.default_monthly_salary?.toString() || f.monthly_salary,
-              }))
+              // Phase 328 — the pick sets position / role / incentive flags
+              // (read from `picked`); it never touches the salary box.
+              set('designation_id', e.target.value)
             }}
             style={fullInput}
           >
