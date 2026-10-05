@@ -1,5 +1,6 @@
-import { useEffect, useState, useMemo } from 'react'
-import { Search, Plus, Trash2, ChevronLeft, ChevronRight, Monitor, X, Lock } from 'lucide-react'
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { Search, Plus, Trash2, ChevronLeft, ChevronRight, ChevronDown, Layers, Monitor, X, Lock } from 'lucide-react'
+import { confirmDialog } from '../../v2/ConfirmDialog'
 import { useCities } from '../../../hooks/useCities'
 import { useAuth } from '../../../hooks/useAuth'
 import { formatCurrency } from '../../../utils/formatters'
@@ -44,10 +45,22 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
   const [search, setSearch] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [error, setError] = useState('')
+  // Phase 331 — bulk edit: set the same offered rate / duration / slot seconds /
+  // slots-per-day on EVERY city already in the quote. Empty box = leave unchanged.
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulk, setBulk] = useState({ offered_rate: '', duration_months: '', slot_seconds: '', slots_per_day: '', reason: '' })
+  const [bulkNote, setBulkNote] = useState('')
+  // Re-entrancy latch (section 47): a double tap on Apply must not run the
+  // confirm + write twice, and the second tap must not replace the "Done" note.
+  const applyingRef = useRef(false)
 
   useEffect(() => {
     fetchCities()
   }, [])
+
+  // "Done - applied to all 3 cities" is only true for the cities that existed
+  // then; drop it as soon as a city is added or removed.
+  useEffect(() => { setBulkNote('') }, [selectedCities.length])
 
   const filteredCities = useMemo(() => {
     const q = search.toLowerCase()
@@ -122,6 +135,82 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
     updateEntry(cityId, 'duration_months', n)
   }
 
+  // Phase 331 — apply the filled bulk boxes to ALL cities in ONE onChange
+  // (a loop of updateEntry() would each read the same stale selectedCities and
+  // only the last write would survive). Same rules as the per-row inputs:
+  // total = rate x screens x months (calcTotal), duration clamped 1-12,
+  // slots/day != 100 needs a reason. Slot seconds / slots-per-day stay metadata.
+  async function applyBulk() {
+    if (applyingRef.current) return
+    const hasRate  = bulk.offered_rate !== ''
+    const hasDur   = bulk.duration_months !== ''
+    const hasSec   = bulk.slot_seconds !== ''
+    const hasSlots = bulk.slots_per_day !== ''
+    if (!hasRate && !hasDur && !hasSec && !hasSlots) {
+      setBulkNote('Fill at least one box first.')
+      return
+    }
+    const rate = hasRate ? Math.max(0, Number(bulk.offered_rate)) : null
+    let dur = hasDur ? Math.round(Number(bulk.duration_months)) : null
+    if (dur !== null) dur = Math.max(MIN_MONTHS, Math.min(MAX_MONTHS, dur))
+    const sec = hasSec ? Number(bulk.slot_seconds) : null
+    // 0 / blank / junk -> the default 100, exactly like the per-row Slots/day box.
+    const slots = hasSlots ? (Math.round(Number(bulk.slots_per_day)) || DEFAULT_SLOTS_PER_DAY) : null
+    if (slots !== null && slots < 1) {
+      setBulkNote('Slots/day must be 1 or more.')
+      return
+    }
+    if ([rate, dur, sec, slots].some(v => v !== null && !Number.isFinite(v))) {
+      setBulkNote('One of the boxes is not a valid number.')
+      return
+    }
+    const reason = bulk.reason.trim()
+    if (slots !== null && slots !== DEFAULT_SLOTS_PER_DAY && !reason) {
+      setBulkNote(`Give a reason — slots/day is not ${DEFAULT_SLOTS_PER_DAY}.`)
+      return
+    }
+    const n = selectedCities.length
+    // Rate / duration / slots overwrite what the rep may have set city by city
+    // (rate + duration also change every total) -> ask first. No undo in the wizard.
+    applyingRef.current = true
+    try {
+    if (rate !== null || dur !== null || slots !== null) {
+      const parts = []
+      if (rate !== null) parts.push(`offered rate ${formatCurrency(rate)}`)
+      if (dur !== null) parts.push(`${dur} month${dur === 1 ? '' : 's'}`)
+      if (slots !== null) parts.push(`${slots} slots/day`)
+      const ok = await confirmDialog({
+        title: `Change all ${n} cities?`,
+        message: `Set ${parts.join(' and ')} on all ${n} cities. This replaces each city's current value${(rate !== null || dur !== null) ? ' and recalculates every total' : ''}.`,
+        confirmLabel: 'Apply to all',
+        cancelLabel: 'Cancel',
+      })
+      if (!ok) return
+    }
+    onChange(
+      selectedCities.map(sc => {
+        const u = { ...sc }
+        if (rate !== null)  u.offered_rate = rate
+        if (dur !== null)   u.duration_months = dur
+        if (sec !== null)   u.slot_seconds = sec
+        if (slots !== null) {
+          u.slots_per_day = slots
+          u.slots_override_reason = slots === DEFAULT_SLOTS_PER_DAY ? '' : reason
+        }
+        if (rate !== null || dur !== null) {
+          u.campaign_total = calcTotal(u.offered_rate, u.screens, u.duration_months)
+        }
+        return u
+      })
+    )
+    setBulk({ offered_rate: '', duration_months: '', slot_seconds: '', slots_per_day: '', reason: '' })
+    setError('')
+    setBulkNote(`Done — applied to all ${n} cities.`)
+    } finally {
+      applyingRef.current = false
+    }
+  }
+
   const subtotal = selectedCities.reduce((s, c) => s + c.campaign_total, 0)
 
   function handleNext() {
@@ -155,6 +244,130 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       {/* Selected cities */}
       {selectedCities.length > 0 && (
         <div className="campaign-cities">
+          {/* Phase 331 — bulk edit (2+ cities). Collapsed by default so the
+              normal per-city rows stay the main thing on screen. */}
+          {selectedCities.length > 1 && (
+            <div className="campaign-city-row">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => setBulkOpen(o => !o)}
+                aria-expanded={bulkOpen}
+              >
+                <Layers size={14} />
+                Bulk edit all {selectedCities.length} cities
+                <ChevronDown size={14} style={{ transform: bulkOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+              </button>
+
+              {bulkOpen && (
+                <>
+                  <p className="ccr-station" style={{ margin: 0 }}>
+                    Fill only the boxes you want to change. Empty boxes stay as they are. Applies to every city below.
+                  </p>
+                  <div className="campaign-city-controls">
+                    <div className="ccr-field">
+                      <label className="ccr-label ccr-label--accent">Offered (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="ccr-input ccr-input--accent"
+                        placeholder="no change"
+                        value={bulk.offered_rate}
+                        onChange={e => { setBulk(b => ({ ...b, offered_rate: e.target.value })); setBulkNote('') }}
+                      />
+                    </div>
+
+                    <div className="ccr-field">
+                      <label className="ccr-label">Duration (months)</label>
+                      <input
+                        type="number"
+                        min={MIN_MONTHS}
+                        max={MAX_MONTHS}
+                        step="1"
+                        className="ccr-input"
+                        placeholder="no change"
+                        value={bulk.duration_months}
+                        onChange={e => { setBulk(b => ({ ...b, duration_months: e.target.value })); setBulkNote('') }}
+                      />
+                      <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                        {QUICK_DURATIONS.map(m => {
+                          const active = Number(bulk.duration_months) === m
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => { setBulk(b => ({ ...b, duration_months: String(m) })); setBulkNote('') }}
+                              style={{
+                                fontSize: 10, padding: '2px 8px', borderRadius: 999, cursor: 'pointer', fontWeight: 600,
+                                border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                                background: active ? 'var(--accent-soft)' : 'transparent',
+                                color: active ? 'var(--accent)' : 'var(--text-muted)',
+                              }}
+                            >
+                              {m}mo
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="ccr-field">
+                      <label className="ccr-label">Slot Sec</label>
+                      <select
+                        className="ccr-select"
+                        value={bulk.slot_seconds}
+                        onChange={e => { setBulk(b => ({ ...b, slot_seconds: e.target.value })); setBulkNote('') }}
+                      >
+                        <option value="">no change</option>
+                        {SLOT_SECONDS_OPTIONS.map(s => (
+                          <option key={s} value={s}>{s}s</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="ccr-field">
+                      <label className="ccr-label">Slots/day</label>
+                      <input
+                        type="number"
+                        min="1"
+                        className="ccr-input"
+                        placeholder="no change"
+                        value={bulk.slots_per_day}
+                        onChange={e => { setBulk(b => ({ ...b, slots_per_day: e.target.value })); setBulkNote('') }}
+                      />
+                    </div>
+
+                    {bulk.slots_per_day !== '' && Number(bulk.slots_per_day) !== DEFAULT_SLOTS_PER_DAY && (
+                      <div className="ccr-field" style={{ flex: '1 1 220px' }}>
+                        <label className="ccr-label" style={{ color: 'var(--warning)' }}>
+                          Reason for Slots Override * (used on all cities)
+                        </label>
+                        <input
+                          type="text"
+                          className="ccr-input"
+                          style={{ width: '100%' }}
+                          placeholder={`Why not ${DEFAULT_SLOTS_PER_DAY} slots/day?`}
+                          value={bulk.reason}
+                          onChange={e => { setBulk(b => ({ ...b, reason: e.target.value })); setBulkNote('') }}
+                        />
+                      </div>
+                    )}
+
+                    <button type="button" className="btn btn-y btn-sm" onClick={applyBulk}>
+                      Apply to all {selectedCities.length}
+                    </button>
+                  </div>
+                  {bulkNote && (
+                    <p role="status" className="ccr-station" style={{ margin: 0, color: bulkNote.startsWith('Done') ? 'var(--success)' : 'var(--warning)' }}>
+                      {bulkNote}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           {selectedCities.map(sc => {
             const slotsOverridden = (Number(sc.slots_per_day) || DEFAULT_SLOTS_PER_DAY) !== DEFAULT_SLOTS_PER_DAY
             return (

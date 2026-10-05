@@ -20059,3 +20059,25 @@ expected result at ~14:45 IST (inside the 09:00-21:00 IST window) with all four 
   so the UTC-vs-IST edge case that 98.E2 fixes cannot occur. Left unapplied (section 42: do not change code for static risks).
 - The other three functions are the latest definitions that exist (quiet-hours gate present on all; `enqueue_attendance_reminder`
   Phase 61 supersedes Phase 60). Re-running this file is safe; nothing newer was reverted.
+
+
+---
+
+## 319 · Phase 331 — Private LED quote: "Bulk edit all N cities" (2026-10-05)
+
+Owner (screenshot of the private-LED quote Step 2 "Campaign Locations"): "how can I bulk update?" There was no bulk edit (only "Add all" to add cities). Decisions (AskUserQuestion): fields = offered rate, duration,
+slot seconds, slots/day; scope = ALL cities in the quote. The Government GSRTC wizard already had bulk set (section 147/195/247.5); this is the private-LED equivalent.
+
+### What shipped (`src/components/quotes/QuoteWizard/Step2Campaign.jsx` only; JS-only, no SQL, no APK)
+A collapsed "Bulk edit all N cities" button (shown when 2+ cities) above the rows. Open it: Offered (Rs), Duration (months + 1/3/6/12mo pills), Slot Sec, Slots/day, shared reason (appears only when slots/day != 100).
+Empty box = leave unchanged. "Apply to all N" writes ONE `onChange` over every city (a loop of `updateEntry` would each read the same stale `selectedCities`).
+- Price rule unchanged: `campaign_total = calcTotal(offered_rate, screens, duration_months)` is recomputed ONLY when rate or duration is filled; slot seconds and slots/day stay metadata (never price).
+- Duration clamped/rounded 1-12 like the per-row blur; negative rate -> 0; slots/day 0/blank -> 100 (same as the per-row box); slots/day != 100 needs the reason (written to every city's `slots_override_reason`; 100 clears it)
+  so `handleNext` still passes. The rate-change reason prompt stays removed (owner decision, section 118).
+- Rate / duration / slots changes ask `confirmDialog` first (replaces each city's value, no undo in the wizard); cancel applies nothing and keeps the boxes. `applyingRef` latch (section 47) stops a double tap running it twice.
+- "Done - applied to all N cities" clears as soon as the city count changes (it would be false for a city added after).
+- Reviewed by a correctness simulation (46/47 checks on the real extracted functions; the one miss was an unreachable input) + sales-module-guardian: SHIP, P3s only, all applied.
+
+### Notes
+Step2Campaign is rendered only by WizardShell (private LED quote, create + edit + renew + copy-last) inside V2AppShell (ConfirmDialogViewport mounted). Other Media and both Govt wizards untouched.
+Pre-existing, left (section 16): the per-row duration pills still use the `#fbc42d` fallback and are under 36px tall.
