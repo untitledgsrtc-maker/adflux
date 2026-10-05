@@ -19760,3 +19760,17 @@ company-standard prefills (5x / 5% / 2% / 10,000) but are still required and sho
 B10 (forward-only call lead-link on the last 10 digits, `callHistoryIngest.js`, needs the guardian); the compute_daily_score
 early return for ops/hr/accounts; PAN/Aadhaar exposure in the anon fetch_offer_by_token; re-issue the 6 wrong signed
 letters (4 Telecaller, 2 Operation Execution); remove the test operations account after Part 2(ii).
+
+
+---
+
+## 307 · September ops pay prep APPLIED + verified (2026-10-05)
+
+Owner ran `supabase_ops_sept_pay_prep.sql` Part 2(i)+(ii) (via an uncommented run copy). Every check PASS:
+- Gohil + Gulshan: their only counted September day (10 Sep, score 0.00, no uptime behind it) is excluded with the
+  marker `ops Sept 2026: no stations assigned - owner decision 2026-10-05 (full variable once)` -> 0 counted days ->
+  full variable once. Live Sept net: **Gohil 14,000 -> 20,000, Gulshan 11,200 -> 16,000** (shadow = expected).
+  October follows real uptime (both now own 10 stations each).
+- `test` operations account is_active=false, owned 0 stations, 0 payouts -> off the Salary sheet.
+- Dixita untouched (17 counted days, avg 10.3, variable 0, net 17,500 - genuine low network uptime).
+- Revert lines stay in the file if ever needed. The run copy `supabase_ops_sept_pay_prep_RUN.sql` is untracked on purpose.
