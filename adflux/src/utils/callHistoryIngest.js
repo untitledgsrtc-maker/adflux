@@ -84,11 +84,12 @@ function safeDuration(durationSeconds, outcome) {
 // tel-tap matching (§170/§173) is DELIBERATELY left as per-record DB queries —
 // untouched. EXACT reproduction of the old lookups: keyed by the RAW lead.phone
 // (the old `.eq('phone', cleaned)` compared the stored phone to the cleaned
-// 10-digit string verbatim — normalising the key would change attribution).
+// 10-digit string verbatim). B10 (5 Oct 2026) supersedes this: the key is now the last
+// 10 digits of the stored phone on purpose (see the comment in the loop).
 // Two separate .eq() queries (never .or() with an interpolated id — Phase 56l
 // guardian P1). Chunked (§66) so a rep with >1000 leads isn't capped. Each
 // bucket is created_at-desc, so [0] == the old `.order(created_at desc).limit(1)`.
-// Returns { [rawPhone]: { tc: [...desc], as: [...desc] } }.
+// Returns { [last10Digits]: { tc: [...desc], as: [...desc] } }.
 async function buildLeadPhoneMap(userId) {
   const map = {}
   async function load(col, bucket) {
@@ -103,8 +104,13 @@ async function buildLeadPhoneMap(userId) {
         .range(from, from + 999)
       if (error || !data) break
       for (const r of data) {
-        const k = r.phone
-        if (k == null) continue
+        // B10 (owner 2026-10-05, FORWARD-ONLY): key by the LAST 10
+        // DIGITS - the exact form ingestOne looks up (cleanPhone(raw.number)).
+        // Keyed on the raw string, a lead stored as "91xxxxxxxxxx" / "+91 ..." /
+        // with spaces never matched, so ~271 calls in 14 days lost their lead_id.
+        // Past calls are NOT relinked; only calls ingested from now on.
+        const k = cleanPhone(r.phone)
+        if (!k) continue
         if (!map[k]) map[k] = { tc: [], as: [] }
         map[k][bucket].push(r)   // pages stay created_at-desc → [0] = most recent
       }

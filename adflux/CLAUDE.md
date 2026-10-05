@@ -19774,3 +19774,17 @@ Owner ran `supabase_ops_sept_pay_prep.sql` Part 2(i)+(ii) (via an uncommented ru
 - `test` operations account is_active=false, owned 0 stations, 0 payouts -> off the Salary sheet.
 - Dixita untouched (17 counted days, avg 10.3, variable 0, net 17,500 - genuine low network uptime).
 - Revert lines stay in the file if ever needed. The run copy `supabase_ops_sept_pay_prep_RUN.sql` is untracked on purpose.
+
+
+---
+
+## 308 · B10 - call lead-link on the last 10 digits, FORWARD-ONLY (2026-10-05)
+
+`src/utils/callHistoryIngest.js` `buildLeadPhoneMap` now keys each rep's lead map by the last 10 digits of the stored
+phone (it was the raw string, so a lead saved as `91xxxxxxxxxx` / `+91 ...` / with spaces never matched and ~271 calls
+in 14 days lost their `lead_id`). Owner decision: forward-only - past calls are NOT relinked. guardian FLAG, none
+blocking. Known/accepted: (P2) a NULL-lead tel-tap row outside the 60s exact window no longer folds when the number now
+resolves to a lead, so a rare duplicate call row is possible; (P3) more >=10s calls now carry a lead_id, so a TC's daily
+score can rise slightly (the score counts activity rows - nothing double-counts, and a bare call still creates no
+score). Dedup, direction rules and duration capture are untouched. Verify in a week: `call_logs` rows with
+`lead_id IS NULL` AND a phone that matches a lead should stop appearing.
