@@ -19629,3 +19629,65 @@ Phase-number note (§52): 303/304/327/329 here are batch labels — disambiguate
 This week: B3 (ops/HR/accounts on Salary sheet), Sept-pay + test-deactivation prep SQL, B4 (default salary
 0 + always-create-profile + stale-save guard) — Wave 2. Next week: B10 (forward-only call lead-link fix).
 Held for owner decisions: B7/B8 (atomic offer→user→login-link), B5 guards.
+
+
+---
+
+## 304 · Wave 2 — B4 shipped, ops pay-prep SQL shipped, B3 BUILT but HELD (2026-10-05)
+
+Follows §303. Owner ran Phase 327 (audit + backups: all 12 checks PASS, 28 salary rows + 15
+designations backed up, "other triggers: none") and `db/functions/fetch_offer_by_token.sql` (anon +
+authenticated can run, 42 columns, 4 role fields present).
+
+### Shipped (origin `untitled-os`)
+- **B4 `54d7fc8` (Phase 328):** default salary = 0 everywhere. `HRNewUserV2` no longer pre-fills salary from
+  the designation rate card; salary must be typed (an explicit 0 needs a confirm that warns an incentive
+  person with salary 0 earns incentive from the first rupee + the 10,000 flat bonus — the engine has no
+  zero-salary guard, §290/§71). The salary profile is now an UPSERT every time (it used to be a plain
+  insert that silently lost HR's typed salary for sales hires, because `auto_create_incentive_profile` had
+  already made the row); non-incentive roles get multiplier/rates/bonus = 0; save failure is shown to the
+  user. `SendOfferModal` + `HROfferLetterV2` stop reading `default_monthly_salary`. `StaffModal` re-reads the
+  current profile on open, saves only changed fields, confirms before a salary change. Master → Designations
+  no longer shows a salary box. **`supabase_phase328_zero_designation_defaults.sql` = OWNER RUNS AFTER this
+  deploys** (zeroes the rate card inside a checksum guard that rolls the whole thing back if any staff
+  salary would differ; live check proved no trigger can move salaries). HR must now type a salary on every
+  hire/offer — tell Riya.
+- **PREP `2173a51` `supabase_ops_sept_pay_prep.sql`** (owner-run, diagnostic-first): Part 1 read-only grids;
+  Part 2 COMMENTED (i) exclude Gohil's + Gulshan's stray September 0.0 score day (only where no real uptime
+  row backs it) so monthly_score sees 0 counted days = full variable cap (owner decision: Sept only), (ii)
+  deactivate the `test` operations account; Part 3 after-state + shadow. Every change has a one-line REVERT.
+
+### B3 BUILT, NOT COMMITTED (held on purpose — files sit in the working tree)
+`supabase_phase323_tier3_batch_rpcs.sql` (predicate `COALESCE(role,'')<>'agency'`, Part 5 shadow grid),
+`src/pages/v2/SalaryAdminV2.jsx` (everyone except agency, "No salary set" / "Unmeasured · 0 days" chips,
+deploy-order banner), `src/pages/v2/LeavesAdminV2.jsx` (ops names pickable + `SCORED_ROLES` guard on the
+four `compute_daily_score` calls). Review PASS + guardian FLAG(1 fix applied). **Commit + push the page only
+AFTER the owner has run the SQL and Part 5 rows 1 and 2 read PASS** (page-first is safe — amber banner,
+dashes, disabled Payout — but accounts would see 6 people with blanks mid-payroll).
+
+### MUST-KNOW findings from this wave's reviews (do not lose)
+1. **October gate:** `ops_uptime_to_daily_performance` marks any `screens_total=0` day excluded; a tech who
+   owns NO stations therefore has 0 counted days every month → monthly_score pays the FULL 30% variable.
+   Gohil + Gulshan own 0 stations → October overpays full variable too. **Assign real stations to them in the
+   Ops Head console (and the screens `test` owns) BEFORE October payroll.**
+2. **Deactivating `test` strands its stations:** `test` still owns ~264 depots (`ops_depots.assigned_to`);
+   the auto-ticket engine keeps assigning tickets + pushes to the inactive account and
+   `OpsCommandV2` "unassigned faults" (assigned_to IS NULL) will not list them. Reassign the stations to the
+   real techs first (owner's split) or run Part 2(ii) only afterwards. Login is not gated by
+   `users.is_active` anywhere in `src/store` — deactivation hides it from lists/Salary, it does not block sign-in.
+3. **LATENT MONEY BUG (not fixed):** `compute_daily_score` has no early return for non-scored roles. Any
+   call for an ops tech (leave add/approve/reject — the DB `approve_leave`/`reject_leave`, the Sales-Head
+   path, the p8 `ops_approve_leave`) takes the meetings branch and upserts a NON-excluded score-0
+   `daily_performance` row → overwrites the uptime score for that date and zeroes variable. LeavesAdminV2's
+   direct calls are now guarded (B3); the DB-side callers still are not. Fix = an early-return for
+   `operation_*`/hr/accounts in the §72 canonical `db/functions/compute_daily_score.sql` + shadow-compare
+   (§71). Queue it. This may be where the stray 0.0 September rows came from.
+4. Fixed-salary roles (hr/accounts/office_staff/staff) have no daily_performance rows → 0 days → full
+   variable cap → net = full salary (correct by accident). Chip "Unmeasured" only covers operation_*.
+5. `SendOfferModal.validate()` still rejects salary 0 while Add Member now allows an explicit 0 (commission-only
+   people can get a login but not an offer through that modal) — pre-existing rule, left.
+
+### Owner run order
+(a) assign stations to Gohil/Gulshan (his split) → (b) run `supabase_ops_sept_pay_prep.sql`, read Part 1,
+uncomment 2(i)+2(ii), run → (c) run `supabase_phase323_tier3_batch_rpcs.sql`, read Part 5 → tell Claude → page
+goes out → (d) after the B4 deploy shows Ready, run `supabase_phase328_zero_designation_defaults.sql`.
