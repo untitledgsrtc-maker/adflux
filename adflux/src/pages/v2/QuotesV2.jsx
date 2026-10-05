@@ -151,11 +151,13 @@ export default function QuotesV2() {
     refetch()
   }
   const [searchDraft, setSearchDraft] = useState(filters.search || '')  // store-backed; restores via the filters.search effect below
-  // Phase 268 — persisted so tapping Back into /quotes keeps the sort + these
-  // filters (were plain useState → remount reset them). search/status/date
-  // already survive via the shared useQuotes filters store.
-  const [sortField, setSortField] = usePersistedState('quotesv2.sortField', 'created_at')
-  const [sortDir, setSortDir] = usePersistedState('quotesv2.sortDir', 'desc')
+  // Phase 268 persists the rep/segment/media filters below so tapping Back into
+  // /quotes keeps them (search/status/date survive via the shared useQuotes
+  // filters store). The SORT is deliberately NOT persisted (Phase 332): a sort
+  // click stuck for the whole session and the list stopped opening newest-first.
+  // Every fresh open = newest date first.
+  const [sortField, setSortField] = useState('created_at')
+  const [sortDir, setSortDir] = useState('desc')
   // Admin-only sales-rep filter — derived from the quotes already
   // loaded so no extra fetch is needed. 'all' shows everyone.
   const [repFilter, setRepFilter] = usePersistedState('quotesv2.rep', 'all')

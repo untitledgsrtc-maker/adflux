@@ -20081,3 +20081,21 @@ Empty box = leave unchanged. "Apply to all N" writes ONE `onChange` over every c
 ### Notes
 Step2Campaign is rendered only by WizardShell (private LED quote, create + edit + renew + copy-last) inside V2AppShell (ConfirmDialogViewport mounted). Other Media and both Govt wizards untouched.
 Pre-existing, left (section 16): the per-row duration pills still use the `#fbc42d` fallback and are under 36px tall.
+
+## 321 · Phase 332 (sort fix) — /quotes opens newest-first again; the SORT is no longer remembered (2026-10-05)
+
+Owner (screenshot of /quotes): "why changed, why not according to dates, it was fine before." The list was sorted by Sales Rep, not date.
+
+### Root cause (confirmed in code, my own regression)
+Phase 268 (`2d1a068`, 28 Jul, section 141) made the /quotes filters survive a browser Back by backing them with `usePersistedState` (sessionStorage). It also swapped
+the two SORT states (`quotesv2.sortField` / `quotesv2.sortDir`). So one tap on the "Sales Rep" header stuck for the whole app session; in the PWA / Android WebView the
+session lasts until the app is fully closed, so the list kept opening by rep. Before Phase 268 the sort was plain `useState` and reset to newest-first on every open.
+
+### Fix (QuotesV2.jsx only, section 28 frozen, sales-module-guardian PASS)
+`sortField` / `sortDir` back to plain `useState('created_at')` / `useState('desc')`. The rep / segment / media / team-view filters STAY persisted (that was the
+Phase 268 ask). Tapping a column header still sorts within the screen; it just no longer survives a remount (Back navigation also returns to newest-first).
+Stale `quotesv2.sortField` keys left in a phone's sessionStorage are never read -> harmless.
+
+### Lesson (apply to LeadsV2 / any list that uses usePersistedState)
+Persist FILTERS across Back, never a pure view preference like sort order: a stuck sort is invisible to the user and reads as "the app changed." If a list adds
+persisted state, ask "would the owner be surprised to find this still set tomorrow?" before persisting. (LeadsV2 has no sort control, so it is not affected.)
