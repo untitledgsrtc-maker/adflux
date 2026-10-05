@@ -2087,36 +2087,23 @@ limit 60;
 
 -- ==============================================================================================
 -- BLOCK 43  [HR10]  cost: trivial
--- WHAT: Has the app ever sent an offer or login email (email log counts)
--- WHY: Proves whether offer or login mails are really being sent today, which decides if an
--- email-based first-login link is worth building.
--- HOW TO READ: The app's own mail path logs only three kinds: offer (HR offer mails), quote and
--- pitch (client mails). There is no 'login' kind at all, so no login or set-password mail goes
--- through this path (a password-reset mail sent by Supabase's own auth service, if any, would not
--- appear here). Look for kind = offer: no rows (or only status = failed) means offer mails are not
--- really used or not working; sent rows with recent dates mean the email path is live. status =
--- failed rows mean the mail service rejected the message. The last row, 'total rows in table',
--- always appears; a count of 0 there means nothing has ever been logged (the log is best effort,
--- so 0 can also mean logging is broken, not only that no mail was sent).
+-- WHAT: Does the email log exist, and has the app ever logged an offer or login email
+-- WHY: Decides whether an email-based first-login link can be tracked, and whether offer mails are
+-- really going out today.
+-- HOW TO READ: Answer starting with MISSING = the email_log table was never created in the live
+-- database (supabase_email_log.sql was never run). The send endpoint writes to that log best-effort,
+-- so mail may still be going out but nothing is recorded. Answer with a number = the table exists
+-- and holds that many rows; then ask Claude for the by-kind breakdown. (First version of this block
+-- read the table directly and stopped with error 42P01 because the table is missing - this version
+-- checks first and cannot fail.)
 -- ----------------------------------------------------------------------------------------------
-select 'last 30 days' as period, coalesce(kind, '(none)') as kind, status, count(*) as emails,
-       (min(created_at) at time zone 'Asia/Kolkata')::date as first_on,
-       (max(created_at) at time zone 'Asia/Kolkata')::date as last_on
-from public.email_log
-where created_at >= now() - interval '30 days'
-group by coalesce(kind, '(none)'), status
-union all
-select 'all time', coalesce(kind, '(none)'), status, count(*),
-       (min(created_at) at time zone 'Asia/Kolkata')::date,
-       (max(created_at) at time zone 'Asia/Kolkata')::date
-from public.email_log
-group by coalesce(kind, '(none)'), status
-union all
-select 'total rows in table', '(all kinds)', '(all)', count(*),
-       (min(created_at) at time zone 'Asia/Kolkata')::date,
-       (max(created_at) at time zone 'Asia/Kolkata')::date
-from public.email_log
-order by 1 desc, 2, 3;
+select case
+         when to_regclass('public.email_log') is null
+           then 'MISSING - table email_log does not exist in the live database'
+         else (xpath('/row/c/text()',
+                     query_to_xml('select count(*) as c from public.email_log', false, true, '')))[1]::text
+              || ' rows logged in total'
+       end as email_log_status;
 
 -- ==============================================================================================
 -- BLOCK 44  [HR11]  cost: trivial
