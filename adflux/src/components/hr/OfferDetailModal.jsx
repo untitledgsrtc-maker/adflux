@@ -18,12 +18,12 @@
 // does not carry the offer salary over).
 
 import { useState, useRef } from 'react'
-import { X, Download, UserPlus, Copy, Check, MessageSquare, Mail, KeyRound } from 'lucide-react'
+import { X, Download, UserPlus, Copy, Check, MessageSquare, Mail, KeyRound, FileText } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useOffers, buildOfferUrl, STATUS_META } from '../../hooks/useOffers'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { formatCurrency } from '../../utils/formatters'
-import { toastError } from '../v2/Toast'
+import { toastError, toastSuccess } from '../v2/Toast'
 import SendEmailModal from '../v2/SendEmailModal'
 
 // Phase 109.4 — open a private PAN/Aadhaar card via a short-lived signed
@@ -133,6 +133,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
   const [pwLocked, setPwLocked] = useState(!!savedPw)
   const [done, setDone] = useState(null)
   const [emailOpen, setEmailOpen] = useState(false)
+  const [letterBusy, setLetterBusy] = useState(false)
   const [showConvertForm, setShowConvertForm] = useState(false)
   const [shortUrlValue, setShort]   = useState('')
   const [copiedKey, setCopiedKey]   = useState(null)
@@ -346,6 +347,55 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
     const text = loginMessage(done)
     try { await navigator.clipboard.writeText(text); setCopiedKey('login'); setTimeout(() => setCopiedKey(null), 1600) }
     catch { window.prompt('Copy this message:', text) }
+  }
+
+  // B-letter (owner 2026-10-05): a fresh copy of the signed letter in the person's
+  // ROLE format. Offers accepted before the per-role letters (and Sneha's, signed
+  // before the open-link fix) carry a SALES letter in storage. This builds a new PDF
+  // from the same signed details and DOWNLOADS it - nothing is uploaded, and the
+  // original signed PDF is never changed. The role comes from the offer's saved
+  // snapshot, else from the designation whose name matches the offer's position.
+  async function handleCorrectedLetter() {
+    setLetterBusy(true)
+    try {
+      let sig = {
+        auth: offer.designation_auth_role, team: offer.designation_team_role,
+        inc:  offer.designation_has_incentive, name: offer.designation_name,
+      }
+      if (!sig.auth) {
+        const label = (offer.designation_name || offer.position || '').trim()
+        const { data: d, error: dErr } = await supabase
+          .from('designations')
+          .select('name, auth_role, team_role, has_incentive')
+          .ilike('name', label.replace(/[%_\\]/g, '\\$&'))
+          .eq('is_active', true)
+          .limit(2)
+        if (dErr) throw dErr
+        if (!d || d.length !== 1) {
+          throw new Error('Could not match "' + label + '" to exactly one designation - check Master > Designations.')
+        }
+        sig = { auth: d[0].auth_role, team: d[0].team_role, inc: d[0].has_incentive, name: d[0].name }
+      }
+      let tpl = null
+      if (offer.template_id) {
+        const { data: t } = await supabase
+          .from('hr_offer_templates').select('*').eq('id', offer.template_id).maybeSingle()
+        tpl = t || null
+      }
+      const { downloadOfferLetter } = await import('./OfferLetterPDF')
+      await downloadOfferLetter({
+        ...offer,
+        designation_auth_role:     sig.auth,
+        designation_team_role:     sig.team,
+        designation_has_incentive: sig.inc,
+        designation_name:          sig.name,
+      }, tpl)
+      toastSuccess('Letter downloaded (' + (sig.name || 'role format') + '). The original signed PDF is unchanged.')
+    } catch (e) {
+      toastError(e, 'Could not build the letter.')
+    } finally {
+      setLetterBusy(false)
+    }
   }
 
   async function handleCancel() {
@@ -649,6 +699,17 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
             <button className="btn btn-ghost" onClick={handleCancel}
               style={{ color: 'var(--red)' }}>
               Cancel Offer
+            </button>
+          )}
+          {(isAccepted || isConverted) && (
+            <button
+              className="btn btn-ghost"
+              onClick={handleCorrectedLetter}
+              disabled={letterBusy}
+              title="Builds a fresh copy of this letter in the person's role format from their signed details. The original signed PDF is not changed."
+            >
+              <FileText size={14} style={{ marginRight: 6 }} />
+              {letterBusy ? 'Preparing...' : 'Letter in role format'}
             </button>
           )}
           {offer.offer_pdf_url && (

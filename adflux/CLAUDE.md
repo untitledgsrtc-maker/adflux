@@ -19859,3 +19859,23 @@ EXECUTE intact; overload_count 1.
   not listable since section 210) still contains PAN / address. Anyone with the full URL can download that one file,
   which is the candidate's own letter; the token is an unguessable uuid. A private bucket + signed URLs would close it
   but touches the anon upload and the rep-reads-own link (section 86 item 1) - left as its own change.
+
+
+---
+
+## 312 · B-letter - "Letter in role format" button on accepted/converted offers (2026-10-05)
+
+`OfferDetailModal.jsx` (HR; opens from HR -> Offers) gets a **Letter in role format** button on accepted / converted
+offers. It builds a FRESH copy of the letter from the person's own signed details and DOWNLOADS it. It uploads nothing,
+changes no record and never touches the original signed PDF (a signed document is not overwritten). The role comes from
+the offer's saved designation snapshot, else from the ONE active designation whose name matches the offer's position
+(so the pre-Phase-285 offers - Jayna, Aayushi, Rima, Gohil, Gulshan - resolve: Telecaller -> telecaller letter, Operation
+Execution -> ops letter); if zero or two designations match it stops with a plain message instead of guessing.
+`@react-pdf` is loaded on click only (dynamic import), so the HR chunk stays light.
+- PROOF (local render of live offers): Gohil -> Operations letter (uptime variable, per-km travel, LED screens, 14 pages incl.
+  the holiday annexure); Jayna -> Telecaller letter (inside-sales, connect rate, 12 pages); Viral (Sales Head) -> sales
+  letter, unchanged. The test copies held personal data and were deleted.
+- This is how HR fixes the 6 wrongly-templated signed letters (Jayna, Aayushi, Rima, Sneha = Telecaller; Gohil, Gulshan =
+  Operation Execution): open the offer, press the button, share the new copy and get an acknowledgement. Sneha has a saved
+  role snapshot but her stored PDF was signed before the open-link fix, so she is in the same list.
+- No SQL, no APK, no storage write. HR file, not frozen.
