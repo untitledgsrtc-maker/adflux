@@ -19836,3 +19836,26 @@ Owner said "apply". Ran `db/functions/compute_daily_score.sql` via `supabase db 
   approve/reject/add for those roles can no longer wipe variable.
 - Still open (owner decision, NOT touched): Dixita Aug 2026 - 2 counted score-0 days written when she was a sales rep,
   no payout recorded; clearing them would make her Aug variable the full 7,500 instead of 0.
+
+
+---
+
+## 311 · B-pii - the open offer link no longer returns the candidate's personal details (2026-10-05, APPLIED live)
+
+`db/functions/fetch_offer_by_token.sql` (anon-callable, the pre-login read behind `/offer/:token`) used to return
+PAN, Aadhaar, bank account, DOB, mobile, email, address and emergency contact to anyone holding the link. It now returns
+those as NULL (same 41-column shape, same order) and keeps only `full_legal_name`, status, the offer terms,
+`offer_pdf_url` and the 4 designation fields. Applied live via `supabase db query --linked` (dry-run in a rolled-back
+transaction first), then tested with the anon key and a real token: PAN / Aadhaar / bank / dob / mobile / email /
+address / emergency all null; name, status, pdf url, position, salary, designation present. anon + authenticated
+EXECUTE intact; overload_count 1.
+- WHY IT IS SAFE: personal fields are written in ONE submit (`submit_offer_acceptance` sets them together with
+  status='accepted' and refuses further writes). Live check: 13 offers hold a PAN (2 accepted, 11 converted_to_user),
+  0 rows hold personal data before acceptance. So the old "reopen after a partial save" prefill never had anything to
+  show, and the accepted screen needs only name / status / pdf url. HR reads the full row directly from `hr_offers`
+  (RLS), not through this function. No frontend change was needed (OfferForm prefills `|| ''`).
+- The locked rule "every candidate-filled column stays returned" in that file's header is REPLACED - do NOT put them back.
+- Residual (accepted): the signed offer PDF itself (public `offer-letters` bucket, path = invite token + timestamp,
+  not listable since section 210) still contains PAN / address. Anyone with the full URL can download that one file,
+  which is the candidate's own letter; the token is an unguessable uuid. A private bucket + signed URLs would close it
+  but touches the anon upload and the rep-reads-own link (section 86 item 1) - left as its own change.

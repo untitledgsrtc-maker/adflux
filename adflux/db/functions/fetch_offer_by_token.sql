@@ -29,9 +29,17 @@
 --     (§211 anon allow-list: fetch_offer_by_token · is_open_offer_token ·
 --     submit_offer_acceptance). Removing anon breaks every offer link.
 --   • WHERE invite_token = p_token AND status <> 'cancelled' + LIMIT 1.
---   • Every candidate-filled column stays returned (full_legal_name … emergency_contact_rel):
---     a candidate who reopens the link after a partial save is pre-filled from them.
---   • No PII masking here (deliberately not part of Phase 329).
+--   • B-pii (owner 2026-10-05): the candidate's personal details are NO LONGER returned.
+--     Only full_legal_name (shown on the "Offer accepted" screen) still comes back; dob,
+--     mobile, personal_email, address, PAN, Aadhaar, qualification, bank and emergency
+--     columns are returned as NULL (the OUT columns stay, so the page and the 41-column
+--     shape are unchanged). WHY SAFE: the page only writes these fields in ONE submit
+--     (submit_offer_acceptance sets them and status='accepted' together; once accepted it
+--     refuses more writes) - checked live: all 13 offers holding a PAN are accepted or
+--     converted, none before. So the old "reopen after a partial save" prefill never had
+--     data to show; and the accepted screen needs only name, status and offer_pdf_url.
+--     HR reads the full row directly from hr_offers (RLS), not through this function.
+--     Do NOT put them back: anyone holding the link could read PAN / Aadhaar / bank.
 --
 -- RE-RUN HAZARD: supabase_hr_module.sql and the generated supabase_all_migrations.sql
 --   still carry the OLD 37-column body of this function (DROP + CREATE). Re-running
@@ -124,11 +132,14 @@ AS $$
     incentive_sales_multiplier, incentive_new_client_rate,
     incentive_renewal_rate, incentive_flat_bonus,
     place, template_id, offer_pdf_url, accepted_terms_at,
-    full_legal_name, fathers_name, dob, mobile, personal_email,
-    address_line1, address_line2, city, district, state, pincode,
-    pan_number, aadhaar_number, qualification,
-    bank_account_number, bank_name, bank_ifsc,
-    emergency_contact_name, emergency_contact_phone, emergency_contact_rel,
+    full_legal_name,
+    -- B-pii (5 Oct 2026): the open link no longer returns the candidate's personal
+    -- details. NULL placeholders keep the 41-column shape + order identical.
+    NULL::text, NULL::date, NULL::text, NULL::text,
+    NULL::text, NULL::text, NULL::text, NULL::text, NULL::text, NULL::text,
+    NULL::text, NULL::text, NULL::text,
+    NULL::text, NULL::text, NULL::text,
+    NULL::text, NULL::text, NULL::text,
     designation_auth_role, designation_team_role,
     designation_has_incentive, designation_name
   FROM public.hr_offers
