@@ -19905,3 +19905,25 @@ Execution -> ops letter); if zero or two designations match it stops with a plai
 - Uncommitted android/ changes in the working tree (`capacitor.build.gradle`, `capacitor.settings.gradle`, splash pngs)
   are `cap sync` output (it added the app-launcher / filesystem / local-notifications / share plugin lines the committed
   copy was missing). Left uncommitted on purpose; they regenerate on every sync.
+
+
+---
+
+## 314 · APK 96019 camera + Scan VERIFIED on an Android 16 emulator (2026-10-05) - NOT yet published
+
+Tested on the Mac's emulator (`ck_pixel`, Android 16, virtual-scene back camera) instead of a phone. Owner logged in himself
+(Rakesh Prajapati, Sales Head) - credentials are never typed by Claude on the live app. Drove it with `adb` taps + screenshots.
+- Leads -> New Lead -> **Scan card**: logcat shows the app fired `android.media.action.IMAGE_CAPTURE` with a `content://` clip URI
+  and flags 0x3 (the FileProvider hand-off the B2 `file_paths.xml` + `<queries>` fix enables) and `com.android.camera2`
+  CaptureActivity opened and connected to the camera. Shutter -> the camera closed, the photo returned to the app, the button
+  showed "Reading card...", and the app then showed "No usable text found in photo" (correct: a picture of a virtual room).
+- Server read of a real card (synthetic business-card image with text, sent to the live `ocr-business-card`): all 7 fields
+  correct - name, designation, phone (normalised to 10 digits), email, company, city (Vadodara), website, is_business_card=true.
+- Emulator quirks seen (NOT app bugs): first boot throws a "System UI isn't responding" dialog (tap Wait); `monkey` launch can
+  miss - use `am start -n in.untitledad.app/.MainActivity`; `uiautomator dump` does NOT expose the WebView's text (use screenshot
+  coordinates, screenshot size 1080x2400); `adb` calls hang for ~60s while the camera app is open - run them one at a time.
+- Cleanup done: app uninstalled from the emulator (drops the session), emulator shut down, temp files deleted.
+- STILL TO DO before the fleet gets it (owner's call): (1) trim the APK - 45 MB because `cap sync` copies ~57 MB of
+  `public/deck|investor|led|email` media into the app (unused in live-update mode; 96014 was ~9 MB); (2) upload as
+  `apk/untitled-os.apk`, insert `app_version` 96019 with `apk_url = https://app.untitledad.in/apk`. Nothing published yet.
+- Owner should change Rakesh's password (a weak one was shared in chat).
