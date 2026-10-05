@@ -19927,3 +19927,26 @@ Tested on the Mac's emulator (`ck_pixel`, Android 16, virtual-scene back camera)
   `public/deck|investor|led|email` media into the app (unused in live-update mode; 96014 was ~9 MB); (2) upload as
   `apk/untitled-os.apk`, insert `app_version` 96019 with `apk_url = https://app.untitledad.in/apk`. Nothing published yet.
 - Owner should change Rakesh's password (a weak one was shared in chat).
+
+
+---
+
+## 315 · Calls health check on live data (2026-10-05, read-only, owner "calls issues checked")
+
+Ran against the live DB with `supabase db query --linked`. Capture is healthy; no code change.
+- Volume: ~900-1,040 call rows/day (29 Sep - 3 Oct). Incoming 107-159/day and missed 31-59/day are recorded -> the Phase 228
+  native listener works on 96018. Weekend 4 Oct is naturally low.
+- Durations (call_capture_log, 3 Oct): modal_save phone-found 540/563 (96%), saved blank 21 (3.7%); auto60 277/287 found (96.5%);
+  **resume_sweep 189/189 found, 0 blank**. The old 68% blank-on-save (section 195) is gone; the +10s/+30s resume sweeps heal it.
+  Today (to 14:00): modal_save 180/206 found, saved blank 21 (10%, partial day).
+- B10 lead link (section 308): before the fix 24-36 calls/day (about 3%) had no lead_id although the number was one of the rep's
+  leads. Calls inserted after the fix went live: 0 of 33 unlinked (small sample - re-check after a full day; reps get the new JS on
+  next app open).
+- Still imperfect (people, not code): Kamina Thakor reports app_version `web` (no call-log access in a browser); GULSHAN YADAV has
+  not opened the app since 10 Sep (no calls); Jani Ajaykumar and Viral Ghaskata save ~25% of outcomes where the phone's call log has
+  no matching row (calls made another way, or saved before dialling); Rima/Dhara had 2/4 saves from the web build. Everyone else is on
+  96018. Rakeshkumar shows 96019 only because of the emulator test login.
+- Cosmetic, left: device-scan rows with note `Outgoing call (0s)` are stamped outcome `connected` although they have no duration; they
+  never count (the 50-call target needs >=10s), so scores and pay are unaffected.
+- FOOT-GUN when querying call_logs by `created_at` and grouping by `call_at` date: late-ingested old calls make a fake "jump" in the
+  earlier days (I almost reported one). Group by the same column you filter on.
