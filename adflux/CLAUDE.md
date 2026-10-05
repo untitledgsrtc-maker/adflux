@@ -19980,3 +19980,65 @@ Supersedes the "NOT yet published" and size-warning lines in sections 313/314. O
   `update public.app_version set is_active=false where version_code=96019`.
 - Still open (unchanged): re-check B10 lead-link after a full day (section 308); Rakesh Prajapati password; GULSHAN has not
   opened the app since 10 Sep; Kamina reports `web`.
+
+
+---
+
+## 317 · Pending sweep: email_log live, B10 proven, release script hardened, repo matches the shipped APK (2026-10-05)
+
+Owner said "u do it if anything pending". What was closeable by me, closed:
+
+**1 · `email_log` table was MISSING on the live DB -> created.** B0 (section 303) had shown it absent, so no offer or quote email
+was ever logged (the send endpoint writes it best-effort). Dry-run in a rolled-back transaction, then applied
+`supabase_email_log.sql` via `supabase db query --linked`. Live now: RLS on, 2 SELECT-only policies (admin/co_owner/hr/accounts
+read all, sender reads own), no INSERT policy (only the endpoint's service role writes), 0 rows. The endpoint's insert columns
+match the table exactly. From now every offer/quote email is logged.
+
+**2 · B10 (call lead-link) PROVEN in the field.** It reached GitHub 12:22 IST on 5 Oct. Calls before it: 16 that day were
+unlinked although the number was one of that rep's leads, all in the messy formats ("+91 97250 89625", "918485930959",
+"95377 47829"). Calls since 12:35 IST: 125 calls, 7 reps, 98 linked, 0 unlinked-but-is-my-lead (the other 27 are numbers that
+are not that rep's leads). Closed - do not re-check.
+
+**3 · `scripts/release-apk.sh` rewritten (supersedes the section 316 line "it would stop at the 409 - fix it").** An independent
+3-reviewer pass of the first rewrite found a catastrophic path: a flaky "what is served now" download was read as "first
+release", so the script removed the live APK with no backup. Final script (tested by a 12-case, 34-check harness that runs the
+REAL script against a fake bucket + fake download link, plus a real-service DRY_RUN):
+- Preflight asks the BUCKET (`supabase storage ls`) whether the object exists - never infers it from a download. If it exists
+  the backup must download (curl --retry/timeouts), pass `unzip -tq` and have a numeric versionCode, else abort BEFORE any rm.
+- Backups go to `~/apk-backups/` (not TMPDIR, which macOS purges). Today's copies are there: `untitled-os-96018-prev-fleet.apk`
+  (39 MB, what the fleet had) and `untitled-os-served-20261005-*.apk` (96019).
+- A trap (EXIT/INT/TERM/HUP) restores the backup if anything stops the script between "old object removed" and "new one
+  uploaded" (Ctrl-C, closed terminal, upload error). After rm it checks the object is really gone before uploading.
+- Pins the signing key (SHA-256 15d785ae...2fe6): gradle silently makes a new debug keystore if ~/.android/debug.keystore is
+  lost and phones would then refuse every update. Override only with ALLOW_NEW_KEY=1.
+- Verify polls the public link (6 tries) and reports separately: download failed / old versionCode still served / bytes differ.
+- Flags: `DRY_RUN=1` (any value except 0/false/no counts as dry - fails safe), `FORCE=1`, `SKIP_BUILD=1` (re-use the built APK,
+  also the recovery after a failed verify), `APK_BACKUP_DIR`. Version guard: refuses to ship versionCode <= what is served
+  unless FORCE=1. The script still NEVER inserts the app_version row - that stays the owner's go-live step.
+- Printed SQL now uses `apk_url = https://app.untitledad.in/apk` (section 76), not the old raw-storage URL.
+- **HEADS-UP, not fixed:** the moment the upload lands, that file IS what `/apk` serves, so stragglers who tap the OLD banner
+  get the build before the owner has tested it. Release outside field hours. A real fix is stage-and-swap (upload
+  `untitled-os-next.apk`, test on a phone from the raw storage URL, promote with `storage mv` + the INSERT) - NOT built.
+- Rollback note: Android cannot downgrade an installed app, so for phones that already updated, ship the old code under a HIGHER
+  versionCode. Also: a rebuild is never byte-identical to the published APK (same versionCode, ~4 bytes of zip metadata).
+
+**4 · Repo now matches the APK that shipped.** The working tree had uncommitted cap-sync output: `capacitor.build.gradle` /
+`capacitor.settings.gradle` were missing four plugins the app imports (app-launcher, filesystem, local-notifications, share), and
+26 `splash.png` files were still an old "ua" placeholder while the fleet has shipped the real UA logo splash since 25 May (identical
+bytes in the 96018 and 96019 APKs). All committed. `android/.gitignore` now ignores `.gradle-user-home/` (a stale partial Gradle
+download that a broad `git add` would have swept in). Fresh-clone build needs: `npm ci`, `npx cap sync android`,
+`android/app/google-services.json` (gitignored; without it the build succeeds with push silently broken), `local.properties`, and
+this Mac's `~/.android/debug.keystore`.
+
+**5 · Git hygiene.** Deleted two broken iCloud-duplicate remote refs (`.git/refs/remotes/origin/untitled-os 2` and `... 3`) that made
+every `git fetch` error. The git repo root is `/Users/apple/Documents/untitled-os2/Untitled` (adflux is a subfolder).
+
+**Foot-guns learned (do not repeat):**
+- A flaky download is NOT "first release". Decide "does the object exist" from the storage listing, and fail closed.
+- `printf ... | grep -q` under `set -o pipefail` can report failure when grep exits early (SIGPIPE); use `grep -q ... <<<"$VAR"`.
+- macOS has no `timeout` command, and `$TMPDIR` is `/var/folders/...`, not `/tmp`.
+- `supabase storage rm` asks y/N on stdin (`echo y |`), and `storage cp` has no overwrite - remove first, always keep a backup.
+
+**Still open (owner-side or deferred):** change Rakesh Prajapati's password; ask Kamina to use the Android app (reports `web`);
+Gulshan has not opened the app since 10 Sep; stage-and-swap release (above); the native `installApk` receiver does not check
+DownloadManager success (needs an APK rebuild); no splash source art is tracked (only the generated PNGs).
