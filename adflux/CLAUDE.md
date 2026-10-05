@@ -20144,6 +20144,13 @@ Smoke after apply: a rep opens /leads -> Upload CSV -> pick a 5-row file -> 5 le
 shows under Errors with that rep's name. Test one real phone (file picker + 5 leads) before telling the team.
 
 
+### APPLIED + LIVE (2026-10-05 20:00:09-20:00:15 IST, via `supabase db query --linked`, off-peak, stop-on-error script)
+All 4 SQL files ran clean in order; VERIFY: `lead_import_quiet_ready()` true, 3 triggers carry the WHEN clause, `lead_imports_own_update` policy 1, 0 disabled triggers, bundle keeps the M21 `chase` arm and
+excludes imports. Code pushed `b1ed39f` after the SQL (so no dead Upload button). Live-tested by fresh agents (rolled-back, rep roles impersonated): sales + telecaller self-imports = 0 follow-ups / tasks /
+activities / push / counter bump; single lead and admin-for-rep imports stay loud; cross-rep duplicate rejected with the owner's name; RLS blocks assigning to someone else; delete-heal does not re-inflate the
+counter; team_dashboard_bundle returns the 21 keys the page reads. Known/accepted (low): a rep can set `created_by` = a telecaller and `telecaller_id` = that telecaller to make a dump "quiet" - it creates the
+both-owners-differ state that the `leads_both_owners_differ` tripwire in the Phase 333/334 heals counts; closing it would need `created_by = auth.uid()` enforcement (lead_is_self_import is IMMUTABLE, so not inside it).
+
 ## 321 · Phase 332 (sort fix) — /quotes opens newest-first again; the SORT is no longer remembered (2026-10-05)
 
 Owner (screenshot of /quotes): "why changed, why not according to dates, it was fine before." The list was sorted by Sales Rep, not date.
@@ -20189,12 +20196,44 @@ Rolled-back dry-run on the live DB: still_on_wrong_owner 0, dhara_unreadable_ope
 - 0 of ~9,900 leads have BOTH owner columns set to different people today, so telecaller-first (inbox, nurture revisit) and assigned_to-first (engine) agree. Re-check with the
   `leads_both_owners_differ` line in the heal's VERIFY if that ever stops being 0.
 
-### OPEN (guardian P2, NOT fixed here - its own guarded change)
-`lead_activity_aftermath` (supabase_phase88_4_trigger_consolidation.sql, LIVE, runs on every activity insert) has the same defect: owner `COALESCE(v_lead.assigned_to, NEW.created_by)`;
-a non-owner logging a next-action-date activity on a telecaller-owned lead creates the follow-up for themselves, and its UPDATE branch re-assigns the lead's oldest open follow-up to them
-(can partly undo the heal). Fix = add `v_lead.telecaller_id` as the middle term AND capture the function into `db/functions/lead_activity_aftermath.sql` (section 72); needs a guardian pass.
-Also noted: `generate_lead_tasks` filters `l.assigned_to = p_user_id` only (telecaller-owned leads never get smart tasks; dormant, panel hidden for sales).
+### APPLIED 2026-10-05 19:39 IST + verified; the OPEN item below was CLOSED by Phase 334 (section 323)
+Live result: 980 backed up, 420 stale closed, 560 re-pointed, still_on_wrong_owner 0, dhara_unreadable_open 0; lead stages unchanged, nothing respawned, no push. 3 fresh verifier agents (31 behaviour
+assertions incl. Nurture->Working spawning 9 lead_intro to the telecaller, RLS impersonation of all 20 assignees, side-effects audit) all PASS. UNDO caution: restoring is_done=false fires tg_push_followup_due
+(up to 420 pushes) - run the undo outside 09:00-21:00 IST or inside `SET LOCAL session_replication_role = replica`. The 110 re-pointed due/overdue rows had their reminder already sent to the old owner (no new ping).
 
 ### Owner run order
 1) the four `db/functions/*.sql` above  2) `supabase_phase333_cadence_owner_heal.sql`  3) reload Dhara's Follow-ups: the "Unknown lead" cards are gone; Brijesh's queue drops by ~770.
+
+## 323 · Phase 334 - "check the same issue is not there for other people": 3 leftovers fixed + CSV upload live (2026-10-05)
+
+Owner after the Dhara fix: "also check same issues not there in other persons." A fleet-wide READ-ONLY audit (3 agents: follow-up mismatches, every live function, every other owner-bearing table) found:
+**no other telecaller is affected** (Phase 333 covered them all; 0 leads have both owner columns set to different people; 0 ownerless open leads; manual follow-ups all sit with the lead owner) but 3 leftovers of the same family:
+
+1. **17 stranded open auto follow-ups** (Jayna 8 + Jignesh 3 - both inactive - and Brijesh 6) on leads LATER reassigned to sales reps (Jani 11, Kirti 5, Mayur 1). Phase 333 only matched still-telecaller-owned leads and the Phase 130
+   owner-change trigger only moved rows held by the PREVIOUS owner. Healed by `supabase_phase334_followup_owner_heal2.sql`: backup `_bak_followups_p334` (appends every run), 9 closed (overdue lead_intro / legacy
+   'Auto-scheduled:' notes only - rep-typed next-action rows are re-pointed, never closed), 8 re-pointed to COALESCE(assigned_to, telecaller_id).
+2. **`lead_activity_aftermath`** (live trigger on every activity insert) still used COALESCE(assigned_to, activity author): a non-owner logging a next-action date on a telecaller-owned lead got the follow-up for themselves
+   (55 such activities historically, last 14 Aug; 0 wrong rows today). Now `assigned_to -> telecaller_id -> author`. Captured into `db/functions/lead_activity_aftermath.sql` (section 72; old body in phase88_4 replaced by a
+   pointer, trigger wiring kept). The DORMANT `lead_activity_sync_followup` (no trigger) got the same fix in `db/functions/lead_activity_sync_followup.sql`; phase34's CREATE TRIGGER that would re-attach it is commented out.
+3. **`lead_owner_change_transfer_followups`** now moves every open AUTO-generated follow-up to the new owner, wherever it was parked (was: only rows held by the old owner). Canonical `db/functions/lead_owner_change_transfer_followups.sql`
+   (phase130 body -> pointer). Manual rows held by a third person still stay.
+4. Side effect caught by the reviewers and PROVEN live by a test agent: with (3) a far-future cadence row moved to the new owner made `_reassign_lead_apply` skip the Phase 100.E "call today" handoff task (and its single push).
+   Guard tightened in `supabase_phase100_a_reassign_rpc.sql`: only an open row due TODAY or overdue suppresses the task. Re-test: far-future moved row -> task now created; due/overdue moved row -> no duplicate. ACLs unchanged.
+
+Verification (all rolled-back or read-only): 24 aftermath assertions (TC lead -> Dhara not Brijesh; sales lead unchanged; ownerless -> author; first-engagement / heat / closed-lead contracts intact; no double follow-up), transfer
+scenarios incl. the real `reassign_lead` RPC, push audit (the transfer adds none), CSV upload as sales + telecaller + admin + team-viewer, pg_cron / pg_net / trigger / ACL health. Reviewers: sales-module-guardian PASS; regression PASS; SQL review FLAG -> 1 P2 fixed
+(narrow the heal's close arm) + 4 P3s applied. Live: 17 backed up, 9 closed, 8 moved, 0 left on a wrong owner.
+
+### OPEN - owner decisions / separate changes (NOT done)
+- **11 payment-chase follow-ups held by 5 INACTIVE reps** (Dipak 5, Abhinav 3, Avkashbhai 2, Jignesh 1) on sent quotes worth about Rs 36.4 lakh (UA-2026-0232 = Rs 34,40,880); their leads are owned by Dhara. Plus ~26 open quotes of deactivated reps.
+  Nobody is chasing them. Needs a decision: re-point to the lead owner (Dhara) or to accounts; and a deactivation checklist (reassign leads, quotes, follow-ups).
+- **New-lead push never fires for telecaller-owned leads** (`tg_push_on_lead_assign` watches `assigned_to` only; ~746 telecaller leads / 30 days). Product decision; interacts with the Phase 330 quiet-import WHEN clause on the same trigger.
+- Smart tasks (`generate_lead_tasks` filters `assigned_to` only) never serve telecallers (dormant, panel hidden); round-robin load counts `assigned_to` only; 6 WhatsApp conversations have a stale `assigned_to`; 12 stale open lead_tasks.
+- **PRE-EXISTING, unrelated: the 20:00 IST `attendance-tick` cron fails** (also on 3 Oct): `enforce_evening_before_checkout` raises 'Cannot check out before submitting evening report' and rolls back that minute's auto-checkout batch; later ticks succeed.
+- Owner-order inconsistency (assigned_to-first in the engine vs telecaller-first in inbox / nurture revisit / hot-lead): equal on every lead today (0 leads with differing columns); `leads_both_owners_differ` in the heals' VERIFY is the tripwire.
+
+### Foot-guns
+- Owner of record for ANY follow-up code = `assigned_to -> telecaller_id -> (created_by / activity author as last resort)`; never put the creator or activity author ahead of `telecaller_id`.
+- A heal that closes "legacy NULL-cadence" auto rows must key on the note (`Auto-scheduled:%`), not on cadence_type alone: aftermath rows are auto_generated + NULL cadence + the rep's own typed text.
+- A rule that moves rows to a new owner must be checked against every "does the new owner already have something?" guard downstream (here the Phase 100.E landing task).
 

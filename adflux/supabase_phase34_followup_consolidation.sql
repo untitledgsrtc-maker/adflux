@@ -176,69 +176,18 @@ CREATE TRIGGER trg_leads_auto_assign
 -- lead we update its date; otherwise we insert a new one. We mark
 -- the row with auto_generated=true so future cleanups can tell
 -- system-inserted rows from rep-curated ones.
-CREATE OR REPLACE FUNCTION public.lead_activity_sync_followup()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_owner uuid;
-  v_existing uuid;
-BEGIN
-  IF NEW.next_action_date IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  -- Owner of the follow-up: prefer the lead's current assignee, fall
-  -- back to the activity's author so a follow-up never lands without
-  -- someone to action it.
-  SELECT COALESCE(l.assigned_to, NEW.created_by)
-    INTO v_owner
-    FROM public.leads l
-   WHERE l.id = NEW.lead_id;
-
-  IF v_owner IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  -- Try to update an existing open follow-up first.
-  SELECT id INTO v_existing
-    FROM public.follow_ups
-   WHERE lead_id = NEW.lead_id
-     AND is_done = false
-   ORDER BY follow_up_date ASC
-   LIMIT 1;
-
-  IF v_existing IS NOT NULL THEN
-    UPDATE public.follow_ups
-       SET follow_up_date = NEW.next_action_date,
-           assigned_to    = v_owner,
-           note           = COALESCE(NEW.notes, note)
-     WHERE id = v_existing;
-  ELSE
-    INSERT INTO public.follow_ups (
-      lead_id, assigned_to, follow_up_date, follow_up_time,
-      note, auto_generated
-    ) VALUES (
-      NEW.lead_id,
-      v_owner,
-      NEW.next_action_date,
-      '10:00:00',
-      COALESCE(NEW.notes, 'Follow up'),
-      true
-    );
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
+-- ⛔ PHASE 334: the body of public.lead_activity_sync_followup() was REMOVED from this file (§71/§72).
+--    CANONICAL: db/functions/lead_activity_sync_followup.sql — edit THAT file, never re-paste a copy here.
+--    DORMANT fn (no trigger since Phase 88.4); fixed to assigned_to -> telecaller_id -> author. The trigger wiring below still re-attaches it if this file is re-run — do NOT re-run this section.
+--    (Re-running this file can no longer revert the function.)
 
 DROP TRIGGER IF EXISTS trg_lead_activity_sync_followup ON public.lead_activities;
-CREATE TRIGGER trg_lead_activity_sync_followup
-  AFTER INSERT ON public.lead_activities
-  FOR EACH ROW
-  EXECUTE FUNCTION public.lead_activity_sync_followup();
+-- ⛔ PHASE 334: re-attaching this trigger is DISABLED. Since Phase 88.4 the logic lives in lead_activity_aftermath();
+--    attaching lead_activity_sync_followup() next to it would write every follow-up twice. (Run db/functions/*.sql first on a fresh DB.)
+-- CREATE TRIGGER trg_lead_activity_sync_followup
+--   AFTER INSERT ON public.lead_activities
+--   FOR EACH ROW
+--   EXECUTE FUNCTION public.lead_activity_sync_followup();
 
 
 NOTIFY pgrst, 'reload schema';

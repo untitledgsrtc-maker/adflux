@@ -32,49 +32,15 @@
 
 -- ─── 2. Reassign transfers open follow_ups to the new owner ──────────
 -- Catches EVERY owner-change path (reassign_lead RPC, campaign inbox
--- direct write, any future admin edit). Only rows assigned to the OLD
--- owner move (manual + auto — they belong to the lead). Rows assigned
+-- direct write, any future admin edit). Rows held by the OLD owner move
+-- (manual + auto), and since Phase 334 EVERY open auto-generated (cadence) row
+-- on the lead follows it too, wherever it was parked. (Run db/functions/*.sql first on a fresh DB.) Rows assigned
 -- to someone who REMAINS an owner (e.g. TC kept while sales changes)
 -- stay put. Quote-tied payment FUs have lead_id NULL -> untouched.
-CREATE OR REPLACE FUNCTION public.lead_owner_change_transfer_followups()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_new_owner uuid;
-BEGIN
-  v_new_owner := COALESCE(NEW.assigned_to, NEW.telecaller_id);
-  IF v_new_owner IS NULL THEN
-    RETURN NEW;                       -- never transfer to nobody
-  END IF;
-  IF NEW.assigned_to   IS NOT DISTINCT FROM OLD.assigned_to
-     AND NEW.telecaller_id IS NOT DISTINCT FROM OLD.telecaller_id THEN
-    RETURN NEW;                       -- defensive: no real owner change
-  END IF;
-
-  -- EXCEPTION-wrapped: a reassign must never fail on FU housekeeping.
-  BEGIN
-    UPDATE public.follow_ups fu
-       SET assigned_to = v_new_owner
-     WHERE fu.lead_id = NEW.id
-       AND fu.is_done = false
-       AND fu.assigned_to IS NOT NULL
-       AND fu.assigned_to IN (OLD.assigned_to, OLD.telecaller_id)
-       AND fu.assigned_to IS DISTINCT FROM NEW.assigned_to
-       AND fu.assigned_to IS DISTINCT FROM NEW.telecaller_id;
-    -- Push note: tg_push_followup_due is UPDATE OF follow_up_date,
-    -- is_done (34Z.55) -> this UPDATE fires NO push. The new owner is
-    -- told via the existing quiet-hours-gated reassign push, and the
-    -- fu-due cron / morning digest read assigned_to live from now on.
-  EXCEPTION WHEN OTHERS THEN
-    RAISE WARNING 'lead_owner_change_transfer_followups skipped for lead %: %',
-                  NEW.id, SQLERRM;
-  END;
-  RETURN NEW;
-END;
-$$;
+-- ⛔ PHASE 334: the body of public.lead_owner_change_transfer_followups() was REMOVED from this file (§71/§72).
+--    CANONICAL: db/functions/lead_owner_change_transfer_followups.sql — edit THAT file, never re-paste a copy here.
+--    Phase 334 broadened it: cadence (auto) follow-ups follow the lead to its new owner wherever they were parked.
+--    (Re-running this file can no longer revert the function.)
 
 DROP TRIGGER IF EXISTS trg_lead_owner_change_transfer_fu ON public.leads;
 CREATE TRIGGER trg_lead_owner_change_transfer_fu

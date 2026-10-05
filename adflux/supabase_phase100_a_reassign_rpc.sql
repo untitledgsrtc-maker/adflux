@@ -388,7 +388,8 @@ BEGIN
   -- tg_push_followup_due trigger (§34Z.55) fires the ping on THIS INSERT
   -- automatically (no direct enqueue_push here → no double-ping, reuses the
   -- frozen push path). SKIP if they already have an open follow-up for this
-  -- lead (the Phase 130 transfer AFTER-UPDATE trigger just moved one).
+  -- lead that is due TODAY or overdue (the Phase 130 transfer AFTER-UPDATE trigger just
+  -- moved it; Phase 334: a far-future moved row no longer counts).
   -- Subtransaction + EXCEPTION so a failure here can NEVER roll back or break
   -- the reassign itself — the task/ping is best-effort, the handoff is the core.
   BEGIN
@@ -397,6 +398,8 @@ BEGIN
        WHERE lead_id = p_lead_id
          AND assigned_to = p_new_owner
          AND is_done = false
+         AND follow_up_date <= CURRENT_DATE     -- Phase 334: only a row already DUE (today/overdue) counts; a far-future cadence row the
+                                                -- transfer trigger just moved must not hide the 'call today' handoff task + its push
     ) THEN
       -- follow_up_time = NULL EXPLICITLY (override the table's stale
       -- DEFAULT '10:00:00'). With a time set, a same-day row is BOTH pushed
