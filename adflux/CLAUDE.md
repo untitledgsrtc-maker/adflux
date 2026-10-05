@@ -19950,3 +19950,33 @@ Ran against the live DB with `supabase db query --linked`. Capture is healthy; n
   never count (the 50-call target needs >=10s), so scores and pay are unaffected.
 - FOOT-GUN when querying call_logs by `created_at` and grouping by `call_at` date: late-ingested old calls make a fake "jump" in the
   earlier days (I almost reported one). Group by the same column you filter on.
+
+
+---
+
+## 316 · APK 96019 PUBLISHED to the fleet - trimmed 45 MB -> 9.5 MB (2026-10-05)
+
+Supersedes the "NOT yet published" and size-warning lines in sections 313/314. Owner said yes to "trim then publish".
+- **Trim method:** `npm run build`, then `rm -rf dist/deck dist/investor dist/led dist/email dist/email-footers`, delete
+  `android/app/src/main/assets/public` (also clears the iCloud " 2" duplicates), `npx cap sync android`,
+  `cd android && ./gradlew clean assembleDebug`. Bundled web assets 66 MB -> 8 MB. Safe because the app runs in live-update
+  mode (loads app.untitledad.in), so the bundled copy is only a fallback and the sales-deck/investor media were never used
+  from inside the APK. Re-do this prune on EVERY APK build or the file balloons back to ~45 MB.
+- **Verified before publishing:** aapt2 versionCode 96019 / 0.96.19, signed with the reps' debug cert SHA-256 15d785ae...2fe6
+  (installs over their app), `res/xml/file_paths.xml` present, no `assets/public/deck`. Native code is unchanged since the
+  emulator camera test (section 314). Trimmed build installed on the emulator and loaded the live Sign In screen.
+- **Published:** uploaded to the `apk` bucket as `untitled-os.apk`; `https://app.untitledad.in/api/apk` now serves it
+  (9.5 MB, byte-identical to the local build, content-type application/vnd.android.package-archive); `app_version` row
+  96019 inserted, is_active=true, apk_url `https://app.untitledad.in/apk`, changelog "Scan card camera fix + smaller download".
+  Reps on 96018 get the in-app "Update available" banner (2 taps, section 74/76). 96014 and 96018 rows stay active; the banner
+  reads the highest version_code.
+- **GOTCHA - overwriting the APK:** `supabase storage cp ... ss:///apk/untitled-os.apk` fails with 409 "Duplicate" (no upsert
+  flag), and `supabase storage rm` waits on a y/N prompt. Working sequence: `echo y | supabase storage rm ss:///apk/untitled-os.apk
+  --experimental` then `supabase storage cp <apk> ss:///apk/untitled-os.apk --experimental --content-type
+  application/vnd.android.package-archive`, then curl `/api/apk?v=<ts>` and aapt2-check the versionCode. `scripts/release-apk.sh`
+  does NOT handle this (it would stop at the 409) - fix it before relying on it.
+- **Rollback:** the previous 96018 APK (39 MB) was saved at the session scratchpad `untitled-os-96018-backup.apk`
+  (session-only; otherwise rebuild from commit 5ba2d96's tree). Re-upload it with the rm+cp sequence above and
+  `update public.app_version set is_active=false where version_code=96019`.
+- Still open (unchanged): re-check B10 lead-link after a full day (section 308); Rakesh Prajapati password; GULSHAN has not
+  opened the app since 10 Sep; Kamina reports `web`.
