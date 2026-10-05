@@ -24,4 +24,17 @@
          external files dir via DownloadManager.setDestinationInExternalFilesDir),
          then FileProvider serves it to the package installer. -->
     <external-files-path name="apk_update" path="apk/" />
+    <!-- 2026-10-02 — lead "Scan card" camera fix (APK 96019). Capacitor's
+         WebView camera capture (<input type="file" capture>) writes its
+         temp photo to getExternalFilesDir(DIRECTORY_PICTURES), i.e. the
+         APP-PRIVATE .../Android/data/in.untitledad.app/files/Pictures/,
+         then asks this FileProvider for a content:// URI for it. The
+         "external_pictures" entry above is the SHARED /storage/emulated/0/
+         Pictures folder, a different place, so it does not cover this.
+         Phase 76.2.2 (92266b7) replaced external-path "." with the narrow
+         entries and dropped the only root that covered it; the capture
+         then threw "Unable to create temporary media capture file" and
+         Capacitor silently fell back to the file picker. Least-privilege
+         fix: expose ONLY that one subfolder. Do NOT restore path=".". -->
+    <external-files-path name="capacitor_camera" path="Pictures/" />
 </paths>

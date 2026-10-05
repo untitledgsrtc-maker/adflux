@@ -95,8 +95,12 @@ android {
         //         (ring/answer/hangup) independent of the OEM call-log TYPE —
         //         the permanent fix that supersedes the 220/227/227.1 type
         //         patches (CLAUDE.md §92). Requires APK rebuild (Part B).
-        versionCode 96018
-        versionName "0.96.18"
+        // 96019 — Lead "Scan card" camera fix: file_paths.xml gains
+        //         external-files-path Pictures/ (Capacitor capture file) +
+        //         AndroidManifest <queries> IMAGE_CAPTURE. Regression from
+        //         Phase 76.2.2 (92266b7). Native/config only; needs APK rebuild.
+        versionCode 96019
+        versionName "0.96.19"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

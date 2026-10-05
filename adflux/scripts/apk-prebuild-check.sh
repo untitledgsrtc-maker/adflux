@@ -9,6 +9,9 @@
 #   2. Stale Gradle daemon eating heap → kills it pre-emptively.
 #   3. JDK version mismatch → Capacitor 8 needs JDK 17+.
 #   4. Stale Vite dist/ vs latest src/ → forces rebuild.
+#   5. (2026-10-02) Camera "Scan card" config - file_paths.xml +
+#      AndroidManifest <queries> + no CAMERA permission
+#      (scripts/check-android-camera.mjs).
 #
 # Usage:
 #   ./scripts/apk-prebuild-check.sh
@@ -92,6 +95,13 @@ if (( free_gb < 5 )); then
   fail=1
 else
   echo "${grn}OK — ${free_gb} GB free${clr}"
+fi
+
+# 7. Camera capture config (lead "Scan card"). The .mjs prints its own
+#    OK / WARN / FAIL line(s); it exits 1 ONLY on a positively detected defect
+#    and 0 on any error of its own, so it can never block by accident.
+if ! node scripts/check-android-camera.mjs; then
+  fail=1
 fi
 
 if (( fail == 1 )); then

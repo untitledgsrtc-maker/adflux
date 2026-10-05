@@ -149,6 +149,15 @@
          REBUILD REQUIRED. Native manifest change → APK rebuild +
          redistribute. JS live-update alone won't fix this. -->
     <queries>
+        <!-- 2026-10-02 (APK 96019) — camera app for the lead "Scan card"
+             button. Capacitor's WebView capture calls
+             Intent(ACTION_IMAGE_CAPTURE).resolveActivity(); on Android 11+
+             that returns null (and Capacitor falls back to the file picker)
+             unless the intent is declared here. Do NOT add
+             android.permission.CAMERA: this uses the phone's own camera app. -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
         <!-- Telephone dialer (tel: scheme) -->
         <intent>
             <action android:name="android.intent.action.DIAL" />
