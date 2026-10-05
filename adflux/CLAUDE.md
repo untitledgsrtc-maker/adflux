@@ -19549,3 +19549,83 @@ read live every minute, so the job short-circuits (`skipped: holiday`) and nobod
   is §28-frozen → guardian first) is the real fix and is NOT built. Until it is, treat every holiday toggle as a pay event.
 - Gandhi Jayanti 2026 stays as a (past) holiday row; whether the company really closes Republic Day / Independence Day /
   Christmas / Gandhi Jayanti in 2027 is still the owner's decision.
+
+
+---
+
+## 303 · Five-issue fix programme — live findings (B0) + Wave 1 shipped (2026-10-05)
+
+Owner (2 Oct) listed five problems: calls not recorded, lead Scan camera, salary changing by
+itself + default 0, HR hired→offer→user→login flow, ops salary missing from Salary sheet. A 5-agent
+read-only analysis + a critic produced a batch plan (B0..B12). The owner ran the read-only B0 query
+pack on the LIVE DB (`supabase_b0_diagnostics_2026_10_02.sql` + the one-paste
+`supabase_b0_part_a_one_shot.sql`). THESE ARE THE LIVE FACTS — do not re-derive them.
+
+### What the live data proved
+- **Salary "auto-change":** NO database trigger can do it (SAL1: the Phase 213 designation→salary
+  sync is gone; zero triggers on `staff_incentive_profiles` / `designations`). Remaining causes are
+  human/screen: StaffModal stale-snapshot save, offer-convert re-run overwriting an existing profile,
+  HR/Accounts RLS write rights, and one raise re-pricing every month (pay is computed live). No
+  history existed before Phase 327. Also: nobody earns incentive on zero salary (SAL8 = 0 rows) and
+  every active user has a salary row (SAL9) — zero-salary = Brijesh (admin), Vishal (co_owner), 2
+  agency only. So the "zero-salary earns incentive" P0 is NOT live; that guard is deprioritised.
+- **Ops salary missing:** confirmed — live `compute_monthly_salaries` lists only sales/telecaller/
+  admin/co_owner. Newly listed (everyone except agency): Gohil 20k, Gulshan 16k, Dixita 25k
+  (operation_head, designation oddly "Sales Executive"), Diya 45k (accounts), Riya 35k (hr), `test` 22k.
+- **September ops variable is ZERO for Gohil + Gulshan** (est. pay 14,000 / 11,200 instead of 20,000
+  / 16,000): they joined 10 Sep with no stations assigned → 0 uptime-measured days; their only
+  daily_performance row is a lone 0.0 score day (likely from an activity, not uptime) which
+  monthly_score counts (is_excluded=false) → avg 0 → zero variable. NB: this is the OPPOSITE of the
+  §184 "0 days → full cap" trap analysts predicted. Dixita Sept = zero variable too (network uptime
+  75.0% < the 85% floor) — genuine, unchanged.
+- **Calls:** all 11 APK users are on 96018. "WEB" chip = last-writer-wins (Rima, Sneha, Kamina, Dixita
+  show web but Rima/Sneha have thousands of app capture rows → they use BOTH). Confirmed capture hole:
+  271 calls in 14 days lost their `lead_id` because the lead phone is stored 91xxxxxxxxxx / +91 /
+  spaces and the matcher compares 10 digits (Rima 167 of her 225 unlinked). 2,054 of 3,001 unlinked
+  calls (68%) are to numbers not in `leads` at all (personal/other). The stored counter counts every
+  call row; the screen rule counts duration>=10 AND lead_id not null → visible disagreement.
+- **HR offers:** live `fetch_offer_by_token` returns NO designation_* role fields → every
+  candidate-signed PDF is the SALES letter. 6 signed non-sales letters are wrong (4 Telecaller, 2
+  Operation Execution). Separate security finding (NOT fixed): the same anon-callable function also
+  returns PAN / Aadhaar / bank / dob to anyone with the link — fix as its own reviewed change.
+- **Scan:** `lead_photos` has only 3 rows ever → no DB trace of scans; the owner's own account reads
+  "web" so the APK camera fix may not be what he saw — his tap test (APK vs Chrome) decides.
+- **email_log table does NOT exist live** (`supabase_email_log.sql` was never run) → no offer/quote
+  email has ever been logged (api/email/send.js logs best-effort, mail may still send).
+- Inference from his accidental whole-file paste: Studio ran every B0 block top-to-bottom and stopped
+  at the first missing table (HR10 → email_log) → all Part A blocks ran without error on the live schema.
+
+### Owner decisions (2026-10-05, locked)
+1. **Sept 2026 only: Gohil + Gulshan get FULL variable once** (nothing was measurable); October on = real uptime.
+2. **Deactivate the `test` operations account** (salary 22,000, would become payable).
+3. **Salary sheet lists everyone except agency.**
+4. **Calls: forward-only lead-link fix** (match on last-10 digits); do NOT relink past calls yet.
+Still unanswered (ask before B7/B8): what a salary of 0 means (not-set vs commission-only), one-click
+HR convert vs automatic on acceptance, login via personal email.
+
+### Wave 1 SHIPPED (all on origin `untitled-os`, each reviewed by an independent agent; B1/B9 + the
+frozen PushDebugV2 also by sales-module-guardian)
+| Batch | Commit | What | Owner step |
+|---|---|---|---|
+| B0 | `a35badb`, `f0d0c53` | read-only diagnostics (49 blocks; HR10 made missing-table-safe) | done |
+| B1 (Phase 327) | `32ed569` | `supabase_phase327_salary_change_audit.sql`: audit log of every salary change + locked backups `_bak_sip_20261002` / `_bak_designations_20261002`; fail-open SECURITY DEFINER trigger; admin-only read | **RUN in Studio**, read the PASS grid |
+| B6 (Phase 329) | `93fcae4` | HR: Send-offer share step stays open (+WhatsApp to the candidate's own chat); `db/functions/fetch_offer_by_token.sql` (canonical, one BEGIN/COMMIT paste) returns the 4 role fields; OfferForm shows incentive terms | **RUN `db/functions/fetch_offer_by_token.sql`**, then test one sales + one non-sales link as a logged-out visitor |
+| B9 (Phase 303) | `aae8d54` | Team dashboard chip: amber "Browser - not the app" when app_version='web' (a hint, NOT proof — last-writer-wins); PushDebug: field roles told to use the Android app | none (JS) |
+| B2 (Phase 304) | `036d648` | camera fix: `file_paths.xml` + `external-files-path Pictures/`, `<queries>` IMAGE_CAPTURE, versionCode 96019, `scripts/check-android-camera.mjs` tripwire (APK path only, never blocks web build) | **APK rebuild + one-phone test + publish app_version 96019** (§74/§76); NOT device-tested |
+Phase-number note (§52): 303/304/327/329 here are batch labels — disambiguate by SHA.
+
+### FOOT-GUNS (new)
+- ❌ The §258-era assumption "0 measured days pays FULL variable" is only true when the month has ZERO
+  non-excluded daily_performance rows; a single stray 0.0 row flips it to ZERO variable. Check the real
+  rows before reasoning about an ops exec's variable.
+- ❌ A "WEB" app_version chip is not proof a rep never uses the APK (both flip it). Never word UI as
+  "calls not tracked" off it — say "last opened in a browser".
+- ❌ Do not push a Salary-sheet page change before its batch RPC SQL runs (page-first = people listed with
+  dashes). SQL first, shadow-compare 0 CHANGED / 0 DROPPED, then push.
+- ❌ `fetch_offer_by_token` is anon-callable and on the §211 allow-list: a DROP+CREATE drops its grants —
+  the canonical file re-GRANTs anon + authenticated and its VERIFY proves it.
+
+### Queue (one money change per week, never mid-payout — critic rule)
+This week: B3 (ops/HR/accounts on Salary sheet), Sept-pay + test-deactivation prep SQL, B4 (default salary
+0 + always-create-profile + stale-save guard) — Wave 2. Next week: B10 (forward-only call lead-link fix).
+Held for owner decisions: B7/B8 (atomic offer→user→login-link), B5 guards.
