@@ -38,6 +38,18 @@ const LEAVE_TYPES = [
   { key: 'other',        label: 'Other'       },
 ]
 
+// Batch B3 fixer (2026-10-05) — ONLY these roles have a daily performance score.
+// compute_daily_score (the frozen §72 canonical) has NO guard for other roles: for
+// anyone who is not 'telecaller' it takes the meetings branch (target 5, done 0) and
+// UPSERTS a non-excluded score-0 daily_performance row. For ops / office_staff / staff
+// / hr / accounts that stray 0.0 row makes monthly_score count one measured day at
+// average 0 (variable becomes Rs 0 instead of the "0 days = full cap" path) and, for
+// ops executives, overwrites the uptime-driven score the p4 trigger writes (§232 "two
+// writers fight the PK"). So this page must only ask for a score recompute when the
+// leave belongs to a scored role. FAILS CLOSED: unknown / missing / NULL role -> skip.
+// Leave DEDUCTION in pay is unaffected (compute_monthly_salary reads `leaves` directly).
+const SCORED_ROLES = ['sales', 'telecaller']
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -118,7 +130,12 @@ export default function LeavesAdminV2({ embedded = false }) {
         // Phase 273 — include hr + accounts (they take leave too → their name
         // shows in the table + they appear in the rep filter). Agency dropped
         // (commission-only, no leave/payroll).
-        .in('role', ['sales', 'telecaller', 'admin', 'co_owner', 'hr', 'accounts'])
+        // Batch B3 (2026-10-05) — widened to EVERYONE EXCEPT AGENCY, the same rule
+        // as the Salary sheet (SalaryAdminV2 + compute_monthly_salaries). The old
+        // allow-list lacked operation_executive / operation_head / office_staff /
+        // staff, so their leave rows showed "Unknown" and the admin could not pick
+        // an ops person when adding a leave.
+        .neq('role', 'agency')
         .order('name', { ascending: true }),
       supabase.from('leaves')
         .select('id, user_id, leave_date, leave_type, reason, status, is_half_day, is_paid_request, created_at')
@@ -139,6 +156,15 @@ export default function LeavesAdminV2({ embedded = false }) {
     users.forEach(u => { m[u.id] = u.name })
     return m
   }, [users])
+
+  // Map user_id → role (from the already-loaded users array — no extra query) so the
+  // score recompute can be limited to scored roles (see SCORED_ROLES above).
+  const roleMap = useMemo(() => {
+    const m = {}
+    users.forEach(u => { m[u.id] = u.role })
+    return m
+  }, [users])
+  const isScoredUser = (uid) => SCORED_ROLES.includes(roleMap[uid])
 
   async function handleSave() {
     if (!fUser)  { setErr('Pick a team member.'); return }
@@ -182,9 +208,12 @@ export default function LeavesAdminV2({ embedded = false }) {
       return
     }
     // Recompute each saved day's score so /my-performance reflects it.
+    // B3 fixer: scored roles only (sales/telecaller) — see SCORED_ROLES.
     try {
-      for (const d of dates) {
-        await supabase.rpc('compute_daily_score', { p_user_id: fUser, p_date: d })
+      if (isScoredUser(fUser)) {
+        for (const d of dates) {
+          await supabase.rpc('compute_daily_score', { p_user_id: fUser, p_date: d })
+        }
       }
     } catch (_) { /* ignore */ }
     toastSuccess(
@@ -216,10 +245,13 @@ export default function LeavesAdminV2({ embedded = false }) {
     }
     // Re-score that day so the rep's performance flips back to
     // "counted" if it was previously excluded.
+    // B3 fixer: scored roles only (sales/telecaller) — see SCORED_ROLES.
     try {
-      await supabase.rpc('compute_daily_score', {
-        p_user_id: row.user_id, p_date: row.leave_date,
-      })
+      if (isScoredUser(row.user_id)) {
+        await supabase.rpc('compute_daily_score', {
+          p_user_id: row.user_id, p_date: row.leave_date,
+        })
+      }
     } catch (_) { /* ignore */ }
     load()
   }
@@ -238,7 +270,8 @@ export default function LeavesAdminV2({ embedded = false }) {
       const r = await supabase.from('leaves').update({ status: 'approved' }).eq('id', row.id)
       error = r.error
       if (!error) {
-        try { await supabase.rpc('compute_daily_score', { p_user_id: row.user_id, p_date: row.leave_date }) }
+        // B3 fixer: scored roles only (sales/telecaller) — see SCORED_ROLES.
+        try { if (isScoredUser(row.user_id)) await supabase.rpc('compute_daily_score', { p_user_id: row.user_id, p_date: row.leave_date }) }
         catch (_) { /* ignore */ }
       }
     }
@@ -263,7 +296,8 @@ export default function LeavesAdminV2({ embedded = false }) {
       error = r.error
       if (!error) {
         // Re-score with rejected status so the day counts again.
-        try { await supabase.rpc('compute_daily_score', { p_user_id: row.user_id, p_date: row.leave_date }) }
+        // B3 fixer: scored roles only (sales/telecaller) — see SCORED_ROLES.
+        try { if (isScoredUser(row.user_id)) await supabase.rpc('compute_daily_score', { p_user_id: row.user_id, p_date: row.leave_date }) }
         catch (_) { /* ignore */ }
       }
     }

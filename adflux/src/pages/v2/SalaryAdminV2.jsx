@@ -36,6 +36,45 @@ function fmtINR(n) {
 import { istCurrentMonthYM } from '../../utils/istDate'
 function currentMonthYM() { return istCurrentMonthYM() }
 
+// Batch B3 (2026-10-05) — the Salary sheet lists EVERYONE ACTIVE EXCEPT AGENCY
+// (owner decision). Plain labels for the Role dropdown + the name-cell sub-line.
+// Order here = order in the dropdown.
+const ROLE_LABELS = {
+  sales:               'Sales',
+  telecaller:          'Telecaller',
+  operation_executive: 'Operations',
+  operation_head:      'Operation head',
+  hr:                  'HR',
+  accounts:            'Accounts',
+  office_staff:        'Office staff',
+  staff:               'Staff',
+  admin:               'Admin',
+  co_owner:            'Co-owner',
+}
+const roleLabel = (role) => ROLE_LABELS[role] || role || '—'
+// Founders + commission-only never get the "No salary set" chip.
+const NO_SALARY_EXEMPT = ['admin', 'co_owner', 'agency']
+// Roles whose variable is driven by screen uptime (no daily score rows until
+// stations are assigned) — see the "Unmeasured" chip.
+const OPS_ROLES = ['operation_executive', 'operation_head']
+
+// Honest per-row flags. `missing` = the users query returned this person but the
+// salary function returned NO row for them (page deployed before the SQL ran, or
+// the batch call failed) — we show dashes, never an invented number.
+function rowFlags(r) {
+  const missing = !!r._missing
+  const role = r.user?.role
+  const noSalary = !missing
+    && !NO_SALARY_EXEMPT.includes(role)
+    && !(Number(r.monthly_salary) > 0)
+  // 0 measured days → the salary function counts the score as 100 by default
+  // (variable = full cap). That 100 is not a real score for an ops person.
+  const unmeasured = !missing
+    && OPS_ROLES.includes(role)
+    && Number(r.working_days || 0) === 0
+  return { missing, noSalary, unmeasured }
+}
+
 // Phase 38 — `embedded` prop suppresses own page-head when mounted
 // inside PeopleV2 (which renders the shared "People" head once). When
 // embedded, the month picker + CSV export move to a toolbar row above
@@ -78,8 +117,12 @@ export default function SalaryAdminV2({ embedded = false }) {
     const [usersRes, polRes, payRes, taRes] = await Promise.all([
       supabase.from('users')
         .select('id, name, role')
-        // Phase 101.A2 — agency dropped (commission-only, no salary).
-        .in('role', ['sales', 'telecaller', 'admin', 'co_owner'])
+        // Batch B3 (2026-10-05) — everyone EXCEPT agency (owner decision): adds
+        // operation_executive / operation_head / hr / accounts / office_staff /
+        // staff. Agency stays out (commission-only, Phase 101.A2). LOCKSTEP with
+        // compute_monthly_salaries in supabase_phase323_tier3_batch_rpcs.sql
+        // (WHERE is_active AND COALESCE(role,'') <> 'agency') — change both together.
+        .neq('role', 'agency')
         .eq('is_active', true)
         .order('name', { ascending: true }),
       supabase.from('salary_policy')
@@ -132,15 +175,21 @@ export default function SalaryAdminV2({ embedded = false }) {
       p_year: y, p_month: m,
     })
     if (batchErr) {
-      // deploy-before-SQL / transient: surface per-row (existing error UI), never a wrong number.
-      setRows((usersRes.data || []).map(u => ({ user: u, error: batchErr.message })))
+      // deploy-before-SQL / transient: show the people with dashes (never a wrong
+      // number) AND say why — the old per-row error was never rendered anywhere.
+      setErr(`Could not compute salaries: ${batchErr.message}`)
+      setRows((usersRes.data || []).map(u => ({ user: u, error: batchErr.message, _missing: true })))
       setLoading(false)
       return
     }
     const salByUser = new Map((batch || []).map(b => [b.user_id, b.result]))
     const out = (usersRes.data || []).map((u) => {
       const data = salByUser.get(u.id)
-      return { user: u, ...((data && typeof data === 'object') ? data : {}) }
+      if (data && typeof data === 'object') return { user: u, ...data }
+      // Listed by the users query but the salary function returned NO row (the
+      // page went live before supabase_phase323_tier3_batch_rpcs.sql ran). Flag
+      // it — dashes + one banner — instead of rendering a silent zero.
+      return { user: u, _missing: true }
     })
     setRows(out)
     setLoading(false)
@@ -162,6 +211,14 @@ export default function SalaryAdminV2({ embedded = false }) {
     })
   }, [rows, roleFilter, searchQ])
 
+  // Batch B3 — people the users query listed but the salary function returned no
+  // row for (SQL not updated yet). Rows with `error` are a failed batch call —
+  // that already has its own red banner, so they are not counted here.
+  const pendingSqlCount = useMemo(
+    () => rows.filter(r => r._missing && !r.error).length,
+    [rows],
+  )
+
   const totals = useMemo(() => {
     return filteredRows.reduce((acc, r) => {
       acc.totalSalary += Number(r.monthly_salary || 0)
@@ -182,21 +239,30 @@ export default function SalaryAdminV2({ embedded = false }) {
       'Leave Total', 'Leave Paid', 'Leave Unpaid',
       'Unpaid Deduction', 'NET PAYABLE',
     ]
-    const lines = filteredRows.map(r => [
-      r.user?.name || '',
-      r.user?.role || '',
-      r.monthly_salary || 0,
-      r.base || 0,
-      r.variable || 0,
-      r.score_pct || 0,
-      r.incentive || 0,
-      r.ta_da || 0,
-      r.leave_days_total || 0,
-      r.leave_days_paid || 0,
-      r.leave_days_unpaid || 0,
-      r.unpaid_deduction || 0,
-      r.net_payable || 0,
-    ].map(v => String(v).replace(/,/g, ' ')).join(','))
+    const lines = filteredRows.map(r => {
+      const f = rowFlags(r)
+      // A person with no computed figures (salary function not updated yet / call
+      // failed) exports name + role with BLANK money cells — never invented zeros.
+      const cells = f.missing
+        ? [r.user?.name || '', r.user?.role || '', '', '', '', '', '', '', '', '', '', '', '']
+        : [
+            r.user?.name || '',
+            r.user?.role || '',
+            r.monthly_salary || 0,
+            r.base || 0,
+            r.variable || 0,
+            // Unmeasured ops rows: the function's default 100 is not a real score → blank.
+            f.unmeasured ? '' : (r.score_pct || 0),
+            r.incentive || 0,
+            r.ta_da || 0,
+            r.leave_days_total || 0,
+            r.leave_days_paid || 0,
+            r.leave_days_unpaid || 0,
+            r.unpaid_deduction || 0,
+            r.net_payable || 0,
+          ]
+      return cells.map(v => String(v).replace(/,/g, ' ')).join(',')
+    })
     const csv = [header.join(','), ...lines].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -234,15 +300,15 @@ export default function SalaryAdminV2({ embedded = false }) {
               style={{ ...inputStyle, minWidth: 160 }}
             >
               <option value="all">All roles</option>
-              <option value="sales">Sales</option>
-              <option value="telecaller">Telecaller</option>
-              <option value="agency">Agency</option>
-              <option value="admin">Admin</option>
-              <option value="co_owner">Co-owner</option>
+              {/* Batch B3 — every role on the sheet (agency is not listed, so no
+                  Agency option). Labels come from ROLE_LABELS. */}
+              {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
             </select>
           </div>
           <div style={filtColStyle}>
-            <label style={labelStyle}>Search rep</label>
+            <label style={labelStyle}>Search name</label>
             <input
               type="text"
               value={searchQ}
@@ -275,7 +341,7 @@ export default function SalaryAdminV2({ embedded = false }) {
             <div className="v2d-page-kicker">HR · Payroll</div>
             <h1 className="v2d-page-title">Salary Sheet</h1>
             <div className="v2d-page-sub">
-              Per-rep monthly breakdown: base + variable + incentive + TA – leave
+              Per-person monthly breakdown: base + variable + incentive + TA – leave
               deduction. Policy: {policy ? `every leave deducted · salary ÷ ${policy.unpaid_divisor} per day` : 'loading…'}.
             </div>
           </div>
@@ -319,7 +385,7 @@ export default function SalaryAdminV2({ embedded = false }) {
             <SummaryCard
               label="Net Payable"
               value={fmtINR(totals.net)}
-              sub={`${rows.length} reps · ${month}`}
+              sub={`${rows.length} people · ${month}`}
             />
             <SummaryCard
               label="Already Paid"
@@ -331,7 +397,7 @@ export default function SalaryAdminV2({ embedded = false }) {
               label="Pending"
               value={fmtINR(pending)}
               valueColor="var(--v2-amber, #F59E0B)"
-              sub={`${repsNotFull} reps not paid in full`}
+              sub={`${repsNotFull} people not paid in full`}
             />
             <SummaryCard
               label="Unpaid Leave Cut"
@@ -350,6 +416,22 @@ export default function SalaryAdminV2({ embedded = false }) {
           fontSize: 13, display: 'flex', alignItems: 'center', gap: 6,
         }}>
           <AlertTriangle size={14} /> {err}
+        </div>
+      )}
+
+      {/* Batch B3 deploy-order safety — the page is live but the salary function
+          has not been updated yet (supabase_phase323_tier3_batch_rpcs.sql), so
+          some listed people have NO computed row. They show dashes; this ONE
+          banner says why. Disappears the moment the SQL is run. */}
+      {!loading && pendingSqlCount > 0 && (
+        <div role="status" style={{
+          padding: '8px 12px', borderRadius: 'var(--v2-r-sm, 10px)',
+          background: 'var(--tint-warning)', border: '1px solid var(--tint-warning-bd)',
+          color: 'var(--warning)',
+          fontSize: 12, display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <AlertTriangle size={14} strokeWidth={1.6} />
+          {pendingSqlCount} {pendingSqlCount === 1 ? 'person is' : 'people are'} listed but the salary function has not been updated yet - run supabase_phase323_tier3_batch_rpcs.sql
         </div>
       )}
 
@@ -374,11 +456,11 @@ export default function SalaryAdminV2({ embedded = false }) {
             <div className="v2d-empty-ic" style={{ marginBottom: 12 }}>
               <Wallet size={28} strokeWidth={1.6} />
             </div>
-            <div className="v2d-empty-t">No reps to compute</div>
+            <div className="v2d-empty-t">No people to compute</div>
           </div>
         ) : filteredRows.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--v2-ink-2)', fontSize: 13 }}>
-            No reps match the current Role / Search filter. Clear filters to see all {rows.length} reps.
+            No people match the current Role / Search filter. Clear filters to see all {rows.length} people.
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -404,15 +486,39 @@ export default function SalaryAdminV2({ embedded = false }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map(r => (
+                {filteredRows.map(r => {
+                  const flags = rowFlags(r)
+                  return (
                   <tr key={r.user.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
                     <td style={tdStyle}>
                       <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>
                         {r.user.name}
                       </div>
                       <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
-                        {r.user.role}
+                        {roleLabel(r.user.role)}
                       </div>
+                      {/* Batch B3 — honest chips. Only ever shown for a person whose
+                          figures WERE computed (a missing row just shows dashes). */}
+                      {(flags.noSalary || flags.unmeasured) && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                          {flags.noSalary && (
+                            <span
+                              style={chipWarnStyle}
+                              title="No monthly salary is set for this person, so base and variable are 0. Set it on their profile or offer."
+                            >
+                              No salary set
+                            </span>
+                          )}
+                          {flags.unmeasured && (
+                            <span
+                              style={chipWarnStyle}
+                              title="No measured working days this month (no stations assigned, or nothing to measure yet), so the variable shown is the full amount by default. Confirm before paying."
+                            >
+                              Unmeasured - 0 days
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     {/* Phase 40 — Total Salary = monthly_salary
                         contract from staff_incentive_profiles. */}
@@ -422,15 +528,26 @@ export default function SalaryAdminV2({ embedded = false }) {
                     <td style={tdNum}>{fmtINR(r.base)}</td>
                     <td style={tdNum}>{fmtINR(r.variable)}</td>
                     <td style={tdNum}>
-                      <span style={{
-                        fontFamily: 'inherit',
-                        fontSize: 11,
-                        color: (Number(r.score_pct || 0) >= 80) ? 'var(--v2-green, #10B981)'
-                             : (Number(r.score_pct || 0) >= 50) ? 'var(--v2-amber, #F59E0B)'
-                             :                                    'var(--v2-rose, #EF4444)',
-                      }}>
-                        {r.score_pct != null ? `${r.score_pct}%` : '—'}
-                      </span>
+                      {(flags.missing || flags.unmeasured) ? (
+                        // Neutral dash: either no computed row, or an ops person with
+                        // 0 measured days (the function's default "100%" is not a real score).
+                        <span
+                          style={{ fontSize: 11, color: 'var(--text-muted)' }}
+                          title={flags.unmeasured ? 'No measured days this month - no real score yet' : undefined}
+                        >
+                          —
+                        </span>
+                      ) : (
+                        <span style={{
+                          fontFamily: 'inherit',
+                          fontSize: 11,
+                          color: (Number(r.score_pct || 0) >= 80) ? 'var(--v2-green, #10B981)'
+                               : (Number(r.score_pct || 0) >= 50) ? 'var(--v2-amber, #F59E0B)'
+                               :                                    'var(--v2-rose, #EF4444)',
+                        }}>
+                          {r.score_pct != null ? `${r.score_pct}%` : '—'}
+                        </span>
+                      )}
                     </td>
                     <td style={tdNum}>{fmtINR(r.incentive)}</td>
                     {/* Phase 40 — TA/DA cell hover tooltip shows
@@ -443,7 +560,9 @@ export default function SalaryAdminV2({ embedded = false }) {
                       const gpsOnly = Math.max(0, Number(r.ta_da || 0) - claimsTotal)
                       const tip = `GPS-TA ${fmtINR(gpsOnly)} · DA night ${fmtINR(tb.da_night)} · Hotel ${fmtINR(tb.hotel)} · Other ${fmtINR(tb.other + tb.ta_override)}`
                       return (
-                        <td style={tdNum} title={tip}>
+                        // Batch B3 — no tooltip on a row with no computed figures (it
+                        // would claim "GPS-TA ₹0" while the cell itself shows a dash).
+                        <td style={tdNum} title={flags.missing ? undefined : tip}>
                           {fmtINR(r.ta_da)}
                         </td>
                       )
@@ -453,7 +572,7 @@ export default function SalaryAdminV2({ embedded = false }) {
                         fontFamily: 'inherit',
                         fontSize: 11, color: 'var(--v2-ink-1)',
                       }}>
-                        {Number(r.leave_days_total || 0).toFixed(1)}d
+                        {flags.missing ? '—' : `${Number(r.leave_days_total || 0).toFixed(1)}d`}
                       </div>
                       {(r.leave_days_unpaid > 0 || r.leave_days_paid > 0) && (
                         <div style={{ fontSize: 10, color: 'var(--v2-ink-2)' }}>
@@ -505,7 +624,15 @@ export default function SalaryAdminV2({ embedded = false }) {
                           <button
                             type="button"
                             className="btn btn-ghost"
-                            style={{ padding: '5px 10px', fontSize: 12 }}
+                            // Batch B3 — no computed row (salary function not updated /
+                            // call failed) means NO number to pay against: disabled, so a
+                            // payout can never be recorded against an invented ₹0.
+                            disabled={flags.missing}
+                            title={flags.missing ? 'Salary not computed yet - run supabase_phase323_tier3_batch_rpcs.sql' : undefined}
+                            style={{
+                              padding: '5px 10px', fontSize: 12,
+                              ...(flags.missing ? { opacity: 0.45, cursor: 'not-allowed' } : null),
+                            }}
                             onClick={() => setPayoutTarget({
                               user_id: r.user.id,
                               name: r.user.name,
@@ -519,7 +646,8 @@ export default function SalaryAdminV2({ embedded = false }) {
                       })()}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
                 <tr style={{ borderTop: '2px solid var(--v2-line)', background: 'rgba(255,255,255,.02)' }}>
                   <td style={{ ...tdStyle, fontWeight: 700, color: 'var(--v2-ink-0)' }}>
                     TOTAL{filteredRows.length !== rows.length ? ` · ${filteredRows.length} of ${rows.length}` : ''}
@@ -628,6 +756,16 @@ const ghostBtnStyle = {
   color: 'var(--text)', padding: '0 12px', height: 36,
   borderRadius: 'var(--v2-r-sm, 10px)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
   display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
+}
+// Batch B3 — amber chip + tint pattern (CLAUDE.md §6): --tint-warning bg + border,
+// --warning text, pill radius. Used for "No salary set" / "Unmeasured - 0 days".
+const chipWarnStyle = {
+  display: 'inline-flex', alignItems: 'center',
+  padding: '2px 8px', borderRadius: 999,
+  fontSize: 10, fontWeight: 600, lineHeight: 1.5, whiteSpace: 'nowrap',
+  color: 'var(--warning)',
+  background: 'var(--tint-warning)',
+  border: '1px solid var(--tint-warning-bd)',
 }
 const ctaBtnStyle = {
   background: 'var(--accent, #FFE600)', border: 'none',
