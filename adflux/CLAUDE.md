@@ -20042,3 +20042,20 @@ every `git fetch` error. The git repo root is `/Users/apple/Documents/untitled-o
 **Still open (owner-side or deferred):** change Rakesh Prajapati's password; ask Kamina to use the Android app (reports `web`);
 Gulshan has not opened the app since 10 Sep; stage-and-swap release (above); the native `installApk` receiver does not check
 DownloadManager success (needs an APK rebuild); no splash source art is tracked (only the generated PNGs).
+
+
+---
+
+## 318 · Quiet-hours SQL re-run checked: harmless; duplicate file removed (2026-10-05)
+
+Owner opened `supabase_phase61_quiet_hours.sql` and pasted its VERIFY (`push_allowed_right_now = true`, `functions_present = 4`) - the
+expected result at ~14:45 IST (inside the 09:00-21:00 IST window) with all four functions present.
+- The file existed twice, byte-identical: `supabase_phase61_quiet_hours.sql` (deleted on disk, still tracked) and
+  `supabase_phase61_4_quiet_hours.sql`. The old name is now removed from git (single copy, section 71).
+- Checked whether re-running the 19 May file could have overwritten a newer function. The only later redefinition is
+  `tg_push_on_followup_due` in `supabase_phase98_e2_followup_create_trigger_ist.sql` (IST date anchor, written 28 May, never
+  recorded as run). Live `tg_push_on_followup_due` is the Phase 61 body (raw `CURRENT_DATE`, quiet-hours gate present) - i.e. 98.E2 is
+  not live. It is functionally MOOT: pushes only fire 09:00-21:00 IST = 03:30-15:30 UTC, where the UTC date always equals the IST date,
+  so the UTC-vs-IST edge case that 98.E2 fixes cannot occur. Left unapplied (section 42: do not change code for static risks).
+- The other three functions are the latest definitions that exist (quiet-hours gate present on all; `enqueue_attendance_reminder`
+  Phase 61 supersedes Phase 60). Re-running this file is safe; nothing newer was reverted.

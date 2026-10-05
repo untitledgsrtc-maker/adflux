@@ -1,4 +1,4 @@
--- supabase_phase61_quiet_hours.sql
+-- supabase_phase61_4_quiet_hours.sql   (the old duplicate name supabase_phase61_quiet_hours.sql was removed - CLAUDE.md section 318)
 --
 -- Phase 61.4 (19 May 2026) — push notification quiet hours.
 --
