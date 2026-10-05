@@ -19691,3 +19691,31 @@ dashes, disabled Payout — but accounts would see 6 people with blanks mid-payr
 (a) assign stations to Gohil/Gulshan (his split) → (b) run `supabase_ops_sept_pay_prep.sql`, read Part 1,
 uncomment 2(i)+2(ii), run → (c) run `supabase_phase323_tier3_batch_rpcs.sql`, read Part 5 → tell Claude → page
 goes out → (d) after the B4 deploy shows Ready, run `supabase_phase328_zero_designation_defaults.sql`.
+
+
+---
+
+## 305 · B3 + Phase 328 live; B3 page shipped; Sept prep Part 1 read (2026-10-05)
+
+Owner ran, in order: `supabase_ops_sept_pay_prep.sql` Part 1 (read-only), `supabase_phase323_tier3_batch_rpcs.sql`,
+`supabase_phase328_zero_designation_defaults.sql`.
+- **B3 SQL shadow = PASS:** "checked 13 people | CHANGED 0 | DROPPED 0", user set correct (missing 0 / extra 0). Newly
+  listed: Dixita (head, 17 days, 25k), Diya (accounts, 45k), Gohil (20k, 1 day), Gulshan (16k, 1 day), Riya (hr, 35k),
+  `test` (22k, 26 days). B3 page + LeavesAdminV2 committed and pushed after that → the Salary sheet now lists
+  everyone except agency. Commit `Phase 305 (B3)`.
+- **Phase 328 = PASS:** all 15 designations default salary = 0; 28 staff salaries, total ₹5,78,000, md5 fingerprint
+  unchanged (no salary moved); backup `_bak_designations_salary_20261005`; the Phase 327 audit triggers are live on
+  both tables.
+- **Prep Part 1 (nothing changed yet):** Gohil and Gulshan each own **10 stations now** (the October "0 stations →
+  full variable" gate is cleared) and `test` owns 0 stations (no stranded stations on deactivation). Their only
+  counted September day is 2026-09-10 (score 0.00, written 23:45, no real uptime, 0 meeting activities); every other
+  September day is already excluded "no screen data". Live Sept: Gohil variable 0 → net ₹14,000, Gulshan ₹11,200;
+  after Part 2(i) expected ₹20,000 / ₹16,000. Dixita Sept = 17 counted days avg 10.3 → variable 0, net ₹17,500
+  (genuine; network uptime ~75% < 85% floor). **Part 2(i)+(ii) still to be uncommented and run by the owner**
+  (state row 3a/3c = WAITING).
+- The 2026-09-10 23:45 written time is the NIGHTLY recompute, not a user action — the stray 0.0 day on each tech's
+  first day is the p4 trigger scoring a 0-screen day before stations existed (the 9 Sep→10 Sep join), consistent
+  with the §286 finding; not a leave or a call.
+
+Open: Part 2 run; B10 (call lead-link) next week; compute_daily_score early-return for non-scored roles (§304 #3);
+B7/B8 (HR convert + login link) still waiting on the owner's two decisions.
