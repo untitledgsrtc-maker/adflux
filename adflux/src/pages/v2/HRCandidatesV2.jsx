@@ -187,10 +187,13 @@ export default function HRCandidatesV2() {
       {callFor && <CallLogModal candidate={callFor} profile={profile}
         onClose={() => setCallFor(null)} onLogged={() => { setCallFor(null); load() }} />}
 
+      {/* Phase 329 — onCreated must NOT unmount the modal: SendOfferModal flips itself to its
+          share step (copy link / WhatsApp) after creating the offer. It closes only via its own
+          Done / X (onClose). candidate_phone → the WhatsApp button opens THIS candidate's chat. */}
       {offerFor && <SendOfferModal
-        prefill={{ candidate_name: offerFor.name || '', candidate_email: offerFor.email || '' }}
+        prefill={{ candidate_name: offerFor.name || '', candidate_email: offerFor.email || '', candidate_phone: offerFor.phone || '' }}
         onClose={() => setOfferFor(null)}
-        onCreated={() => { setOfferFor(null); toastSuccess('Offer created — share the link from HR → Offers.') }} />}
+        onCreated={() => { toastSuccess('Offer created — copy the link or share it on WhatsApp.') }} />}
 
       <style>{`.spin{animation:hrspin 1s linear infinite}@keyframes hrspin{to{transform:rotate(360deg)}}`}</style>
     </div>

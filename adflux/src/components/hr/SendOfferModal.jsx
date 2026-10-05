@@ -16,6 +16,7 @@ import { X, Copy, Check, MessageSquare } from 'lucide-react'
 import { useOffers, buildOfferUrl } from '../../hooks/useOffers'
 import { supabase } from '../../lib/supabase'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
+import { phoneLast10 } from '../../utils/phone'
 import { formatCurrency } from '../../utils/formatters'
 
 function Field({ label, required, error, hint, children }) {
@@ -38,6 +39,13 @@ function Field({ label, required, error, hint, children }) {
 
 export function SendOfferModal({ onClose, onCreated, prefill }) {
   const { createOffer, markSent } = useOffers()
+
+  // Phase 329 — candidate phone, passed by the Recruit card (HRCandidatesV2) so the
+  // WhatsApp share opens THAT candidate's chat. 91 + last 10 digits; fewer than 10
+  // digits (or no prefill — HR → Offers page) → '' → openWhatsApp opens the contact
+  // picker exactly as before.
+  const candidateLast10 = phoneLast10(prefill?.candidate_phone)
+  const waPhone = candidateLast10.length === 10 ? `91${candidateLast10}` : ''
 
   // Structured incentive defaults mirror the existing Team profile
   // defaults so a "just send it" admin gets sensible values without
@@ -212,11 +220,10 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
       '',
       `Untitled Advertising`,
     ].join('\n')
-    // openWhatsApp strips non-digits and adds the 91 prefix for bare
-    // 10-digit numbers — since we don't collect the candidate phone
-    // in this modal, pass an empty string so the app opens the
-    // "choose contact" picker.
-    openWhatsApp('', msg)
+    // This modal does not collect a phone. When the caller passed the
+    // candidate's phone (waPhone = 91 + last 10 digits) WhatsApp opens that
+    // chat; otherwise '' → the app opens the "choose contact" picker.
+    openWhatsApp(waPhone, msg)
   }
 
   // ── SHARE PANEL ─────────────────────────────────────
@@ -235,6 +242,9 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
               Share it with them via WhatsApp. They'll open it, fill in
               personal details, accept the terms, and their signed
               offer letter PDF will be generated automatically.
+              {waPhone && (
+                <> WhatsApp will open the chat with <strong>+{waPhone.slice(0, 2)} {waPhone.slice(2)}</strong>.</>
+              )}
             </p>
 
             <Field label="Short link (preferred for WhatsApp)">

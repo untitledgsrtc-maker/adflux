@@ -30,6 +30,28 @@ import { supabase } from '../lib/supabase'
 import { generateOfferLetterBlob } from '../components/hr/OfferLetterPDF'
 import { formatCurrency } from '../utils/formatters'
 
+// Phase 329 — structured incentive terms for the offer summary.
+// SendOfferModal saves incentive_text = null for every new offer and writes the terms
+// into four numeric columns instead (all 0 for flat-salary roles), so the old
+// `offer.incentive_text` line showed nothing. Returns [label, value] rows, or [] when
+// there is nothing to show (no incentive, or the offer's role earns none).
+function structuredIncentiveRows(offer) {
+  if (!offer || offer.designation_has_incentive === false) return []
+  const mult   = Number(offer.incentive_sales_multiplier) || 0
+  const newPct = (Number(offer.incentive_new_client_rate) * 100) || 0
+  const renPct = (Number(offer.incentive_renewal_rate)   * 100) || 0
+  const bonus  = Number(offer.incentive_flat_bonus) || 0
+  // Labels use the signed letter's terms (OfferLetterPDF B.2 "Performance Incentive &
+  // Commission": Monthly Target / New-Client + Renewal Commission on realised billings /
+  // Flat Stretch Bonus), so this page never contradicts what the candidate signs.
+  const rows = []
+  if (mult)   rows.push(['Monthly target',       `${+mult.toFixed(2)}× monthly salary`])
+  if (newPct) rows.push(['New-client commission', `${+newPct.toFixed(2)}% on realised billings`])
+  if (renPct) rows.push(['Renewal commission',    `${+renPct.toFixed(2)}% on realised billings`])
+  if (bonus)  rows.push(['Flat stretch bonus',    `${formatCurrency(bonus)} when billings exceed the monthly target`])
+  return rows
+}
+
 function Field({ label, required, error, hint, children }) {
   return (
     <div className="fg" style={{ marginBottom: 12 }}>
@@ -421,6 +443,8 @@ export default function OfferForm() {
   }
 
   // ── FILL-IN PATH ────────────────────────────────
+  // Phase 329 — structured incentive rows; hidden when the legacy free-text line is used.
+  const incentiveRows = offer.incentive_text ? [] : structuredIncentiveRows(offer)
   return (
     <Layout>
       {/* Offer summary */}
@@ -444,6 +468,16 @@ export default function OfferForm() {
         {offer.incentive_text && (
           <div style={{ marginTop: 8, fontSize: '.84rem', color: 'var(--fg)' }}>
             <strong>Incentive:</strong> {offer.incentive_text}
+          </div>
+        )}
+        {!offer.incentive_text && incentiveRows.length > 0 && (
+          <div style={{ marginTop: 10, fontSize: '.84rem', color: 'var(--fg)' }}>
+            <div style={{ marginBottom: 4 }}><strong>Incentive:</strong></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {incentiveRows.map(([label, value]) => (
+                <div key={label}><span style={{ color: 'var(--text-muted)' }}>{label}:</span> {value}</div>
+              ))}
+            </div>
           </div>
         )}
       </div>
