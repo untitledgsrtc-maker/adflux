@@ -19879,3 +19879,29 @@ Execution -> ops letter); if zero or two designations match it stops with a plai
   Operation Execution): open the offer, press the button, share the new copy and get an acknowledgement. Sneha has a saved
   role snapshot but her stored PDF was signed before the open-link fix, so she is in the same list.
 - No SQL, no APK, no storage write. HR file, not frozen.
+
+
+---
+
+## 313 · APK 96019 built for the one-phone camera test; Dixita Aug decision (2026-10-05)
+
+- **Dixita Aug 2026: owner decided LEAVE AS IS** (variable stays 0 of 7,500; her two old score-0 days from her sales
+  period are NOT cleared). Closed - do not re-offer.
+- **APK 96019 BUILT, NOT yet published.** `npm run build && npx cap sync android && cd android && ./gradlew clean assembleDebug`
+  (no iCloud " 2" duplicates found; 1m13s). Output `android/app/build/outputs/apk/debug/app-debug.apk`, 45 MB.
+  Verified with aapt2/apksigner: package `in.untitledad.app`, versionCode **96019** / versionName 0.96.19, signed with the
+  **debug cert SHA-256 15d785ae...2fe6** (the same key the reps' installed app uses, so it installs OVER their current app),
+  `res/xml/file_paths.xml` present with the `capacitor_camera` entry, no CAMERA permission (intentional), and
+  `scripts/check-android-camera.mjs` OK (IMAGE_CAPTURE in `<queries>`).
+- **Publish gate (section 74 / 39): do NOT upload to the `apk` bucket or insert the `app_version` row until the owner
+  has installed it on ONE phone and "Scan card" opens the camera and fills the lead.** Steps after a PASS: upload as
+  `apk/untitled-os.apk` (the `/api/apk` proxy forces the right content-type, section 76), insert `app_version` 96019 with
+  `apk_url = https://app.untitledad.in/apk`, reps then update in-app.
+- **Size warning (follow-up, not built):** the APK grew from ~9 MB (96014) to 45 MB because `cap sync` copies all of
+  `public/` into the app: ~57 MB uncompressed of sales-deck media, console HTML, PDFs and videos (`public/deck`,
+  `public/investor`, `public/led`, `public/email`). The app runs in live-update mode (loads app.untitledad.in), so none
+  of it is needed inside the APK. A 45 MB in-app update is heavy on mobile data for reps; prune the heavy media from
+  the synced web assets before the fleet rollout.
+- Uncommitted android/ changes in the working tree (`capacitor.build.gradle`, `capacitor.settings.gradle`, splash pngs)
+  are `cap sync` output (it added the app-launcher / filesystem / local-notifications / share plugin lines the committed
+  copy was missing). Left uncommitted on purpose; they regenerate on every sync.
