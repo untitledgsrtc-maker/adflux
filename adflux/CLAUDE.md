@@ -19821,3 +19821,18 @@ Sales / telecaller / agency / admin fall through unchanged. New 7th tripwire `ha
 ### Status
 Built + shadow-verified + dry-run OK. NOT applied: waiting for the owner's OK (section 71 rule 3). Apply = run the canonical
 file (CREATE OR REPLACE; no data change), then its VERIFY (all 7 TRUE).
+
+
+---
+
+## 310 · Leave-score fix APPLIED to live (2026-10-05) - supersedes the "not applied" line in section 309
+
+Owner said "apply". Ran `db/functions/compute_daily_score.sql` via `supabase db query --linked -f`. Proof, all on the live DB:
+- Tripwire: all 7 checks TRUE (incl. `has_bops_early_return`).
+- Behaviour test inside a rolled-back DO block: calling `compute_daily_score` for the ops head leaves her row untouched
+  (`ops_head_row_untouched=t`), an hr user gets no row (`hr_row_still_absent=t`), a telecaller is still scored
+  (`telecaller_still_scored=t`). Dixita's live rows (4 and 5 Oct, score 59.20) intact.
+- Changes no existing score or salary. Only future writes for ops/hr/accounts/office_staff/staff are blocked; leave
+  approve/reject/add for those roles can no longer wipe variable.
+- Still open (owner decision, NOT touched): Dixita Aug 2026 - 2 counted score-0 days written when she was a sales rep,
+  no payout recorded; clearing them would make her Aug variable the full 7,500 instead of 0.
