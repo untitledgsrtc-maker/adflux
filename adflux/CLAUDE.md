@@ -20305,3 +20305,44 @@ end for the field tech, and the head had to add every number by hand.
 2. 3 phone numbers are shared across depots (7043299704 Junagadh + Porbandar, 8780162552 Chikli + Surat, 9428716375 Chikli + Valsad) and Godhra "Control Room Depoq" 02672241923 dials wrong
    on the APK (should be +912672241923) - data to confirm.
 3. Still open from section 323: the 20:00 IST `attendance-tick` cron failure; OpsDownV2 / OpsFixV2 empty-state "add a number" buttons not built (every station has contacts today).
+
+## 326 · Phase 338 - the 58 stuck ops tickets moved to the real technicians; CSV phone test NOT seen in the DB (2026-10-06)
+
+Owner: "repoint tickets - yes go" (the section 325 finding) and "CSV test - done".
+(Phase-number note, section 52: "Phase 338" = this batch; disambiguate by SHA / this section.)
+
+### Ticket repoint - APPLIED LIVE 2026-10-06 13:29 IST (one transaction)
+`supabase_phase338_ops_stuck_tickets_repoint.sql`. Before: all 58 open / in_progress tickets were held by the inactive `test` account. Now:
+- **57 moved** to the owner of their station: GOHIL ANKITKUMAR 25 (7 camera + 9 offline + 1 in-progress offline + 8 manual), GULSHAN YADAV 32 (8 camera + 12 offline + 12 manual).
+  Only `assigned_to` and `updated_at` changed (proven column-by-column: 0 other differences). Status, notes, dates, photos untouched. No trigger on ops_tickets, so no push / WhatsApp fired.
+- **1 left on `test`**: an auto ticket on the retired "Test Untitled" station (no real technician exists for it). Shows as still_stuck = 1.
+- **Nothing was cancelled.** The first draft also cancelled 21 rows (20 manual tickets + that 1); the review correctly said the owner's approval covered MOVING, not cancelling. The cancel steps sit
+  commented in the file under "OPTIONAL - ONLY IF THE OWNER SAYS CANCEL" - owner's call.
+- Backup `public._bak_ops_tickets_p338` (RLS on, no policies, 37 'repoint' + 20 'repoint_manual'). KEEP 30 days, then DROP TABLE.
+  UNDO (safe: only rows nobody touched since): `UPDATE ops_tickets t SET assigned_to=b.assigned_to,status=b.status,resolved_at=b.resolved_at,notes=b.notes,updated_at=b.updated_at FROM _bak_ops_tickets_p338 b WHERE b.id=t.id AND t.updated_at=b.bak_at;`
+- Process: a 3-lens independent review (SQL correctness / what the people and screens see / rollback + scope) -> SHIP, SHIP, FIX_THEN_SHIP; every fix applied. Rolled-back proof on live: apply, re-run (changes nothing),
+  simulated technician work + UNDO (worked rows left alone, the 55 untouched restored byte-exact), abort-guard (data drifted -> "Phase 338 aborted ... found 36 + 20", nothing written).
+
+### The pattern worth reusing (data heals)
+Drive the UPDATE from the backup table and only touch a row that is still exactly as backed up (same holder, same status, same updated_at), and set updated_at = the backup time. Then a re-run is a no-op,
+and UNDO (`... AND t.updated_at = b.bak_at`) can tell "untouched since" from "someone worked on it". Pin the scope to the stuck account id and abort with a RAISE unless the backup holds the approved counts.
+
+### What the review found that is STILL OPEN (nothing here is applied - owner decisions / separate builds)
+1. **The technicians still will not see the 37 auto tickets on their own screens.** OpsHomeV2 and OpsTicketsV2 only list `source='manual'` tickets; the only page that lists everything assigned to the tech is
+   OpsWorkV2 `/ops`, which is not in the nav (reachable only from the check-in banner on Home). No alert was sent (Gohil has no whatsapp_number, Gulshan has not opened the app since 10 Sep, both have 0 push
+   subscriptions). Tell both to open /ops, or add an "auto faults assigned to you" section / nav link. The head sees them correctly (Down now, Head console, ops_tech_detail).
+2. **25 of the 37 auto tickets cannot be closed by anyone right now.** `ops_ticket_resolve` refuses while ANY screen at the depot is offline, whatever the ticket type: 15 offline tickets at depots still offline,
+   7 at depots fully online (never auto-close: section 259 only cancels same-day), and 15 camera tickets (8 have the camera already back on, 10 blocked by unrelated offline screens). "Mark resolved" on an
+   `open` ticket errors ("ticket must be in progress"). Decision: cancel the camera tickets whose camera is already fixed, and/or let the resolve guard ignore offline screens for camera tickets.
+3. Two depots now hold TWO open auto_offline tickets (Godhra, Himmatnagar - an old reopened one plus a newer one); nothing merges them.
+4. The 20 manual tickets name real screens and real fault types (4 are on screens offline today) but were all created by the `test` account itself; cancel or keep = owner's call (optional block in the file).
+5. Display only: the first closes will read avg-fix ~800 h and "overdue >48h" lists all of them; OpsDownV2 "down Xd" uses the TICKET age (the section 267 mistake - use the screens' last_response_at); priority sorts as
+   text so `high` lists LAST in OpsWorkV2 / OpsHeadV2 (use a CASE rank).
+6. Structural cause not fixed: reassigning a DEPOT does not move its open tickets, and the engine dedups on "an open auto ticket exists" regardless of owner - a stranded ticket silently mutes alerts for that depot.
+   A depot-owner-change trigger (like the section 130 lead-owner transfer) would prevent a repeat - NOT built, needs the owner's OK.
+7. The `test` account is still being logged into (last session today on app 0.96.19, 2 push subscriptions): deactivating a user does not block login (section 304 #2).
+
+### CSV upload real-phone test (section 320 / 324) - NOT confirmed
+Owner said "done" at ~13:15 IST but the live DB has NO trace: no `lead_imports` row for zz-test-upload, no `ZZ TEST` leads, no Excel-source lead in the last 12 h (the only import in 24 h is Brijesh's
+5 Oct 16:37 admin file). `lead_import_quiet_ready()` = true, so the feature is on. Rakeshkumar's last app-version report is 5 Oct 13:42 (the emulator test), none today. The saved 14-check verify showed 8 FAIL
+(missing import / leads) and 6 vacuous PASS (zero rows) - NOT a pass. Next: ask which account / phone / screen the owner used and what it showed; the verify SQL stays in the scratchpad (`csvtest/zz_verify.sql`).
