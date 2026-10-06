@@ -61,7 +61,15 @@ export default async function handler(req) {
   const nowIso = new Date().toISOString()
   let sent = 0, failed = 0, logFailed = 0, markFailed = 0
 
-  for (const c of due) {
+  // HARD per-run cap (2026-10-06, owner re-start of the nudge): at most MAX_PER_RUN
+  // nudges per hourly run (~10 runs between 09:30 and 19:30 => ~120/day ceiling) so a
+  // burst of QR scans can never turn into a burst of outbound messages on a number that
+  // has been flagged twice (sections 133 / 148). Candidates beyond the cap are NOT
+  // marked, so they stay due and go out on a later run while their 24h window is open.
+  const MAX_PER_RUN = 12
+  const batch = due.slice(0, MAX_PER_RUN)
+
+  for (const c of batch) {
     const to   = String(c.customer_wa_id || '').replace(/\D/g, '')
     const pnid = String(c.phone_number_id || '')
     if (to.length < 10 || !/^\d+$/.test(pnid)) { failed++; continue }
@@ -115,5 +123,5 @@ export default async function handler(req) {
     } catch { failed++ }
   }
 
-  return ok({ due: due.length, sent, failed, logFailed, markFailed })
+  return ok({ due: due.length, attempted: batch.length, sent, failed, logFailed, markFailed })
 }
