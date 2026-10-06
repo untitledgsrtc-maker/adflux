@@ -48,6 +48,16 @@
 --                             office_staff / staff RETURN before any write (never scored
 --                             by this fn; ops pay = the p4 uptime trigger only).
 --
+--      • Site visits (6 Oct 2026) — a logged SITE VISIT earns the same score as a
+--                             meeting. The meeting branch counts activity_type
+--                             IN ('meeting','site_visit') with the SAME exclusions and
+--                             the SAME per-lead dedupe (a meeting + a site visit to the
+--                             same lead the same day = 1). This matches the live
+--                             counter (lead_activity_bump_counter) + recompute_daily_meetings,
+--                             which already counted both. Owner decision 2026-10-06
+--                             (section 291 remainder #2). At the time of the change NO rep
+--                             had ever logged a site visit, so no existing score moved.
+--
 -- OWNER DECISION (do NOT "fix" without his sign-off): the CALL branch counts a
 --    call on  outcome IS NOT NULL OR ≥10s  — looser than the ≥10s-only counter.
 --    Tightening it to ≥10s-only would lower some reps' scores/pay. Owner said
@@ -177,11 +187,15 @@ BEGIN
     -- matching recompute_daily_meetings + the GPS-track headline + the
     -- evening report. COUNT(*) over-counted revisits → inflated score →
     -- inflated incentive. COALESCE(lead_id,id) keeps walk-ins unique.
+    --
+    -- Site visits (owner 2026-10-06) — a site visit counts as a meeting, so
+    -- the type test is IN ('meeting','site_visit') (this ELSE branch is only
+    -- reached for non-telecallers; v_activity is 'meeting' here).
     SELECT COUNT(DISTINCT COALESCE(la.lead_id::text, la.id::text))
       INTO v_done
       FROM lead_activities la
      WHERE la.created_by    = p_user_id
-       AND la.activity_type = v_activity
+       AND la.activity_type IN ('meeting', 'site_visit')
        AND (la.created_at AT TIME ZONE 'Asia/Kolkata')::date = p_date
        AND (la.notes IS NULL OR la.notes NOT LIKE 'Meeting scheduled%')
        AND (la.notes IS NULL OR la.notes NOT LIKE 'I''m here · auto-check-in%');
@@ -214,7 +228,7 @@ GRANT EXECUTE ON FUNCTION public.compute_daily_score(uuid, date) TO authenticate
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All seven must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All eight must be TRUE.
 -- A FALSE means an older copy of compute_daily_score was re-run and stripped a
 -- locked fix → re-run this file to restore the canonical version.
 -- ============================================================================
@@ -225,6 +239,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%Meeting scheduled%'                  AS has_33_sched_excl,
 --   pg_get_functiondef(p.oid) LIKE '%auto-check-in%'                      AS has_33_autocheckin_excl,
 --   pg_get_functiondef(p.oid) LIKE '%COUNT(DISTINCT COALESCE(la.lead_id%' AS has_127_lead_dedup,
---   pg_get_functiondef(p.oid) LIKE '%IF v_role IN (''operation_executive''%' AS has_bops_early_return
+--   pg_get_functiondef(p.oid) LIKE '%IF v_role IN (''operation_executive''%' AS has_bops_early_return,
+--   pg_get_functiondef(p.oid) LIKE '%IN (''meeting'', ''site_visit'')%'      AS has_site_visit_scored
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'compute_daily_score';

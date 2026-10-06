@@ -20363,3 +20363,42 @@ database. Since 5 Oct 2026 (section 309) it can: `supabase db query --linked -f 
   irreversible steps (DROP, DELETE, bulk cancel), or anything beyond what the owner already approved. An additive change he asked for that is dry-run clean: just apply it.
 - **Still the owner's:** Meta / WhatsApp tokens, Vercel env values, building and installing the APK on phones, passwords and logins (never type credentials into the live app).
 - Keep committing the `.sql` file to the repo as the record (section 71 canonical files stay the single home of each function). The "owner runs SQL" wording in older sections is historical - read it as "Claude runs it".
+
+---
+
+## 328 · Phase 339-343 — old ops tickets closed, station-owner trigger, 5 holidays removed, site visit = meeting for score, WhatsApp nudge back on (2026-10-06)
+
+Owner's decisions on the section 325/326 "what is left" list. Applied by Claude via `supabase db query --linked` (section 327), each dry-run first in a rolled-back transaction.
+(Phase-number note, section 52: 339/341/343 here are batch labels; disambiguate by SHA / this section. Phase 340 and 342 were not used.)
+
+### 1. Old tickets closed (Phase 339, `supabase_phase339_ops_cancel_old_tickets.sql`) - APPLIED LIVE 14:11 IST
+Cancelled 29 tickets: 20 manual tickets the inactive `test` account logged, 1 auto ticket on the retired "Test Untitled" station, 8 auto_camera tickets. Status 'cancelled' + a plain note, nothing deleted.
+Backup `_bak_ops_tickets_p339` (KEEP 30 days). UNDO: `UPDATE ops_tickets t SET status=b.status, resolved_at=b.resolved_at, notes=b.notes, updated_at=b.updated_at FROM _bak_ops_tickets_p339 b WHERE b.id=t.id AND t.updated_at=b.bak_at;`
+Now 0 open tickets sit on an inactive user; 29 real ones left for Gohil / Gulshan.
+HONEST NOTE on the camera ones: the owner approved them as "camera already back on". By the engine's own definition (section 273: a camera fault = screen ONLINE and camera dead) the fault is gone at all 8 depots, but at 5 of them a screen that is OFFLINE still has camera_active=false (covered by that depot's offline ticket). Only 3 depots (Bhachau, Chikli, Surat) have no dead camera anywhere. If a camera dies on an online screen the engine opens a fresh ticket.
+
+### 2. Reassigning a station now moves its tickets (`db/functions/ops_depot_owner_change_move_tickets.sql`) - INSTALLED LIVE
+AFTER UPDATE OF assigned_to ON ops_depots. OPEN tickets move to the new technician if held by nobody / the previous owner / an inactive user. IN-PROGRESS tickets stay with the technician who started them, unless he is gone (nobody / inactive). A ticket the head gave to a different ACTIVE person stays. Resolved / cancelled never move. Only assigned_to + updated_at change.
+Safe: SECURITY DEFINER, EXCEPTION-wrapped + 2 s lock_timeout, fires only on a real owner change, REVOKEd from anon/authenticated, no user triggers on ops_tickets so no push. Proof (rolled back, live data): 9 scenarios + RLS (head can reassign, a sales rep is blocked) + a planted failing ticket update does not stop the depot reassignment; tripwire (7 checks) all true.
+KNOWN: `supabase_ops_assign_stations.sql` (bulk assign) now also moves tickets - intended.
+
+### 3. Five future national holidays deleted (Phase 341, `supabase_phase341_holidays_remove_national_not_closed.sql`) - APPLIED LIVE
+2026-12-25 Christmas, 2027-01-26 Republic Day, 2027-08-15 Independence Day, 2027-10-02 Gandhi Jayanti, 2027-12-25 Christmas (the company works those days). Backup `_bak_holidays_p341`. 2 Oct 2026 + the past 2026 rows and every festival row stay (FY2026-27 = 12 rows: 10 festival + 2 national). `supabase_phase12_m1_m7_foundation.sql` no longer re-seeds the 5 deleted dates.
+UNDO: `INSERT INTO holidays (id,holiday_date,name,type,is_recurring,is_active,notes,created_by,created_at) SELECT id,holiday_date,name,type,is_recurring,is_active,notes,created_by,created_at FROM _bak_holidays_p341 ON CONFLICT DO NOTHING;`
+
+### 4. Site visit counts as a meeting for the pay score (owner decision) - APPLIED LIVE 2026-10-06 14:13 IST
+`db/functions/compute_daily_score.sql`: the non-telecaller meeting branch counts `activity_type IN ('meeting','site_visit')` with the same section 33 exclusions and the same per-lead dedupe (a meeting + a site visit to one lead the same day = 1). `useDaySummary.js` mirrors it for the day report score only (`meetingsForScore`); the report lines "meetings" and "site visits" stay separate. Tripwire now 8 checks (`has_site_visit_scored`) - all 8 TRUE on live after apply. sales-module-guardian PASS (no findings). Shadow old-vs-new = 0 differences over 343 rep-days; no rep has ever logged a site visit (0 rows), so no existing score moves. REVERT = re-run the previous canonical: `git show 9e73d83:adflux/db/functions/compute_daily_score.sql`.
+Pre-existing P3s the guardian noted (not changed): the report's auto-check-in test (`startsWith("I'm here")`) is slightly broader than the SQL's `"I'm here · auto-check-in%"`; `daily_performance.meetings_done` and the My Performance card label "meetings" now include site visits; the `LogActivityModal` Site-visit / Meeting buttons have no hard GPS gate (only `LeadFormV2` meeting mode does).
+KNOWN GAP (documented, not widened): the live trigger `tg_recompute_score_on_activity` only fires for activity_type 'meeting' or 'call', so a site visit is scored by the nightly 23:45 IST recompute (`recompute_all_scores_today`), not instantly. Pay is complete by day end; only the live display lags.
+
+### 5. WhatsApp follow-up restart (owner: "start again, you decide") - APPLIED
+Quality on both numbers has read GREEN every 4 h since 2 Oct (wa_quality_log). Stage 1, conservative:
+ * 98982 marketing: `ai_nudge_enabled = true` (the free-text same-day nudge, inside the customer's own 24 h window, 0 cost). `api/wa/quote-nudge.js` now has a hard cap of 12 sends per hourly run (about 120/day ceiling), candidates beyond the cap stay due. Live candidates right now = 0, so nothing bursts.
+ * 95815 service: `ai_welcome_image_url = NULL` (this number carries all 22 QR boards, section 298; an unsolicited image to cold scanners is the section 133 trigger). To restore: `UPDATE whatsapp_accounts SET ai_welcome_image_url='https://app.untitledad.in/wa/welcome.jpg' WHERE purpose='service';`
+ * STILL OFF on purpose: `ai_followup_enabled` (paid Utility chase), `ai_cadence_enabled` (13-touch cadence). Re-evaluate about 13-16 Oct after ~10-14 clean days. Reaction rule: if quality drops to YELLOW/RED, the 4-hourly watcher logs/pauses; to switch off by hand: `UPDATE whatsapp_accounts SET ai_nudge_enabled=false WHERE purpose='marketing'`.
+ * Not built: "send the poster AFTER they reply" (the safe replacement for the cold image).
+
+### Foot-guns / open
+- Quote-nudge `ai_nudge_enabled` is the section 297 contract's "re-arm" - allowed now only because quality is GREEN and the owner OK'd it; do not re-arm followup/cadence/auto-image until a clean period + his OK.
+- SEPARATE finding, NOT changed (security/money, needs its own plain yes): a live sweep shows 123 SECURITY DEFINER functions in `public` are executable by `anon` (Supabase default grants; the section 211 sweep needs re-running and `ALTER DEFAULT PRIVILEGES` was never added - section 86 item 4). `compute_daily_score` is one of them and its self-or-admin gate lets a call with no login through (section 128 note), so anyone with the public key could re-trigger a score recompute for any rep (it recomputes the true value, it cannot write an arbitrary one). Fix = re-run the section 211 REVOKE sweep + a NULL-role guard; shadow-test first.
+- Still open from before: CSV phone test not seen in the DB; the 20:00 IST `attendance-tick` failure; techs cannot see the 37 auto tickets on Home/Tickets (tell Gohil/Gulshan to open /ops); 25 tickets could not be resolved by the guard (now mostly cancelled/moved - re-check); 3 shared depot phones.

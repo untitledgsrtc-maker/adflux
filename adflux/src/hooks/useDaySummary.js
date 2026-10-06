@@ -368,6 +368,11 @@ export default function useDaySummary({ dateISO } = {}) {
       })
       const meetings = meetingLeads.size
       const site_visits = siteVisitLeads.size
+      // Owner 2026-10-06 - a site visit counts like a meeting for the SCORE
+      // (compute_daily_score counts IN ('meeting','site_visit'), deduped by lead).
+      // The two report lines above stay separate; only the day-score component
+      // uses the union so the report score matches the pay score.
+      const meetingsForScore = new Set([...meetingLeads, ...siteVisitLeads]).size
 
       // PLAN — prefer the morning planner row, fall back to daily_targets,
       // then to the same defaults V2Hero / TeamDashboard use.
@@ -467,7 +472,7 @@ export default function useDaySummary({ dateISO } = {}) {
       const dayScore = Math.round(
         (isTC
           ? pctOf(callRes.count || 0, planCalls) * 50
-          : pctOf(meetings, planMeetings) * 50) +
+          : pctOf(meetingsForScore, planMeetings) * 50) +
         pctOf(followUpsReal, fuAssigned) * 20 +
         pctOf(leadRes.count || 0, planLeads) * 15 +
         pctOf(quotesToday, 1) * 15
