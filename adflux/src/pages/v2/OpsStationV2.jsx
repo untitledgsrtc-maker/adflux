@@ -12,6 +12,10 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+import DepotContactsModal from '../../components/ops/DepotContactsModal'
+import { dialPhone } from '../../utils/openExternal'
+import { normalizeIndianPhone } from '../../utils/phone'
+import { t, getOpsLang } from '../../utils/opsStrings'
 
 const card = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }
 const label = { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-muted)', fontWeight: 700 }
@@ -54,12 +58,17 @@ export default function OpsStationV2() {
   const [issueTypes, setIssueTypes] = useState([])
   const [editTypes, setEditTypes] = useState(false)
   const busyRef = useRef(false)
+  // The operation EXECUTIVE gets a read-only "who to call" card (Call + Add a number via the
+  // shared sheet, Phase 337); head/admin keep the inline editor below, unchanged.
+  const isExec = profile?.role === 'operation_executive'
+  const lang = isExec ? getOpsLang() : 'en'
+  const [contactsOpen, setContactsOpen] = useState(false)
 
   // 1 · depots (the station picker) + the global issue-type reference
   const loadShell = useCallback(async () => {
     try {
       const [dRes, itRes] = await Promise.all([
-        supabase.from('ops_depots').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('ops_depots').select('id, name, assigned_to').eq('is_active', true).order('name'),
         supabase.from('ops_issue_types').select('id, issue_en, solution_en, display_order').eq('is_active', true).order('display_order'),
       ])
       const ds = dRes.data || []
@@ -76,7 +85,7 @@ export default function OpsStationV2() {
       const [sRes, tRes, cRes] = await Promise.all([
         supabase.from('ops_screens').select('id, name, status').eq('depot_id', id).eq('is_active', true).order('name'),
         supabase.from('ops_tickets').select('id, screen_id, status, type, issue_type_id').eq('depot_id', id).in('status', ['open', 'in_progress']),
-        supabase.from('ops_depot_contacts').select('id, role_en, name, phone, display_order').eq('depot_id', id).order('display_order'),
+        supabase.from('ops_depot_contacts').select('id, role_en, role_gu, name, phone, display_order').eq('depot_id', id).order('display_order'),
       ])
       setScreens(sRes.data || [])
       setTickets(tRes.data || [])
@@ -202,6 +211,30 @@ export default function OpsStationV2() {
       {/* two-col: contacts + issue types */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 18, marginTop: 18 }}>
         {/* contacts */}
+        {isExec ? (
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
+              <div style={label}>{depot?.name} — {t('who_to_call', lang)}</div>
+              {depot?.assigned_to === profile?.id && (
+                <button className="btn btn-sec btn-sm" onClick={() => setContactsOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 44 }}><Plus size={14} /> {t('add_contact', lang)}</button>
+              )}
+            </div>
+            {contacts.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 13.5, padding: '6px 0' }}>{t('no_contacts_add', lang)}</div>}
+            {contacts.map(c => {
+              const who = (lang === 'gu' ? (c.role_gu || c.role_en) : (c.role_en || c.role_gu)) || c.name || '—'
+              return (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{c.name || who}</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{[c.name ? who : null, c.phone].filter(Boolean).join(' · ')}</div>
+                  </div>
+                  {c.phone && <button onClick={() => dialPhone(normalizeIndianPhone(c.phone).value || c.phone)} aria-label={t('call', lang)}
+                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 48, minHeight: 44, padding: '0 12px', borderRadius: 10, background: 'var(--success-soft, rgba(16,185,129,.12))', color: 'var(--success)', border: '1px solid var(--success)', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}><Phone size={15} /> {t('call', lang)}</button>}
+                </div>
+              )
+            })}
+          </div>
+        ) : (
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={label}>{depot?.name} — who to call</div>
@@ -222,6 +255,7 @@ export default function OpsStationV2() {
             </div>
           ))}
         </div>
+        )}
 
         {/* issue types & solutions */}
         <div style={card}>
@@ -248,6 +282,10 @@ export default function OpsStationV2() {
           {editTypes && <button onClick={addIssueType} style={{ marginTop: 8, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', border: '1px dashed var(--border-strong, var(--border))', borderRadius: 6, padding: 8, background: 'transparent', cursor: 'pointer' }}><Plus size={14} /> Add issue type</button>}
         </div>
       </div>
+      {contactsOpen && depot && isExec && (
+        <DepotContactsModal depot={depot} lang={lang} meId={profile?.id} canDeleteAll={false}
+          onClose={() => setContactsOpen(false)} onChanged={() => loadStation(depotId)} />
+      )}
     </div>
   )
 }

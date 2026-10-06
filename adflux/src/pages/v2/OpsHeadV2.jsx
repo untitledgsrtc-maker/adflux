@@ -95,7 +95,7 @@ export default function OpsHeadV2() {
                   'issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en)')
           .in('status', ['open', 'in_progress'])
           .order('priority', { ascending: false }).order('opened_at', { ascending: true }),
-        supabase.from('ops_depot_contacts').select('id, depot_id, role_en, role_gu, name, phone').order('display_order'),
+        supabase.from('ops_depot_contacts').select('id, depot_id, role_en, role_gu, name, phone, created_by').order('display_order').then(r => r.error ? supabase.from('ops_depot_contacts').select('id, depot_id, role_en, role_gu, name, phone').order('display_order') : r),
         supabase.from('ops_tickets')
           .select('id, type, priority, assigned_to, down_count, resolved_at, cause, notes, ' +
                   'depot:ops_depots!ops_tickets_depot_id_fkey(id,name), ' +
@@ -509,6 +509,9 @@ export default function OpsHeadV2() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{c.name || c.role_en || 'Contact'}</div>
                   <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{[c.role_en, c.phone].filter(Boolean).join(' · ') || '—'}</div>
+                  {c.created_by && techs.find(x => x.id === c.created_by) && (
+                    <div style={{ fontSize: 11.5, color: 'var(--text-subtle, var(--text-muted))', marginTop: 2 }}>Added by {techs.find(x => x.id === c.created_by).name}</div>
+                  )}
                 </div>
                 <button onClick={() => delContact(c.id)} title="Remove" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}><Trash2 size={16} /></button>
               </div>

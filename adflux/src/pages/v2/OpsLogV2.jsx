@@ -6,11 +6,12 @@
 // first (§231) via opsStrings. Ops roles + admin. Additive; app v2 tokens.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { MapPin, Phone, Monitor, Camera, Loader2, Check, AlertTriangle } from 'lucide-react'
+import { MapPin, Phone, Monitor, Camera, Loader2, Check, AlertTriangle, Plus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { t, getOpsLang, setOpsLang } from '../../utils/opsStrings'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+import DepotContactsModal from '../../components/ops/DepotContactsModal'
 
 const card = { background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v2-line, #334155)', borderRadius: 14, padding: 16 }
 const lbl = { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--v2-ink-2, #94a3b8)', display: 'block', marginBottom: 6 }
@@ -27,6 +28,7 @@ export default function OpsLogV2() {
   const [issueTypes, setIssueTypes] = useState([])
   const [depotId, setDepotId] = useState('')
   const [contacts, setContacts] = useState([])
+  const [contactsOpen, setContactsOpen] = useState(false)   // add-a-number sheet (Phase 337)
   const [screens, setScreens] = useState([])
   const [screenId, setScreenId] = useState('')
   const [showAll, setShowAll] = useState(false)   // dropdown lists OFFLINE (faulty) screens by default; toggle to log a working screen (cleaning/damage)
@@ -47,7 +49,7 @@ export default function OpsLogV2() {
   const loadShell = useCallback(async () => {
     try {
       const [dRes, itRes] = await Promise.all([
-        supabase.from('ops_depots').select('id, name').eq('is_active', true).order('name'),
+        supabase.from('ops_depots').select('id, name, assigned_to').eq('is_active', true).order('name'),
         supabase.from('ops_issue_types').select('id, issue_en, issue_gu, solution_en, solution_gu, display_order').eq('is_active', true).order('display_order'),
       ])
       if (dRes.error) throw dRes.error
@@ -86,6 +88,12 @@ export default function OpsLogV2() {
     if (pre && depots.some(d => d.id === pre)) setDepotId(pre)
   }, [depots, params])
   useEffect(() => { loadCity(depotId) }, [depotId, loadCity])
+  // contacts-only refetch after the add-a-number sheet (loadCity would clear the fault form).
+  const reloadContacts = useCallback(async () => {
+    if (!depotId) return
+    const { data, error } = await supabase.from('ops_depot_contacts').select('id, role_en, role_gu, name, phone, display_order').eq('depot_id', depotId).order('display_order')
+    if (!error) setContacts(data || [])   // on a failed refetch keep the list on screen, never blank it
+  }, [depotId])
   // Preselect a screen from ?screen= (tap a screen on the station-fix page → log it).
   useEffect(() => {
     const pre = params.get('screen')
@@ -94,6 +102,8 @@ export default function OpsLogV2() {
   useEffect(() => { loadRecent(screenId) }, [screenId, loadRecent])
 
   const depot = depots.find(d => d.id === depotId)
+  // Head/admin can add at any station; an exec only at a station he owns (RLS enforces the same).
+  const canAddContact = !!depotId && (['operation_head', 'admin', 'co_owner'].includes(profile?.role) || depot?.assigned_to === profile?.id)
   const contactRole = (c) => (lang === 'gu' ? c.role_gu : c.role_en) || c.role_en || c.name || '—'
   const screenLabel = useMemo(() => {
     const m = {}; screens.forEach((s, i) => { m[s.id] = `${t('screen', lang)} ${i + 1}` }); return m
@@ -177,13 +187,18 @@ export default function OpsLogV2() {
           <div style={{ marginTop: 12, background: 'var(--v2-tint-blue, rgba(59,130,246,.12))', borderRadius: 10, padding: '10px 12px' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--v2-blue, #3B82F6)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Phone size={14} />{depot?.name} — {t('who_to_call', lang)}
+              {canAddContact && (
+                <button type="button" onClick={() => setContactsOpen(true)} style={{ marginLeft: 'auto', minHeight: 44, padding: '0 12px', borderRadius: 10, border: '1px solid var(--v2-blue, #3B82F6)', background: 'transparent', color: 'var(--v2-blue, #3B82F6)', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}><Plus size={14} />{t('add_number_cta', lang).replace(/^\+\s*/, '')}</button>
+              )}
             </div>
             {contacts.length === 0
               ? <div style={{ fontSize: 13, color: 'var(--v2-ink-2, #94a3b8)' }}>{t('no_contacts', lang)}</div>
               : contacts.map(c => (
                 <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: 14 }}>
                   <span style={{ color: 'var(--v2-ink-2, #94a3b8)' }}>{contactRole(c)}</span>
-                  <a href={`tel:${(c.phone || '').replace(/\s/g, '')}`} style={{ color: 'var(--v2-yellow, #FFE600)', fontFamily: 'var(--v2-mono, monospace)', textDecoration: 'none' }}>{c.phone || '—'}</a>
+                  {c.phone
+                    ? <a href={`tel:${c.phone.replace(/\s/g, '')}`} style={{ color: 'var(--v2-yellow, #FFE600)', fontFamily: 'var(--v2-mono, monospace)', textDecoration: 'none' }}>{c.phone}</a>
+                    : <span style={{ color: 'var(--v2-ink-2, #94a3b8)' }}>—</span>}
                 </div>
               ))}
           </div>
@@ -263,6 +278,11 @@ export default function OpsLogV2() {
               ))}
           </div>
         </div>
+      )}
+      {contactsOpen && depot && (
+        <DepotContactsModal depot={depot} lang={lang} meId={profile?.id}
+          canDeleteAll={['operation_head', 'admin', 'co_owner'].includes(profile?.role)}
+          onClose={() => setContactsOpen(false)} onChanged={reloadContacts} />
       )}
     </div>
   )

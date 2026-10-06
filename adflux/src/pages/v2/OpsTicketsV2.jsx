@@ -8,7 +8,7 @@
 // the same lead-* classes + global tokens as OpsAdminV2 so it matches the cockpit.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Loader2, MapPin, Phone, ChevronRight, Camera, Check, Wrench, Clock } from 'lucide-react'
+import { Loader2, MapPin, Phone, ChevronRight, Camera, Check, Wrench, Clock, Plus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { t, getOpsLang, setOpsLang } from '../../utils/opsStrings'
@@ -18,6 +18,9 @@ import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { istTodayISO } from '../../utils/istDate'
 import { isOnHours, istClock, faultAgeHours, ageLabel, severityOf } from '../../utils/opsHours'
 import { estVariable } from '../../utils/opsPay'
+import { dialPhone } from '../../utils/openExternal'
+import { normalizeIndianPhone } from '../../utils/phone'
+import DepotContactsModal from '../../components/ops/DepotContactsModal'
 
 // Map an ops outcome label -> the sales call_logs.outcome enum (never widen the enum).
 const OUTCOME_DB = { reached: 'connected', will_come: 'connected', fixed_call: 'connected', no_answer: 'no_answer' }
@@ -69,6 +72,7 @@ export default function OpsTicketsV2() {
   const fileRef = useRef(null)
 
   const [callFor, setCallFor] = useState(null)
+  const [contactsFor, setContactsFor] = useState(null)   // { id, name } of the station whose number sheet is open
   const [outcome, setOutcome] = useState('')
   const [callNote, setCallNote] = useState('')
 
@@ -212,11 +216,10 @@ export default function OpsTicketsV2() {
     } finally { setBusy(false); savingRef.current = false }
   }
 
-  function startCall(ticket) {
-    const cs = contactsByDepot[ticket.depot_id] || []
-    const contact = cs[0] || null
-    if (contact?.phone) window.location.href = `tel:${String(contact.phone).replace(/\s/g, '')}`
-    setCallFor({ ticket, contact }); setOutcome(''); setCallNote('')
+  function startCall(ticket, contact) {
+    const c = contact || (contactsByDepot[ticket.depot_id] || [])[0] || null
+    if (c?.phone) dialPhone(normalizeIndianPhone(c.phone).value || c.phone)
+    setCallFor({ ticket, contact: c }); setOutcome(''); setCallNote('')
   }
 
   async function saveCall() {
@@ -312,13 +315,17 @@ export default function OpsTicketsV2() {
         </div>
       )}
 
-      {tab === 'open' && <OpenTab />}
-      {tab === 'proc' && <ProcTab />}
-      {tab === 'fixed' && <FixedTab />}
-      {tab === 'mystats' && <MeTab />}
+      {tab === 'open' && OpenTab()}
+      {tab === 'proc' && ProcTab()}
+      {tab === 'fixed' && FixedTab()}
+      {tab === 'mystats' && MeTab()}
 
-      {sheet && <IssueSheet />}
-      {callFor && <CallSheet />}
+      {sheet && IssueSheet()}
+      {callFor && CallSheet()}
+      {contactsFor && (
+        <DepotContactsModal depot={contactsFor} lang={lang} meId={uid} canDeleteAll={isHead}
+          onClose={() => setContactsFor(null)} onChanged={load} />
+      )}
     </div>
   )
 
@@ -367,7 +374,11 @@ export default function OpsTicketsV2() {
     if (!cityProc.length) return empty(t('no_proc', lang))
     return <div style={gridWrap}>{cityProc.map(tk => {
       const calls = callsByTicket[tk.id] || []
-      const contact = (contactsByDepot[tk.depot_id] || [])[0]
+      const cs = contactsByDepot[tk.depot_id] || []
+      const contact = cs[0]
+      const rest = cs.slice(1)
+      const addTarget = { id: tk.depot_id, name: tk.depot?.name || depotName(tk.depot_id) }
+      const canAdd = isHead || depots.some(d => d.id === tk.depot_id)   // an exec can only add at a station he owns (RLS enforces the same)
       return (
         <div key={tk.id} className="lead-card" style={{ padding: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -375,13 +386,31 @@ export default function OpsTicketsV2() {
             {chip(t('in_process', lang), 'amber')}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 12px' }}>{tk.depot?.name || depotName(tk.depot_id)} · {tk.issue ? nm(tk.issue, 'issue') : (tk.cause || t('fault', lang))}</div>
-          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13.5 }}><Phone size={13} style={{ verticalAlign: -1, marginRight: 5, color: 'var(--text-muted)' }} />
-              {contact ? (contact.name || nm(contact, 'role') || t('call', lang)) : t('no_contacts', lang)}
-              <br /><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{contact ? [contact.name ? nm(contact, 'role') : null, contact.phone].filter(Boolean).join(' · ') : ''}</span>
-            </span>
-            {contact && <button onClick={() => startCall(tk)} className="lead-btn" style={{ color: 'var(--success)', borderColor: 'var(--success)', flexShrink: 0 }}><Phone size={14} /> {t('call', lang)}</button>}
-          </div>
+          {contact ? (
+            <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13.5 }}><Phone size={13} style={{ verticalAlign: -1, marginRight: 5, color: 'var(--text-muted)' }} />
+                {contact.name || nm(contact, 'role') || t('call', lang)}
+                <br /><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{[contact.name ? nm(contact, 'role') : null, contact.phone].filter(Boolean).join(' · ')}</span>
+              </span>
+              {contact.phone && <button onClick={() => startCall(tk, contact)} className="lead-btn" style={{ color: 'var(--success)', borderColor: 'var(--success)', flexShrink: 0 }}><Phone size={14} /> {t('call', lang)}</button>}
+            </div>
+          ) : canAdd ? (
+            <button onClick={() => setContactsFor(addTarget)} className="lead-btn lead-btn-primary" style={{ width: '100%', justifyContent: 'center', minHeight: 44 }}><Plus size={14} /> {t('no_contacts_add', lang)}</button>
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '6px 0' }}>{t('no_contacts', lang)}</div>
+          )}
+          {rest.length > 0 && (
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', minHeight: 44, display: 'flex', alignItems: 'center', gap: 6 }}><ChevronRight size={14} />{t('more_numbers', lang)} ({rest.length})</summary>
+              {rest.map(c => (
+                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 2px', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: 13 }}>{c.name || nm(c, 'role')}<br /><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{[c.name ? nm(c, 'role') : null, c.phone].filter(Boolean).join(' · ')}</span></span>
+                  {c.phone && <button onClick={() => startCall(tk, c)} className="lead-btn" style={{ color: 'var(--success)', borderColor: 'var(--success)', flexShrink: 0, minHeight: 44 }}><Phone size={14} /> {t('call', lang)}</button>}
+                </div>
+              ))}
+            </details>
+          )}
+          {contact && canAdd && <button onClick={() => setContactsFor(addTarget)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', padding: '10px 0 0', minHeight: 44 }}>{t('add_number_cta', lang)}</button>}
           {calls.length > 0 && <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 10 }}>{calls.length} {t('n_calls', lang)} · {calls[0].notes || calls[0].outcome}</div>}
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button onClick={() => reopen(tk)} disabled={busy} className="lead-btn" style={{ justifyContent: 'center' }}>{t('reopen', lang)}</button>

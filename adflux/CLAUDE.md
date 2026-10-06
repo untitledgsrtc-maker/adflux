@@ -20263,3 +20263,45 @@ Owner answered the two open decisions of section 323: (1) telecallers SHOULD get
 - Do not create a lead-linked follow-up for a Lost-lead quote (born-closed by the guard) or a Nurture lead (hidden by `keepInFollowupQueue`).
 - A follow-up with quote_id only (lead_id NULL) is unreadable to a telecaller (quotes RLS = creator only) - always link to the lead.
 
+
+## 325 · Phase 337 - operation executive can ADD "Who to call" numbers for his own stations (2026-10-06)
+
+Owner (screenshot of the Ops Head "Who to call - Anand Bus Stand" modal): "operation person not able to contact / I want they can add the details."
+(Phase-number note, section 52: the modal header says "Phase 337"; disambiguate by SHA / this section.)
+
+### Root cause
+`ops_depot_contacts` writes were head/admin-only (the Phase 0 blanket `ops_depot_contacts_manage` policy). The executive could READ numbers but not add or fix one, and the
+Station board showed him add/edit boxes that silently did nothing (a write control shown to a role whose RLS denies it = a silent no-op). A station with no contact is a dead
+end for the field tech, and the head had to add every number by hand.
+
+### What shipped (all on origin `untitled-os`; the SQL is APPLIED LIVE 2026-10-06 and re-verified)
+- `supabase_ops_p11_exec_contacts.sql` - additive, idempotent. `ops_depot_contacts.created_by` (default auth.uid(); the 95 seed rows stay NULL = owner-verified, an exec can never delete them);
+  `ops_depot_contacts_exec_insert` (role operation_executive AND an ACTIVE user AND created_by = self AND phone matches `^[0-9]{10}$` AND role/name each <= 60 chars AND fewer than 20 numbers on the station
+  AND the depot is ACTIVE and `ops_depots.assigned_to` = him); `ops_depot_contacts_exec_delete` (only rows he added); NO exec UPDATE (a wrong number = delete + add again, keeps the audit honest);
+  BEFORE INSERT trigger `trg_ops_depot_contacts_exec_order` forces his number to the END (display_order = max+1) and created_at = now(), so he can never jump ahead of the verified numbers
+  (the first contact is the one the app dials). Head / admin / co_owner keep `_manage` FOR ALL; sales / telecaller / agency / everyone else still have zero access.
+- Dry-run before applying: a rolled-back impersonation harness, 19 cases all correct (own depot add OK; other exec's depot, other roles, spoofed created_by, 61-char text, formatted phone, 21st contact, update, delete of head/seed rows all DENIED).
+- `src/components/ops/DepotContactsModal.jsx` (NEW, shared): list + add (role chips store BOTH role_en and role_gu) + remove-your-own. Phone goes through `normalizeIndianPhone`
+  (`src/utils/phone.js`, append-only: Gujarati/Devanagari digits, strips 91 / 0 prefix, exactly 10 digits not starting 0, rejects all-same digits). A FAILED list load shows Retry and disables Add
+  (never "no contacts"). Save uses the section 47 `useRef` latch; zero-row delete / insert is reported as failure; z-index 9000.
+- Wired in: `OpsStationV2` (exec: read-only card + Call + Add for stations he owns; head/admin keep the old inline-edit card unchanged), `OpsTicketsV2` (primary number + "More numbers" + Add;
+  Call now uses `dialPhone`), `OpsLogV2` (Add button in the contacts box), `OpsHeadV2` (the head's modal shows "Added by <tech>"; select retries without `created_by` before the SQL ran).
+  `opsStrings.js` +29 Gujarati-first keys. No section 28 frozen file touched (App.jsx / V2AppShell.jsx untouched). Full `npm run build` PASS.
+- Also fixed in the same pass (pre-existing): OpsTicketsV2's six inner components (`OpenTab/ProcTab/FixedTab/MeTab/IssueSheet/CallSheet`) were defined inside the parent and remounted on every render
+  (typing in a sheet lost focus) - they are now called as functions.
+
+### Contracts / foot-guns
+- An exec adds numbers only to a depot he OWNS (`ops_depots.assigned_to`). The head must assign stations first (section 253) - an unassigned exec sees no Add button, correctly.
+- UI must show a write control only when the RLS policy would allow it (gate the button on the same predicate: owns the depot, list loaded, role). Never render edit inputs for a role that cannot save.
+- The 20-number cap is a subquery on the SAME table inside the INSERT policy. It is safe today ONLY because this table's SELECT policies are pure role checks (no subquery on this table).
+  If a SELECT policy here ever gains a subquery on `ops_depot_contacts`, move the count into a SECURITY DEFINER helper (the section 172c recursion trap).
+- A PostgREST select that names a not-yet-migrated column returns 400 for the whole query - keep the tolerant retry (without `created_by`) in the modal and OpsHeadV2.
+- Stored phones are exactly 10 digits (the policy enforces it); display formatting is the app's job.
+
+### Findings surfaced to the owner (NOT applied - his call)
+1. **58 open tickets are assigned to the inactive `test` user** (22 auto_offline open, 20 manual open, 15 auto_camera open, 1 auto_offline in_progress). Gulshan / Gohil see none of them, and the
+   section 243 engine dedups on open auto tickets so it never opens (or pushes) new ones for those depots. Proposed repair: re-point auto tickets to `ops_depots.assigned_to` of their depot and
+   close / cancel the 20 stale manual ones. Also add "reassign a depot also moves its open tickets" and a deactivation checklist (reassign `ops_depots.assigned_to` before deactivating an exec).
+2. 3 phone numbers are shared across depots (7043299704 Junagadh + Porbandar, 8780162552 Chikli + Surat, 9428716375 Chikli + Valsad) and Godhra "Control Room Depoq" 02672241923 dials wrong
+   on the APK (should be +912672241923) - data to confirm.
+3. Still open from section 323: the 20:00 IST `attendance-tick` cron failure; OpsDownV2 / OpsFixV2 empty-state "add a number" buttons not built (every station has contacts today).
