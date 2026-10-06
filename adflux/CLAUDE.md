@@ -20443,3 +20443,53 @@ NO policy on quotes / quote_cities / payments / leads / users was added or chang
 - Pre-existing: the `quote-pdfs` bucket lets any signed-in user insert / update / delete any object; worth a hardening ticket.
 - Rima's installed PWA may serve the old bundle for up to ~24 h: hard-refresh ("Reload without cache") once.
 - The reviewers' own harness once held a transaction open; verified live clean afterwards (0 new functions before the real apply, 4 token policies, no locks). Keep review harnesses in ONE rolled-back file and never put a policy on a live hot table inside them (use a temp copy).
+
+
+---
+
+## 330 · Phase 345 - ONE client per phone, merged automatically (2026-10-06)
+
+Owner (screenshot of /clients "Find duplicate clients - 2 groups", Anee Marcom + Hero MotoCorp, each twice): "always auto merge the client."
+(Phase-number note, section 52: 345 = this batch; the "Phase 345 candidates" list at the end of section 329 is still unbuilt.)
+
+### Root cause
+`clients` held one row per (phone, created_by) (section 12 / supabase_clients_module.sql, "prevents silent lead-stealing"). After a lead is reassigned and the new owner quotes again, the same company gets a second row
+(Anee Marcom: Brijesh + Rima). The old unique index also missed phone FORMATS ("81603 21686" vs "+91 81603 21686" = the same Mayur client twice). The admin had to click "Keep this - merge 1"; that button only DELETED rows (counters lost).
+
+### The rule (FROZEN - do not regress)
+- CLIENT KEY = the LAST 10 DIGITS of the phone, only when the phone has 10-14 digits (`client_phone_key`). Fewer / more digits = no key = never auto-merged (junk, or two numbers typed into one field).
+- ONE clients row per key, enforced by UNIQUE index `clients_phone_key_uk` + two triggers: `trg_clients_absorb_duplicate` (BEFORE INSERT folds the new row into the existing one) and `trg_clients_phone_guard` (BEFORE UPDATE OF phone:
+  admin / same-owner merges, a rep onto another rep's client is refused with the existing 23505 "Another client already uses that phone number.").
+- Fold = counters ADD, first/last dates widen, blank fields fill (notes are concatenated on a heal / admin merge), call_logs.client_id re-pointed, extra row deleted. quotes are NEVER touched (quotes.created_by drives incentive).
+- OWNER of the merged client (`_client_owner_for_key`): (1) the owner of the OPEN lead on that phone (COALESCE(telecaller_id, assigned_to), active sales/agency/telecaller/sales_manager); else (2) the creator of the most recent quote on
+  that phone, ONLY an ACTIVE sales/agency/telecaller/sales_manager (never admin, co_owner, ops, a former rep); else NULL = keep the current owner. Ownership moves only on a 'create' sync, never on 'update'/'won'.
+- Phone-less rows (109, government bodies) and short-phone rows keep the old per-owner name/phone match - NOT merged across reps.
+- Canonical files (section 72): `db/functions/client_auto_merge.sql` (8 functions: client_phone_key, _client_owner_for_key, _client_fold_row, _client_fold, clients_absorb_duplicate, clients_phone_change_guard,
+  sync_client_from_quote(quote_id, mode), admin_merge_clients(keep, drop[])) + `supabase_phase345_clients_auto_merge.sql` (backup, triggers, heal, unique index). The 3 `_client_*` helpers are in the section 211 re-lock list.
+- App: `src/utils/syncClient.js` now calls the RPC (reads the SAVED quote server-side); the old per-owner upsert is a fallback ONLY when the function is missing (PGRST202 / 42883) - any other error returns, so a lost response can never double-count.
+  `ClientsV2.jsx` DuplicatesPanel = a safety net now (same key, merges via admin_merge_clients, wording "merged into"); `handleSave` detects a client that was moved to another rep while the page was open (0 rows updated).
+
+### APPLIED LIVE 2026-10-06 ~21:30 IST (Claude ran it via the CLI, section 327)
+619 -> 613 clients, 6 duplicate groups merged, quote_count / total_won sums identical (744 / 28,886,293), second run is a no-op. Backup `public._bak_clients_p345` (12 rows) - KEEP 30 days, then DROP TABLE. UNDO recipe in the phase file header.
+Result: Anee Marcom = Rima, 3 quotes (open lead owner) / Hero MotoCorp = Rima, 2 / KJMH = Mayur, 2 quotes, won 24,786 / Shree Clinical Lab = Mayur, 2, won 8,000 (the inactive Avkashbhai's row absorbed) /
+Nova IVF = Salpesh, 2 / vksfnsnfj = Rima, 2 (test junk).
+
+### Review (3 adversarial lenses + the sales-module-guardian) - all FIX_THEN_SHIP, every P0/P1/P2 fixed before applying
+- P0/P1: the SECURITY DEFINER BEFORE INSERT trigger returns NULL, which SKIPS the table's RLS insert check (anon HAS INSERT table privilege) - so anyone with the public key could overwrite another client's row. Fixed: a caller gate -
+  a JWT caller (anon / authenticated) must pass the insert policy's own test (active admin, or sales/agency/telecaller/sales_manager inserting created_by = self) else the row goes back to RLS (42501, proven live: anon, foreign created_by refused, row untouched);
+  a rep's insert is clamped to quote_count <= 1 and won >= 0; another rep's insert may only FILL BLANKS (a stored GSTIN is never replaced by a non-owner); service_role / ai_build_quote / cron are trusted.
+- P2: owner rule 2 no longer hands a client to admin / co_owner / ops / inactive users; 'WhatsApp lead' (ai_build_quote's placeholder) never overwrites a real name; 'won' sync requires status won; GSTIN replace only by the client's owner;
+  phone-guard merge fills blanks from the deleted row; key rejects >14 digits.
+- P3: lock_timeout 3 s + a per-key advisory lock in the heal loop; UNDO recipe now disables the guard trigger and filters the backup; soft-ROLLBACK note now says to also DROP sync_client_from_quote.
+
+### OPEN / owner-aware (NOT built)
+- Counters are display-only (no pay path reads them) and the RPC is not idempotent: a repeated 'create' sync for one quote counts twice. A per-(quote, mode) marker table would fix it; deferred.
+- Kirti Kotak lost the Nova IVF client card (Salpesh owns it; Kirti's old quote UA-2026-0185 is still "negotiating" at Rs 2,86,740 on a LOST lead) - confirm with her.
+- A shared client's email / GSTIN / address / notes are now readable by whichever rep owns it next (each rep used to keep a private copy).
+- ai_build_quote still keeps its own client-sync copy (section 71); its insert is now absorbed by the trigger, which is safe. Fold it into the shared RPC when that function is next touched.
+- Reps' Clients pages: a client lives with ONE rep; the other rep stops seeing it (their quotes stay in /quotes). Step1Client search follows the same RLS.
+
+### Foot-guns
+- A SECURITY DEFINER BEFORE INSERT trigger that returns NULL bypasses RLS WITH CHECK entirely - always replicate the policy's test inside it, and test with SET LOCAL ROLE anon.
+- Test a data heal's phone key against REAL stored formats (91..., +91 ..., spaces, leading 0) - the old (phone, owner) unique index never saw them as equal.
+- A 3-lens review earns its keep on a DEFINER trigger: the first lens-less draft shipped a cross-rep write hole.

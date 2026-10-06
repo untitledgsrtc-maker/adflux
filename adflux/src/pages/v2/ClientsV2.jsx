@@ -3,10 +3,13 @@
 // Clients CRM view. Rendered inside V2AppShell.
 //
 // Data model reminder (see supabase_clients_module.sql):
-//   • Each sales rep has their own client rows — unique on (phone,
-//     created_by). Admin sees everyone's; sales sees only their own.
-//     RLS enforces this at the DB level, so we don't need to re-filter
-//     in JS — we just select * and trust the policy.
+//   • ONE client row per phone number (last 10 digits) across ALL reps
+//     (Phase 345 — merged automatically in the database, see
+//     db/functions/client_auto_merge.sql). The client belongs to the rep
+//     who owns the open lead (else the latest quote's creator). Admin
+//     sees everyone's; sales sees only the clients they own. RLS
+//     enforces this at the DB level, so we don't need to re-filter in
+//     JS — we just select * and trust the policy.
 //   • Editing a client here does NOT rewrite past quotes. Each quote
 //     has its own denormalized client_* snapshot captured at creation
 //     time. This file updates the CRM snapshot only; the clients
@@ -126,8 +129,8 @@ export default function ClientsV2() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     let list = clients
-    // Admin-only rep filter — clients are owned per (phone, created_by)
-    // so filtering by created_by gives admin a single rep's book.
+    // Admin-only rep filter — each client has ONE owner (created_by), so
+    // filtering by created_by gives admin a single rep's book.
     if (isAdmin && repFilter !== 'all') {
       list = list.filter(c => c.created_by === repFilter)
     }
@@ -177,10 +180,11 @@ export default function ClientsV2() {
       setSaving(false)
       return
     }
-    const { error } = await supabase
+    const { data: savedRows, error } = await supabase
       .from('clients')
       .update(patch)
       .eq('id', editing.id)
+      .select('id')
     setSaving(false)
     if (error) {
       // Most likely cause: unique (phone, created_by) conflict if they
@@ -189,6 +193,13 @@ export default function ClientsV2() {
       setSaveErr(error.code === '23505'
         ? 'Another client already uses that phone number.'
         : (error.message || 'Save failed.'))
+      return
+    }
+    // Phase 345 — a client can be merged/moved to another rep while this page is open;
+    // RLS then matches 0 rows WITHOUT an error. Say so instead of a false "saved".
+    if (!savedRows || savedRows.length === 0) {
+      setSaveErr('This client now belongs to another rep (merged). Nothing was saved - reloading the list.')
+      load()
       return
     }
     setEditing(null)
@@ -298,11 +309,12 @@ export default function ClientsV2() {
         </button>
       </div>
 
-      {/* Phase 33L — duplicate finder. Admin-only. Surfaces clients
-          with the same normalized phone (or company when phone is
-          blank) so admin can merge by picking a primary and deleting
-          the others. Clients table is decoupled from quote history,
-          so deleting a dup doesn't affect past quote snapshots. */}
+      {/* Phase 33L — duplicate finder, Phase 345 — now a SAFETY NET. Clients
+          with the same phone (last 10 digits) merge automatically in the
+          database, so this normally reads "no duplicates". It still lists
+          what the system cannot match by phone (no phone / short phone,
+          same company) so admin can merge those by hand — via
+          admin_merge_clients, which keeps counters + call history. */}
       {isAdmin && (
         <DuplicatesPanel
           clients={clients}
@@ -567,18 +579,21 @@ export default function ClientsV2() {
   )
 }
 
-/* Phase 33L — DuplicatesPanel
-   Admin tool that groups clients by normalized phone (or company when
-   phone is blank). Surfaces groups with 2+ rows; admin picks a
-   primary and the rest get deleted. Clients table is decoupled from
-   quote history (every quote carries its own client_* snapshot), so
-   deletes don't affect past quotes. */
+/* Phase 33L — DuplicatesPanel (Phase 345: safety net)
+   Groups clients by the SAME key the database uses (last 10 digits of the
+   phone; digits as-is when shorter; company name when phone is blank).
+   Surfaces groups with 2+ rows; admin picks the one to KEEP and the rest are
+   merged into it (counters added, call history moved) by admin_merge_clients.
+   Clients table is decoupled from quote history (every quote carries its own
+   client_* snapshot), so a merge doesn't affect past quotes. */
 function DuplicatesPanel({ clients, userMap, isOpen, onToggle, onChanged }) {
   const groups = useMemo(() => {
     const buckets = new Map()
     clients.forEach(c => {
-      // Normalize phone to digits-only. Empty? Fall back to company name.
-      const phoneKey = (c.phone || '').replace(/\D/g, '')
+      // Same key as the database (client_phone_key): last 10 digits when the
+      // phone has 10+ digits, else the digits as typed. Empty? Company name.
+      const digits = (c.phone || '').replace(/\D/g, '')
+      const phoneKey = digits.length >= 10 ? digits.slice(-10) : digits
       const companyKey = (c.company || '').trim().toLowerCase()
       const key = phoneKey || (companyKey ? 'co:' + companyKey : null)
       if (!key) return
@@ -598,12 +613,12 @@ function DuplicatesPanel({ clients, userMap, isOpen, onToggle, onChanged }) {
       || group.rows.find(r => r.id === primaryId)?.name || 'this client'
     if (!(await confirmDialog({
       title: 'Merge duplicates?',
-      message: `Delete ${others.length} duplicate row${others.length > 1 ? 's' : ''} and keep "${primaryName}" as the primary. Past quotes are unaffected.`,
+      message: `Merge ${others.length} duplicate row${others.length > 1 ? 's' : ''} into "${primaryName}". Quote counts and call history are added to it. Past quotes are unaffected.`,
       confirmLabel: 'Merge',
       danger: true,
     }))) return
     const ids = others.map(r => r.id)
-    const { error } = await supabase.from('clients').delete().in('id', ids)
+    const { error } = await supabase.rpc('admin_merge_clients', { p_keep: primaryId, p_drop: ids })
     if (error) { toastError(error, 'Merge failed.'); return }
     onChanged()
   }
@@ -640,7 +655,7 @@ function DuplicatesPanel({ clients, userMap, isOpen, onToggle, onChanged }) {
         <div style={{ borderTop: '1px solid var(--v2-line)' }}>
           {groups.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--v2-ink-2)', fontSize: 13 }}>
-              No duplicates found. Clients are unique by phone (or by company name where phone is blank).
+              No duplicates. Clients with the same phone number merge automatically (matched on the last 10 digits).
             </div>
           ) : (
             groups.map(g => (
@@ -649,7 +664,7 @@ function DuplicatesPanel({ clients, userMap, isOpen, onToggle, onChanged }) {
               }}>
                 <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginBottom: 8 }}>
                   {g.rows.length} clients share {g.key.startsWith('co:') ? `company "${g.key.slice(3)}"` : `phone ${g.key}`}
-                  — pick the one to KEEP. Others will be deleted.
+                  — pick the one to KEEP. The others are merged into it.
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {g.rows.map(c => (
@@ -678,7 +693,7 @@ function DuplicatesPanel({ clients, userMap, isOpen, onToggle, onChanged }) {
                         onClick={() => mergeGroup(g, c.id)}
                         className="v2d-cta"
                         style={{ padding: '6px 12px', fontSize: 12 }}
-                        title="Keep this row, delete the others"
+                        title="Keep this row, merge the others into it"
                       >
                         Keep this · merge {g.rows.length - 1}
                       </button>

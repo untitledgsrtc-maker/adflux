@@ -4,8 +4,14 @@
 // Shared between the private CreateQuote flow (via useQuotes hook) and
 // the Government wizards (CreateGovtAutoHoodV2, CreateGovtGsrtcLedV2).
 //
-// Dedup rule (matches DB unique index): one row per (phone, created_by).
-// Each sales rep has their own view of a client; admin sees everyone's.
+// Dedup rule (Phase 345, owner "always auto merge the client"): ONE client
+// per phone number (last 10 digits) across ALL reps. The merge is done in
+// the database by sync_client_from_quote (db/functions/client_auto_merge.sql):
+// it finds the client by phone key, folds twins, adds counters, and moves
+// the client to the rep who owns the lead now. This file only calls it.
+// The old per-(phone, created_by) upsert below is kept ONLY as a fallback
+// for a deploy that reaches a phone before the SQL ran, or a quote without
+// an id (the DB trigger trg_clients_absorb_duplicate still folds the twin).
 //
 // Silently swallows errors — a client-sync failure should NEVER block a
 // quote from saving. The clients table is a CRM layer on top of quotes;
@@ -22,6 +28,26 @@ import { supabase } from '../lib/supabase'
 export async function syncClientFromQuote(quote, snapshotMode = 'create') {
   try {
     if (!quote?.created_by) return
+
+    // Phase 345 — the one-client-per-phone merge lives in the database. The saved
+    // quote is read there (authoritative); we only say which quote + what happened.
+    if (quote.id) {
+      const { error: rpcErr } = await supabase.rpc('sync_client_from_quote', {
+        p_quote_id: quote.id,
+        p_mode:     snapshotMode,
+      })
+      if (!rpcErr) return
+      // Fall back ONLY when the function is not deployed yet (PostgREST PGRST202 / Postgres
+      // 42883). Any other error (e.g. a lost response AFTER the commit) must NOT re-run the old
+      // upsert - that would count the quote twice.
+      const missing = rpcErr.code === 'PGRST202' || rpcErr.code === '42883'
+        || /could not find the function|does not exist/i.test(rpcErr.message || '')
+      if (!missing) {
+        console.warn('[clients] sync_client_from_quote failed:', rpcErr.message)
+        return
+      }
+    }
+
     const phone   = String(quote.client_phone || '').trim()
     const company = String(quote.client_company || '').trim()
     const name    = String(quote.client_name || '').trim()

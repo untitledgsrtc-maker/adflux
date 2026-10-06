@@ -85,7 +85,11 @@ BEGIN
                         'followup_cadence_dispatch', 'wa_quality_watch_dispatch',
                         -- §225 Batch 2b ghosted-inbound recovery: re-fires ai-reply for
                         -- dropped dispatches. REVOKED — only the cron reaches it.
-                        'wa_ai_recovery_dispatch')
+                        'wa_ai_recovery_dispatch',
+                        -- Phase 345 client auto-merge internals: SECURITY DEFINER, REVOKED —
+                        -- _client_fold deletes client rows, so a rep must never call it directly.
+                        -- Only the trigger / sync_client_from_quote / admin_merge_clients reach them.
+                        '_client_owner_for_key', '_client_fold_row', '_client_fold')
   LOOP
     EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', r.sig);
   END LOOP;
@@ -147,7 +151,8 @@ WHERE n.nspname = 'public'
                     'quote_nudge_candidates','quote_nudge_mark','quote_nudge_dispatch',
                     'followup_cadence_candidates','followup_cadence_mark',
                     'followup_cadence_dispatch','wa_quality_watch_dispatch',
-                    'wa_ai_recovery_dispatch')
+                    'wa_ai_recovery_dispatch',
+                    '_client_owner_for_key','_client_fold_row','_client_fold')
 ORDER BY p.proname;
 
 SELECT 'Phase 211 anon-execute sweep applied' AS status;
