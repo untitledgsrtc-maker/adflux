@@ -73,15 +73,17 @@ CREATE INDEX IF NOT EXISTS idx_holidays_date ON public.holidays (holiday_date) W
 
 -- Fixed-date national holidays (verified). Gujarat festivals lunar-dependent
 -- and must be added by admin via Master → Holidays page (Phase 1 wk 2).
+-- 2026-10-06 (Phase 341): the 5 FUTURE national rows that used to sit here
+-- (2026-12-25 Christmas, 2027-01-26 Republic Day, 2027-08-15 Independence Day,
+-- 2027-10-02 Gandhi Jayanti, 2027-12-25 Christmas) were REMOVED from this seed. The
+-- owner said the company does NOT close on those days, and a holiday row turns the
+-- date into a closed day for the whole app (no check-in, no auto-absent, no score).
+-- Re-running this file must not bring them back. The 3 past/current 2026 rows stay.
+-- The real closed days live in public.holidays, managed in Master -> Holidays.
 INSERT INTO public.holidays (holiday_date, name, type, is_recurring) VALUES
   ('2026-01-26', 'Republic Day',        'national', true),
   ('2026-08-15', 'Independence Day',    'national', true),
-  ('2026-10-02', 'Gandhi Jayanti',      'national', true),
-  ('2026-12-25', 'Christmas',           'national', true),
-  ('2027-01-26', 'Republic Day',        'national', true),
-  ('2027-08-15', 'Independence Day',    'national', true),
-  ('2027-10-02', 'Gandhi Jayanti',      'national', true),
-  ('2027-12-25', 'Christmas',           'national', true)
+  ('2026-10-02', 'Gandhi Jayanti',      'national', true)
 ON CONFLICT (holiday_date, name) DO NOTHING;
 
 -- is_off_day(date) — returns true for Sundays + active holidays.
