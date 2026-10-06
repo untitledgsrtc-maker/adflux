@@ -450,7 +450,16 @@ export default function CampaignInboxV2() {
       .order('created_at', { ascending: false })
       .limit(20)
     if (error) toastError(error, 'Could not load quotes.')
-    setLeadQuotes(data || [])
+    let merged = data || []
+    // Phase 344 - quotes of a lead that was reassigned to her were created by someone else,
+    // so the direct read (created_by = me) misses them. The gated RPC returns the ones she
+    // may open + send; merge by id. An RPC error (not deployed yet) is ignored on purpose.
+    const { data: viaLead, error: viaErr } = await supabase.rpc('get_lead_quotes_brief', { p_lead_id: sel.lead_id })
+    if (!viaErr && Array.isArray(viaLead)) {
+      const seen = new Set(merged.map((q) => q.id))
+      merged = [...merged, ...viaLead.filter((q) => !seen.has(q.id))]
+    }
+    setLeadQuotes(merged)
     setQuotesLoading(false)
   }
 

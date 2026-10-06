@@ -125,7 +125,21 @@ export function useQuotes() {
       .select('*, quote_cities(*)')
       .eq(lookupCol, id)
       .maybeSingle()
-    if (!error && data) store.setCurrentQuote(data)
+    if (!error && data) { store.setCurrentQuote(data); return { data, error } }
+    // Phase 344 - RLS shows a rep only the quotes she CREATED. When a lead is
+    // reassigned, the new owner's direct read comes back empty (no error). Ask the
+    // gated read-only RPC: it answers only for the lead's CURRENT owner (flagged
+    // view_only), else null = today's 'Quote not found'. Never widen the quotes
+    // RLS policy for this (per-user not per-page: it leaks into every list).
+    if (!error && !data) {
+      const { data: viaLead, error: rpcErr } = await supabase.rpc('get_lead_quote', { p_ref: id })
+      if (rpcErr) console.warn('[useQuotes] get_lead_quote failed:', rpcErr.message)   // not-deployed / network: falls back to 'Quote not found'
+      if (!rpcErr && viaLead && viaLead.id) {
+        store.setCurrentQuote(viaLead)
+        return { data: viaLead, error: null }
+      }
+      store.setCurrentQuote(null)   // not found must never leave a previous quote in the store
+    }
     return { data, error }
   }
 

@@ -20402,3 +20402,44 @@ Quality on both numbers has read GREEN every 4 h since 2 Oct (wa_quality_log). S
 - Quote-nudge `ai_nudge_enabled` is the section 297 contract's "re-arm" - allowed now only because quality is GREEN and the owner OK'd it; do not re-arm followup/cadence/auto-image until a clean period + his OK.
 - SEPARATE finding, NOT changed (security/money, needs its own plain yes): a live sweep shows 123 SECURITY DEFINER functions in `public` are executable by `anon` (Supabase default grants; the section 211 sweep needs re-running and `ALTER DEFAULT PRIVILEGES` was never added - section 86 item 4). `compute_daily_score` is one of them and its self-or-admin gate lets a call with no login through (section 128 note), so anyone with the public key could re-trigger a score recompute for any rep (it recomputes the true value, it cannot write an arbitrary one). Fix = re-run the section 211 REVOKE sweep + a NULL-role guard; shadow-test first.
 - Still open from before: CSV phone test not seen in the DB; the 20:00 IST `attendance-tick` failure; techs cannot see the 37 auto tickets on Home/Tickets (tell Gohil/Gulshan to open /ops); 25 tickets could not be resolved by the guard (now mostly cancelled/moved - re-check); 3 shared depot phones.
+
+
+---
+
+## 329 · Phase 344 - the new lead owner can open + send the quote after a reassign (2026-10-06)
+
+Owner: reassigned lead "Anee Marcom Pvt Ltd" (contact Yogesh Yadav) to Rima; her "View quote" showed "Quote not found" (quote UA-2026-0596, Rs 3,43,000 before GST, created by Brijesh).
+(Phase-number note, section 52: 344 is this batch's label; 345 is reserved for the candidates below.)
+
+### Root cause
+Quotes RLS lets sales / telecaller / agency read ONLY quotes they CREATED (`quotes_sales_own`: created_by = auth.uid(); quote_cities / payments / pdf_share_tokens follow the parent quote's creator). A reassign moves the LEAD (`telecaller_id` / `assigned_to`) but the quote stays with its creator, so the new owner sees nothing. Fleet size at the time: 34 quotes (16 live) of 695 had a lead owner different from the creator (Rima 2 worth about Rs 4.75 lakh, Dhara several).
+
+### The fix (design chosen by a 7-agent recon + design + judge workflow, then a 4-lens adversarial review; both rolled-back dry-runs on live data, 40 checks)
+NO policy on quotes / quote_cities / payments / leads / users was added or changed (a broad SELECT policy is per-USER not per-PAGE - sections 84 / 116 - it would have changed the /quotes list, totals, Co-Pilot and search for the new owner). Instead, all in `db/functions/get_lead_quote.sql` (canonical, section 71/72):
+ * `is_lead_quote_owner(quote_id)` - THE one definition of "may open this quote because of the lead": ACTIVE sales / agency / telecaller, segment_access ALL or PRIVATE, who CURRENTLY owns the lead (leads.telecaller_id OR assigned_to) of a PRIVATE quote. Reads the lead live, so a later reassign removes access by itself (proven: Rima loses it, Dhara gains it).
+ * `get_lead_quote(ref)` - ONE quote (uuid or quote_number) as jsonb: quote + quote_cities + APPROVED payments (WHITELISTED columns only: amount, mode, date, is_final, status - no UTR, notes, TDS, commission, received/approved-by names) + `view_only` flag. NULL = not found OR not yours (no existence oracle). govt_commission_percent stripped.
+ * `get_lead_quotes_brief(lead_id)` - id / number / total / status of the quotes she may open on that lead; feeds the WhatsApp inbox "Send quote" picker (it used to be empty for her).
+ * `supabase_phase344_lead_owner_quote_share.sql` - two policies on pdf_share_tokens ONLY: lead-owner SELECT (reuse the creator's stable branded link) and INSERT (created_by = herself, is_lead_quote_owner, expires_at <= 91 days, token >= 32 chars). pdf_share_tokens is read client-side by exactly one file (QuotePDFHtml.jsx) so nothing else can be polluted. No UPDATE / DELETE.
+ * All REVOKEd from PUBLIC/anon, GRANT authenticated + service_role. Both files APPLIED LIVE 2026-10-06 ~15:55 IST; both VERIFY blocks all TRUE; monthly_sales_data fingerprint identical; quote-table policy count unchanged (19).
+ * Frontend: `useQuotes.fetchQuoteById` falls back to the RPC when the direct read comes back empty (error ignored + console.warn so a not-deployed RPC = today's "Quote not found"); `QuoteDetail.jsx` view-only mode (hides Edit, Delete, status change, Add/Edit/Delete payment, Create Renewal, Follow-ups tab, Incentive forecast, live-photo request; shows a blue note "Created by X. This lead is yours now..."; totals come from the RPC payments; only renders the quote that matches the URL id - stale-store fix); `CampaignInboxV2` merges the brief RPC into its quote picker.
+ * She CAN: open the quote, download the PDF, send WhatsApp / email / PDF link (uses the creator's live share token or mints her own). She CANNOT: edit, change status, mark Won, add payments, renew. The database - not the hidden buttons - is the boundary.
+
+### FROZEN CONTRACTS / foot-guns
+- quotes.created_by is NEVER changed by a reassign (it drives incentive). Do not "fix" this by re-pointing created_by.
+- Never widen quotes / quote_cities / payments RLS for the lead owner. Any NEW rep-facing reader that must see inherited quotes needs its own gated RPC on `is_lead_quote_owner` (candidates below).
+- `get_lead_quote` returns the quote as a DENYLIST (to_jsonb minus govt_commission_percent): when `quotes` gains a sensitive column, review this function. Payments are a whitelist - extend it deliberately.
+- Do NOT create quote-keyed follow-ups for the new owner (section 324 stranding trap); follow-ups belong on the lead page.
+- The owner rule is a UNION (telecaller_id OR assigned_to). Equal to COALESCE today (0 leads with two different owners); the VERIFY tripwire flags it if the CSV self-import loophole (section 320) ever creates one.
+
+### OPEN - owner decisions (NOT built, NOT guessed)
+1. **Incentive credit.** Credit stays with the quote CREATOR. UA-2026-0596 was created by Brijesh (admin, incentive profile all zero), so if it closes nobody earns incentive although Rima (about Rs 16,860 = 2% + the Rs 10,000 flat bonus, possibly full variable) would have. Needs the owner's word BEFORE that payment lands: (a) leave it, or (b) a separate guarded sprint adding a credited_to concept across ~10 money functions with a shadow-compare.
+2. **Who closes it.** Rima cannot mark Won or record the payment; Brijesh/admin does. Allow her to? Recommend no until decision 1.
+3. GOVERNMENT quotes are not covered (0 of 194 mismatched today); the first reassigned govt lead still bounces the new owner. Needs a TDS / commission hiding decision.
+4. The quote's own auto follow-up row ("Auto follow-up after quote sent", due 8 Oct) is still assigned to Brijesh; a small data fix if wanted.
+
+### Phase 345 candidates / known gaps (not built)
+- Still invisible to the new owner by design: the /quotes list, GlobalSearch, TelecallerV2 last-quote pill, Co-Pilot. A gated list RPC would fix the pill/list if asked.
+- Pre-existing, NOT fixed (frozen file): `LeadDetailV2.jsx` ~line 580 selects a column `ref` that does not exist on quotes (use quote_number), so the "Quotes . N" card on the lead page never rendered for anyone; needs its own guardian-audited commit.
+- Pre-existing: the `quote-pdfs` bucket lets any signed-in user insert / update / delete any object; worth a hardening ticket.
+- Rima's installed PWA may serve the old bundle for up to ~24 h: hard-refresh ("Reload without cache") once.
+- The reviewers' own harness once held a transaction open; verified live clean afterwards (0 new functions before the real apply, 4 token policies, no locks). Keep review harnesses in ONE rolled-back file and never put a policy on a live hot table inside them (use a temp copy).

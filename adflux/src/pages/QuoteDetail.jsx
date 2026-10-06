@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Download, MessageCircle, ChevronDown,
   Building2, Phone, Mail, MapPin, FileText, Calendar,
-  CheckCircle, CreditCard, X, Pencil, Trash2
+  CheckCircle, CreditCard, X, Pencil, Trash2, Info
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useQuotes } from '../hooks/useQuotes'
@@ -46,6 +46,10 @@ import { FollowUpList } from '../components/followups/FollowUpList'
 import { OpsPhotoRequestButton, OpsLivePhotos } from '../components/ops/OpsPhotoRequest'
 import { formatCurrency, formatDate, formatPhone, todayISO } from '../utils/formatters'
 import { STATUS_LABELS } from '../utils/constants'
+
+// Phase 344 - true when the loaded quote is the one the URL asks for (uuid, any case,
+// or quote_number). Stops a stale store entry from rendering/redirecting for a different id.
+const sameQuote = (q, ref) => !!q && (String(q.id).toLowerCase() === String(ref).toLowerCase() || q.quote_number === ref)
 
 function getAllowedTransitions(quote, hasFinalPayment) {
   // Won-with-no-final-payment is the "client said yes, never paid"
@@ -113,7 +117,7 @@ export default function QuoteDetail() {
       console.warn('[quote-touch] activity log failed:', e?.message)
     }
   }
-  const { payments, loading: paymentsLoading, totalPaid, hasFinalPayment, fetchPayments, addPayment, updatePayment, deletePayment } = usePayments(id)
+  const { payments: hookPayments, loading: paymentsLoading, totalPaid: hookTotalPaid, hasFinalPayment: hookHasFinal, fetchPayments, addPayment, updatePayment, deletePayment } = usePayments(id)
 
   const [loading, setLoading]               = useState(true)
   const [activeTab, setActiveTab]           = useState('overview')
@@ -151,14 +155,32 @@ export default function QuoteDetail() {
   // click before the QuotesV2 list learned to discriminate), bounce
   // over to /proposal/:id without losing the user's place.
   useEffect(() => {
-    if (currentQuote?.segment === 'GOVERNMENT') {
+    if (currentQuote?.segment === 'GOVERNMENT' && sameQuote(currentQuote, id)) {
       navigate(`/proposal/${id}`, { replace: true })
     }
-  }, [currentQuote?.segment, id, navigate])
+  }, [currentQuote?.segment, currentQuote?.id, id, navigate])
 
-  const quote  = currentQuote
+  const quote  = sameQuote(currentQuote, id) ? currentQuote : null   // only ever render the quote that matches the URL
+  // Phase 344 - server-supplied: this viewer is the CURRENT OWNER OF THE LEAD, not the
+  // creator (get_lead_quote RPC). She can read + send the quote; edits, status changes,
+  // payments and renewals stay with the creator / admin. The database is the boundary,
+  // hiding buttons below is only to avoid dead clicks.
+  const isViewOnly = quote?.view_only === true
+  const payments = isViewOnly ? (quote.payments || []) : hookPayments
+  const totalPaid = isViewOnly
+    ? payments.filter(p => p.approval_status === 'approved').reduce((s, p) => s + (p.amount_received || 0), 0)
+    : hookTotalPaid
+  const hasFinalPayment = isViewOnly
+    ? payments.some(p => p.is_final_payment && p.approval_status === 'approved')
+    : hookHasFinal
+  const visibleTabs = isViewOnly ? TABS.filter(t => t.key !== 'followups') : TABS
   const cities = quote?.quote_cities || []
   const balance = quote ? (quote.total_amount - totalPaid) : 0
+  // Phase 344 - a view-only owner never sees the Follow-ups tab; if the page was left on that
+  // tab for a quote she created and she then opens an inherited one, fall back to Overview.
+  useEffect(() => {
+    if (isViewOnly && activeTab === 'followups') setActiveTab('overview')
+  }, [isViewOnly, activeTab])
 
   async function handleStatusChange(newStatus) {
     setStatusOpen(false)
@@ -478,7 +500,7 @@ export default function QuoteDetail() {
     )
   }
 
-  const allowed = getAllowedTransitions(quote, hasFinalPayment)
+  const allowed = isViewOnly ? [] : getAllowedTransitions(quote, hasFinalPayment)
 
   return (
     <div className="page">
@@ -496,7 +518,7 @@ export default function QuoteDetail() {
               Phase 29b — Other Media has its own wizard; the Private
               LED WizardShell can't load OTHER_MEDIA quotes correctly,
               so route by media_type. */}
-          {quote?.status !== 'lost' && (
+          {quote?.status !== 'lost' && !isViewOnly && (
             <button
               className="btn btn-sec btn-sm"
               onClick={() => {
@@ -537,13 +559,13 @@ export default function QuoteDetail() {
           </button>
           {/* Phase 230 — Operations: request a live photo of the ad on the screens
               (won private-LED only; the button self-hides otherwise). */}
-          <OpsPhotoRequestButton quote={quote} profile={profile} onRequested={() => setOpsPhotoKey(k => k + 1)} />
+          {!isViewOnly && <OpsPhotoRequestButton quote={quote} profile={profile} onRequested={() => setOpsPhotoKey(k => k + 1)} />}
           {/* Phase 29b — Delete (hard remove from DB), drafts only.
               Phase 11b's DB trigger blocks delete on non-draft quotes
               so the button is hidden when status != 'draft' to avoid
               an obvious dead click. Confirmation prompt prevents
               accidents. */}
-          {quote?.status === 'draft' && (
+          {quote?.status === 'draft' && !isViewOnly && (
             <button
               className="btn btn-sec btn-sm"
               style={{ borderColor: 'var(--red)', color: 'var(--red)' }}
@@ -589,6 +611,13 @@ export default function QuoteDetail() {
       {statusMsg && (
         <div style={{ background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: '.82rem', color: '#81c784' }}>
           ✓ {statusMsg}
+        </div>
+      )}
+
+      {isViewOnly && (
+        <div role="note" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--blue-soft)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 14, fontSize: '.82rem', color: 'var(--text-muted)' }}>
+          <Info size={14} strokeWidth={1.6} style={{ marginTop: 2, flexShrink: 0 }} />
+          <span>Created by {quote.sales_person_name || 'another team member'}. This lead is yours now, so you can view and send this quote. Edits, payments and status changes stay with the creator or admin.</span>
         </div>
       )}
 
@@ -660,7 +689,7 @@ export default function QuoteDetail() {
 
       {/* ── Tabs ── */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, background: 'var(--mid)', border: '1.5px solid var(--brd)', borderRadius: 10, padding: 5 }}>
-        {TABS.map(t => (
+        {visibleTabs.map(t => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key)}
@@ -821,7 +850,7 @@ export default function QuoteDetail() {
           {/* Phase 34D — incentive forecast. Hidden for admin + for
               already-won/lost quotes. Tells the rep how much closing
               this quote this month bumps their incentive. */}
-          <IncentiveForecastCard quote={quote} />
+          {!isViewOnly && <IncentiveForecastCard quote={quote} />}
 
           {/* Won quote actions — Create Renewal stays here so the
               renewal CTA is visible at the bottom of the quote.
@@ -829,7 +858,7 @@ export default function QuoteDetail() {
               buttons opened a modal that was never rendered (dead state);
               full editing now lives on the Edit button in the header
               and is available for every status except 'lost'. */}
-          {quote.status === 'won' && (
+          {quote.status === 'won' && !isViewOnly && (
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button className="btn btn-y btn-sm" onClick={() => navigate(`/quotes/renew/${id}`)}>
                 Create Renewal Quote
@@ -838,7 +867,7 @@ export default function QuoteDetail() {
           )}
 
           {/* Add payment button — both admin and sales can add */}
-          {quote.status !== 'lost' && !hasFinalPayment && (
+          {quote.status !== 'lost' && !hasFinalPayment && !isViewOnly && (
             <div style={{ textAlign: 'center' }}>
               <button className="btn btn-y" onClick={() => { fetchPayments(); setShowPaymentModal(true) }}>
                 <CreditCard size={15} /> Add Payment
@@ -855,10 +884,10 @@ export default function QuoteDetail() {
           <PaymentHistory
             payments={payments}
             loading={paymentsLoading}
-            onEdit={p => { setEditingPayment(p); setShowEditPayment(true) }}
-            onDelete={handleDeletePayment}
+            onEdit={isViewOnly ? undefined : (p => { setEditingPayment(p); setShowEditPayment(true) })}
+            onDelete={isViewOnly ? undefined : handleDeletePayment}
           />
-          {quote.status !== 'lost' && !hasFinalPayment && (
+          {quote.status !== 'lost' && !hasFinalPayment && !isViewOnly && (
             <div style={{ textAlign: 'center', paddingBottom: 8 }}>
               <button className="btn btn-y" onClick={() => setShowPaymentModal(true)}>
                 <CreditCard size={15} /> Add Payment
@@ -869,7 +898,7 @@ export default function QuoteDetail() {
       )}
 
       {/* ── Follow-ups Tab ── */}
-      {activeTab === 'followups' && (
+      {activeTab === 'followups' && !isViewOnly && (
         <div className="card">
           <FollowUpList quoteId={id} assignedTo={quote.created_by} />
         </div>
