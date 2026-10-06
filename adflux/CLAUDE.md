@@ -20346,3 +20346,20 @@ and UNDO (`... AND t.updated_at = b.bak_at`) can tell "untouched since" from "so
 Owner said "done" at ~13:15 IST but the live DB has NO trace: no `lead_imports` row for zz-test-upload, no `ZZ TEST` leads, no Excel-source lead in the last 12 h (the only import in 24 h is Brijesh's
 5 Oct 16:37 admin file). `lead_import_quiet_ready()` = true, so the feature is on. Rakeshkumar's last app-version report is 5 Oct 13:42 (the emulator test), none today. The saved 14-check verify showed 8 FAIL
 (missing import / leads) and 6 vacuous PASS (zero rows) - NOT a pass. Next: ask which account / phone / screen the owner used and what it showed; the verify SQL stays in the scratchpad (`csvtest/zz_verify.sql`).
+
+## 327 · SQL is run by Claude, not pasted by the owner (2026-10-06, OWNER DIRECTIVE)
+
+Owner: "why every time I need to open SQL and paste in Supabase?"
+
+**SUPERSEDES** the "SQL files must be run by hand in Supabase Studio" lines in section 14, section 154 and every "owner runs SQL" step in earlier sections. That workflow existed because the old sandbox could not reach the
+database. Since 5 Oct 2026 (section 309) it can: `supabase db query --linked -f <file.sql>` from `/Users/apple/Documents/untitled-os2/Untitled/adflux` (the Mac's Supabase CLI is logged in; the project-ref is in
+`supabase/.temp/project-ref`). Edge functions deploy with `supabase functions deploy <name> --project-ref kompjctmisnitjpbjalh`.
+
+### The rule
+- **Claude runs the SQL.** Do not end a turn with "run this in Studio" unless the CLI actually fails (then fall back to opening the file in VS Code).
+- **Every write: dry-run first** inside `BEGIN; ...; ROLLBACK;` (or a DO block that ends in RAISE EXCEPTION), confirm live is unchanged, apply, verify with a read-only query, report in plain words. Heals follow the
+  Phase 338 pattern (section 326): back up first, pin the scope, abort unless the counts are the approved ones, re-run is a no-op, UNDO only touches rows nobody has worked on since.
+- **Ask for ONE plain yes first** (then run it yourself) only for: money / pay / incentive / salary functions (section 71 rule 3 shadow-compare + owner-verify), security or RLS on sensitive data, destructive or
+  irreversible steps (DROP, DELETE, bulk cancel), or anything beyond what the owner already approved. An additive change he asked for that is dry-run clean: just apply it.
+- **Still the owner's:** Meta / WhatsApp tokens, Vercel env values, building and installing the APK on phones, passwords and logins (never type credentials into the live app).
+- Keep committing the `.sql` file to the repo as the record (section 71 canonical files stay the single home of each function). The "owner runs SQL" wording in older sections is historical - read it as "Claude runs it".
