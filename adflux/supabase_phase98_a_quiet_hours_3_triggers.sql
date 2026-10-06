@@ -55,37 +55,8 @@
 
 
 -- ─── 1. tg_push_on_lead_assign ──────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.tg_push_on_lead_assign()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_title text;
-  v_body  text;
-BEGIN
-  -- INSERT with assignee, OR UPDATE to a different assignee.
-  IF (TG_OP = 'INSERT' AND NEW.assigned_to IS NOT NULL)
-     OR (TG_OP = 'UPDATE'
-         AND NEW.assigned_to IS NOT NULL
-         AND NEW.assigned_to IS DISTINCT FROM OLD.assigned_to) THEN
-    v_title := 'New lead: ' || COALESCE(NEW.name, NEW.company, 'unnamed');
-    v_body  := COALESCE(NEW.company, '') ||
-               CASE WHEN NEW.phone IS NOT NULL THEN ' · ' || NEW.phone ELSE '' END;
-    -- Phase 98.A — quiet-hours gate.
-    IF public.is_push_allowed_now() THEN
-      PERFORM public.enqueue_push(
-        NEW.assigned_to,
-        v_title,
-        v_body,
-        '/leads/' || NEW.id::text,
-        'lead-' || NEW.id::text
-      );
-    END IF;
-  END IF;
-  RETURN NEW;
-END $$;
+-- tg_push_on_lead_assign: BODY REMOVED (Phase 335). Canonical home = db/functions/tg_push_on_lead_assign.sql (CLAUDE.md §71/§72).
+-- Re-running this file used to put back an older body and strip the telecaller 'new lead' branch. Edit the canonical file only.
 
 
 -- ─── 2. tg_push_on_payment_approved ─────────────────────────────────
@@ -202,9 +173,8 @@ NOTIFY pgrst, 'reload schema';
 -- a legitimate push that owner WANTS at night. Restores the
 -- Phase 33W function bodies byte-identical. Re-opens F-D010.
 --
---   CREATE OR REPLACE FUNCTION public.tg_push_on_lead_assign() ...
---     (Phase 33W body with `PERFORM public.enqueue_push(...)` NOT
---      wrapped in `IF public.is_push_allowed_now() THEN ... END IF;`)
+--   tg_push_on_lead_assign: see db/functions/tg_push_on_lead_assign.sql (no body kept here;
+--     for an UNGATED (24x7) body, remove the is_push_allowed_now() wrapper in the canonical file).
 --
 --   CREATE OR REPLACE FUNCTION public.tg_push_on_payment_approved() ...
 --     (same restore)
@@ -214,6 +184,5 @@ NOTIFY pgrst, 'reload schema';
 --
 --   NOTIFY pgrst, 'reload schema';
 --
--- Full byte-identical rollback bodies live in
--- `supabase_phase33w_push_triggers.sql:103-197`. Paste from there
--- if rollback is needed.
+-- tg_push_on_payment_approved / tg_push_on_quote_won rollback bodies: git history of
+-- `supabase_phase33w_push_triggers.sql` (still defines the ungated versions).

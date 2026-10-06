@@ -55,36 +55,9 @@ CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
 
 -- enqueue_push GRANT removed (Phase 178): §97.A2 revoked EXECUTE from authenticated; the canonical (db/functions/enqueue_push.sql) enforces the revoke. Re-granting here would RE-OPEN the rep-to-rep push-spam hole.
 
--- ─── 3. Trigger: new lead assigned ───────────────────────────────
--- Fires when:
---   • A new lead row is INSERTed with assigned_to set, OR
---   • An existing lead's assigned_to column is changed (reassign)
--- Pushes to the NEW assignee.
-CREATE OR REPLACE FUNCTION public.tg_push_on_lead_assign()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
-AS $$
-DECLARE
-  v_title text;
-  v_body  text;
-BEGIN
-  -- INSERT with assignee, OR UPDATE to a different assignee.
-  IF (TG_OP = 'INSERT' AND NEW.assigned_to IS NOT NULL)
-     OR (TG_OP = 'UPDATE'
-         AND NEW.assigned_to IS NOT NULL
-         AND NEW.assigned_to IS DISTINCT FROM OLD.assigned_to) THEN
-    v_title := 'New lead: ' || COALESCE(NEW.name, NEW.company, 'unnamed');
-    v_body  := COALESCE(NEW.company, '') ||
-               CASE WHEN NEW.phone IS NOT NULL THEN ' · ' || NEW.phone ELSE '' END;
-    PERFORM public.enqueue_push(
-      NEW.assigned_to,
-      v_title,
-      v_body,
-      '/leads/' || NEW.id::text,
-      'lead-' || NEW.id::text
-    );
-  END IF;
-  RETURN NEW;
-END $$;
+-- ─── 3. Trigger function: new lead assigned ─────────────────────
+-- tg_push_on_lead_assign: BODY REMOVED (Phase 335). Canonical home = db/functions/tg_push_on_lead_assign.sql (CLAUDE.md §71/§72).
+-- Re-running this file used to put back an older body and strip the telecaller 'new lead' branch. Edit the canonical file only.
 
 -- Phase 330: the tg_push_lead_assign trigger DDL was REMOVED from this file. Its canonical definition (with
 -- WHEN (NOT public.lead_is_self_import(...)) so CSV self-imports stay quiet) now lives ONLY in

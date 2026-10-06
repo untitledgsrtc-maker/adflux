@@ -20225,9 +20225,9 @@ scenarios incl. the real `reassign_lead` RPC, push audit (the transfer adds none
 (narrow the heal's close arm) + 4 P3s applied. Live: 17 backed up, 9 closed, 8 moved, 0 left on a wrong owner.
 
 ### OPEN - owner decisions / separate changes (NOT done)
-- **11 payment-chase follow-ups held by 5 INACTIVE reps** (Dipak 5, Abhinav 3, Avkashbhai 2, Jignesh 1) on sent quotes worth about Rs 36.4 lakh (UA-2026-0232 = Rs 34,40,880); their leads are owned by Dhara. Plus ~26 open quotes of deactivated reps.
+- **[RESOLVED, section 324 / Phase 336]** 11 payment-chase follow-ups held by 5 INACTIVE reps (Dipak 5, Abhinav 3, Avkashbhai 2, Jignesh 1) on sent quotes worth about Rs 36.4 lakh (UA-2026-0232 = Rs 34,40,880); their leads are owned by Dhara. Plus ~26 open quotes of deactivated reps.
   Nobody is chasing them. Needs a decision: re-point to the lead owner (Dhara) or to accounts; and a deactivation checklist (reassign leads, quotes, follow-ups).
-- **New-lead push never fires for telecaller-owned leads** (`tg_push_on_lead_assign` watches `assigned_to` only; ~746 telecaller leads / 30 days). Product decision; interacts with the Phase 330 quiet-import WHEN clause on the same trigger.
+- **[RESOLVED, section 324 / Phase 335]** New-lead push never fires for telecaller-owned leads (`tg_push_on_lead_assign` watches `assigned_to` only; ~746 telecaller leads / 30 days). Product decision; interacts with the Phase 330 quiet-import WHEN clause on the same trigger.
 - Smart tasks (`generate_lead_tasks` filters `assigned_to` only) never serve telecallers (dormant, panel hidden); round-robin load counts `assigned_to` only; 6 WhatsApp conversations have a stale `assigned_to`; 12 stale open lead_tasks.
 - **PRE-EXISTING, unrelated: the 20:00 IST `attendance-tick` cron fails** (also on 3 Oct): `enforce_evening_before_checkout` raises 'Cannot check out before submitting evening report' and rolls back that minute's auto-checkout batch; later ticks succeed.
 - Owner-order inconsistency (assigned_to-first in the engine vs telecaller-first in inbox / nurture revisit / hot-lead): equal on every lead today (0 leads with differing columns); `leads_both_owners_differ` in the heals' VERIFY is the tripwire.
@@ -20236,4 +20236,30 @@ scenarios incl. the real `reassign_lead` RPC, push audit (the transfer adds none
 - Owner of record for ANY follow-up code = `assigned_to -> telecaller_id -> (created_by / activity author as last resort)`; never put the creator or activity author ahead of `telecaller_id`.
 - A heal that closes "legacy NULL-cadence" auto rows must key on the note (`Auto-scheduled:%`), not on cadence_type alone: aftermath rows are auto_generated + NULL cadence + the rep's own typed text.
 - A rule that moves rows to a new owner must be checked against every "does the new owner already have something?" guard downstream (here the Phase 100.E landing task).
+
+## 324 · Phase 335 + 336 - telecaller "new lead" push, and the former reps' quotes (2026-10-06)
+
+Owner answered the two open decisions of section 323: (1) telecallers SHOULD get a new-lead alert ("yes"); (2) "create follow-ups for" the Rs 36.4 lakh of quotes left with former reps. Investigated by 3 read-only agents, verified on the live DB inside rolled-back transactions.
+
+### Phase 335 - telecaller-owned lead push (canonical `db/functions/tg_push_on_lead_assign.sql`)
+- Gap: `tg_push_on_lead_assign` only looked at `assigned_to`; a telecaller-owned lead has `assigned_to` NULL + owner in `telecaller_id` (section 99.C) -> ~746 leads / 30 days (712 from admin CSV imports, 34 hand-offs) gave NO alert.
+- Fix = ONE extra branch, INSERT only, inside its own `BEGIN..EXCEPTION` (a push problem can never fail the lead insert, section 45). Branch 1 (sales + WhatsApp/Meta/QR leads that carry BOTH columns) is byte-identical to the Phase 98.A body.
+  * single lead (import_id NULL): push the telecaller, same title/body/url/tag as the sales branch (`lead-<id>`).
+  * bulk import (import_id set): ONE push per (import, telecaller), tag `lead-batch-<import_id>`, url `/leads`, serialised by `pg_advisory_xact_lock` + skipped when push_log already holds that tag for that user in 24 h (an admin import of 189 leads = 1 push; per-lead would have been 712 in a month).
+  * `created_by = telecaller_id` (a lead you typed yourself) -> silent; quiet hours (09:00-20:59 IST gate) -> silent.
+  * Trigger wiring + Phase 330 WHEN clause untouched; UPDATE/reassign path untouched (Phase 100.E already pings through its landing task); no double-ping with `tg_push_on_wa_inbound_lead` / `tg_push_on_followup_due`.
+- Old copies of the function in `supabase_phase33w_push_triggers.sql` and `supabase_phase98_a_quiet_hours_3_triggers.sql` are now pointers (re-running them can no longer strip the telecaller branch). Section 71/72 VERIFY block at the bottom of the canonical file (8 x TRUE).
+- Dry-run (rolled back, live DB): 11 scenarios incl. 200-row import = 1 push (+~30 ms), quiet hours = 0, enqueue_push raising = lead insert survives. Known/accepted: off-hours imports (after 20:59) are silent; the batch text cannot carry a count; the sales branch still has no exception wrapper (pre-existing, kept byte-identical).
+
+### Phase 336 - quotes left with former (inactive) reps (`supabase_phase336_former_rep_quote_followups.sql`)
+- Reality check on the "Rs 36.4 lakh nobody is chasing": 13 of the 26 open quotes of former reps sit on leads already LOST (client said no; UA-2026-0232 = Rs 34,40,880: Jayna phoned 22 Jul, "he does not require it"), 10 on Nurture (Dhara/Jani already hold nurture + after-call rows), 1 on a Won lead (UA-2026-0193, Rs 8,000, quote still `sent`), only 2 genuinely live (UA-2026-0127, UA-2026-0139, QuoteSent, owner Dhara, Rs 27,795 together).
+- The 11 stale `Auto follow-up after quote sent` rows (quote-linked, lead_id NULL) were CLOSED, not re-pointed: the quotes RLS policy lets a telecaller read only quotes she created, so re-pointing to Dhara would render "Unknown client / no phone" (the Phase 333 family). Marker `[closed: auto - ...]` (section 175 system-close). Backup `_bak_followups_p336`.
+- 2 NEW lead-linked follow-ups ("Quote chase: UA-... - client - Rs ... (was with <rep>)") to the lead owner of record (Dhara), due today, `follow_up_time` NULL (section 106), cadence_type NULL, auto_generated=false -> no cadence function touches them. Backup `_bak_followups_p336_new`. DB guard `followup_block_on_lost_lead` would born-close any lead-linked row on a Lost lead, so none were created for those.
+- Live: 11 closed, 2 created, open rows on inactive users 0, 2 pushes to Dhara. Default owner = Dhara (owner did not pick Dhara vs accounts; accounts has nothing to collect - no payment exists on these quotes).
+- NOT done (owner's call): PART 5 in the file (commented) marks the 13 Lost-lead quotes `lost` (one-way, moves won/lost stats); UA-2026-0193 (Won lead, quote still `sent`) needs someone with quote access; Dhara cannot open quotes of leads she owns (RLS); no deactivation checklist yet.
+
+### Foot-guns
+- A telecaller-only lead has NO `assigned_to`: any new "notify the owner" code must use `COALESCE(assigned_to, telecaller_id)` or it silently skips ~25% of leads.
+- Do not create a lead-linked follow-up for a Lost-lead quote (born-closed by the guard) or a Nurture lead (hidden by `keepInFollowupQueue`).
+- A follow-up with quote_id only (lead_id NULL) is unreadable to a telecaller (quotes RLS = creator only) - always link to the lead.
 
