@@ -20493,3 +20493,31 @@ Nova IVF = Salpesh, 2 / vksfnsnfj = Rima, 2 (test junk).
 - A SECURITY DEFINER BEFORE INSERT trigger that returns NULL bypasses RLS WITH CHECK entirely - always replicate the policy's test inside it, and test with SET LOCAL ROLE anon.
 - Test a data heal's phone key against REAL stored formats (91..., +91 ..., spaces, leading 0) - the old (phone, owner) unique index never saw them as equal.
 - A 3-lens review earns its keep on a DEFINER trigger: the first lens-less draft shipped a cross-rep write hole.
+
+
+---
+
+## 331 · Phase 346 - in-app GSRTC deck: PHONE-responsive + real face-detection hero + "See it live" page 2 (2026-10-07)
+
+Owner: the in-app presentation (`/present/:leadId`, section 77, deck = `public/deck/led-deck-final.html`) was built for a laptop and broke on phones in both orientations. Then: put the /led "See it live - Real screens. Real stations." station picker in as page 2, and replace page 1's background with real station footage that has REAL face detection, saved as a small cached video.
+(Phase-number note, section 52: 346 = this batch; disambiguate by SHA.) JS/HTML + media only: no SQL, no APK. Desktop look unchanged.
+
+### What shipped (all on origin `untitled-os`)
+- **Phone layer** = ONE `<style id="phone-layer">` appended last in the deck, wrapped in `@media (max-width:820px),(max-height:520px)` so desktop is untouched; every rule scoped `section.slide[data-i="X"]`. Landscape-only rules MUST be gated `(max-height:520px) and (orientation:landscape)` (a bare max-height also fires on short portrait phones). Slides are built per-slide (each reviewed by an independent verifier).
+- **PresentView.jsx** (not frozen): phone bar with prev / next / slide counter (drives the iframe by dispatching ArrowLeft/Right keydown; counter read from `#deckCounter` via MutationObserver); the iframe html gets class `in-app` (hides the deck's own floating bar) ONLY after the counter is found (fail-safe); `env(safe-area-inset-*)` is 0 inside an iframe so the insets are applied as padding on the PresentView root. Presentation logging (section 77: any exit, 3s floor, 60 min cap) untouched.
+- **Hero (slide 1)** background = `hero-faces.mp4` (1280x720, ~10s seamless loop, 1.1 MB) / `hero-faces-m.mp4` (640x360 phone clip, 447 KB) + `hero-faces.jpg` poster. Faces are REAL: OpenCV 4.11 `FaceDetectorYN` + YuNet, tracked by IoU, drawn as yellow corner boxes with chip "ID NN · X.Xs" (honest viewing time). Gender / age are deliberately NOT shown (the model is unreliable at this resolution - it tagged a man F); a face on a TV ad was excluded. The old fake canvas/reticles were removed. The build tooling lives in the session scratchpad (not committed): to change the clip, re-render with the same recipe and overwrite the three files.
+- **New slide 2 (data-i="v1")** "Real screens. Real stations.": video + 21 station pills. Pills rebuild from `/api/deck-videos` (the section 221 cities-master source, same as /led and the WhatsApp AI); offline or if it fails the local clips remain. The old "opportunity" slide is now page 3. **Deck = 12 slides**; counter and overview are dynamic.
+- **No-refetch video**: each clip is fetched ONCE as a whole file (a normal 200, cacheable by the service worker), played from a blob URL, and kept; so offline works and nothing re-downloads. (The SW never caches `<video src>` range/206 requests - that is why a plain src re-fetches.) `public/sw.js` deck cache `pitch-deck-v18` -> `v19`.
+
+### CONTRACTS / foot-guns (do NOT regress)
+- **CSP: `vercel.json` now has `media-src 'self' blob:`** (guardian P1). Before, media fell back to `default-src 'self'`, which does NOT match `blob:`, so blob-played video would have been silently refused on the live site (a local server sends no CSP, so local tests pass). The deck's `loadVid` also falls back ONCE to the plain URL if blob playback errors. Any new blob/media feature needs this checked against the LIVE header, not localhost.
+- Bump the SW deck cache name (`pitch-deck-vNN`) on EVERY deck change (section 77); reps reopen the app once. The SW `activate` still never deletes old `pitch-deck-v*` caches (pre-existing, owner decision).
+- Do NOT re-add fake detection boxes or invented gender/age to the hero. Real detections only.
+- Headless Chrome clamps its window to ~500px wide; verify phone layout with an in-page overflow check, never by a sub-500 screenshot. Count-up numbers caught mid-animation (negative / huge values) in headless shots are a virtual-time artifact (they appear in the ORIGINAL deck too), not a defect.
+- `/api/deck-videos` is an Edge fn that only exists on Vercel; local previews show only the 4 local pills.
+
+### Verification done
+Full-deck independent QA: 6 reviewers x 12 slides x 3 phone sizes (390x780, 360x600, 844x330): 10 PASS, 2 fixed (landscape pills 34 -> 40px; contact slide fits a short portrait phone). Desktop before/after: layout identical on every unchanged slide (only count-up digits and a video frame differ). sales-module-guardian: no frozen contract broken; 1 P1 (CSP) + 1 P3 (`in-app` only with counter) fixed. `npm run build` + the SW-denylist tripwire green.
+
+### Known / not done (owner-aware, minor)
+Face chips are small (~8-9 px) on a portrait phone window (re-render the phone clip with bigger chip text if wanted); the 360x600 hero stats card is half below the fold (headline, video and AI panel are on the first screen); `/api/deck-videos` city clips only appear on the deployed site. Not tested on a real Android WebView (autoplay of the muted blob video) - check once on a phone after the deploy.

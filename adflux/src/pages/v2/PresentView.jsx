@@ -5,7 +5,7 @@
 // My Performance log. Additive; touches no frozen sales contract (§45).
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Square, Loader2, Radio, MessageCircle, Mail } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Square, Loader2, Radio, MessageCircle, Mail } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
@@ -23,6 +23,20 @@ const fmtClock = (s) => {
   const m = Math.floor(s / 60)
   const ss = s % 60
   return `${m}:${String(ss).padStart(2, '0')}`
+}
+
+const navBtn = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 40,
+  height: 40,
+  borderRadius: 10,
+  border: '1px solid var(--border, #334155)',
+  background: 'transparent',
+  color: 'var(--text, #f1f5f9)',
+  cursor: 'pointer',
+  flex: '0 0 auto',
 }
 
 const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/
@@ -46,6 +60,53 @@ export default function PresentView() {
   const [emailSending, setEmailSending] = useState(false)
   const [emailErr, setEmailErr] = useState('')
   const endingRef = useRef(false)
+
+  // Phone mode: the deck (same-origin iframe) switches to its phone layout via a
+  // media query. When it does, its own floating button bar is hidden (class
+  // "in-app" added below) and THIS bar carries prev / next / slide counter, so a
+  // phone shows ONE bar instead of two stacked ones. Fail-safe: if the iframe
+  // cannot be reached, nothing is hidden and the deck keeps its own controls.
+  const frameRef = useRef(null)
+  const detachRef = useRef(null)
+  const [deckPhone, setDeckPhone] = useState(false)
+  const [slideLabel, setSlideLabel] = useState('')
+
+  const onFrameLoad = useCallback(() => {
+    if (detachRef.current) detachRef.current()
+    detachRef.current = null
+    try {
+      const win = frameRef.current.contentWindow
+      const doc = win.document
+      const mql = win.matchMedia('(max-width: 820px), (max-height: 520px)')
+      const onMq = () => setDeckPhone(mql.matches)
+      onMq()
+      mql.addEventListener('change', onMq)
+      let mo = null
+      const counter = doc.getElementById('deckCounter')
+      if (counter) {
+        const read = () => setSlideLabel((counter.textContent || '').replace(/\s+/g, ' ').trim())
+        read()
+        mo = new MutationObserver(read)
+        mo.observe(counter, { childList: true, subtree: true, characterData: true })
+      }
+      if (counter) doc.documentElement.classList.add('in-app')   // last: only once the bar can show + drive the deck
+      detachRef.current = () => {
+        mql.removeEventListener('change', onMq)
+        if (mo) mo.disconnect()
+      }
+    } catch {
+      /* deck not reachable: leave its own controls alone */
+    }
+  }, [])
+
+  useEffect(() => () => { if (detachRef.current) detachRef.current() }, [])
+
+  const pressKey = useCallback((key) => {
+    try {
+      const doc = frameRef.current.contentDocument
+      doc.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+    } catch { /* ignore */ }
+  }, [])
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(elapsedSeconds(getActive())), 1000)
@@ -189,22 +250,29 @@ export default function PresentView() {
         background: 'var(--bg, #0f172a)',
         display: 'flex',
         flexDirection: 'column',
+        // notched phones: keep the deck (and its text) out from under the notch / status bar
+        // (env() is 0 inside the iframe, so the inset has to be applied out here)
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingLeft: 'env(safe-area-inset-left, 0px)',
+        paddingRight: 'env(safe-area-inset-right, 0px)',
       }}
     >
       <iframe
+        ref={frameRef}
+        onLoad={onFrameLoad}
         title="GSRTC presentation"
         src="/deck/led-deck-final.html"
         allow="autoplay; fullscreen"
-        style={{ flex: 1, width: '100%', border: 0, background: '#0a0a0c' }}
+        style={{ flex: 1, minHeight: 0, width: '100%', border: 0, background: '#0a0a0c' }}
       />
       <div
         style={{
           flex: '0 0 auto',
           display: 'flex',
           alignItems: 'center',
-          gap: 12,
-          padding: '10px 14px',
-          paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+          gap: deckPhone ? 8 : 12,
+          padding: deckPhone ? '6px 10px' : '10px 14px',
+          paddingBottom: `calc(${deckPhone ? 6 : 10}px + env(safe-area-inset-bottom, 0px))`,
           background: 'var(--surface, #1e293b)',
           borderTop: '1px solid var(--border, #334155)',
         }}
@@ -241,31 +309,69 @@ export default function PresentView() {
           }}
         >
           <Radio size={15} />
-          {capped ? 'Max time reached' : 'Presenting'}
+          {deckPhone ? (capped ? 'Max' : null) : (capped ? 'Max time reached' : 'Presenting')}
         </span>
 
         <span
           style={{
             fontFamily: 'var(--font-display, Space Grotesk, system-ui)',
-            fontSize: 22,
+            fontSize: deckPhone ? 18 : 22,
             fontWeight: 700,
             fontVariantNumeric: 'tabular-nums',
             color: 'var(--text, #f1f5f9)',
-            minWidth: 64,
+            minWidth: deckPhone ? 48 : 64,
           }}
         >
           {fmtClock(elapsed)}
         </span>
 
+        {deckPhone && slideLabel && (
+          <div
+            role="group"
+            aria-label="Slide controls"
+            style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, flex: '0 0 auto' }}
+          >
+            <button
+              onClick={() => pressKey('ArrowLeft')}
+              aria-label="Previous slide"
+              style={navBtn}
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <span
+              style={{
+                fontFamily: 'var(--font-display, Space Grotesk, system-ui)',
+                fontSize: 13,
+                fontWeight: 600,
+                fontVariantNumeric: 'tabular-nums',
+                color: 'var(--text-muted, #94a3b8)',
+                minWidth: 54,
+                textAlign: 'center',
+              }}
+            >
+              {slideLabel}
+            </span>
+            <button
+              onClick={() => pressKey('ArrowRight')}
+              aria-label="Next slide"
+              style={navBtn}
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        )}
+
         <button
           onClick={() => end(true)}
           disabled={ending}
           style={{
-            marginLeft: 'auto',
+            marginLeft: deckPhone && slideLabel ? 0 : 'auto',
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
-            padding: '10px 18px',
+            padding: deckPhone ? '0 12px' : '10px 18px',
+            minHeight: deckPhone ? 40 : undefined,
+            flex: '0 0 auto',
             borderRadius: 10,
             border: 'none',
             background: 'var(--accent, #FFE600)',
@@ -282,7 +388,7 @@ export default function PresentView() {
           ) : (
             <Square size={15} />
           )}
-          End Presentation
+          {deckPhone ? 'End' : 'End Presentation'}
         </button>
       </div>
 
