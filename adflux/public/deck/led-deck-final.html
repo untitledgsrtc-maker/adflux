@@ -1512,7 +1512,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       <h2 class="sr-only">Untitled Advertising — AI-verified digital out-of-home advertising in GSRTC government bus stations. AI cameras and QR scan tracking prove who actually sees each ad. 264 screens, 20 bus stations, 29 lakh+ monthly views, 700+ brands.</h2>
 
       <!-- BACKGROUND -->
-      <video class="s1-bg-video" poster="hero-faces.jpg" muted loop playsinline preload="none" aria-hidden="true"></video>
+      <video class="s1-bg-video" poster="hero-hd.jpg" muted loop playsinline preload="none" aria-hidden="true"></video>
       <div class="s1-scrim"></div>
       <div class="s1-scrim-top"></div>
       <div class="s1-scanlines"></div>
@@ -5477,11 +5477,153 @@ section.slide[data-i="12"] .s13-foot .dot{flex:none;}
   }
   window.__deckLoadVid = loadVid;
 
-  /* ---- hero background (slide 1): face-tracked station clip, 1 MB ---- */
+  /* ---- live face-detection HUD on the hero ----
+     The video is CLEAN footage. The yellow corner boxes + "ID NN . X.Xs" chips are drawn here, live, on a
+     canvas laid exactly over the video, so they stay razor sharp at any screen size / pixel ratio (baking them
+     into the compressed video made them blurry). Box positions are REAL detections (hero-hud.json, one box per
+     tracked face per frame); the canvas follows the video's own frame clock. If the file is missing, the clean
+     footage simply plays without boxes. */
+  function startHud(video, url){
+    if(!window.fetch || !video || !video.parentNode) return;
+    var FPS = 30, N = 297, POSTER_IDX = 48;
+    var D = null, running = false, queued = false, dead = false;
+    var cv = document.createElement('canvas');
+    cv.className = 's1-hud'; cv.setAttribute('aria-hidden', 'true');
+    cv.style.cssText = 'position:absolute;pointer-events:none;left:0;top:0;width:0;height:0;';
+    video.parentNode.insertBefore(cv, video.nextSibling);
+    var ctx = cv.getContext('2d');
+    var cw = 0, ch = 0, dpr = 1, px = 0.5, py = 0.5, fam = 'system-ui,sans-serif';
+    var zone = null, zoneAt = 0, lastIdx = POSTER_IDX;
+
+    function geometry(){
+      var w = video.clientWidth, h = video.clientHeight;
+      if(!w || !h) return false;
+      var cs = getComputedStyle(video);
+      var r = Math.max(0, (parseFloat(cs.borderTopLeftRadius) || 0) - (video.clientLeft || 0));
+      var pos = (cs.objectPosition || '50% 50%').split(/\s+/);
+      var nx = parseFloat(pos[0]), ny = parseFloat(pos[1] == null ? pos[0] : pos[1]);
+      px = isNaN(nx) ? 0.5 : (/%/.test(pos[0]) ? nx / 100 : 0.5);
+      py = isNaN(ny) ? 0.5 : (/%/.test(pos[1] == null ? pos[0] : pos[1]) ? ny / 100 : 0.5);
+      var d = Math.min(window.devicePixelRatio || 1, 3);
+      d = Math.max(1, Math.min(d, Math.sqrt(16e6 / (w * h))));   /* keep the canvas under ~16M pixels (iOS limit) */
+      cv.style.left = (video.offsetLeft + (video.clientLeft || 0)) + 'px';
+      cv.style.top = (video.offsetTop + (video.clientTop || 0)) + 'px';
+      cv.style.width = w + 'px'; cv.style.height = h + 'px';
+      cv.style.zIndex = cs.zIndex === 'auto' ? '1' : cs.zIndex;
+      cv.style.borderRadius = r + 'px';
+      if(w !== cw || h !== ch || d !== dpr){
+        cw = w; ch = h; dpr = d;
+        cv.width = Math.round(w * d); cv.height = Math.round(h * d);
+        ctx.setTransform(d, 0, 0, d, 0, 0);
+      }
+      var f = getComputedStyle(document.documentElement).getPropertyValue('--disp');
+      if(f && f.trim()) fam = f.trim();
+      /* keep boxes out from behind the headline when the video is full-bleed behind it (desktop / landscape) */
+      var now = performance.now();
+      if(now - zoneAt > 300){
+        zoneAt = now; zone = null;
+        var copy = video.parentNode.querySelector('.s1-copy');
+        if(copy && cs.position === 'absolute'){
+          var a = copy.getBoundingClientRect(), b = cv.getBoundingClientRect();
+          zone = { x1: a.left - b.left - 10, y1: a.top - b.top - 10, x2: a.right - b.left + 10, y2: a.bottom - b.top + 10 };
+        }
+      }
+      return true;
+    }
+    function rr(x, y, w, h, r){
+      ctx.beginPath(); ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    }
+    function draw(idx){
+      if(!D || !geometry()) return;
+      lastIdx = idx;
+      ctx.clearRect(0, 0, cw, ch);
+      var sc = Math.max(cw / D.w, ch / D.h);
+      var ox = (cw - D.w * sc) * px, oy = (ch - D.h * sc) * py;
+      var fs = Math.max(10.5, Math.min(26, 12.5 * sc));
+      var lw = Math.max(1.6, Math.min(3.4, 1.25 * sc));
+      ctx.font = '700 ' + fs + 'px ' + fam; ctx.textBaseline = 'middle';
+      for(var k = 0; k < D.tracks.length; k++){
+        var t = D.tracks[k], bx, ain, aout, lock, al, gs;
+        if(idx >= t.a && idx <= t.b){
+          bx = t.box[idx - t.a]; if(!bx) continue;
+          ain = idx - t.a; aout = t.b - idx;
+          lock = t.a === 0 ? 1 : Math.min(1, (ain + 1) / 9);   /* faces already on screen at the loop start appear instantly */
+          al = lock * Math.min(1, (aout + 1) / 6);
+          gs = 1 + 0.25 * (1 - lock);
+        } else if(t.a === 0 && idx >= 287){
+          /* loop seam: the clip cross-fades back into its first frames, so those same people are already visible
+             in the last 10 frames - fade their boxes in there instead of popping at the wrap */
+          bx = t.box[0]; ain = 0; lock = 1; gs = 1; al = Math.min(1, (idx - 286) / 10);
+        } else continue;
+        if((idx * 7 + t.a) % 97 < 2) al *= 0.5;
+        var cx = ox + (bx[0] + bx[2] / 2) * sc, cy = oy + (bx[1] + bx[3] / 2) * sc;
+        if(zone){
+          var dx = Math.max(zone.x1 - cx, 0, cx - zone.x2), dy = Math.max(zone.y1 - cy, 0, cy - zone.y2);
+          if(dx === 0 && dy === 0) continue;
+          al *= Math.min(1, Math.hypot(dx, dy) / (46 * sc));
+        }
+        if(al <= 0.02) continue;
+        var bw = bx[2] * 1.28 * sc * gs, bh = bx[3] * 1.38 * sc * gs;
+        var x1 = cx - bw / 2, y1 = cy - bh / 2, x2 = cx + bw / 2, y2 = cy + bh / 2;
+        var L = Math.max(6, Math.min(14 * sc, 0.32 * Math.min(bw, bh)));
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        for(var pass = 0; pass < 2; pass++){
+          ctx.lineWidth = pass ? lw : lw + 4;
+          ctx.strokeStyle = pass ? 'rgba(255,230,0,' + al + ')' : 'rgba(255,230,0,' + (0.2 * al) + ')';
+          ctx.beginPath();
+          ctx.moveTo(x1, y1 + L); ctx.lineTo(x1, y1); ctx.lineTo(x1 + L, y1);
+          ctx.moveTo(x2 - L, y1); ctx.lineTo(x2, y1); ctx.lineTo(x2, y1 + L);
+          ctx.moveTo(x1, y2 - L); ctx.lineTo(x1, y2); ctx.lineTo(x1 + L, y2);
+          ctx.moveTo(x2 - L, y2); ctx.lineTo(x2, y2); ctx.lineTo(x2, y2 - L);
+          ctx.stroke();
+        }
+        var txt = t.id + ' · ' + ((ain + 1) / FPS).toFixed(1) + 's';
+        var tw = ctx.measureText(txt).width, padx = fs * 0.5, chh = fs * 1.5;
+        var chx = Math.min(Math.max(2, x1), cw - tw - padx * 2 - 2), chy = y2 + 3;
+        if(chy + chh > ch - 2) chy = y1 - chh - 3;
+        ctx.fillStyle = 'rgba(255,230,0,' + al + ')';
+        rr(chx, chy, tw + padx * 2, chh, Math.max(3, fs * 0.3)); ctx.fill();
+        ctx.fillStyle = 'rgba(15,15,18,' + Math.min(1, al + 0.1) + ')';
+        ctx.fillText(txt, chx + padx, chy + chh / 2 + 0.5);
+      }
+    }
+    function frame(now, meta){
+      queued = false;
+      if(!running || dead) return;
+      var tm = meta && meta.mediaTime != null ? meta.mediaTime : video.currentTime;
+      try{ draw(((Math.floor(tm * FPS + 0.5) % N) + N) % N); }catch(e){ dead = true; cv.style.display = 'none'; return; }
+      queue();
+    }
+    function queue(){
+      if(queued || !running || dead) return;
+      queued = true;
+      if(video.requestVideoFrameCallback) video.requestVideoFrameCallback(frame);
+      else requestAnimationFrame(function(t){ frame(t, null); });
+    }
+    function start(){ running = true; queue(); }
+    function stop(){ running = false; }
+    video.addEventListener('playing', start);
+    video.addEventListener('pause', stop);
+    video.addEventListener('ended', stop);
+    if(window.ResizeObserver) new ResizeObserver(function(){ if(D) draw(lastIdx); }).observe(video);
+    window.addEventListener('resize', function(){ if(D) draw(lastIdx); });
+    fetch(url).then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(j){
+      if(!j || !j.tracks) throw 0;
+      D = j; FPS = j.fps || 30; N = j.n || 297;
+      draw(video.readyState >= 2 && !video.paused ? Math.floor(video.currentTime * FPS + 0.5) % N : POSTER_IDX);
+      if(!video.paused && video.readyState >= 2) start();
+    }).catch(function(){ dead = true; cv.style.display = 'none'; });
+    window.__heroHud = { draw: function(i){ stop(); draw(i); }, canvas: cv };
+  }
+
+  /* ---- hero background (slide 1): clean station clip + live face-detection HUD ---- */
   var hero = document.querySelector('.s1-bg-video');
   if(hero){
     var phone = window.matchMedia && window.matchMedia('(max-width: 820px), (max-height: 520px)').matches;
-    loadVid(hero, phone ? 'hero-faces-m.mp4' : 'hero-faces.mp4', function(){ var p = hero.play(); if(p && p.catch) p.catch(function(){}); });
+    loadVid(hero, phone ? 'hero-hd-m.mp4' : 'hero-hd.mp4', function(){ var p = hero.play(); if(p && p.catch) p.catch(function(){}); });
+    try{ startHud(hero, 'hero-hud.json'); }catch(e){}   /* the HUD is decoration: it must never break the rest of the deck */
     /* pause the hero clip while another slide is on screen (saves battery on phones) */
     var hs = hero.closest('.slide');
     if(hs) new MutationObserver(function(){

@@ -20521,3 +20521,31 @@ Full-deck independent QA: 6 reviewers x 12 slides x 3 phone sizes (390x780, 360x
 
 ### Known / not done (owner-aware, minor)
 Face chips are small (~8-9 px) on a portrait phone window (re-render the phone clip with bigger chip text if wanted); the 360x600 hero stats card is half below the fold (headline, video and AI panel are on the first screen); `/api/deck-videos` city clips only appear on the deployed site. Not tested on a real Android WebView (autoplay of the muted blob video) - check once on a phone after the deploy.
+
+
+---
+
+## 332 · Phase 347 - hero resolution: clean 1080p footage + LIVE sharp face-detection HUD (2026-10-08)
+
+Owner (screenshot of the deck hero on a big screen): "see the resolution it's very bad." Section 331's hero looked soft and its "ID 15 . 1.6s" chips were blurry.
+(Phase-number note, section 52: 347 = this batch; disambiguate by SHA.) JS/HTML + media only: no SQL, no APK.
+
+### Root cause (measured, not guessed)
+- The ONLY copy of this footage on the Mac is a 720p / 2.4 Mbps WhatsApp-compressed clip (a 144-video feature-matching hunt confirmed `WhatsApp Video 2026-03-16 at 6.44.40 PM.mp4` is the same file; nothing sharper exists). The true quality ceiling is that source.
+- My section 331 bake made it worse: JPEG intermediate frames, then CRF 30 at ~0.9 Mbps (1/3 of the source bitrate), 30 fps, AND the boxes + ID chips burned INTO those compressed pixels - so the text went blurry when the browser stretched 720p across a 1920-2560 px screen.
+
+### What shipped
+- **Clean footage, encoded properly** (an encode lab compared ~25 variants by PSNR/SSIM and by eye): light nlmeans denoise (calms the WhatsApp block noise) -> lanczos upscale to 1920x1080 -> luma-only unsharp 0.8 -> x264 veryslow, tune film, CRF 24.5. `hero-hd.mp4` 1920x1080, 4.38 MB; `hero-hd-m.mp4` (phone) 1280x720, 1.55 MB; `hero-hd.jpg` clean poster, 215 KB. An independent verifier measured about +10-15% edge detail vs the old file and no added banding / blocking / seam pop. HONEST: still a soft 720p source - the footage cannot get truly sharp without the camera-roll original.
+- **LIVE HUD** (the real fix for the blurry text): the video is CLEAN; `startHud()` in the deck draws the yellow corner boxes + `ID NN . X.Xs` chips on a `<canvas class="s1-hud">` laid exactly over the video, at the screen's native pixel ratio (crisp text and lines at any size, DPR 1-3). Box positions are REAL YuNet detections (`hero-hud.json`: one box per tracked face per frame, 1280x720 coordinate space, 15 tracks, 25 KB). It follows the video's own frame clock (`requestVideoFrameCallback`, rAF fallback), maps through the video's real `object-fit: cover` + `object-position` (desktop full-bleed, phone-portrait framed window, phone-landscape), fades boxes out from behind the headline (desktop/landscape only, read from the DOM), draws on the poster before playback, and fades the start-of-loop faces in during the last 10 frames so nothing pops at the wrap. If the JSON fails to load the clean footage just plays.
+- Tracks curation: dropped 4 boxes that were NOT on faces (back/side of heads, hair, an arm - two of those were in the section 331 build too) and trimmed 2 that started off-face. Dropped, not re-detected.
+- `sw.js` deck cache `pitch-deck-v19` -> `v20`. Old `hero-faces*.mp4/jpg` removed. `media-src 'self' blob:` (section 331) still required for the blob playback.
+
+### Verification
+Real-browser (Chromium pane) at desktop 1600x900 DPR2, phone portrait 390x780, phone landscape 844x390: no console errors; HUD canvas sized to the video content box; boxes sit on the faces in all three crops. Frame-sync proven numerically: browser video frame N matches lossless frame N exactly (offset 0, sharp MSE minimum at the high-motion frames 120 / 200 / 290). Desktop clip served 1920x1080 / 4.3 MB, phone clip 1280x720. sales-module-guardian run on the final diff.
+
+### CONTRACTS / foot-guns
+- The HUD data is keyed to FRAME INDEX of the 297-frame, 30 fps, 9.9 s loop (`N`, `FPS` read from the JSON). Re-encoding the video with a different frame count/rate or trimming it WITHOUT re-running the tracks makes the boxes drift off the faces. If the clip changes, re-detect the tracks on the new loop and replace `hero-hud.json` together with the video.
+- Never bake the HUD back into the video (that is exactly what made it blurry). Edits to box style are code in `startHud()`.
+- Phone vs desktop clip is picked ONCE at load by `matchMedia('(max-width:820px),(max-height:520px)')`; rotating the phone keeps the first clip (fine: both are 16:9 and the HUD re-maps to the new layout).
+- The detection tooling + lossless frames lived in the session scratchpad (not committed) and are GONE. To rebuild: extract `station-hero.mp4` to 30 fps frames, blend the last 15 frames into the first 15 for the loop, run OpenCV 4.11 `FaceDetectorYN` (YuNet, score 0.55) + IoU tracking (gap<=6, min 14 frames, mean score>=0.62, k=9 smoothing), exclude the TV-screen face, and visually verify every box.
+- KNOWN, not done (owner-aware): a few clear faces have no box for stretches (the large cream-shirt man at bottom-right around frames 126-177 is split across tracks; a bearded man at bottom-left frames 162-170; a woman at the right edge before frame 122). Fixing needs a re-detection run with the YuNet model (not on disk - re-download from the opencv_zoo) and a verified merge. Sending the original camera-roll video (not the WhatsApp copy) would improve sharpness more than anything else.
