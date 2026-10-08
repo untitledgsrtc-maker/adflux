@@ -20575,3 +20575,26 @@ UNDO (back to read-only): DROP POLICY IF EXISTS quotes_govt_partner_insert ON pu
 - A dry-run of a quote INSERT burns a number from `quote_number_seq_*` (sequences are not rolled back). The dry-run used `SET LOCAL session_replication_role = replica` so the numbering trigger did not fire and an explicit `DRYRUN-n` number was used (worked from the CLI role). Every REJECTED live insert also burns a number (BEFORE INSERT trigger runs before the RLS check) - that is why Vishal's failed attempts left gaps in UA/GSRTC numbering.
 - In a dry-run, resolve other users' ids BEFORE `SET LOCAL ROLE authenticated`: under his claims Vishal cannot read all `users` rows, so lookups returned NULL and 4 of the 11 checks passed for the wrong reason on the first run.
 - He can now also EDIT those proposals; Mark Sent / locked-PDF updates work (own, not won). Marking a govt deal Won stays with admin.
+
+
+---
+
+## 334 · Phase 349 - hero face-boxes: coverage gaps filled (15 -> 17 tracks) (2026-10-08)
+
+Closes the "KNOWN, not done" list of section 332 (Phase 347). Owner said "ok go" to the re-detection run. Label note (section 52): 349 = this batch; disambiguate by SHA. Data-only: `public/deck/hero-hud.json` + the SW deck cache bump. No deck code, SQL or APK change.
+
+### What changed
+- Re-ran YuNet (OpenCV 4.11 FaceDetectorYN, model re-downloaded because the scratchpad was wiped) at score 0.30 over all 297 loop frames, then a build agent merged / extended / added tracks and visually confirmed every decision; an independent verify agent re-checked and returned PASS (round 1 of max 3).
+- `hero-hud.json`: 15 -> **17 tracks**, 1002 -> 1596 box-frames, 39 KB. Every frame 0-286 now has at least one box (mean 5.6 per frame, was 3.5). Schema identical (fps 30, 1280x720, n 297). Largest fixes: the cream-shirt man is now ONE continuous track (ID 08, f93-208, was split across 3 tracks with gaps at 126-147 and 167-177); the woman at the bus steps (ID 13) now boxed f166-279 (was only 221-279); the woman at the right edge (ID 10) from f106; a seated plaid-shirt man (ID 17) f213-285; plus ID 03 (standing man), ID 07, ID 12, and tail extensions of IDs 04/05/06/09/11/16.
+- `sw.js` deck cache `pitch-deck-v20` -> `v21` (the ONLY sw.js change) so phones re-fetch the new JSON (CacheFirst `/deck/*`).
+
+### Verification
+Schema check (len(box)==b-a+1, boxes in frame, max frame 286); worst frame-to-frame jump after camera-pan compensation 0.61 box widths (no teleports); only overlap = IDs 05/06 (two different faces); YuNet matches 93-100% of frames on every track; 37 clusters of unboxed raw detections all viewed (backs of heads, arms, the TV face, machinery - none a clear face). I re-checked in the Browser pane at 1600x900 using a throwaway copy of the deck that exposed the HUD draw function: boxes + chips draw crisp on faces (ID 08 cream-shirt man, ID 10) at 9 frames spread across the loop, no deck JS errors. `npm run build` + the SW-denylist tripwire pass.
+
+### Known / accepted (documented, not fixed)
+- Weak but kept: ID 10 f136-207 (deep shadow, YuNet 93%), ID 07 (14 frames, blurry), ID 03 f136-144, ID 12 f164-180.
+- Optional later: extend ID 12 back to f152-163 (removes a pop-in at f164) and ID 13 to f286; small lag of ID 02's last 3 frames. Faces left unboxed on purpose: a far-background face (~12 px), the dark-shirt man f145-194 (turned/blurred), 2 ambiguous faces near (330,505) f110-133.
+- Seam 287-296 has no new tracks; the deck's existing a===0 seam-fade handles the five tracks that start at frame 0.
+- Sharpness is still capped by the 720p WhatsApp source; the original camera-roll video would help more than anything else.
+- Contract from section 332 holds: tracks are keyed to the frame index of the 297-frame / 30 fps / 9.9 s loop - re-detect and replace the JSON TOGETHER with any change to the video.
+- Browser-pane note: with the page "hidden" the HUD (rVFC) never redraws after a seek and `innerWidth` reads 0 until the viewport is set with resize_window - test by exposing `draw` in a throwaway copy and compositing video + HUD canvas (not by trusting a plain screenshot).
