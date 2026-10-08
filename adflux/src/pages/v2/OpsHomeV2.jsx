@@ -13,13 +13,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, MapPin, ChevronRight, FilePlus, Activity, AlertCircle, Monitor, Wifi, WifiOff, VideoOff } from 'lucide-react'
+import { Loader2, MapPin, ChevronRight, FilePlus, Activity, AlertCircle, Monitor, Wifi, WifiOff, VideoOff, ClipboardList } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { t, getOpsLang, setOpsLang } from '../../utils/opsStrings'
 import { isOnHours, faultAgeHours, ageLabel, severityOf } from '../../utils/opsHours'
 import { istTodayISO } from '../../utils/istDate'
+import OpsEveningCard from '../../components/ops/OpsEveningCard'
 
 const NIL = '00000000-0000-0000-0000-000000000000'
 const SEV = { 2: 'var(--danger)', 1: 'var(--warning)', 0: 'var(--text-subtle, var(--text-muted))' }
@@ -85,14 +86,20 @@ export default function OpsHomeV2() {
       setScreensAll(allScreens)
       setCamKnown(cam)
 
-      const [inProc, fixedTd, fixMo, fixedWk, calls, upRows, ws] = await Promise.all([
+      const [inProc, fixedTd, fixMo, fixedWk, calls, upRows, ws, openTix] = await Promise.all([
         supabase.from('ops_tickets').select('id', { count: 'exact', head: true }).eq('assigned_to', uid).eq('source', 'manual').eq('status', 'in_progress'),
         supabase.from('ops_tickets').select('id', { count: 'exact', head: true }).eq('assigned_to', uid).eq('source', 'manual').eq('status', 'resolved').gte('resolved_at', dayStart),
         supabase.from('ops_tickets').select('created_at, resolved_at').eq('assigned_to', uid).eq('source', 'manual').eq('status', 'resolved').gte('resolved_at', monthStart),
         supabase.from('ops_tickets').select('id', { count: 'exact', head: true }).eq('assigned_to', uid).eq('source', 'manual').eq('status', 'resolved').gte('resolved_at', weekAgo),
-        supabase.from('call_logs').select('call_at').eq('user_id', uid).gte('call_at', monthStart),
+        supabase.from('call_logs').select('id', { count: 'exact', head: true }).eq('user_id', uid).gte('call_at', monthStart),
         supabase.from('ops_uptime_daily').select('uptime_pct, screens_total').eq('user_id', uid).gte('work_date', monthStart),
-        supabase.from('work_sessions').select('id').eq('user_id', uid).eq('work_date', istTodayISO()).maybeSingle(),
+        // check_in_at, not just the row: the call counter pre-creates today's row
+        // (check_in_at NULL) on the first logged call, so "a row exists" is NOT
+        // "checked in" (same rule as OpsWorkV2).
+        supabase.from('work_sessions').select('id, check_in_at').eq('user_id', uid).eq('work_date', istTodayISO()).maybeSingle(),
+        // everything assigned to me that is still open / in process (all sources,
+        // head count only - no rows pulled, so the 1000-row cap cannot undercount).
+        supabase.from('ops_tickets').select('id', { count: 'exact', head: true }).eq('assigned_to', uid).in('status', ['open', 'in_progress']),
       ])
 
       // faults = the screens whose live state ≠ expected (§250 7 AM–9 PM rule),
@@ -132,9 +139,11 @@ export default function OpsHomeV2() {
         fixedMo: fx.length, fixedWk: fixedWk.count || 0,
         avgFixH: durs.length ? Math.round(durs.reduce((a, b) => a + b, 0) / durs.length) : null,
         avgUptime: up.length ? Math.round(up.reduce((a, r) => a + Number(r.uptime_pct || 0), 0) / up.length) : null,
-        callsMo: (calls.data || []).length,
+        callsMo: calls.count || 0,
+        openTickets: openTix.count || 0,
       })
-      setCheckedIn(!!ws.data)
+      // On a read error keep the previous answer (starts true = banner hidden).
+      setCheckedIn(prev => (ws.error ? prev : !!(ws.data && ws.data.check_in_at)))
     } catch (e) { setErr(e?.message || 'load failed') }
   }, [uid])
 
@@ -229,6 +238,11 @@ export default function OpsHomeV2() {
         </div>
       )}
 
+      {/* evening report — from 19:00 IST (small "view" button before that). Read-only:
+          shows my day + a Share on WhatsApp button; writes nothing. Kept out of the
+          no-stations empty state so that stays clean (§253). */}
+      {!noDepots && <OpsEveningCard lang={lang} />}
+
       {/* Down > 1 day — genuine multi-day faults (auto tickets opened a previous day,
           §259/§264). Shown even off-hours; these are broken, not a night timer-off. */}
       {!noDepots && cityAged.length > 0 && (
@@ -291,6 +305,17 @@ export default function OpsHomeV2() {
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>{t('fixed_today_w', lang)}</div>
             </button>
           </div>
+
+          {/* everything assigned to me that is still open (auto + manual). /ops is in no
+              nav, and it is the page that lists the auto-opened faults. */}
+          {(s.openTickets ?? 0) > 0 && (
+            <button onClick={() => nav('/ops')} className="lead-card" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', marginBottom: 14, minHeight: 48, textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
+              <ClipboardList size={18} strokeWidth={1.6} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{t('open_tickets', lang)}</span>
+              <span style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 20, fontWeight: 700, color: 'var(--warning)' }}>{s.openTickets}</span>
+              <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            </button>
+          )}
 
           {/* my month */}
           <div className="lead-card" style={{ padding: '13px 14px' }}>

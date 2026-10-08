@@ -20598,3 +20598,74 @@ Schema check (len(box)==b-a+1, boxes in frame, max frame 286); worst frame-to-fr
 - Sharpness is still capped by the 720p WhatsApp source; the original camera-roll video would help more than anything else.
 - Contract from section 332 holds: tracks are keyed to the frame index of the 297-frame / 30 fps / 9.9 s loop - re-detect and replace the JSON TOGETHER with any change to the video.
 - Browser-pane note: with the page "hidden" the HUD (rVFC) never redraws after a seek and `innerWidth` reads 0 until the viewport is set with resize_window - test by exposing `draw` in a throwaway copy and compositing video + HUD canvas (not by trusting a plain screenshot).
+
+
+---
+
+## 335 · Phase 350-353 - ops evening report + push alerts + stale tickets cleared (2026-10-08)
+
+Owner: "operation evening report not there / operation person notification not there". Decisions (all asked, recommended options): alerts go to the
+technicians AND the operation head; the evening report is VIEW + SHARE only (no submit), km only, NO rupees / pay / salary anywhere; the daily
+check-in is shown but has no salary effect; delete the test account's push registrations and cancel the 22 stale auto tickets (backup first).
+Built as a workflow of builders + independent reviewers (all SHIP after fixes), applied to the live DB by Claude through the CLI (section 327),
+every SQL dry-run first in a rolled-back transaction. Label note (section 52): 350-353 are this batch's labels; disambiguate by SHA / this section.
+
+### Phase 350 - test-account push registrations cleared
+`supabase_phase350_clear_test_push_subs.sql` (applied earlier; backup `public._bak_push_subs_p350`, undo recipe inside). The old `test` ops account kept
+two phone registrations, so alerts for its stations went to a dead device. Gohil + Gulshan (Android) registered fresh afterwards. Dixita (the head)
+still only has stale WEB registrations from 28 Aug: she must reopen the app and tap Allow notifications or she receives no head alerts.
+
+### Phase 351 - evening / day report (READ-ONLY, no pay)
+`db/functions/ops_day_report.sql` is the ONE home (section 71): `ops_tech_day_block(uuid,date)` (internal helper, service_role only),
+`ops_my_day_report(date)` (a technician's own, role operation_executive) and `ops_head_day_report(date)` (admin / co_owner / operation_head). Both public
+functions are STABLE SECURITY DEFINER, fail-closed on NULL uid / NULL role (`IS NULL OR NOT IN`, section 41) and return `{}` when denied; a tripwire in the file
+RAISES if the grants are ever wrong. The day is clamped to [today-7, today] and windowed in IST. LIVE screen figures (offline, camera-off, worst stations)
+exist only for TODAY inside 07:00-21:00 IST; outside it, or for a past day, the report says `closed: true` and withholds them (timer-off screens would read as a
+fault). Uptime % is the stored day value, so it still reads at night. Fixed = status IN ('resolved','approved') AND resolved_at in the day (cancelled rows also carry a
+resolved_at). Depot calls = outgoing calls matched to depot contacts on the last 10 digits via EXISTS (3 numbers are shared by two depots, a JOIN would double count).
+UI: `OpsEveningCard.jsx` (technician, mounted on OpsHomeV2), `OpsHeadEveningCard.jsx` (OpsCommandV2), `OpsEveningShared.jsx`, `useOpsDayReport.js`, plain text builder
+`opsEveningText.js` shared through the EXISTING `openWhatsAppShare` (no new send path). The share text drops the "Still open" line once the day is closed. 31 new gu/en
+labels were APPENDED to `opsStrings.js` (4 legacy duplicate keys already existed at HEAD: no_contacts, screen, pick_screen, needs_you - last one wins, left alone).
+Also fixed on OpsHomeV2: the check-in test reads `check_in_at` (the call counter pre-creates the row), and the month call count is now a head-only server count (no 1000-row cap).
+
+### Phase 352 - ops push alerts (`supabase_phase352_ops_alerts.sql` + 3 function files)
+Pushes go out ONLY inside `is_push_allowed_now()` (09:00-20:59 IST). Camera faults are digest-only. WhatsApp is out of scope (ticket-wa.js untouched).
+- `db/functions/ops_notify_outages.sql` - called best-effort by `api/ops/sync.js` after every 10-minute sync (step 5c, response key `notify_outages`). "Down" = active screen,
+  offline, last_response_at older than 20 minutes. ONE collapsed Gujarati push per technician per run ("12 screens down - 3 stations", /ops-home), claim-then-send (the baseline in
+  `ops_outage_alert_state` moves BEFORE the push, so a lost write can never double-send). Head: one push per run, at most one per 2 h, for a station newly at 5+ down or a station with
+  NO active technician (once per 24 h per depot); head events are consumed only after a head push really went out. Advisory lock stops overlapping runs. Whole body is one EXCEPTION
+  block: never raises. REVOKEd from client roles, service_role only.
+- `db/functions/ops_digest.sql` - `ops_morning_digest()` (cron 04:00 UTC = 09:30 IST Mon-Sat, per technician + per head, idempotent per day through push_log tags, skips Sunday and holidays
+  through `is_off_day`), `ops_head_evening_push()` (14:00 UTC = 19:30 IST; body is now only "N stations down" or "all stations up" - the "not checked in" clause was dropped because
+  check-in drives no pay and is only a soft roster nudge), `ops_ticket_assignment_push()` (statement-level trigger with transition tables: a bulk reassign of 20 tickets = ONE push "20 faults
+  assigned to you"; a plain AFTER UPDATE because Postgres forbids a column list together with REFERENCING) and `ops_ticket_resolved_push()` (row trigger when status becomes 'resolved' -> every
+  head except the actor; taps through to /ops-dashboard where Approve / Reject lives).
+- Engine `ops_reconcile_offline_tickets()` (canonical = Section 2 of `supabase_ops_p2_auto_tickets.sql`): the TICKET still opens any time 07:00-21:00, but its WhatsApp and legacy English push now fire only
+  inside the push window, and the legacy push stays silent once `ops_notify_outages()` exists (otherwise one outage = two pushes). A 07:xx boot gap used to open ~13 tickets = 13 WhatsApps + 13 pushes before 09:00.
+  The section 259 calendar-day close rule and the per-depot advisory lock are byte-unchanged (verified live).
+- `supabase_phase211_anon_execute_sweep.sql` re-lock list + VERIFY-D extended with the new REVOKEd functions (7 previously-locked functions would have been re-opened by its blanket GRANT). The sweep was NOT run.
+
+### Phase 353 - 22 stale auto tickets cleared (`supabase_phase353_ops_clear_stale_auto_tickets.sql`, applied 23:30 IST)
+The 22 `auto_offline` tickets from 27-28 Aug (40 days old, counts out of date, Godhra and Himmatnagar duplicated) are now `cancelled` with a plain note; backup `public._bak_ops_tickets_p353`
+(KEEP 30 days then DROP), pinned scope + abort unless exactly 22, only rows still as backed up are touched, re-run changes nothing. The 10 camera tickets and the 1 manual ticket were left.
+Done at NIGHT on purpose: the engine reopens ONE fresh ticket per station at the 07:xx sync with the right count, and sends nothing before 09:00 (Phase 352 gating); the technicians then get one
+collapsed push from `ops_notify_outages()` at the first 09:00+ sync. Doing it after 09:00 would have made the engine WhatsApp the technician once per reopened station.
+
+### Live apply record (2026-10-08 ~23:10-23:30 IST)
+Order: ops_day_report.sql, ops_notify_outages.sql, ops_digest.sql, phase352, then ONLY Section 2 of the p2 file (the whole p2 file aborts with 23514 on the status CHECK). VERIFY all true:
+functions SECURITY DEFINER + pinned + locked from anon / authenticated, report grants right, 2 triggers on ops_tickets, crons `ops-morning-digest` + `ops-head-evening-push` active, state table RLS on with no
+policies, calling `ops_notify_outages()` as service_role at night returns `{"skipped":"quiet-hours"}`. The dry-run (stubbing `enqueue_push` and `is_push_allowed_now`, 25+ checks incl. real-role
+impersonation of technician / head / sales / no login, a raising push not failing a ticket UPDATE, pay tables unchanged) is the recipe to reuse.
+
+### Contracts / foot-guns
+- NEVER run the whole `supabase_ops_p2_auto_tickets.sql` to change the engine - extract Section 2 (file lines 25-149) and run only that.
+- Dry-running code that sends pushes: stub `enqueue_push(p_user_id uuid, p_title text, p_body text, p_url text DEFAULT '/work', p_tag text DEFAULT 'untitled')` (the live defaults must match or
+  CREATE OR REPLACE fails with 42P13) and drive `is_push_allowed_now()` from a GUC; everything is rolled back, so nothing real can be sent. The CLI role is `postgres`, so DEFINER owners are postgres.
+- A bulk SQL heal that touches ops_tickets now fires the assignment push (and the resolved push on status 'resolved'): run it inside `SET LOCAL session_replication_role = replica;` or accept the coalesced push.
+- Kill switches are in the phase352 header (unschedule the two crons, REVOKE service_role on ops_notify_outages, drop the two triggers). Undo of everything is documented there too.
+- OPEN OWNER DECISIONS: (1) the engine WhatsApp still has no 20-minute debounce (fires when one screen reads offline, 09:00-20:59) and Gohil has no whatsapp_number so it skips him; (2) the resolved-ticket push says
+  "awaiting approval" while sections 244/246 say fixes need no head sign-off - reword to an FYI pointing at /ops-tickets?tab=fixed if approval is dropped for good; (3) ops_digest evening push has no per-technician check-in line any more.
+- Still pending from earlier: WhatsApp fallback repair (api/ops/ticket-wa.js 91-prefix, whatsapp_number for Gohil / Dixita, Meta template check), collision-proof push enrolment, attendance-tick 7d fix,
+  the section 328 anon-execute sweep (separate owner decision), quote credit decision.
+- Tomorrow acceptance (after the 09:00 sync): `SELECT tag, left(body,60) FROM push_log WHERE tag LIKE 'ops-%' AND enqueued_at > now()-interval '2 hours'` should show one `ops-outage-<tech>` push per technician and at
+  most one `ops-head-outage-` push; at 09:30 the `ops-digest-` rows; `ops_tickets` should show one fresh auto_offline ticket per station with offline screens.

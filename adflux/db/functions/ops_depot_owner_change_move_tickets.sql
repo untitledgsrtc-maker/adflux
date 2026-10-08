@@ -34,8 +34,10 @@
 --     error in the UPDATE of ops_depots, which is not this function's doing.
 --   * Fires ONLY when assigned_to really changes (WHEN clause) - zero cost on every
 --     other depot save (the 10-minute screen sync never touches assigned_to).
---   * ops_tickets has no user triggers, so moving tickets pushes nothing and
---     cascades nothing. Pay (uptime) never reads ops_tickets.
+--   * Moving tickets cascades nothing except ONE coalesced push: since Phase 352 ops_tickets has
+--     an AFTER UPDATE statement trigger (ops_ticket_assignment_push) that tells the new technician
+--     "N faults assigned to you" once per statement (09:00-20:59 IST only, fully exception-wrapped,
+--     so it can never fail this move). Pay (uptime) never reads ops_tickets.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.ops_depot_owner_change_move_tickets()

@@ -31,6 +31,21 @@ NOTIFY pgrst, 'reload schema';
 -- closes it (owner rule, §259). Never touches in_progress /
 -- resolved / approved / manual / sales_request tickets. EXCEPTION-wrapped so a
 -- reconcile failure can never break the sync.
+--
+-- ALERTS (Phase 352 review, 2026-10-08): opening the TICKET is allowed across the whole 07:00-21:00
+-- operating window (the head's board must be complete), but the two ALERTS this engine fires at
+-- ticket-open follow the push rules:
+--   * WhatsApp (ops_ticket_wa_dispatch) and the English 'New ticket' push go out ONLY inside the push
+--     window public.is_push_allowed_now() = 09:00-20:59 IST. Before this, a 07:00 boot gap (screens still
+--     powering on) opened ~13 tickets and sent 13 WhatsApps + 13 pushes to the technician at 07:xx.
+--     A ticket opened at 07:xx-08:59 sends nothing now; if the outage persists, ops_notify_outages()
+--     (db/functions/ops_notify_outages.sql) sends the technician ONE debounced, collapsed push from 09:00.
+--   * Once ops_notify_outages() is installed it OWNS the technician push (20-minute debounce, one push
+--     per technician, quiet hours). The engine's own push then stays SILENT, otherwise one outage would
+--     produce two pushes. Until it is installed the engine keeps its push (now quiet-hours gated).
+-- OPEN OWNER DECISION: the WhatsApp has no debounce - it still fires at ticket-open (09:00-20:59) the
+--   moment one screen reads offline. If a flicker should not WhatsApp the technician, add the same
+--   20-minute test as ops_notify_outages (offline AND last_response_at older than 20 minutes) here.
 CREATE OR REPLACE FUNCTION public.ops_reconcile_offline_tickets()
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -45,6 +60,8 @@ DECLARE
   v_opened    int := 0;
   v_cancelled int := 0;
   v_on_hours  boolean;
+  v_push_ok   boolean;   -- inside the push window (09:00-20:59 IST); fails closed on NULL
+  v_owner352  boolean;   -- Phase 352's ops_notify_outages() is installed -> it owns the technician push
 BEGIN
   -- 7 AM–9 PM IST operating window (§250). Off-hours a screen SHOULD be off, so
   -- offline is EXPECTED (the timer turned it off) — do NOT open a fault ticket
@@ -52,6 +69,8 @@ BEGIN
   -- isOnHours() exactly (on = IST hour >= 7 AND < 21).
   v_on_hours := (extract(hour FROM (now() AT TIME ZONE 'Asia/Kolkata')) >= 7
              AND extract(hour FROM (now() AT TIME ZONE 'Asia/Kolkata')) <  21);
+  v_push_ok  := COALESCE(public.is_push_allowed_now(), false);
+  v_owner352 := to_regprocedure('public.ops_notify_outages()') IS NOT NULL;
 
   FOR d IN SELECT id, name, assigned_to FROM public.ops_depots WHERE is_active LOOP
     -- serialize concurrent reconciles per depot (sync cron + Record-uptime button)
@@ -77,20 +96,25 @@ BEGIN
            CASE WHEN v_down >= 5 THEN 'high' ELSE 'normal' END, now())
         RETURNING id INTO v_ticket;
         v_opened := v_opened + 1;
-        BEGIN
-          PERFORM public.ops_ticket_wa_dispatch(v_ticket);
-        EXCEPTION WHEN OTHERS THEN NULL; END;
 
-        -- native push to the assigned tech (best-effort; enqueue_push is §96)
-        IF d.assigned_to IS NOT NULL THEN
+        -- ALERTS: only inside the push window 09:00-20:59 IST (see the ALERTS note above the function).
+        IF v_push_ok THEN
           BEGIN
-            PERFORM public.enqueue_push(
-              d.assigned_to,
-              'New ticket',
-              d.name || ' — ' || v_down || ' screen(s) offline',
-              '/ops',
-              'ops-ticket-' || v_ticket::text);
+            PERFORM public.ops_ticket_wa_dispatch(v_ticket);
           EXCEPTION WHEN OTHERS THEN NULL; END;
+
+          -- native push to the assigned tech (best-effort; enqueue_push is §96). Only while Phase 352's
+          -- ops_notify_outages() is NOT installed - once it is, it sends the (debounced, collapsed) push.
+          IF d.assigned_to IS NOT NULL AND NOT v_owner352 THEN
+            BEGIN
+              PERFORM public.enqueue_push(
+                d.assigned_to,
+                'New ticket',
+                d.name || ' — ' || v_down || ' screen(s) offline',
+                '/ops',
+                'ops-ticket-' || v_ticket::text);
+            EXCEPTION WHEN OTHERS THEN NULL; END;
+          END IF;
         END IF;
       END IF;
 
@@ -218,6 +242,12 @@ NOTIFY pgrst, 'reload schema';
 --      ('ops_reconcile_offline_tickets','ops_ticket_start','ops_ticket_resolve','ops_ticket_approve','ops_ticket_reject')) AS five_fns,
 --   (SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='ops_tickets_status_check') AS status_check,
 --   (SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='ops_tickets_source_check') AS source_check;
+--
+-- Phase 352 tripwire (read-only; both must be TRUE - FALSE means an older copy of this file was re-run
+-- and the engine is back to alerting at 07:xx / double-pushing):
+-- SELECT
+--   pg_get_functiondef('public.ops_reconcile_offline_tickets()'::regprocedure) LIKE '%is_push_allowed_now%' AS alerts_quiet_hours_gated,
+--   pg_get_functiondef('public.ops_reconcile_offline_tickets()'::regprocedure) LIKE '%ops_notify_outages%'  AS legacy_push_yields_to_352;
 
 -- ==== SECTION 4 · WhatsApp dispatch (fast-follow; inert until api/ops/ticket-wa live) ====
 -- Fires a WhatsApp ticket-alert to the assigned tech via pg_net -> api/ops/ticket-wa.

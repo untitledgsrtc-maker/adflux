@@ -89,7 +89,30 @@ BEGIN
                         -- Phase 345 client auto-merge internals: SECURITY DEFINER, REVOKED —
                         -- _client_fold deletes client rows, so a rep must never call it directly.
                         -- Only the trigger / sync_client_from_quote / admin_merge_clients reach them.
-                        '_client_owner_for_key', '_client_fold_row', '_client_fold')
+                        '_client_owner_for_key', '_client_fold_row', '_client_fold',
+                        -- Phase 352 ops PUSH alerts (db/functions/ops_notify_outages.sql, ops_digest.sql,
+                        -- ops_day_report.sql): SECURITY DEFINER, REVOKED. They enqueue pushes or read
+                        -- other people's ops data, so a rep must never be able to call them via rpc().
+                        -- Only the service-role Edge sync, pg_cron and the ticket triggers reach them.
+                        -- ops_ticket_resolved_push is the 5th: the resolved-ticket trigger function.
+                        'ops_notify_outages', 'ops_morning_digest', 'ops_head_evening_push',
+                        'ops_ticket_assignment_push', 'ops_ticket_resolved_push',
+                        'ops_tech_day_block',
+                        -- Already REVOKEd on live by their own files (a 2026-10-08 rolled-back dry-run of
+                        -- this sweep found exactly these 7 flipping from locked to authenticated-executable
+                        -- through step 2's blanket GRANT, and nothing else). Re-locked here so a sweep
+                        -- re-run can never re-open them:
+                        --  * ops_aiadflux_sync_dispatch  - fires the CMS sync on demand (pg_net POST with the ops secret)
+                        --  * ops_ticket_wa_dispatch      - sends a WhatsApp to a technician from the business number
+                        --  * earned_incentive_for        - reads another rep's earned incentive (money)
+                        --  * recompute_daily_new_leads   - rewrites a stored daily counter for any user/date
+                        'ops_aiadflux_sync_dispatch', 'ops_ticket_wa_dispatch',
+                        'earned_incentive_for', 'recompute_daily_new_leads',
+                        --  * 3 TRIGGER functions: harmless, but kept locked so the live ACL does not drift. A trigger
+                        --    function needs no EXECUTE grant to fire (PostgreSQL checks it only at CREATE TRIGGER time),
+                        --    so locking them cannot stop the triggers.
+                        'ops_depot_owner_change_move_tickets', 'clients_absorb_duplicate',
+                        'clients_phone_change_guard')
   LOOP
     EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', r.sig);
   END LOOP;
@@ -152,7 +175,13 @@ WHERE n.nspname = 'public'
                     'followup_cadence_candidates','followup_cadence_mark',
                     'followup_cadence_dispatch','wa_quality_watch_dispatch',
                     'wa_ai_recovery_dispatch',
-                    '_client_owner_for_key','_client_fold_row','_client_fold')
+                    '_client_owner_for_key','_client_fold_row','_client_fold',
+                    'ops_notify_outages','ops_morning_digest','ops_head_evening_push',
+                    'ops_ticket_assignment_push','ops_ticket_resolved_push','ops_tech_day_block',
+                    'ops_aiadflux_sync_dispatch','ops_ticket_wa_dispatch',
+                    'earned_incentive_for','recompute_daily_new_leads',
+                    'ops_depot_owner_change_move_tickets','clients_absorb_duplicate',
+                    'clients_phone_change_guard')
 ORDER BY p.proname;
 
 SELECT 'Phase 211 anon-execute sweep applied' AS status;

@@ -300,6 +300,37 @@ export const STR = {
   more_numbers:    { gu: 'બીજા નંબર',                   en: 'More numbers' },
   added_by_you:    { gu: 'તમે ઉમેર્યો',                  en: 'added by you' },
   added_by:        { gu: 'ઉમેર્યો',                     en: 'added by' },
+
+  // — evening report (tech + head). APPEND-ONLY: every key below is NEW. The
+  //   file has a few legacy duplicate keys (last one wins), so never re-declare
+  //   an existing key here — reuse it (fixed_today_w, checked_in_at,
+  //   not_checked_in, worst_now, cameras_off, approvals, all_handled …). —
+  evening_report:  { gu: 'આજનો રિપોર્ટ',                en: "Today's report" },
+  todays_report_view: { gu: 'આજનો રિપોર્ટ જુઓ',         en: "View today's report" },
+  hide_report:     { gu: 'રિપોર્ટ છુપાવો',               en: 'Hide report' },
+  share_whatsapp:  { gu: 'WhatsApp પર મોકલો',            en: 'Share on WhatsApp' },
+  still_open:      { gu: 'હજુ બાકી',                    en: 'Still open' },
+  km_travelled:    { gu: 'કિમી મુસાફરી',                 en: 'Km travelled' },
+  depot_calls:     { gu: 'ડેપોને ફોન',                  en: 'Depot calls' },
+  answered_word:   { gu: 'ઉપાડ્યા',                     en: 'answered' },
+  uptime_now:      { gu: 'આજે સ્ક્રીન ચાલુ',             en: 'Screen uptime today' },
+  as_of:           { gu: 'સુધીનું',                     en: 'as of' },
+  day_closed:      { gu: 'દિવસ પૂરો',                   en: 'Day closed' },
+  ev_needs_you:    { gu: 'આજે જોવાનું',                 en: 'Needs you today' },
+  push_missing:    { gu: 'નોટિફિકેશન ચાલુ નથી',          en: 'Notifications not set up' },
+  no_whatsapp:     { gu: 'WhatsApp નંબર નથી',            en: 'No WhatsApp number' },
+  faults_no_calls: { gu: 'ખરાબી છે, ડેપોને ફોન નથી કર્યો', en: 'Faults open, no depot call' },
+  open_over_48h:   { gu: '૪૮ કલાકથી વધુ ખુલ્લી ખરાબી',    en: 'Faults open over 48 hours' },
+  report_load_failed: { gu: 'રિપોર્ટ લોડ થયો નથી',       en: "Couldn't load the report" },
+  report_unavailable: { gu: 'આ રિપોર્ટ તમારા ખાતા માટે નથી', en: 'This report is not available for your account' },
+  report_stale:    { gu: 'તાજું ન થયું — છેલ્લો રિપોર્ટ દેખાય છે', en: 'Could not refresh — showing the last report' },
+  tech_word:       { gu: 'ટૅક',                         en: 'Tech' },
+  ev_col_in:       { gu: 'ચેક-ઇન',                      en: 'In' },
+  month_word:      { gu: 'મહિનો',                       en: 'Month' },
+  calls_word:      { gu: 'ફોન',                         en: 'Calls' },
+  calls_legend:    { gu: 'ફોન = ઉપાડ્યા / કર્યા',          en: 'Calls = answered / dialled' },
+  km_word:         { gu: 'કિમી',                        en: 'km' },
+  logged_word:     { gu: 'નોંધેલી ખરાબી',                en: 'Faults logged' },
 }
 
 // Resolve a label. Falls back gu → en → key so a missing translation is

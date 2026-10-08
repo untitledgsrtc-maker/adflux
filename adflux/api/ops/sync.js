@@ -125,6 +125,17 @@ async function sbPatch(table, filter, patch) {
     method: 'PATCH', headers: { ...sbH, Prefer: 'return=minimal' }, body: JSON.stringify(patch),
   })
 }
+// Best-effort RPC call (service role). Returns the function's jsonb result, or {error}
+// (a missing function / network blip) — it NEVER throws, so a failing ops RPC can never
+// break the sync. The result is returned in the JSON response + logged (Phase 352).
+async function callRpc(name) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, { method: 'POST', headers: sbH, body: JSON.stringify({}) })
+    const body = await r.json().catch(() => null)
+    if (!r.ok) return { error: String(body?.message || body?.error || `HTTP ${r.status}`).slice(0, 160) }
+    return body
+  } catch (e) { return { error: String(e?.message || e).slice(0, 160) } }
+}
 
 export default async function handler(req) {
   if (!SUPABASE_URL || !SERVICE_KEY) return j({ error: 'not_configured' }, 503)
@@ -260,16 +271,19 @@ export default async function handler(req) {
     await fetch(`${SUPABASE_URL}/rest/v1/rpc/ops_recompute_uptime_today`, { method: 'POST', headers: sbH, body: JSON.stringify({}) })
   } catch { /* Phase 4 SQL not run yet — statuses still synced */ }
 
-  // 5 · reconcile offline tickets (open/auto-cancel per station) — best-effort
-  try {
-    await fetch(`${SUPABASE_URL}/rest/v1/rpc/ops_reconcile_offline_tickets`, { method: 'POST', headers: sbH, body: JSON.stringify({}) })
-  } catch { /* Phase 2 SQL not run yet — statuses still synced */ }
+  // 5 · reconcile offline tickets (open/auto-cancel per station) — best-effort.
+  // Result is kept (Phase 352) and returned below instead of being discarded.
+  const reconcileOffline = await callRpc('ops_reconcile_offline_tickets')   // {error} if the Phase 2 SQL isn't run yet
 
   // 5b · reconcile camera-off tickets (online-but-camera-dead, §272) — best-effort,
   // SEPARATE call so a camera-reconcile failure can't affect the offline one above.
-  try {
-    await fetch(`${SUPABASE_URL}/rest/v1/rpc/ops_reconcile_camera_tickets`, { method: 'POST', headers: sbH, body: JSON.stringify({}) })
-  } catch { /* p10 SQL not run yet — statuses + offline tickets still synced */ }
+  const reconcileCamera = await callRpc('ops_reconcile_camera_tickets')     // {error} if the p10 SQL isn't run yet
+
+  // 5c · outage PUSH alerts (Phase 352) — best-effort, SEPARATE call, runs LAST so it reads the
+  // freshly-upserted statuses. Gujarati push to the owning technician + (thresholds) the head,
+  // only inside 09:00-20:59 IST; returns counts only. {error} if the Phase 352 SQL isn't run yet.
+  const notifyOutages = await callRpc('ops_notify_outages')
+  console.log('[ops/sync] reconcile', JSON.stringify({ offline: reconcileOffline, camera: reconcileCamera, notify: notifyOutages }))
 
   return j({
     ok: true,
@@ -277,6 +291,9 @@ export default async function handler(req) {
     online, offline, unknown: unknownN,
     depots_linked: depotsLinked, depots_created: depotsCreated, unresolved_depot: unresolvedDepot,
     placeholders_retired: placeholdersRetired,
+    reconcile_offline: reconcileOffline,
+    reconcile_camera: reconcileCamera,
+    notify_outages: notifyOutages,
   })
 }
 
