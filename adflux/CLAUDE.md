@@ -20549,3 +20549,29 @@ Real-browser (Chromium pane) at desktop 1600x900 DPR2, phone portrait 390x780, p
 - Phone vs desktop clip is picked ONCE at load by `matchMedia('(max-width:820px),(max-height:520px)')`; rotating the phone keeps the first clip (fine: both are 16:9 and the HUD re-maps to the new layout).
 - The detection tooling + lossless frames lived in the session scratchpad (not committed) and are GONE. To rebuild: extract `station-hero.mp4` to 30 fps frames, blend the last 15 frames into the first 15 for the loop, run OpenCV 4.11 `FaceDetectorYN` (YuNet, score 0.55) + IoU tracking (gap<=6, min 14 frames, mean score>=0.62, k=9 smoothing), exclude the TV-screen face, and visually verify every box.
 - KNOWN, not done (owner-aware): a few clear faces have no box for stretches (the large cream-shirt man at bottom-right around frames 126-177 is split across tracks; a bearded man at bottom-left frames 162-170; a woman at the right edge before frame 122). Fixing needs a re-detection run with the YuNet model (not on disk - re-download from the opencv_zoo) and a verified merge. Sending the original camera-roll video (not the WhatsApp copy) would improve sharpness more than anything else.
+
+
+---
+
+## 333 · Phase 348 - Vishal (government partner) can save his OWN govt proposals again (2026-10-08)
+
+Owner (screenshot, GSRTC LED proposal Review step): red "new row violates row-level security policy for table quotes" when creating. Label note (section 52): 348 = this batch; disambiguate by SHA.
+
+### Root cause (live DB read, not a guess)
+Phase 278 (section 152, 3 Aug 2026) removed co_owner from `quotes_admin_all` so Vishal (the ONLY co_owner, `team_role='government_partner'`) could not read PRIVATE data, and gave him `*_govt_partner_read` (SELECT only).
+His ONLY quote write path was that policy, so since 3 Aug every govt proposal he saves fails the insert check. Evidence it was him: he signed in 8 Oct 12:19 IST; his last govt quote write was 3 Jun (before the lockdown); admin Brijesh (06:19 UTC) and sales rep Kamina (06:57 UTC) both created govt quotes today, so the wizard and the other roles are fine. Section 152 had already recorded the remedy ("if Vishal does data entry himself ... creator-scoped quotes_govt_partner_write").
+
+### The change - `supabase_phase348_govt_partner_quote_write.sql` (APPLIED LIVE 2026-10-08 by Claude, owner said yes)
+Three additive policies, nothing else touched (quotes policies 6 -> 8):
+- `quotes_govt_partner_insert` INSERT: active govt partner, `created_by = auth.uid()`, `segment='GOVERNMENT'`, `status <> 'won'`.
+- `quotes_govt_partner_update` UPDATE: only quotes HE created, GOVERNMENT, not won (USING and WITH CHECK both).
+- `qc_govt_partner_write` on quote_cities (ALL): only line items of such a quote.
+He CANNOT: delete quotes, mark Won (incentive gate stays with admin), touch PRIVATE quotes, touch another rep's quote or line items. The GOVERNMENT media lock (AUTO_HOOD + GSRTC_LED) still applies. quotes_govt_partner_read unchanged. No policy reads its own table (no recursion, section 172c).
+Proof: rolled-back test AS Vishal under RLS, 11 checks all correct (own insert + line item OK, update to sent OK, to won blocked, PRIVATE insert blocked, created_by=someone-else blocked, other rep's quote 0 rows, delete 0 rows, hijack line item blocked, 0 private quotes visible; Kamina's own insert still OK), repeated against the live policies after apply; 0 DRYRUN rows left.
+UNDO (back to read-only): DROP POLICY IF EXISTS quotes_govt_partner_insert ON public.quotes; DROP POLICY IF EXISTS quotes_govt_partner_update ON public.quotes; DROP POLICY IF EXISTS qc_govt_partner_write ON public.quote_cities;
+
+### Contracts / foot-guns
+- co_owner is still NOT a full admin (section 152/153 doctrine holds): read = GOVERNMENT only; write = his OWN govt quotes only. Do not widen to other reps' quotes or to won without a fresh owner OK.
+- A dry-run of a quote INSERT burns a number from `quote_number_seq_*` (sequences are not rolled back). The dry-run used `SET LOCAL session_replication_role = replica` so the numbering trigger did not fire and an explicit `DRYRUN-n` number was used (worked from the CLI role). Every REJECTED live insert also burns a number (BEFORE INSERT trigger runs before the RLS check) - that is why Vishal's failed attempts left gaps in UA/GSRTC numbering.
+- In a dry-run, resolve other users' ids BEFORE `SET LOCAL ROLE authenticated`: under his claims Vishal cannot read all `users` rows, so lookups returned NULL and 4 of the 11 checks passed for the wrong reason on the first run.
+- He can now also EDIT those proposals; Mark Sent / locked-PDF updates work (own, not won). Marking a govt deal Won stays with admin.
