@@ -20669,3 +20669,15 @@ impersonation of technician / head / sales / no login, a raising push not failin
   the section 328 anon-execute sweep (separate owner decision), quote credit decision.
 - Tomorrow acceptance (after the 09:00 sync): `SELECT tag, left(body,60) FROM push_log WHERE tag LIKE 'ops-%' AND enqueued_at > now()-interval '2 hours'` should show one `ops-outage-<tech>` push per technician and at
   most one `ops-head-outage-` push; at 09:30 the `ops-digest-` rows; `ops_tickets` should show one fresh auto_offline ticket per station with offline screens.
+
+
+---
+
+## 336 · Phase 354 - account "Kamina Thakor" renamed to "Gandhinagar", new login email, salary 0 (2026-10-09)
+
+Owner: "just change name from kamina to gandhinagar, email gandhinagar@untitledad.in, salary 0." Same account (id 551dc7ce-..., role sales, same password, same history); only the label, login email and monthly salary changed.
+Applied live by Claude via the CLI (section 327): dry-run in a rolled-back transaction first, then applied, then verified.
+- `public.users` name/email, `auth.users` email + display name, `auth.identities` (email provider) all = Gandhinagar / gandhinagar@untitledad.in. The user signs in with the NEW email, same password.
+- `staff_incentive_profiles.monthly_salary` 18000 -> 0 (audited by the Phase 327 salary_change_audit trigger). Her incentive rates were already all 0, so no incentive risk from the zero salary.
+- Backup `public._bak_rename_p354` (old name, emails, auth metadata, identity data, salary). KEEP 30 days then DROP. UNDO recipe in `supabase_phase354_rename_kamina_to_gandhinagar.sql`. File is idempotent (re-run = no-op).
+- NOT changed (owner's call): her mapped `whatsapp_number` (still the old person's number - routes that number as a "rep" to the WhatsApp assistant, section 197), role/team_role (still sales), and 14 historical references to "Kamina" in older sections.
