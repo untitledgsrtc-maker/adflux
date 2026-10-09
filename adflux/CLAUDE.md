@@ -20682,3 +20682,11 @@ Applied live by Claude via the CLI (section 327): dry-run in a rolled-back trans
 - Backup `public._bak_rename_p354` (old name, emails, auth metadata, identity data, salary). KEEP 30 days then DROP. UNDO recipe in `supabase_phase354_rename_kamina_to_gandhinagar.sql`. File is idempotent (re-run = no-op).
 - NOT changed (owner's call): her mapped `whatsapp_number` (still the old person's number - routes that number as a "rep" to the WhatsApp assistant, section 197), role/team_role (still sales), and 14 historical references to "Kamina" in older sections.
 - Owner confirmed 2026-10-09 (asked after the rename): LEAVE the WhatsApp number as is and KEEP role sales. Decided, not an open item - do not re-flag.
+
+---
+
+## 337 · Ops WhatsApp ticket alert - India 91 prefix fixed (2026-10-09)
+
+`api/ops/ticket-wa.js` sent the stored `users.whatsapp_number` to Meta as-is. Numbers are stored as 10 digits (e.g. Gulshan 6388362147), and the Cloud API needs the country code, so every ops ticket WhatsApp to a 10-digit number would be rejected. Now 10 digits -> `91` + digits, 11 digits with a leading 0 -> `91` + rest, 12-digit `91...` unchanged (same rule as `api/wa/broadcast.js`). Edge function, best-effort: a Meta failure still never touches a ticket. Vercel deploys on push; no SQL.
+- Still needs the owner: Gohil has no `whatsapp_number` (skipped), and the Meta template `ops_ticket_alert` (language `gu`) must be approved - not checkable from the sandbox.
+- Still owner decisions, deliberately NOT guessed: engine WhatsApp 20-minute debounce; resolved-ticket push wording ("awaiting approval" vs FYI); the section 328 anon-execute sweep; quote credit.

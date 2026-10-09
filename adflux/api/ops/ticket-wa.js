@@ -18,7 +18,11 @@ export default async function handler(req) {
 
   let body = {}
   try { body = await req.json() } catch { return j({ error: 'bad json' }, 400) }
-  const phone = String(body.phone || '').replace(/\D/g, '')
+  // Meta needs the country code: stored numbers are 10 digits (e.g. 6388362147) -> 91XXXXXXXXXX
+  const digits = String(body.phone || '').replace(/\D/g, '')
+  const phone = digits.length === 10 ? '91' + digits
+              : digits.length === 11 && digits.startsWith('0') ? '91' + digits.slice(1)
+              : digits
   const depot = String(body.depot || '').slice(0, 60)
   const count = String(body.count ?? '').replace(/\D/g, '') || '0'
   if (phone.length < 10) return j({ ok: true, skipped: 'no phone' })
