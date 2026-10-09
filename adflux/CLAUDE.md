@@ -20681,3 +20681,4 @@ Applied live by Claude via the CLI (section 327): dry-run in a rolled-back trans
 - `staff_incentive_profiles.monthly_salary` 18000 -> 0 (audited by the Phase 327 salary_change_audit trigger). Her incentive rates were already all 0, so no incentive risk from the zero salary.
 - Backup `public._bak_rename_p354` (old name, emails, auth metadata, identity data, salary). KEEP 30 days then DROP. UNDO recipe in `supabase_phase354_rename_kamina_to_gandhinagar.sql`. File is idempotent (re-run = no-op).
 - NOT changed (owner's call): her mapped `whatsapp_number` (still the old person's number - routes that number as a "rep" to the WhatsApp assistant, section 197), role/team_role (still sales), and 14 historical references to "Kamina" in older sections.
+- Owner confirmed 2026-10-09 (asked after the rename): LEAVE the WhatsApp number as is and KEEP role sales. Decided, not an open item - do not re-flag.
