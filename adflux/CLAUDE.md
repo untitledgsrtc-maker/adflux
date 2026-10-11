@@ -20690,3 +20690,40 @@ Applied live by Claude via the CLI (section 327): dry-run in a rolled-back trans
 `api/ops/ticket-wa.js` sent the stored `users.whatsapp_number` to Meta as-is. Numbers are stored as 10 digits (e.g. Gulshan 6388362147), and the Cloud API needs the country code, so every ops ticket WhatsApp to a 10-digit number would be rejected. Now 10 digits -> `91` + digits, 11 digits with a leading 0 -> `91` + rest, 12-digit `91...` unchanged (same rule as `api/wa/broadcast.js`). Edge function, best-effort: a Meta failure still never touches a ticket. Vercel deploys on push; no SQL.
 - Still needs the owner: Gohil has no `whatsapp_number` (skipped), and the Meta template `ops_ticket_alert` (language `gu`) must be approved - not checkable from the sandbox.
 - Still owner decisions, deliberately NOT guessed: engine WhatsApp 20-minute debounce; resolved-ticket push wording ("awaiting approval" vs FYI); the section 328 anon-execute sweep; quote credit.
+
+---
+
+## 338 · Working from TWO Macs - what lives where and how to keep them in step (2026-10-11)
+
+Owner wants to keep working on this Mac AND on a second MacBook. Checked on the original Mac (user `apple`). Nothing has been moved or changed yet (state at 2026-10-11): this section is the map + the rules.
+
+### What lives where (and whether GitHub / iCloud carries it)
+| Thing | Path | Size | In git? |
+|---|---|---|---|
+| Git root (remote `untitledgsrtc-maker/adflux`) | `~/Documents/untitled-os2/Untitled` | 790 MB (node_modules 458 MB, .git 81 MB) | - |
+| The app | `~/Documents/untitled-os2/Untitled/adflux` | 688 MB | yes |
+| Loose project files OUTSIDE the repo: outer `CLAUDE.md` (59 KB, 15 Sep), `AGENTS.md`, `.claude/agents`, `.claude/settings.json`, `.mcp.json`, `.codex`, 3 old PHASE/SALES notes | `~/Documents/untitled-os2/` (NOT a git repo) | small | **NO** |
+| Browser-side keys | `adflux/.env` (4 VITE_ keys: Supabase URL + anon, MapTiler, Google Roads) | tiny | **NO** (git-ignored) |
+| Android Firebase config | `adflux/android/app/google-services.json` | tiny | **NO** (git-ignored) |
+| Supabase link (project-ref only, not a secret) | `adflux/supabase/.temp/project-ref` | tiny | NO |
+| Chat transcripts + this project's memory | `~/.claude/projects/-Users-apple-Documents-untitled-os2/` (6 chats, 1.4 GB, one chat = 335 MB; `memory/` inside) | 1.4 GB | NO, per machine |
+| Desktop-app chat LIST metadata (mixes all projects) | `~/Library/Application Support/Claude/claude-code-sessions` | 1.9 MB | NO, per machine |
+| User-level skills / hooks / commands / plugins / settings (caveman + ponytail + superpowers + ui-ux-pro-max) | `~/.claude/{skills,hooks,commands,plugins,settings.json}` | ~25 MB | NO, per machine |
+| Supabase DB, Vercel, GitHub | cloud | - | shared, nothing to move |
+
+macOS "Desktop & Documents in iCloud" is ON on the original Mac, so `~/Documents/untitled-os2` is already in iCloud Drive. That is fine for the small loose files and WRONG for the git folder when two Macs work live (see rule 2). `~/.claude` and `~/Library` are NOT in iCloud.
+
+### Rules (both Macs)
+1. **GitHub is the ONLY sync for code.** Start of work: fetch + pull. End of work: commit + push (Claude self-pushes, section 211). Pull BEFORE picking the next Phase number - two Macs can otherwise both take the same number / the same section number in this file.
+2. **Do not let iCloud sync the git folder live from two Macs** (conflicted-copy files, a corrupted `.git` index, 458 MB of node_modules churn). Agreed fix, NOT yet applied: rename `Untitled` -> `Untitled.nosync` and leave a symlink `Untitled` -> `Untitled.nosync` (iCloud skips `*.nosync`), so the path stays identical on both Macs; on the second Mac `git clone` into `Untitled.nosync`. Do it with no Claude session open on the folder. The small loose files in the outer folder keep syncing through iCloud.
+3. **Chats are per Mac and do not live-sync.** Continuity = this file + git + memory below. A one-time snapshot (read old chats) is: on the old Mac pack `~/.claude/projects/-Users-apple-Documents-untitled-os2` (`tar -czf X.tgz -C ~/.claude/projects ./-Users-apple-Documents-untitled-os2`) AFTER closing the chat, unpack the same way on the new Mac, then `cd ~/Documents/untitled-os2 && claude --resume`. After that the two diverge. Needs the SAME macOS username (`apple`) or the encoded path no longer matches.
+4. **Per-Mac one-time setup:** sign in to Claude (same account) and GitHub Desktop; `supabase login` (the project is linked through `supabase/.temp`); `npm install` in `adflux` (node_modules is never copied); copy `.env` and `google-services.json` once; copy the user config tgz (`~/.claude/settings.json skills commands hooks plugins`) so caveman / ponytail / superpowers behave the same. Android signing keys and Meta / Vercel secrets are NOT in the repo - owner-held.
+5. **The DB is one live Supabase for both Macs.** SQL applied from either Mac is live for both; the phase SQL file must be committed + pushed so the other Mac sees it (section 327 pattern: backup, dry-run, apply, verify).
+6. **Working-tree churn is not mine:** many deleted `_design_reference/` files + `.DS_Store` sit uncommitted on this Mac. Always stage ONLY the files you changed (never `git add -A`); owner decides whether to commit or restore them.
+
+### Per-machine memory rules, mirrored here so the second Mac has them
+The auto-memory files live in `~/.claude/projects/.../memory/` and do NOT travel through git. Their standing rules, in short:
+- **Push without asking (owner 2026-08-06):** after verified work, commit only the intended files and `git push origin untitled-os`; never ask "want me to push"; never push `main`; no force-push; verify `git rev-list --count origin/untitled-os..HEAD` is 0 (section 211).
+- **Run SQL myself (owner 2026-10-06, section 327):** `supabase db query --linked [-f file] [-o json]` from the repo dir; Edge functions `supabase functions deploy <name> --project-ref kompjctmisnitjpbjalh`. Writes: dry-run in `BEGIN; ...; ROLLBACK;` or a DO block ending in `RAISE EXCEPTION`, confirm live unchanged, apply, verify read-only. Ask ONE plain yes only for money / pay / incentive / salary functions, security / RLS on sensitive data, or destructive steps. Fallback only if the CLI fails: `open -a "Visual Studio Code" <abs path>`.
+- **UI self-verify (owner 2026-08-28):** after a UI change deploys, open the live app in the owner's Chrome (claude-in-chrome), clear the PWA service worker + caches (`navigator.serviceWorker.getRegistrations()` + `caches.keys()`), reload, screenshot, report with the screenshot; owner must not have to send screenshots. Role-specific screens are empty on the admin login - need a tab logged in as the right test account.
+- Owner is non-technical and UI-oriented: plain words, first sentence = the answer, no glazing.
