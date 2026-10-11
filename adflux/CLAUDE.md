@@ -20750,3 +20750,23 @@ Owner forwarded two rep reports with screenshots. (Phase-number note, section 52
 - Why it shows: `trg_z_close_followups_on_terminal` closes follow-ups only ON the Won transition; the guard that blocks new ones (`followup_block_on_lost_lead`, section 135/174) covers LOST only; `keepInFollowupQueue` hides Lost + Nurture only. Fleet-wide there are exactly 2 such rows (Ajay 1, Kirti Kotak 1), both created after the win.
 - Why it can't be cleared by the rep: the section 128 "Done needs a call today" gate blocks Done on a lead with no call today.
 - Options put to the owner: (a) hide/block follow-ups on Won leads (DB born-close like Lost, but KEEP `HOT -` WhatsApp tasks + quote-linked payment-collection rows) ; (b) only close the 2 existing rows; (c) let the rep dismiss without a call. Do not guess - extending the section 174 guard silently drops a rep's post-sale callback and a Won client's repeat-business HOT alert.
+
+---
+
+## 340 · Phase 356 - a WON lead carries no open follow-up (owner decision, applied live) (2026-10-11)
+
+Resolves the OPEN item 3 of section 339. Owner (asked, plain options): **"Hide + stop making them."**
+
+### What changed
+- `db/functions/followup_block_on_lost_lead.sql` (the section 174 BEFORE-INSERT guard, trigger `trg_followup_block_on_lost_lead`, name kept) now also covers a Won lead: a lead-linked follow-up inserted on a Won lead is BORN CLOSED, `done_note = 'Auto-closed: lead is Won (Phase 356)'` (still the section 175 isSystemClose prefix). Lost branch and every section 174 lock are byte-identical (9-check VERIFY tripwire all TRUE live).
+- EXEMPT on purpose: `'HOT —%'` tasks (section 209 WhatsApp buying intent - a Won client asking for a new quote must still reach the rep); `'New lead handed to you%'` (the section 106 reassign landing task - an ADMIN may reassign a Won lead); quote-linked rows (lead_id NULL = payment collection, existing pass-through).
+- One-time heal `supabase_phase356_won_lead_followups_heal.sql` closed the only 2 open rows (Ajay's "a to z the home store", Kirti's "Devam Enterprise-Tata"); backup `_bak_followups_p356` (KEEP 30 days then DROP), UNDO in the file.
+- `PostCallOutcomeModal.jsx` (frozen): the follow-up insert now selects `id, is_done`; when the row comes back already closed it SKIPS the on-device alarm and shows "This lead is closed - no follow-up was scheduled." (guardian P1: without it the phone would arm a phantom reminder for a closed row). Rest of the save path untouched.
+- Dry-run (rolled-back, live data): 12 cases correct; live apply then re-verified.
+
+### FOOT-GUNS / known (owner-aware, not fixed)
+- **Real post-sale work is now dropped.** Guardian counted ~14 follow-ups created after a win in 45 days; about 5 were real delivery work ("showroom ma next day javu", "video shoot editing", "Demo done - awaiting approval"). The rule cannot tell them apart and reps mark Won early. Trade-off accepted by the owner; revert = re-run the previous canonical (`git show 64c0580:adflux/db/functions/followup_block_on_lost_lead.sql`).
+- `api/wa/send-template.js` callback/meeting confirmation reads an OPEN follow-up created in the last 2 h; on a Won lead it now 409s `no_callback_time` (fails closed, visible error) - correct: do not promise a callback that no longer exists.
+- "Closed today" counts in `TodaySummaryCard`, `AdminDashboardDesktop`, `SalesDashboardDesktop` read `done_at` without `isSystemClose`, so born-closed rows (Lost already did this) inflate them slightly. Display only; fix when those files are next touched.
+- `lead_activity_aftermath` step 5 updates the earliest open follow-up: on a Won lead that can only be a HOT task, so a later activity with `next_action_date` overwrites its note and strips `HOT —`. Rare.
+- A rep who picks "call back tomorrow" on a Won lead now gets the toast and NO reminder - by design.

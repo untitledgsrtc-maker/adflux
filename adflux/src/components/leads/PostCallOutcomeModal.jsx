@@ -718,13 +718,19 @@ export default function PostCallOutcomeModal({
       // foot-gun: FK-embed + RLS combos return wrapped array on
       // Capacitor WebView). Bare insert+select has no FK embed
       // so this is purely defensive.
-      const fuInsertRes = await supabase.from('follow_ups').insert([fuRow]).select('id')
+      const fuInsertRes = await supabase.from('follow_ups').insert([fuRow]).select('id, is_done')
       const fuErr = fuInsertRes.error
-      const fuId  = Array.isArray(fuInsertRes.data)
-        ? fuInsertRes.data[0]?.id
-        : fuInsertRes.data?.id
+      const fuRowBack = Array.isArray(fuInsertRes.data)
+        ? fuInsertRes.data[0]
+        : fuInsertRes.data
+      const fuId  = fuRowBack?.id
       if (fuErr) {
         toastError(fuErr, 'Follow-up scheduled but DB write failed: ' + fuErr.message)
+      } else if (fuRowBack?.is_done === true) {
+        // Phase 356 — a WON (or Lost) lead carries no open follow-up (the BEFORE
+        // INSERT guard born-closes it, owner 2026-10-11). Don't arm a device alarm
+        // for a row that is already closed, and tell the rep why nothing was scheduled.
+        toastSuccess('This lead is closed - no follow-up was scheduled.')
       } else if (fuId) {
         // Fire-and-forget AlarmManager schedule. Helper is native-only;
         // web/SSR path returns immediately. Failure here is a UX

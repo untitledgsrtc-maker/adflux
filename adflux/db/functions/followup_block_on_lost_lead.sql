@@ -11,6 +11,20 @@
 --    stage 'Lost', it is BORN CLOSED (is_done=true). A Lost lead carries NO open
 --    follow-up. Paired with §174's followup_after_done (no lost_nurture respawn).
 --
+-- 🆕 PHASE 356 (owner 2026-10-11): the SAME guard now also covers a WON lead.
+--    A deal that is Won carries no open lead-linked follow-up (the rule §134 already
+--    stated; only the Won TRANSITION used to close them, so a follow-up created AFTER the
+--    win - a call-outcome "call back", a typed follow-up - stayed open and kept nagging
+--    the rep; Ajay, 10 Oct). Born-closed with done_note 'Auto-closed: lead is Won
+--    (Phase 356)' (still the §175 isSystemClose prefix). EXEMPT, on purpose:
+--      * a 'HOT —%' task (a WhatsApp buying-intent alert from flag_lead_hot_from_wa,
+--        section 209 - a Won client asking for a new quote must still reach the rep);
+--      * the reassign landing task 'New lead handed to you by X - call today'
+--        (section 106 / _reassign_lead_apply; an ADMIN may reassign a Won lead, and the
+--        new owner must still get the task + push);
+--      * quote-linked rows (lead_id NULL: payment collection) - already pass-through.
+--    Name kept (trigger wiring + the §211 re-lock reference it); it guards Lost AND Won.
+--
 -- 🔒 LOCKED CONTRACTS (§174 — a diff that breaks any is a BLOCK):
 --    • Born-close ALL follow-ups on a Lost lead — manual AND cadence. §174
 --      SUPERSEDED §135's "manual (cadence_type NULL) only" skip; there is
@@ -55,6 +69,13 @@ BEGIN
       NEW.is_done   := true;
       NEW.done_at   := COALESCE(NEW.done_at, now());
       NEW.done_note := COALESCE(NEW.done_note, 'Auto-closed: lead is Lost (Phase 174)');
+    ELSIF v_stage = 'Won'
+          AND COALESCE(NEW.note, '') NOT LIKE 'HOT —%'
+          AND COALESCE(NEW.note, '') NOT LIKE 'New lead handed to you%' THEN
+      -- Phase 356: Won = done. HOT tasks (WhatsApp buying intent) are exempt.
+      NEW.is_done   := true;
+      NEW.done_at   := COALESCE(NEW.done_at, now());
+      NEW.done_note := COALESCE(NEW.done_note, 'Auto-closed: lead is Won (Phase 356)');
     END IF;
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING 'followup_block_on_lost_lead skipped for lead %: %', NEW.lead_id, SQLERRM;
@@ -65,7 +86,7 @@ END $function$;
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only. All six must be TRUE.
+-- VERIFY / TRIPWIRE — read-only. All nine must be TRUE.
 -- no_cadence_skip is the §174 lock (must stay TRUE — re-adding a cadence_type
 -- condition would let cadence FUs survive on a Lost lead, the bug §174 killed).
 -- ============================================================================
@@ -75,6 +96,9 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%NEW.is_done   := true%'           AS born_closed,
 --   pg_get_functiondef(p.oid) LIKE '%Auto-closed: lead is Lost%'       AS system_close_note,
 --   pg_get_functiondef(p.oid) NOT LIKE '%cadence_type%'                AS no_cadence_skip,
---   pg_get_functiondef(p.oid) LIKE '%EXCEPTION WHEN OTHERS%'           AS never_break_insert
+--   pg_get_functiondef(p.oid) LIKE '%EXCEPTION WHEN OTHERS%'           AS never_break_insert,
+--   pg_get_functiondef(p.oid) LIKE '%v_stage = ''Won''%'               AS won_check,
+--   pg_get_functiondef(p.oid) LIKE '%NOT LIKE ''HOT —%'                AS hot_exempt,
+--   pg_get_functiondef(p.oid) LIKE '%NOT LIKE ''New lead handed to you%' AS handover_exempt
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'followup_block_on_lost_lead';
