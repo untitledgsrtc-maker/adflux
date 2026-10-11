@@ -112,10 +112,18 @@ BEGIN
     'fu', COALESCE((
       SELECT jsonb_agg(to_jsonb(f))
       FROM (
-        SELECT assigned_to, is_done, follow_up_date, done_at, done_note
-        FROM public.follow_ups
-        WHERE (is_done = true  AND done_at >= p_start_of_day AND done_at < p_end_of_day)
-           OR (is_done = false AND follow_up_date >= p_period_start AND follow_up_date < p_period_end)
+        -- Phase 355: + cadence_type + lead.stage so the client applies the §71
+        -- keepInFollowupQueue rule to the PENDING count (a parked Nurture lead's
+        -- near-term row is hidden on the rep's list; counting it made the card
+        -- read 89/100 for a rep with 0 visible). lead NULL (payment-collection
+        -- rows) => JS keeps the row, same as the list.
+        SELECT f2.assigned_to, f2.is_done, f2.follow_up_date, f2.done_at, f2.done_note,
+               f2.cadence_type,
+               (SELECT jsonb_build_object('stage', l.stage)
+                  FROM public.leads l WHERE l.id = f2.lead_id) AS lead
+        FROM public.follow_ups f2
+        WHERE (f2.is_done = true  AND f2.done_at >= p_start_of_day AND f2.done_at < p_end_of_day)
+           OR (f2.is_done = false AND f2.follow_up_date >= p_period_start AND f2.follow_up_date < p_period_end)
       ) f
     ), '[]'::jsonb),
 
@@ -229,7 +237,10 @@ END $function$;
 
 NOTIFY pgrst, 'reload schema';
 
--- VERIFY (expect t): the live function carries the import filter AND the M21 chase arm.
+-- VERIFY (expect t): the live function carries the import filter, the M21 chase arm AND
+-- the Phase 355 fu fields (cadence_type + lead.stage for the keepInFollowupQueue rule).
 SELECT pg_get_functiondef(p.oid) LIKE '%import_id IS NULL%' AS has_import_filter,
-       pg_get_functiondef(p.oid) LIKE '%chase%'           AS has_m21_chase_arm
+       pg_get_functiondef(p.oid) LIKE '%chase%'           AS has_m21_chase_arm,
+       pg_get_functiondef(p.oid) LIKE '%f2.cadence_type%'  AS has_fu_cadence_type,
+       pg_get_functiondef(p.oid) LIKE '%jsonb_build_object(''stage'', l.stage)%' AS has_fu_lead_stage
 FROM pg_proc p WHERE p.proname='team_dashboard_bundle' AND p.pronamespace='public'::regnamespace;

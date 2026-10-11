@@ -2293,7 +2293,13 @@ function StickyPrimaryCta({
   // Phase 35 PR 2.5 — B_ACTIVE state shows TWO sticky CTAs side by
   // side (Log meeting + Log lead). Every other state shows a single
   // primary CTA appropriate to the state.
-  const isActiveState = planSubmitted && checkedIn && !dayDone
+  // Phase 355 — "checked in" is the ONLY thing that makes the day ACTIVE.
+  // A rep who checks in at the morning gate (/check-in → record_checkin)
+  // has check_in_at set but NO plan_submitted_at; the hero already reads
+  // "IN · 09:41" for that rep, so showing a yellow "Start My Day" under it
+  // is wrong (and its tap just asks for a plan with no form on screen).
+  // Ajay reported exactly this 10 Oct 2026. Plan is optional once in.
+  const isActiveState = checkedIn && !dayDone
 
   let label = 'Log meeting'
   let icon = Calendar
@@ -2301,7 +2307,7 @@ function StickyPrimaryCta({
   let isBusy = busy
   let loading = false
 
-  if (!planSubmitted) {
+  if (!checkedIn && !planSubmitted) {
     label   = (busy || parsing) ? 'Starting…' : 'Start My Day'
     icon    = Sun
     handler = startDay

@@ -482,7 +482,7 @@ export default function TeamDashboardV2() {
         // this they inflate "Today F-up done" (Rima read 241 — ~142 of
         // them were the Phase 131 cleanup, not her work).
         supabase.from('follow_ups')
-          .select('assigned_to, is_done, follow_up_date, done_at, done_note')
+          .select('assigned_to, is_done, follow_up_date, done_at, done_note, cadence_type, lead:leads(stage)')
           .or(`and(is_done.eq.true,done_at.gte.${startOfDay},done_at.lt.${endOfDay}),and(is_done.eq.false,follow_up_date.gte.${period.startIso},follow_up_date.lt.${period.endIso})`),
         // Phase 82 — quote-chase: status='sent' quotes whose latest
         // touch is stale. Owner: "daily quote followup". Fetched as
@@ -652,7 +652,10 @@ export default function TeamDashboardV2() {
         if (!r.assigned_to) return
         const e = fuMap[r.assigned_to] || { pending: 0, done: 0 }
         if (r.is_done) { if (!isSystemClose(r.done_note)) e.done += 1 }
-        else           e.pending += 1
+        // Phase 355 — a parked Nurture lead's near-term row is hidden from the
+        // rep's Follow-ups list (§71 keepInFollowupQueue), so it must not count
+        // as "pending" here (the card read 89/100 for Dhara while her list had 0).
+        else if (keepInFollowupQueue(r)) e.pending += 1
         fuMap[r.assigned_to] = e
       })
       setFollowUpsByUser(fuMap)

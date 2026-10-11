@@ -191,8 +191,15 @@ export default function useDaySummary({ dateISO } = {}) {
         // counts only still-open due-today rows; the report total below =
         // real-done + this (a proper superset of the numerator), matching the
         // Team-Dashboard "Today F-up" definition.
+        // Phase 355 — the open-due count now applies keepInFollowupQueue (§71 /
+        // §200 / §276): a Nurture lead's near-term "cnp / call back" row stays
+        // OPEN in the DB but is HIDDEN on the rep's Follow-ups page, so counting
+        // it made the report read "89/100" (11 "pending") for a rep who had
+        // cleared her whole visible list (Dhara 10 Oct: all 11 were Nurture-lead
+        // rows). Fetch the rows + their lead stage and filter below, exactly like
+        // the overdue count (§276).
         supabase.from('follow_ups')
-          .select('id', { count: 'exact', head: true })
+          .select('id, cadence_type, lead:leads(stage)') // cap-ok: one rep, one day (worst seen ~240)
           .eq('assigned_to', profile.id)
           .eq('follow_up_date', targetDate)
           .eq('is_done', false),
@@ -416,10 +423,10 @@ export default function useDaySummary({ dateISO } = {}) {
       const followUpsReal = doneFu.filter(f =>
         f.lead_id && calledLeadIds.has(f.lead_id)).length
       // Phase 215 — total plate = real-done today + still-open-due-today
-      // (fuTotalRes now counts open-only). A proper superset of followUpsReal
+      // (fuTotalRes = open rows still in the queue). A proper superset of followUpsReal
       // so the ratio can never read "175 of 209 undone" when the rep cleared
       // everything; mirrors the admin Team-Dashboard "Today F-up" total.
-      const followUpsTotal = followUpsReal + (fuTotalRes.count || 0)
+      const followUpsTotal = followUpsReal + (fuTotalRes.data || []).filter(keepInFollowupQueue).length
 
       // Revisit tiers: for each lead met today (real, non-scheduled,
       // non-auto-checkin meeting/visit), what visit number is it over the

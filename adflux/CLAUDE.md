@@ -20727,3 +20727,26 @@ The auto-memory files live in `~/.claude/projects/.../memory/` and do NOT travel
 - **Run SQL myself (owner 2026-10-06, section 327):** `supabase db query --linked [-f file] [-o json]` from the repo dir; Edge functions `supabase functions deploy <name> --project-ref kompjctmisnitjpbjalh`. Writes: dry-run in `BEGIN; ...; ROLLBACK;` or a DO block ending in `RAISE EXCEPTION`, confirm live unchanged, apply, verify read-only. Ask ONE plain yes only for money / pay / incentive / salary functions, security / RLS on sensitive data, or destructive steps. Fallback only if the CLI fails: `open -a "Visual Studio Code" <abs path>`.
 - **UI self-verify (owner 2026-08-28):** after a UI change deploys, open the live app in the owner's Chrome (claude-in-chrome), clear the PWA service worker + caches (`navigator.serviceWorker.getRegistrations()` + `caches.keys()`), reload, screenshot, report with the screenshot; owner must not have to send screenshots. Role-specific screens are empty on the admin login - need a tab logged in as the right test account.
 - Owner is non-technical and UI-oriented: plain words, first sentence = the answer, no glazing.
+
+---
+
+## 339 · Phase 355 - "Start My Day" after check-in + "11 pending" on a finished day (2026-10-11)
+
+Owner forwarded two rep reports with screenshots. (Phase-number note, section 52: 355 = this batch; section 337 also used the label 355 for the ticket-wa fix, disambiguate by SHA.)
+
+### 1 - Ajay (Jani Ajaykumar): checked in at 09:41 but "Start My Day" still showed (FIXED)
+- Cause: `WorkV2.jsx` `StickyPrimaryCta` decided its label from `plan_submitted_at` BEFORE `check_in_at`. A rep who checks in at the morning gate (`/check-in` -> `record_checkin`) has `check_in_at` set but NO plan, so the hero said "IN 09:41" while a yellow "Start My Day" sat under it (its tap only asks for a plan, with no plan form on screen).
+- Fix: `isActiveState = checkedIn && !dayDone` and the Start-My-Day branch is `!checkedIn && !planSubmitted`. A checked-in rep now gets Log meeting + Log lead. Only 4 of 16 states change, all `checkedIn=1, planSubmitted=0`. Pre-check-in flow byte-identical. guardian PASS (16-state matrix).
+- Side effect (intended): a rep who checked in via the gate and whose day was auto-closed now sees "Submit evening report" instead of "Start My Day".
+
+### 2 - Dhara's day report said "Follow-ups 89/100" (11 pending) though she had finished (FIXED)
+- Live read: all 11 open rows due 10 Oct were near-term "cnp / call back" rows on leads she had parked in NURTURE. Her Follow-ups page hides those (section 316 `keepInFollowupQueue`: a Nurture lead only shows its 30-day nurture row), but `useDaySummary` (the section 215 open-due count) counted every open row. Same disease as sections 133/163/276: one rule, several counts.
+- Fix = ONE definition (section 71): `useDaySummary` 5a now selects rows with `cadence_type, lead:leads(stage)` and counts `.filter(keepInFollowupQueue)`; `TeamDashboardV2` "Today F-up" pending branch applies it too (done branch unchanged); the team-viewer RPC `team_dashboard_bundle` `fu` arm now returns `cadence_type` + `lead {stage}` (canonical `db/functions/team_dashboard_bundle.sql`, APPLIED LIVE via the CLI, dry-run as admin: 734 rows all carry the new keys, Dhara's 11 open rows all hidden by the rule, ACL unchanged, function-only so no gps_pings lock).
+- Display only: no DB write, pay score untouched (`compute_daily_score` not edited). The day-report display score's follow-up slot can only rise or stay (guardian note) - a rep near the 70 "km justified" line may flip up; intended.
+- Known/open P3: `supabase_phase193_*`, `supabase_phase316_*`, `supabase_phase323_dashboard_agg_rpcs.sql` still hold old full copies of `team_dashboard_bundle`; re-running any reverts this arm (and M21). The canonical file's header says so; bodies were NOT replaced with pointers (section 72) - do that next time those files are touched.
+
+### 3 - Ajay's "Won lead still in follow-ups" (OPEN - needs an owner decision, NOT changed)
+- Lead "a to z the home store" is Won (24 Sep) with an open MANUAL follow-up created 5 Oct ("Not receive call", due 12 Oct) by Ajay himself. Four follow-ups were created after the win (26 Sep, 30 Sep, 3 Oct, 5 Oct), some with real delivery notes ("video customer side shoot editing ma se 2 day ma final").
+- Why it shows: `trg_z_close_followups_on_terminal` closes follow-ups only ON the Won transition; the guard that blocks new ones (`followup_block_on_lost_lead`, section 135/174) covers LOST only; `keepInFollowupQueue` hides Lost + Nurture only. Fleet-wide there are exactly 2 such rows (Ajay 1, Kirti Kotak 1), both created after the win.
+- Why it can't be cleared by the rep: the section 128 "Done needs a call today" gate blocks Done on a lead with no call today.
+- Options put to the owner: (a) hide/block follow-ups on Won leads (DB born-close like Lost, but KEEP `HOT -` WhatsApp tasks + quote-linked payment-collection rows) ; (b) only close the 2 existing rows; (c) let the rep dismiss without a call. Do not guess - extending the section 174 guard silently drops a rep's post-sale callback and a Won client's repeat-business HOT alert.
