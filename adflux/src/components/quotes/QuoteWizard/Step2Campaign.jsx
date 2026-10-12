@@ -35,8 +35,9 @@ const SLOT_SECONDS_OPTIONS = [10, 15, 20, 30]
 const DEFAULT_SLOT_SECONDS = 10
 
 // Slots per screen per day — default 100. Rep can edit up (premium
-// placement) or down (low-traffic board). Editing away from 100
-// requires a reason, matching the pattern used for rate overrides.
+// placement) or down (low-traffic board). Phase 360 (owner 2026-10-13): NO
+// reason is asked for a rate change or a slots/day change - a price under
+// Rs 600/screen goes to admin for approval instead (see utils/quotePriceGate.js).
 const DEFAULT_SLOTS_PER_DAY = 100
 
 export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
@@ -48,7 +49,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
   // Phase 331 — bulk edit: set the same offered rate / duration / slot seconds /
   // slots-per-day on EVERY city already in the quote. Empty box = leave unchanged.
   const [bulkOpen, setBulkOpen] = useState(false)
-  const [bulk, setBulk] = useState({ offered_rate: '', duration_months: '', slot_seconds: '', slots_per_day: '', reason: '' })
+  const [bulk, setBulk] = useState({ offered_rate: '', duration_months: '', slot_seconds: '', slots_per_day: '' })
   const [bulkNote, setBulkNote] = useState('')
   // Phase 331.1 — tick rows to bulk-edit only those; nothing ticked = all cities.
   const [picked, setPicked] = useState(() => new Set())
@@ -84,7 +85,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       override_reason: '',
       slot_seconds: DEFAULT_SLOT_SECONDS,
       slots_per_day: DEFAULT_SLOTS_PER_DAY,
-      slots_override_reason: '',
+      slots_override_reason: '',   // kept in the row shape (DB column); never asked for now
       campaign_total: calcTotal(city.offer_rate || 0, city.screens || 1, 1),
     }
   }
@@ -145,8 +146,8 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
   // Phase 331 — apply the filled bulk boxes to ALL cities in ONE onChange
   // (a loop of updateEntry() would each read the same stale selectedCities and
   // only the last write would survive). Same rules as the per-row inputs:
-  // total = rate x screens x months (calcTotal), duration clamped 1-12,
-  // slots/day != 100 needs a reason. Slot seconds / slots-per-day stay metadata.
+  // total = rate x screens x months (calcTotal), duration clamped 1-12.
+  // Slot seconds / slots-per-day stay metadata (no reason asked, Phase 360).
   // Ticked ids that still exist in the quote (a removed city drops out silently).
   const pickedCount = selectedCities.filter(sc => picked.has(sc.city.id)).length
   const bulkAll = pickedCount === 0
@@ -185,11 +186,6 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       setBulkNote('One of the boxes is not a valid number.')
       return
     }
-    const reason = bulk.reason.trim()
-    if (slots !== null && slots !== DEFAULT_SLOTS_PER_DAY && !reason) {
-      setBulkNote(`Give a reason — slots/day is not ${DEFAULT_SLOTS_PER_DAY}.`)
-      return
-    }
     const n = bulkCount
     const scopeWord = bulkAll ? `all ${n}` : `the ${n} selected`
     // Rate / duration / slots overwrite what the rep may have set city by city
@@ -219,7 +215,6 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
         if (sec !== null)   u.slot_seconds = sec
         if (slots !== null) {
           u.slots_per_day = slots
-          u.slots_override_reason = slots === DEFAULT_SLOTS_PER_DAY ? '' : reason
         }
         if (rate !== null || dur !== null) {
           u.campaign_total = calcTotal(u.offered_rate, u.screens, u.duration_months)
@@ -227,7 +222,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
         return u
       })
     )
-    setBulk({ offered_rate: '', duration_months: '', slot_seconds: '', slots_per_day: '', reason: '' })
+    setBulk({ offered_rate: '', duration_months: '', slot_seconds: '', slots_per_day: '' })
     setError('')
     setBulkNote(`Done — applied to ${scopeWord} ${n === 1 ? 'city' : 'cities'}.`)
     } finally {
@@ -242,16 +237,9 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       setError('Add at least one city to continue.')
       return
     }
-    // Slot-count overrides tracked separately so admin review knows WHY a
-    // rep cut the daily spot commitment below 100 — common negotiation lever.
-    // Rate changes no longer prompt for a reason (owner directive).
-    for (const sc of selectedCities) {
-      const slots = Number(sc.slots_per_day) || DEFAULT_SLOTS_PER_DAY
-      if (slots !== DEFAULT_SLOTS_PER_DAY && !sc.slots_override_reason?.trim()) {
-        setError('Please provide reason when slots/day differs from 100.')
-        return
-      }
-    }
+    // Phase 360 - no reason is asked for a price or slots/day change
+    // (owner 2026-10-13). A price under Rs 600/screen is approved by admin
+    // after the quote is saved, not justified here.
     setError('')
     onNext()
   }
@@ -386,22 +374,6 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                       />
                     </div>
 
-                    {bulk.slots_per_day !== '' && Number(bulk.slots_per_day) !== DEFAULT_SLOTS_PER_DAY && (
-                      <div className="ccr-field" style={{ flex: '1 1 220px' }}>
-                        <label className="ccr-label" style={{ color: 'var(--warning)' }}>
-                          Reason for Slots Override * (used on all cities)
-                        </label>
-                        <input
-                          type="text"
-                          className="ccr-input"
-                          style={{ width: '100%' }}
-                          placeholder={`Why not ${DEFAULT_SLOTS_PER_DAY} slots/day?`}
-                          value={bulk.reason}
-                          onChange={e => { setBulk(b => ({ ...b, reason: e.target.value })); setBulkNote('') }}
-                        />
-                      </div>
-                    )}
-
                     <button type="button" className="btn btn-y btn-sm" onClick={applyBulk}>
                       {bulkAll ? `Apply to all ${selectedCities.length}` : `Apply to ${pickedCount} selected`}
                     </button>
@@ -417,7 +389,6 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
           )}
 
           {selectedCities.map(sc => {
-            const slotsOverridden = (Number(sc.slots_per_day) || DEFAULT_SLOTS_PER_DAY) !== DEFAULT_SLOTS_PER_DAY
             return (
               <div key={sc.city.id} className="campaign-city-row">
                 <div className="campaign-city-name">
@@ -577,8 +548,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
 
                   {/* Slots per screen per day. Default 100. Edit
                       down for weak boards or as a negotiation lever,
-                      up for premium routes. Override reason enforced
-                      downstream in handleNext(). */}
+                      up for premium routes. No reason is asked. */}
                   <div className="ccr-field">
                     <label className="ccr-label">Slots/day</label>
                     <input
@@ -595,21 +565,6 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                     <label className="ccr-label">Total</label>
                     <p className="ccr-total">{formatCurrency(sc.campaign_total)}</p>
                   </div>
-
-                  {slotsOverridden && (
-                    <div className="ccr-field" style={{ gridColumn: '1 / -1' }}>
-                      <label className="ccr-label" style={{ color: '#ffb74d' }}>
-                        Reason for Slots Override *
-                      </label>
-                      <input
-                        type="text"
-                        className="ccr-input"
-                        placeholder={`Why not ${DEFAULT_SLOTS_PER_DAY} slots/day?`}
-                        value={sc.slots_override_reason || ''}
-                        onChange={e => updateEntry(sc.city.id, 'slots_override_reason', e.target.value)}
-                      />
-                    </div>
-                  )}
 
                   <button
                     className="ccr-remove"

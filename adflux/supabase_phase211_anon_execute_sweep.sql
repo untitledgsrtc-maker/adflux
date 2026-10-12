@@ -108,6 +108,17 @@ BEGIN
                         --  * recompute_daily_new_leads   - rewrites a stored daily counter for any user/date
                         'ops_aiadflux_sync_dispatch', 'ops_ticket_wa_dispatch',
                         'earned_incentive_for', 'recompute_daily_new_leads',
+                        -- Phase 360 quote price approval (supabase_phase360_quote_price_approval.sql):
+                        -- Phase 360 SECURITY DEFINER functions, REVOKED. A rep must never call qpa_recheck_quote
+                        -- (could mint an 'approved' row) or the notify fns (push spam) via rpc(); only
+                        -- the triggers on quote_cities / quotes / quote_price_approvals reach them.
+                        'qpa_before_update', 'qpa_recheck_quote', 'qpa_lines_changed',
+                        'qpa_status_gate', 'qpa_notify_request', 'qpa_notify_decision',
+                        'qpa_quote_send_blocked',
+                        -- Phase 360 v2 (per-line coverage + guards). qpa_is_active_head is
+                        -- deliberately NOT here: RLS policies call it as the caller.
+                        'qpa_low_lines', 'qpa_uncovered_lines', 'qpa_uncovered_min',
+                        'qpa_media_guard', 'qpa_supersede_on_close',
                         --  * 3 TRIGGER functions: harmless, but kept locked so the live ACL does not drift. A trigger
                         --    function needs no EXECUTE grant to fire (PostgreSQL checks it only at CREATE TRIGGER time),
                         --    so locking them cannot stop the triggers.
@@ -180,6 +191,11 @@ WHERE n.nspname = 'public'
                     'ops_ticket_assignment_push','ops_ticket_resolved_push','ops_tech_day_block',
                     'ops_aiadflux_sync_dispatch','ops_ticket_wa_dispatch',
                     'earned_incentive_for','recompute_daily_new_leads',
+                    'qpa_before_update','qpa_recheck_quote','qpa_lines_changed',
+                    'qpa_status_gate','qpa_notify_request','qpa_notify_decision',
+                    'qpa_quote_send_blocked',
+                    'qpa_low_lines','qpa_uncovered_lines','qpa_uncovered_min',
+                    'qpa_media_guard','qpa_supersede_on_close',
                     'ops_depot_owner_change_move_tickets','clients_absorb_duplicate',
                     'clients_phone_change_guard')
 ORDER BY p.proname;

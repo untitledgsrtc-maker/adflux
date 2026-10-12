@@ -217,6 +217,34 @@ Use the exact id. Match on the client name or the quote ref. If NO quote in the 
     pdfQuote = quotes.find((q) => String(q.id).toLowerCase() === wantId) || null   // MUST be one of the rep's own quotes
   }
 
+  // Phase 360 - a private-LED quote with a line under Rs 600 per screen is not
+  // sent until admin approves the price (one definition in the database:
+  // qpa_quote_send_blocked). An admin rep sending it IS the approval. A failed
+  // lookup does not block (fail-open on purpose: a database blip must not stop
+  // sales - the app buttons and the status trigger still enforce the same rule).
+  let pdfWasBlocked = false
+  if (pdfQuote) {
+    let priceBlocked = false
+    try {
+      const roleRows = await sbRows(`users?id=eq.${uid}&select=role&limit=1`)
+      const isAdminRep = roleRows?.[0]?.role === 'admin'
+      if (!isAdminRep) {
+        const br = await fetch(`${SUPABASE_URL}/rest/v1/rpc/qpa_quote_send_blocked`, {
+          method: 'POST',
+          headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ p_quote_id: pdfQuote.id }),
+        })
+        if (br.ok) priceBlocked = (await br.json().catch(() => null)) === true
+      }
+    } catch { /* fail open */ }
+    if (priceBlocked) {
+      try { await sendText(`Quote ${pdfQuote.quote_number || ''} has a price below Rs 600 per screen and is waiting for admin approval. I can send it once it is approved.`) } catch { /* */ }
+      pdfQuote = null
+      pdfWasBlocked = true
+      reply = ''   // Claude's text promised the PDF - do not send that after the 'waiting' note
+    }
+  }
+
   // send the text (if any left after stripping the marker)
   if (reply) {
     try { await sendText(reply) } catch (e) { await markDone(rid, 'error'); return nope('send_failed:' + String(e?.message || e), 502) }
@@ -247,7 +275,7 @@ Use the exact id. Match on the client name or the quote ref. If NO quote in the 
     }
   }
 
-  if (!reply && !pdfQuote) { try { await sendText(snapshot()) } catch { /* */ } }   // empty answer → give the snapshot
+  if (!reply && !pdfQuote && !pdfWasBlocked) { try { await sendText(snapshot()) } catch { /* */ } }   // empty answer → give the snapshot
 
   await markDone(rid, 'handled')
   return ok({ mode: 'ai', pdf: !!pdfQuote })

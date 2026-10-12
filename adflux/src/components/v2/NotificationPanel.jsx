@@ -224,6 +224,46 @@ export default function NotificationPanel() {
         ts: r.created_at,
       })
     })
+    // Phase 360 - quote prices below Rs 600/screen waiting for a decision.
+    // Only the people who DECIDE run this (admin + an active Sales Head): a rep
+    // already sees the state on her quote and gets a push on the decision, so
+    // she does not pay two extra queries on every shell mount. A Sales Head
+    // never sees her own request here (she cannot decide it). Best effort - a
+    // failure here must never blank the rest of the bell.
+    const qpaDecider = profile?.role === 'admin' || profile?.is_sales_head === true
+    if (qpaDecider) {
+      try {
+        const { data: qpaAll } = await supabase
+          .from('quote_price_approvals')
+          .select('id, quote_id, min_rate, requested_by, created_at')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(15)
+        const qpa = (qpaAll || []).filter(r => profile?.role === 'admin' || r.requested_by !== profile?.id)
+        if (qpa.length) {
+          const { data: qrows } = await supabase
+            .from('quotes')
+            .select('id, quote_number, client_company, client_name')
+            .in('id', [...new Set(qpa.map(r => r.quote_id))])
+            .limit(15)   // cap-ok: qpa is .limit(15) above
+          const qm = new Map((qrows || []).map(q => [q.id, q]))
+          qpa.forEach(r => {
+            const q = qm.get(r.quote_id)
+            const who = q?.client_company || q?.client_name || q?.quote_number || '—'
+            const price = `₹${Number(r.min_rate || 0).toLocaleString('en-IN')}/screen`
+            list.push({
+              kind: 'approval', id: `qpa-${r.id}`,
+              title: `Quote price to approve: ${price}`,
+              sub: who,
+              to: profile?.role === 'admin' ? '/pending-approvals' : '/quote-approvals',
+              ts: r.created_at,
+            })
+          })
+        }
+      } catch (e) {
+        console.warn('[NotificationPanel] price approvals failed:', e?.message)
+      }
+    }
     // Sort: admin messages first (direct from the office), then SLA
     // (red), approvals, follow-ups, due actions.
     const order = { message: 0, sla: 1, approval: 2, followup: 3, dueAction: 4 }

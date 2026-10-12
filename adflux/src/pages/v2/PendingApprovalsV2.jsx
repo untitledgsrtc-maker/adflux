@@ -24,6 +24,9 @@ import { fetchPendingApprovals, fetchApprovedPayments } from '../../hooks/usePay
 // confirm/prompt/alert dialogs for in-app primitives + Lucide icon.
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { toastError } from '../../components/v2/Toast'
+// Phase 360 - private-LED quotes priced below Rs 600/screen wait here for the
+// admin (the Sales Head approves from /quote-approvals). Hidden when empty.
+import QuotePriceApprovals from '../../components/quotes/QuotePriceApprovals'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December']
@@ -197,6 +200,8 @@ export default function PendingApprovalsV2() {
           <span>Refresh</span>
         </button>
       </div>
+
+      <QuotePriceApprovals hideWhenEmpty />
 
       {fetchErr && (
         <div style={{

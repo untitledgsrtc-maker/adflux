@@ -1,6 +1,7 @@
-import { ChevronLeft, Send, Save, Monitor } from 'lucide-react'
+import { ChevronLeft, Send, Save, Monitor, ShieldAlert } from 'lucide-react'
 import { formatCurrency } from '../../../utils/formatters'
 import { GST_RATE } from '../../../utils/constants'
+import { PRICE_FLOOR } from '../../../utils/quotePriceGate'
 
 export function Step3Review({
   quoteData,
@@ -16,6 +17,9 @@ export function Step3Review({
   saving,
   isEdit = false,
   originalStatus = null,
+  // Phase 360 — a price below Rs 600/screen that is not yet approved: the quote
+  // can be saved, but not sent until admin approves it.
+  priceHeld = false,
 }) {
   const gstApplicable = Number(gst_rate) > 0
   const gstPct = Math.round(Number(gst_rate) * 100)
@@ -25,9 +29,11 @@ export function Step3Review({
   const saveLabel = isEdit
     ? (saving ? 'Saving…' : 'Save Changes')
     : (saving ? 'Saving…' : 'Save Draft')
-  const sendLabel = isEdit
-    ? (saving ? 'Sending…' : (originalStatus === 'draft' ? 'Save & Send' : 'Save & Re-send'))
-    : (saving ? 'Sending…' : 'Send to Client')
+  const sendLabel = priceHeld
+    ? (saving ? 'Submitting…' : 'Submit for approval')
+    : isEdit
+      ? (saving ? 'Sending…' : (originalStatus === 'draft' ? 'Save & Send' : 'Save & Re-send'))
+      : (saving ? 'Sending…' : 'Send to Client')
   return (
     <div className="wizard-step">
       <div className="wizard-step-header">
@@ -128,6 +134,28 @@ export function Step3Review({
           </div>
         </div>
       </div>
+
+      {priceHeld && (
+        <div
+          role="status"
+          style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            margin: '14px 0 0', padding: '12px 14px', borderRadius: 10,
+            background: 'var(--warning-soft, rgba(245,158,11,0.12))',
+            border: '1px solid var(--warning, #F59E0B)',
+            color: 'var(--text, #f1f5f9)', fontSize: 13, lineHeight: 1.5,
+          }}
+        >
+          <span style={{ flex: '0 0 auto', marginTop: 1, color: 'var(--warning, #F59E0B)', display: 'inline-flex' }}>
+            <ShieldAlert size={18} strokeWidth={1.6} />
+          </span>
+          <span>
+            <strong>Needs admin approval.</strong> One or more cities are priced below
+            {' '}Rs {PRICE_FLOOR} per screen. You can save it now, but you can send it only after
+            admin approves the price.
+          </span>
+        </div>
+      )}
 
       <div className="wizard-footer">
         <button className="btn btn-ghost" onClick={onBack} disabled={saving}>

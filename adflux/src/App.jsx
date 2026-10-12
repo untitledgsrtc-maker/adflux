@@ -27,6 +27,7 @@ const TeamV2 = lazyWithRetry(() => import('./pages/v2/TeamV2'))
 const IncentivesV2 = lazyWithRetry(() => import('./pages/v2/IncentivesV2'))
 const RenewalToolsV2 = lazyWithRetry(() => import('./pages/v2/RenewalToolsV2'))
 const PendingApprovalsV2 = lazyWithRetry(() => import('./pages/v2/PendingApprovalsV2'))
+const QuoteApprovalsV2 = lazyWithRetry(() => import('./pages/v2/QuoteApprovalsV2'))
 const HRV2 = lazyWithRetry(() => import('./pages/v2/HRV2'))
 const HRHomeV2 = lazyWithRetry(() => import('./pages/v2/HRHomeV2'))
 const HRCandidatesV2 = lazyWithRetry(() => import('./pages/v2/HRCandidatesV2'))
@@ -206,6 +207,19 @@ function RequireApprovals({ children }) {
   const { isPrivileged, profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
   const ok = isPrivileged || ['accounts', 'hr'].includes(profile?.role) || profile?.is_sales_head === true
+  if (!ok) return <Navigate to="/quotes" replace />
+  return children
+}
+
+/* Phase 360 (2026-10-13) - quote price approvals. Admin decides in
+   /pending-approvals; a Sales Head (is_sales_head) decides here. A DEDICATED
+   guard, not a RequireApprovals widen: co_owner / accounts / hr have no right
+   on quote_price_approvals (RLS = admin + Sales Head only), so they must not
+   land on an empty page. */
+function RequireQuoteApprovals({ children }) {
+  const { profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  const ok = profile?.role === 'admin' || profile?.is_sales_head === true
   if (!ok) return <Navigate to="/quotes" replace />
   return children
 }
@@ -528,6 +542,7 @@ export default function App() {
           <Route path="/team"                      element={<RequireBackOffice><TeamV2 /></RequireBackOffice>} />
           <Route path="/incentives"                element={<RequireAccountsOrPrivileged><IncentivesV2 /></RequireAccountsOrPrivileged>} />
           <Route path="/pending-approvals"         element={<RequirePrivileged><PendingApprovalsV2 /></RequirePrivileged>} />
+          <Route path="/quote-approvals"           element={<RequireQuoteApprovals><QuoteApprovalsV2 /></RequireQuoteApprovals>} />
           {/* Phase 109 — HR login. These 3 routes admit role='hr' as well
               as admin/co_owner via RequireHROrPrivileged. Every OTHER
               admin route stays RequirePrivileged (admin+co_owner only). */}

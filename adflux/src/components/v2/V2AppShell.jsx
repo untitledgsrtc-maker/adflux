@@ -643,6 +643,8 @@ export function V2AppShell() {
     const extra = []
     if (!arr.some((n) => n.to === '/admin/leaves')) extra.push({ to: '/admin/leaves', label: 'Leaves', icon: CheckSquare })
     if (!arr.some((n) => n.to === '/admin/ta-payouts')) extra.push({ to: '/admin/ta-payouts', label: 'TA Claims', icon: Wallet })
+    // Phase 360 - quote prices below Rs 600/screen wait for her decision here.
+    if (!arr.some((n) => n.to === '/quote-approvals')) extra.push({ to: '/quote-approvals', label: 'Quote prices', icon: CheckSquare })
     return [...arr, ...extra]
   }
   const nav = withOnboarding(withTeam(withSalesHeadApprovals(baseNav)))

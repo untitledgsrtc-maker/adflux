@@ -7642,7 +7642,7 @@ Owner (screenshot of the private "Campaign Locations" step): "I ALSO WANT IN
 PRIVATE SAME LOGIC AND WHEN WE CHANGE THE PRICE WE ASK FOR REASON, I DON'T WANT
 IT." Clarified via AskUserQuestion: (1) slot-seconds = **describe only, NO price
 multiplier** for private (leave current behaviour); (2) remove **only** the
-price-change (offered-rate) reason — KEEP the slots/day reason.
+price-change (offered-rate) reason — KEEP the slots/day reason. [SUPERSEDED 13 Oct 2026 - section 346: the slots/day reason box is removed too; no reason is asked anywhere in the private LED wizard.]
 
 ### What shipped (JS-only, on origin, guardian PASS, §45-safe)
 `src/components/quotes/QuoteWizard/Step2Campaign.jsx` (private LED wizard Step 2 —
@@ -21014,3 +21014,66 @@ Secondary risk found and removed: the PDF header `<Image src="/icon-192.png">` w
 
 ### Still open (separate, owner's call - NOT touched, section 16)
 Same blob-anchor pattern remains in `proposalPdf.js`, `OtherMediaQuotePDF.jsx`, `QuotePDFHtml.jsx`, `OfferLetterPDF.jsx` (quotes already take the native share branch in QuoteDetail, so those are web/desktop only; HR offer letters are desktop) and the CSV / PNG exports (LeadsV2, SalaryAdminV2, AgencyCommissionAdminV2, TaPayoutsAdminV2, CampaignsV2, CampaignQrV2, CampaignClientQrV2). Move them onto a helper when each is next touched; a CSV/PNG sibling of `savePdfBlob` is the natural next step.
+
+
+---
+
+## 346 · Phase 360 - quote price approval: a private-LED price under Rs 600 per screen needs approval (2026-10-13)
+
+Owner: "they are using the APK - when they add a price below 600 per screen in a quote it must go to admin for approval, like payments. And I do not want a reason asked when the price is changed."
+Owner decisions (asked): (a) while it waits the rep can EDIT and SAVE but cannot SEND (WhatsApp, email, PDF, Mark sent locked); (b) approvers = admin AND Sales Head, never their own work; (c) no reason is asked anywhere, the slots/day reason box is removed too.
+(Phase-number note, section 52: 360 = this batch; disambiguate by SHA / this section. Next free number 361.)
+
+### The rule (ONE definition per layer, section 71)
+- SCOPE: segment PRIVATE + media_type LED_OTHER only. Government, Other Media and AI quotes (master rates, min Rs 850) are never gated. 600 itself passes; strictly below is low. A NULL rate counts as 0.
+- Price = `quote_cities.offered_rate` (per screen, per month). A "line" = one row of `quote_cities`; its key = `COALESCE(city_id, lower(btrim(city_name)), row id)`.
+- COVERAGE IS PER LINE: an approved / grandfathered row stores `line_rates = {line_key: rate}` for the low lines it covers; a line is covered when the row holds that line at a rate <= the line's current rate.
+  Approving "Surat at 550" does NOT cover another city, nor Surat at 540. Raising a price never asks again.
+- STICKY REJECTION: after a reject, re-saving the same (or a lower) price does not open a new request - the quote stays blocked. Raising a low line above its rejected rate, or an admin save, re-asks.
+- Admin saving or sending an uncovered quote IS the approval (one 'approved' row, "Saved by admin"). A Sales Head cannot decide a request she raised or a quote she created; an INACTIVE Sales Head cannot decide or read (qpa_is_active_head()).
+
+### Database (APPLIED LIVE 2026-10-13 by Claude via the CLI, dry-run twice-applied in a rolled-back txn first, 36 checks all PASS, VERIFY all true)
+`supabase_phase360_quote_price_approval.sql` (v2, canonical, idempotent): table `quote_price_approvals` (+ `line_rates jsonb`); helpers `qpa_line_key` / `qpa_low_lines` / `qpa_uncovered_lines` / `qpa_uncovered_min` / `qpa_is_active_head`;
+THE rule `qpa_recheck_quote` (called by statement triggers on quote_cities insert / update / delete, so every writer is covered, never raises); `qpa_status_gate` (BEFORE UPDATE OF status on quotes: draft -> sent refused
+while a low line is uncovered, SQL / service role pass); `qpa_media_guard` (only admin may move a quote in or out of private-LED by changing segment / media_type - closes "flip to Other Media, send, flip back");
+`qpa_supersede_on_close` (won / lost closes an open request); push to approvers (tag per quote, quiet-hours gated) and to the rep on the decision; `qpa_quote_send_blocked(uuid)` for the server senders.
+- PRIVILEGES: authenticated has SELECT + UPDATE(status, decision_note) only (Supabase's default ALL incl. TRUNCATE was removed); inserts, line_rates and decided_by are written by the SECURITY DEFINER rule / guard, never by a client.
+- Frozen rows: an approved / rejected / superseded row cannot change, except `requested_by` / `decided_by` going NULL (user delete, FK SET NULL) and the one-time line_rates backfill. A pending row is refreshed IN PLACE (one open request per quote).
+- GRANDFATHER: 102 sent / won / lost private-LED quotes already below 600 got a 'grandfathered' row at their saved line rates, bounded to quotes created <= 2026-10-12 14:15:21 UTC and not drafts, so a re-run can never clear a NEW low quote.
+  Live now: 102 grandfathered + 1 pending (UA-2026-0643, Salpesh, Rs 466.69 / 500, sent 12 Oct 14:17 UTC by an old bundle) awaiting the admin.
+- Section 211: the new REVOKEd functions are in the sweep's re-lock list + VERIFY-D (qpa_low_lines, qpa_uncovered_lines, qpa_uncovered_min, qpa_media_guard, qpa_supersede_on_close ...). qpa_is_active_head is deliberately NOT there (RLS policies call it as the caller).
+  Re-running an OLD sweep copy without this list would re-open them.
+
+### App side (pushed together with this section)
+- `src/utils/quotePriceGate.js` = the client mirror (lineKey / lowLines / uncoveredLines / quotePriceState / needsApproval), parity-tested against the SQL scenarios (27 cases). Same 600, same key, NULL = 0.
+- `useQuoteApprovals(quoteId)` returns `{approvals, loading, error, reload}`; `loading` stays true until THIS quote's rows were read. QuoteDetail keeps the send controls LOCKED while the read is pending or failed (a false lock is one tap to retry, a false unlock is a bypass)
+  and shows a Retry banner; it only reads approvals for a non-admin viewing a private-LED quote.
+- QuoteDetail: lock banner (waiting / not approved + the admin's note), "Price approved - Mark as sent" prompt for a draft whose approval arrived (the held create saves as a draft), allowed-status list hides 'sent' while locked.
+- Wizard (WizardShell / Step2Campaign / Step3Review / Step4Send): rate-change and slots/day reason prompts removed; a below-600 price shows "Submit for approval", saves the quote as a draft (or leaves status alone when editing), and shows a held screen that says
+  "Waiting for approval" or, when the database kept an earlier rejection, "Price not approved" with the admin's note. EDIT ORDER (do not change): update content WITHOUT status -> replace the lines -> promote status LAST, so the gate reads the fresh lines.
+- Approver surfaces: `QuotePriceApprovals` mounted on /pending-approvals (admin) and /quote-approvals (Sales Head, RequireQuoteApprovals), `QuotePriceBanner` on the admin dashboard, bell items in NotificationPanel. Approve / reject pin on the `min_rate` the approver saw; a failed reject shows INSIDE the dialog (the toast layer sits under it).
+- Server senders: `api/wa/send.js` (inbox send quote), `api/wa/team-assistant.js` (SENDPDF; the "waiting" note replaces Claude's "here is the PDF" text) and `api/email/send.js` (kind 'quote' with a real quote id) refuse with 409 `quote_awaiting_price_approval` via `qpa_quote_send_blocked`.
+  All three FAIL OPEN on a lookup error on purpose (a database blip must not stop sales; the page and the status trigger still enforce). Admin is exempt everywhere.
+
+### KNOWN LIMITS (by design - a process control, not a vault)
+1. An old APK / cached PWA bundle can INSERT a quote straight at status 'sent' (the trigger fires on UPDATE). It is flagged pending after the fact and the new app locks its share buttons; a rep can still download the PDF by hand. Stale bundles live up to ~24 h after a deploy.
+2. A quote can go draft -> won without 'sent'; the open request is then closed (supersede_on_close), the won price is visible on the dashboards.
+3. Renewals and copy-last create a NEW quote, so a copied low price asks again (only already-sent old quotes are grandfathered).
+4. An admin re-saving the lines for any reason records a "Saved by admin" approval (matches the rule: the approver saved it).
+5. Admin is the only active approver today: JAYNA ROHIT (the only is_sales_head) is inactive. To use Sales Head approvals, activate one and set is_sales_head.
+6. `createQuote` advances the lead to QuoteSent even for a held draft (pre-existing), so quote-chase reminders start before the client has received it.
+
+### FOOT-GUNS
+- A SECURITY DEFINER trigger function is the ONLY writer of approval rows; do not add client INSERT / UPDATE grants "to make a screen work" - the column grant is the boundary.
+- Never write a test fixture that moves quotes.status backwards (sent -> draft): `quotes_status_one_way` raises. Dry-runs use `SET LOCAL session_replication_role = replica` around the one statement.
+- `quotes.media_type` check allows LED_OTHER, AUTO_HOOD, GSRTC_LED, HOARDING, MALL, CINEMA, DIGITAL, OTHER - NOT 'OTHER_MEDIA' (see below).
+
+### OPEN - found while testing, NOT part of this change (owner decision, one plain yes)
+The Other Media wizard (`CreateQuoteOtherMediaV2.jsx`) saves `media_type: 'OTHER_MEDIA'` but the live CHECK `quotes_media_type_check` does not list it, so every Other Media quote save is rejected (23514). The live table holds 0 such quotes.
+Fix would be one additive line (add 'OTHER_MEDIA' to the allowed list); not applied - outside this request.
+
+### 346.1 - final guardian pass (13 Oct 2026, FLAG: no P0/P1, all applied before commit)
+Applied: won/lost quote with an uncovered low line now says "closed, ask admin to open it and send it" instead of "edit the price" (admin is exempt from every lock, so admin sending it IS the approval);
+reject-dialog close X padded to a 36px tap target; the approvals queue no longer blanks while a refresh runs; approve/reject buttons stay disabled until the reload finishes (a second tap could hit a decided row).
+NOT changed (accepted, owner-aware): approve pins on `min_rate` only, so a SECOND low line added at a higher rate between card load and tap is approved with the request - the approver sees the lowest price; pin `line_rates` too if that ever matters.
+LOCKSTEP NOTE: "Rs 600" is hardcoded in THREE server messages (`api/wa/send.js`, `api/email/send.js`, `api/wa/team-assistant.js`) besides `qpa_price_floor()` and `quotePriceGate.js PRICE_FLOOR`; change the floor in all five places.

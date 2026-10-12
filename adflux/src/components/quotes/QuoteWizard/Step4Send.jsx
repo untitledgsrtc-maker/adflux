@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle, MessageCircle, FileText, ArrowRight } from 'lucide-react'
+import { CheckCircle, MessageCircle, FileText, ArrowRight, Clock } from 'lucide-react'
 import { openWhatsApp } from '../../../utils/whatsapp'
 // Phase 239 — share cascade unified with QuoteDetail. This button was link-only
 // (owner 16 Jul: "direct quotation share goes as a link"); now it uses the same
@@ -7,8 +7,9 @@ import { openWhatsApp } from '../../../utils/whatsapp'
 // definition (§71) — no more drift between the two share buttons.
 import { shareQuoteViaWhatsApp } from '../../../utils/shareQuoteWhatsApp'
 import { formatCurrency } from '../../../utils/formatters'
+import { PRICE_FLOOR } from '../../../utils/quotePriceGate'
 
-export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, onDone, onViewQuote }) {
+export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, onDone, onViewQuote, heldForApproval = false, heldInfo = null }) {
   const [sent, setSent] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
   const [sending, setSending] = useState(false)
@@ -60,6 +61,67 @@ export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, o
     } finally {
       setSending(false)
     }
+  }
+
+  // Phase 360 — saved, but held: the price is under the floor and admin has to
+  // approve it first. No send button here (the database refuses the send too).
+  if (heldForApproval) {
+    return (
+      <div className="wizard-step wizard-step--send">
+        <div className="send-success">
+          <div className="send-success-icon" style={{ color: 'var(--warning, #F59E0B)' }}>
+            <Clock size={40} strokeWidth={1.6} />
+          </div>
+          <h2 className="send-success-title">
+            {heldInfo?.state === 'rejected' ? 'Saved. Price not approved' : 'Saved. Waiting for approval'}
+          </h2>
+          <p className="send-success-sub">
+            <strong style={{ color: 'var(--text)' }}>{quote.quote_number}</strong> for{' '}
+            {quote.client_name}
+          </p>
+        </div>
+
+        <div className="send-summary">
+          <div className="send-summary-row">
+            <span>Total Amount</span>
+            <strong style={{ color: 'var(--accent)', fontSize: 20 }}>{formatCurrency(total_amount)}</strong>
+          </div>
+          <div className="send-summary-row">
+            <span>Status</span>
+            <span className="badge badge-draft">
+              {heldInfo?.state === 'rejected' ? 'Price not approved' : 'Waiting for admin approval'}
+            </span>
+          </div>
+        </div>
+
+        <div className="send-note">
+          {heldInfo?.state === 'rejected' ? (
+            <>
+              A price is below Rs {PRICE_FLOOR} per screen and admin did not approve it
+              {heldInfo.note ? <>: &quot;{heldInfo.note}&quot;</> : '.'}
+              {' '}Raise the price and save again to ask once more.
+            </>
+          ) : (
+            <>
+              A price is below Rs {PRICE_FLOOR} per screen, so admin has been asked to approve it.
+              You will get a notification when it is decided. You can keep editing the quote;
+              you can send it to the client once it is approved.
+            </>
+          )}
+        </div>
+
+        <div className="send-actions">
+          <button className="btn btn-secondary" onClick={onViewQuote}>
+            <FileText size={14} />
+            View Quote Detail
+          </button>
+          <button className="btn btn-ghost" onClick={onDone}>
+            Back to Quotes
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

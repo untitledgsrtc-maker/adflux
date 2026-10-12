@@ -38,6 +38,8 @@ import { istTodayISO } from '../../utils/istDate'
 import { thisMonth } from '../../utils/period'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import WaBillingBanner from '../../components/v2/WaBillingBanner'
+// Phase 360 - private-LED quote prices below Rs 600/screen waiting on admin.
+import QuotePriceBanner from '../../components/quotes/QuotePriceBanner'
 // Phase 12 rev3 — widgets folded in from the retired CockpitV2 page.
 // Phase 31A.2 — added 4 sales-exec analysis widgets per owner spec
 // (8 May 2026): stale leads alert, pipeline funnel, win rate / avg
@@ -1041,6 +1043,7 @@ export default function AdminDashboardDesktop() {
             {/* WhatsApp API billing/eligibility failure (Meta 131042) — surfaced
                 up top with a one-tap "Fix billing" link. Self-renders null when clean. */}
             <WaBillingBanner />
+            <QuotePriceBanner />
 
             {/* Action Queue — demoted from hero to an inline notification.
                 Only renders when there's actually something pending. When

@@ -9,6 +9,10 @@ import {
 import { useAuth } from '../hooks/useAuth'
 import { useQuotes } from '../hooks/useQuotes'
 import { usePayments } from '../hooks/usePayments'
+// Phase 360 - a price below Rs 600/screen must be approved before the quote can
+// be sent. The database enforces it; this page mirrors it (locks + a plain note).
+import { useQuoteApprovals } from '../hooks/useQuoteApprovals'
+import { quotePriceState, isSendLocked, isPriceGatedQuote, lowLines, PRICE_FLOOR } from '../utils/quotePriceGate'
 import { supabase } from '../lib/supabase'
 import { QuoteStatusBadge } from '../components/quotes/QuoteStatusBadge'
 // Phase 34Z.25 — switched to HTML/CSS renderer (html2canvas + jsPDF).
@@ -176,6 +180,26 @@ export default function QuoteDetail() {
   const visibleTabs = isViewOnly ? TABS.filter(t => t.key !== 'followups') : TABS
   const cities = quote?.quote_cities || []
   const balance = quote ? (quote.total_amount - totalPaid) : 0
+  // Phase 360 - price-approval state of THIS quote. Admin is always clear (an
+  // admin sending it IS the approval). The approvals are read only for a
+  // private-LED quote that actually has a line under the floor (the common case
+  // - every line >= Rs 600 - costs no query and no realtime channel).
+  const isAdminViewer = profile?.role === 'admin'
+  const priceRead = !!quote?.id && isPriceGatedQuote(quote) && Object.keys(lowLines(cities)).length > 0
+  const {
+    approvals: priceApprovals, loading: priceChecking, error: priceReadError, reload: reloadPriceApprovals,
+  } = useQuoteApprovals(priceRead ? quote.id : null)
+  const priceState = quotePriceState({
+    quote, cities, approvals: priceApprovals, role: profile?.role,
+  })
+  // While the approvals are still being read - or the read failed - a quote with
+  // a low line keeps its send controls locked: a false lock is one tap to retry,
+  // a false unlock is a bypass. Admin is never locked.
+  const priceUnknown = priceRead && !isAdminViewer && (priceChecking || !!priceReadError)
+  const sendLocked = isSendLocked(priceState) || priceUnknown
+  const lockMessage = (action) => (priceUnknown
+    ? 'Checking the price approval - try again in a moment.'
+    : `Waiting for admin approval - a price is below Rs ${PRICE_FLOOR} per screen. You can ${action} once it is approved.`)
   // Phase 344 - a view-only owner never sees the Follow-ups tab; if the page was left on that
   // tab for a quote she created and she then opens an inherited one, fall back to Overview.
   useEffect(() => {
@@ -270,6 +294,7 @@ export default function QuoteDetail() {
 
   async function handleDownloadPDF() {
     if (!quote) return
+    if (sendLocked) { setError(lockMessage('download the PDF')); return }
     setPdfLoading(true)
     try {
       // Phase 95.10 (27 May 2026) — APK download path. Capacitor
@@ -390,6 +415,7 @@ export default function QuoteDetail() {
 
   async function handleWhatsApp() {
     if (!quote) return
+    if (sendLocked) { setError(lockMessage('send it')); return }
     // Phase 239 — the whole share cascade (attach the PDF on the APK, wa.me link
     // on web) is the shared helper `shareQuoteViaWhatsApp` now, so the
     // post-create Step4Send button attaches too (§71 — one definition; the
@@ -431,6 +457,7 @@ export default function QuoteDetail() {
   // send over the network (no device mail app needed).
   async function handleEmail() {
     if (!quote) return
+    if (sendLocked) { setError(lockMessage('email it')); return }
     const ref = quote.quote_number || quote.ref_number || ''
     let pdfUrl = ''
     try {
@@ -500,7 +527,11 @@ export default function QuoteDetail() {
     )
   }
 
-  const allowed = isViewOnly ? [] : getAllowedTransitions(quote, hasFinalPayment)
+  // Phase 360 - while the price waits for approval 'sent' is not offered
+  // (the database refuses draft -> sent too).
+  const allowed = isViewOnly
+    ? []
+    : getAllowedTransitions(quote, hasFinalPayment).filter(s => !(sendLocked && s === 'sent'))
 
   return (
     <div className="page">
@@ -546,15 +577,30 @@ export default function QuoteDetail() {
               <Pencil size={14} /> Edit
             </button>
           )}
-          <button className="btn btn-sec btn-sm" onClick={handleWhatsApp}>
+          <button
+            className="btn btn-sec btn-sm"
+            onClick={handleWhatsApp}
+            disabled={sendLocked}
+            title={sendLocked ? 'Waiting for admin approval - price below the minimum' : undefined}
+          >
             <MessageCircle size={14} /> WhatsApp
           </button>
           {/* Phase 11i — Email parallel to WhatsApp; uploads PDF and
               opens default mail client with the link prefilled. */}
-          <button className="btn btn-sec btn-sm" onClick={handleEmail} disabled={pdfLoading}>
+          <button
+            className="btn btn-sec btn-sm"
+            onClick={handleEmail}
+            disabled={pdfLoading || sendLocked}
+            title={sendLocked ? 'Waiting for admin approval - price below the minimum' : undefined}
+          >
             <Mail size={14} /> Email
           </button>
-          <button className="btn btn-sec btn-sm" onClick={handleDownloadPDF} disabled={pdfLoading}>
+          <button
+            className="btn btn-sec btn-sm"
+            onClick={handleDownloadPDF}
+            disabled={pdfLoading || sendLocked}
+            title={sendLocked ? 'Waiting for admin approval - price below the minimum' : undefined}
+          >
             <Download size={14} /> {pdfLoading ? 'Generating…' : 'PDF'}
           </button>
           {/* Phase 230 — Operations: request a live photo of the ad on the screens
@@ -611,6 +657,109 @@ export default function QuoteDetail() {
       {statusMsg && (
         <div style={{ background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: '.82rem', color: '#81c784' }}>
           ✓ {statusMsg}
+        </div>
+      )}
+
+      {/* Phase 360 - the approval could not be read: say so, with a retry */}
+      {priceRead && !isAdminViewer && priceReadError && (
+        <div
+          role="status"
+          style={{
+            display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
+            background: 'var(--warning-soft)', border: '1px solid var(--warning)',
+            borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 14,
+            fontSize: '.82rem', color: 'var(--text)',
+          }}
+        >
+          <Info size={14} strokeWidth={1.6} style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1, minWidth: 180 }}>
+            Could not check whether this price is approved, so sending is paused.
+          </span>
+          <button className="btn btn-secondary btn-sm" onClick={() => reloadPriceApprovals()}>Retry</button>
+        </div>
+      )}
+
+      {/* Phase 360 - admin sees a request waiting on THIS quote (sharing it does not decide it) */}
+      {isAdminViewer && priceApprovals.some(a => a.status === 'pending') && (
+        <div
+          role="status"
+          style={{
+            display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
+            background: 'var(--warning-soft)', border: '1px solid var(--warning)',
+            borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 14,
+            fontSize: '.82rem', color: 'var(--text)',
+          }}
+        >
+          <Info size={14} strokeWidth={1.6} style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1, minWidth: 180 }}>
+            <strong>Price waiting for your decision.</strong> This quote has a line below Rs {PRICE_FLOOR} per screen.
+            Sharing it does not approve it - the rep stays locked until you decide.
+          </span>
+          <button className="btn btn-primary btn-sm" onClick={() => navigate('/pending-approvals')}>Review</button>
+        </div>
+      )}
+
+      {/* Phase 360 - approved while the quote is still a draft: one tap to send */}
+      {!isViewOnly && quote.status === 'draft' && priceState.state === 'cleared'
+        && priceApprovals.some(a => a.status === 'approved') && (
+        <div
+          role="status"
+          style={{
+            display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
+            background: 'var(--success-soft)', border: '1px solid var(--success)',
+            borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 14,
+            fontSize: '.82rem', color: 'var(--text)',
+          }}
+        >
+          <Info size={14} strokeWidth={1.6} style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1, minWidth: 180 }}>
+            <strong>Price approved.</strong> This quote is still a draft - mark it as sent when you share it with the client.
+          </span>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => handleStatusChange('sent')}
+            disabled={updatingStatus}
+          >
+            Mark as sent
+          </button>
+        </div>
+      )}
+
+ {/* Phase 360 - price approval banner */}
+      {isSendLocked(priceState) && (
+        <div
+          role="status"
+          style={{
+            display: 'flex', gap: 8, alignItems: 'flex-start',
+            background: priceState.state === 'pending' ? 'var(--warning-soft)' : 'var(--danger-soft)',
+            border: `1px solid ${priceState.state === 'pending' ? 'var(--warning)' : 'var(--danger)'}`,
+            borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 14,
+            fontSize: '.82rem', color: 'var(--text)',
+          }}
+        >
+          <Info size={14} strokeWidth={1.6} style={{ marginTop: 2, flexShrink: 0 }} />
+          <span>
+            {priceState.state === 'pending' ? (
+              <>
+                <strong>Waiting for admin approval.</strong> The lowest price on this quote is
+                {' '}{formatCurrency(priceState.minRate)} per screen, below the Rs {PRICE_FLOOR} minimum.
+                {isViewOnly
+                  ? ' It can be sent once admin approves it.'
+                  : ' You can keep editing it. WhatsApp, email and PDF unlock once it is approved.'}
+              </>
+            ) : (
+              <>
+                <strong>Price not approved.</strong> The lowest price on this quote is
+                {' '}{formatCurrency(priceState.minRate)} per screen, below the Rs {PRICE_FLOOR} minimum.
+                {priceState.rejected?.decision_note ? ` Admin said: "${priceState.rejected.decision_note}". ` : ' '}
+                {(quote.status === 'won' || quote.status === 'lost')
+                  ? 'This quote is closed, so it cannot be re-submitted. Ask admin to open it and send it.'
+                  : isViewOnly
+                    ? 'The quote creator or admin has to revise the price.'
+                    : 'Edit the price and save to ask again.'}
+              </>
+            )}
+          </span>
         </div>
       )}
 

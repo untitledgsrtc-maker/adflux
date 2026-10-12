@@ -142,6 +142,22 @@ export default async function handler(req, res) {
     if (!tiedToConv && q.created_by !== uid && !isAdmin && !isSalesHead) {
       return res.status(403).json({ error: 'not_allowed', detail: 'That quote is not linked to this chat.' })
     }
+    // Phase 360 - a private-LED quote with a line under Rs 600 per screen cannot
+    // be sent until admin approves the price. This endpoint runs as the service
+    // role, so RLS and the status trigger do not see it: the check lives here
+    // (one definition in the database: qpa_quote_send_blocked). Admin sending
+    // IS the approval. A failed lookup does not block (the app + the status
+    // trigger still enforce) - it only logs.
+    if (me.role !== 'admin') {
+      const { data: blocked, error: bErr } = await admin.rpc('qpa_quote_send_blocked', { p_quote_id: q.id })
+      if (bErr) console.warn('[wa/send] qpa_quote_send_blocked failed:', bErr.message)
+      if (blocked === true) {
+        return res.status(409).json({
+          error: 'quote_awaiting_price_approval',
+          detail: 'This quote has a price below Rs 600 per screen and is waiting for admin approval. You can send it once it is approved.',
+        })
+      }
+    }
     // The stored PDF is the artifact (§44.9: uploadQuotePDFHtml writes
     // quote-pdfs/<safeRef>.pdf). Exists only once the quote was shared at
     // least once — no PDF yet is an honest 409, not a silent link.

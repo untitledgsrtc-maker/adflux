@@ -10,6 +10,10 @@ import { useQuotes } from '../../../hooks/useQuotes'
 import { GST_RATE } from '../../../utils/constants'
 import { useAuthStore } from '../../../store/authStore'
 import { toastError, toastSuccess } from '../../v2/Toast'
+// Phase 360 — a price below Rs 600/screen needs admin approval before it can be
+// sent. The database enforces it; this mirrors the rule so the rep is told up
+// front and the quote is held as a draft instead of failing at the send step.
+import { needsApproval as priceNeedsApproval, PRICE_FLOOR } from '../../../utils/quotePriceGate'
 
 const STEPS = [
   { id: 1, label: 'Client' },
@@ -60,6 +64,14 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
   // Track the original status when editing so "Save Changes" preserves it
   // rather than silently demoting a 'sent' quote back to 'draft'.
   const [originalStatus, setOriginalStatus] = useState(null)
+  // Phase 360 — approved / grandfathered price rows of the quote being edited
+  // (create mode has none). Used to know whether the current price is already
+  // cleared. A read that fails leaves [] = "not cleared" = the safe direction.
+  const [approvals, setApprovals] = useState([])
+  // Set when the save was held back from sending because of the price rule.
+  const [heldForApproval, setHeldForApproval] = useState(false)
+  // what the database did with the ask: an open request, or a sticky rejection
+  const [heldInfo, setHeldInfo] = useState({ state: 'pending', note: '' })
 
   const isEdit = !!editOf
 
@@ -182,12 +194,32 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
     loadBaseQuote()
   }, [renewalOf, editOf])
 
+  // Phase 360 — which prices of THIS quote are already approved (edit only).
+  useEffect(() => {
+    if (!editOf) { setApprovals([]); return undefined }
+    let cancelled = false
+    ;(async () => {
+      const { data, error: err } = await supabase
+        .from('quote_price_approvals')
+        .select('status, min_rate, line_rates, created_at')
+        .eq('quote_id', editOf)
+      if (!cancelled && !err) setApprovals(data || [])
+    })()
+    return () => { cancelled = true }
+  }, [editOf])
+
   // Computed totals — GST driven by per-quote gstRate, not the global
   // constant, so "No GST" (rate=0) actually produces gst_amount=0.
   const subtotal = selectedCities.reduce((sum, c) => sum + (c.campaign_total || 0), 0)
   const gst_amount = Math.round(subtotal * gstRate)
   const total_amount = subtotal + gst_amount
   const duration_months = selectedCities[0]?.duration_months || 1
+  // Phase 360 — would sending THIS price need an approver? (admin never does.)
+  const priceHeld = priceNeedsApproval({
+    cities: selectedCities,
+    approvals,
+    role: profile?.role,
+  })
 
   function updateQuoteData(updates) {
     setQuoteData(prev => ({ ...prev, ...updates }))
@@ -263,7 +295,16 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
       // Update existing quote + replace its quote_cities rows.
       // Delete-then-insert is simpler than diffing rows and matches the
       // semantics of "the cities list now looks exactly like this".
-      const { data, error: uErr } = await updateQuote(editOf, payload)
+      //
+      // Phase 360 — ORDER MATTERS. The database refuses draft -> sent when the
+      // quote's CURRENT lines are under the price floor and not approved. If the
+      // status were promoted here, that check would read the OLD lines (the new
+      // ones are not written yet) and wrongly block a corrected price. So the
+      // content is saved with the status UNCHANGED, the lines are replaced, and
+      // the status is promoted last, against the fresh lines.
+      const { status: targetStatus, ...contentPayload } = payload
+      const { data: contentRow, error: uErr } = await updateQuote(editOf, contentPayload)
+      let data = contentRow
       if (uErr) {
         setSaving(false)
         setError(uErr.message || 'Failed to update quote.')
@@ -288,6 +329,19 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
           return null
         }
       }
+      // Promote the status (e.g. draft -> sent) now that the lines are final.
+      if (targetStatus && targetStatus !== (data?.status ?? originalStatus)) {
+        const { data: promoted, error: pErr } = await updateQuote(editOf, { status: targetStatus })
+        if (pErr) {
+          setSaving(false)
+          setError(
+            (pErr.message || 'Could not change the quote status.') +
+            ' Your changes were saved.',
+          )
+          return null
+        }
+        data = promoted || data
+      }
       setSaving(false)
       setSavedQuote(data)
       return data
@@ -305,6 +359,50 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
   }
 
   async function handleSend() {
+    // Phase 360 — price under Rs 600/screen and not yet approved: save the quote
+    // (as a draft when new; status untouched when editing) and show the
+    // "waiting for approval" screen instead of the send screen. Sending is
+    // blocked in the database too; this just tells the rep before she gets an error.
+    let heldNow = priceHeld
+    if (isEdit && editOf && priceHeld) {
+      // an approval may have arrived while this screen was open: ask the database
+      try {
+        const { data: fresh } = await supabase
+          .from('quote_price_approvals')
+          .select('status, min_rate, line_rates, created_at')
+          .eq('quote_id', editOf)
+        if (fresh) {
+          setApprovals(fresh)
+          heldNow = priceNeedsApproval({ cities: selectedCities, approvals: fresh, role: profile?.role })
+        }
+      } catch { /* keep the value from the last read */ }
+    }
+    if (heldNow) {
+      const held = await handleSave(isEdit ? null : 'draft')
+      if (held) {
+        // The database may have kept an earlier REJECTION instead of opening a
+        // new request (same price re-saved). Say which, so the rep is not told
+        // "admin has been asked" when nothing is waiting.
+        let info = { state: 'pending', note: '' }
+        try {
+          const { data: rows } = await supabase
+            .from('quote_price_approvals')
+            .select('status, decision_note, created_at')
+            .eq('quote_id', held.id || editOf)
+            .order('created_at', { ascending: false })
+            .limit(10)
+          const list = rows || []
+          if (!list.some(r => r.status === 'pending')) {
+            const rej = list.find(r => r.status === 'rejected')
+            if (rej) info = { state: 'rejected', note: rej.decision_note || '' }
+          }
+        } catch { /* keep the optimistic 'pending' wording */ }
+        setHeldInfo(info)
+        setHeldForApproval(true)
+        setStep(4)
+      }
+      return
+    }
     // In edit mode, "Send" re-sends — promote draft to sent but leave
     // sent/negotiating/won alone (those already passed the client).
     const targetStatus = isEdit
@@ -320,10 +418,16 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
     if (isEdit) {
       // Preserve current status
       const quote = await handleSave(null)
-      if (quote) navigate(`/quotes/${editOf}`)
+      if (quote) {
+        if (priceHeld) toastSuccess(`Saved. Price is below Rs ${PRICE_FLOOR} per screen, so it needs admin approval before it can be sent.`)
+        navigate(`/quotes/${editOf}`)
+      }
     } else {
       const quote = await handleSave('draft')
-      if (quote) navigate('/quotes')
+      if (quote) {
+        if (priceHeld) toastSuccess(`Saved. Price is below Rs ${PRICE_FLOOR} per screen, so it needs admin approval before it can be sent.`)
+        navigate('/quotes')
+      }
     }
   }
 
@@ -506,6 +610,7 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
             saving={saving}
             isEdit={isEdit}
             originalStatus={originalStatus}
+            priceHeld={priceHeld}
           />
         )}
         {step === 4 && savedQuote && (
@@ -517,6 +622,8 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
             total_amount={total_amount}
             onDone={() => navigate('/quotes')}
             onViewQuote={() => navigate(`/quotes/${savedQuote.id}`)}
+            heldForApproval={heldForApproval}
+            heldInfo={heldInfo}
           />
         )}
       </div>

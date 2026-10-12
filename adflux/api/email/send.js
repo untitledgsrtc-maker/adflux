@@ -140,6 +140,36 @@ export default async function handler(req) {
   const pdfName = String(body?.pdfName || 'document.pdf').trim() || 'document.pdf'
   const relatedId = body?.related_id ? String(body.related_id) : null
 
+  // Phase 360 - a private-LED quote with a line under Rs 600 per screen cannot go
+  // out until admin approves the price. The page already disables the button; this
+  // is the server side of the same rule (one definition in the database:
+  // qpa_quote_send_blocked). Admin sending IS the approval. Only a quote id that
+  // is a real uuid is checked; a failed lookup is logged and does not block (the
+  // page + the status trigger still enforce) so a database blip never stops sales.
+  if (kind === 'quote' && role !== 'admin' && relatedId
+      && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(relatedId)) {
+    try {
+      const gr = await fetch(`${SUPABASE_URL}/rest/v1/rpc/qpa_quote_send_blocked`, {
+        method: 'POST',
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ p_quote_id: relatedId }),
+      })
+      if (gr.ok) {
+        const blocked = await gr.json().catch(() => null)
+        if (blocked === true) {
+          return json({
+            error: 'quote_awaiting_price_approval',
+            detail: 'This quote has a price below Rs 600 per screen and is waiting for admin approval. You can email it once it is approved.',
+          }, 409)
+        }
+      } else {
+        console.warn('[email/send] qpa_quote_send_blocked failed:', gr.status)
+      }
+    } catch (e) {
+      console.warn('[email/send] qpa_quote_send_blocked error:', e?.message)
+    }
+  }
+
   // ONE-TO-ONE ONLY — a single valid recipient (no bulk; §99).
   if (!EMAIL_RE.test(to)) return json({ error: 'bad_recipient', detail: 'Enter one valid email address.' }, 400)
   if (!subject) return json({ error: 'subject_required' }, 400)
