@@ -13,12 +13,14 @@
 // Money is display-only here — the figures come straight from the RPC the
 // rep is already allowed to read for themselves (self-gated). No new math.
 //
-// `downloadSalarySlip(data)` renders + downloads the PDF client-side via
+// `buildSalarySlipBlob(data)` renders the PDF client-side via
 // @react-pdf/renderer (same dep as OfferLetterPDF), so nothing hits a server.
+// Handing it to the person (share sheet / download) is utils/savePdf.js.
 
 import {
   Document, Page, Text, View, Image, StyleSheet, pdf,
 } from '@react-pdf/renderer'
+import { safePdfName } from '../../utils/savePdf'
 
 // Rs. + Indian grouping — avoids the ₹ glyph (blank in react-pdf's default
 // Helvetica) while staying unambiguous on a payslip.
@@ -74,7 +76,9 @@ const S = StyleSheet.create({
 })
 
 // data = { rep:{name,designation}, monthLabel, salary:<jsonb>, payout:{amount_paid,paid_date} }
-export function SalarySlipDocument({ rep, monthLabel, salary, payout }) {
+// logoSrc = optional data: URL for the header logo. When absent the slip simply
+// has no logo (Phase 359: a logo that fails to load must never block the slip).
+export function SalarySlipDocument({ rep, monthLabel, salary, payout, logoSrc }) {
   const base       = Number(salary?.base || 0)
   const variable   = Number(salary?.variable || 0)
   const incentive  = Number(salary?.incentive || 0)
@@ -93,7 +97,7 @@ export function SalarySlipDocument({ rep, monthLabel, salary, payout }) {
         {/* Header — plain Untitled logo, no legal entity */}
         <View style={S.headRow}>
           <View style={S.brandWrap}>
-            <Image src="/icon-192.png" style={S.logo} />
+            {logoSrc ? <Image src={logoSrc} style={S.logo} /> : null}
             <Text style={S.brand}>UNTITLED</Text>
           </View>
           <View>
@@ -191,17 +195,31 @@ export function SalarySlipDocument({ rep, monthLabel, salary, payout }) {
   )
 }
 
-// Render + trigger a client-side download. No server round-trip.
-export async function downloadSalarySlip(data) {
-  const blob = await pdf(<SalarySlipDocument {...data} />).toBlob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  const safeName = String(data?.rep?.name || 'rep').replace(/\s+/g, '-')
-  const safeMonth = String(data?.monthLabel || '').replace(/\s+/g, '-')
-  a.href = url
-  a.download = `Salary-Slip-${safeName}-${safeMonth}.pdf`
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
+// Logo as a data: URL so the PDF renderer never does its own network fetch.
+// Best-effort: any failure returns null and the slip renders without a logo.
+async function loadLogoDataUrl() {
+  try {
+    const res = await fetch('/icon-192.png')
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return await new Promise((resolve) => {
+      const r = new FileReader()
+      r.onerror = () => resolve(null)
+      r.onload = () => resolve(String(r.result || '') || null)
+      r.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+// Render the slip to a PDF Blob. No server round-trip, nothing uploaded.
+export async function buildSalarySlipBlob(data) {
+  const logoSrc = await loadLogoDataUrl()
+  const blob = await pdf(<SalarySlipDocument {...data} logoSrc={logoSrc} />).toBlob()
+  const fileName = safePdfName(
+    `Salary-Slip-${String(data?.rep?.name || 'rep')}-${String(data?.monthLabel || '')}`,
+    'Salary-Slip',
+  )
+  return { blob, fileName }
 }

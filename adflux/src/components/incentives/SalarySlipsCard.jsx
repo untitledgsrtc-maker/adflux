@@ -10,11 +10,12 @@
 // their OWN id (self-or-admin gated). A rep can never see another rep's slip.
 // Additive card — shown for every non-agency rep (agency is commission-only).
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 import { FileText, Download, Loader2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import { downloadSalarySlip } from './SalarySlipPDF'
+import { buildSalarySlipBlob } from './SalarySlipPDF'
+import { savePdfBlob } from '../../utils/savePdf'
 import { istTodayISO } from '../../utils/istDate'
 
 const MON = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -44,11 +45,38 @@ function inr(n) {
   return 'Rs. ' + Number(n || 0).toLocaleString('en-IN')
 }
 
+// Phase 359 — slip build/share state lives at MODULE level, not in the
+// component. MyPerformanceV2 re-keys this card on every auto-refresh, so a
+// component-local `ready` / `busyMonth` would be wiped mid-build (focus, poll or
+// a team realtime event) and the built slip + its "Tap to open" button lost.
+// Keyed by uid so one user's built slip is never offered to the next login.
+//   busyMonth : month_year being built/saved
+//   ready     : { month_year, blob, fileName, title } — built, waiting for a FRESH
+//               tap (iPhone refuses the share sheet once the tap is too old)
+//   slipErr   : last save failure text (shown on the card)
+let slipSnap = { uid: null, busyMonth: null, ready: null, slipErr: null }
+const slipListeners = new Set()
+function setSlip(patch) {
+  slipSnap = { ...slipSnap, ...patch }
+  slipListeners.forEach((l) => l())
+}
+function subscribeSlip(cb) {
+  slipListeners.add(cb)
+  return () => slipListeners.delete(cb)
+}
+function getSlip() { return slipSnap }
+
+const SLIP_SWEEP_PREFIX = 'Salary-Slip-'
+
 export default function SalarySlipsCard() {
   const profile = useAuthStore((s) => s.profile)
   const [rows, setRows] = useState(null)      // null=loading, []=none, [..]=paid months
   const [err, setErr] = useState(null)
-  const [busyMonth, setBusyMonth] = useState(null) // month_year currently generating
+  const slip = useSyncExternalStore(subscribeSlip, getSlip)
+  const mine = !!profile?.id && slip.uid === profile.id
+  const busyMonth = mine ? slip.busyMonth : null
+  const ready = mine ? slip.ready : null
+  const shownErr = err || (mine ? slip.slipErr : null)
 
   useEffect(() => {
     let cancelled = false
@@ -76,29 +104,54 @@ export default function SalarySlipsCard() {
   }, [profile?.id, profile?.role])
 
   async function handleDownload(row) {
-    if (busyMonth) return
-    const { label, year, month } = parseMonth(row.month_year)
-    setBusyMonth(row.month_year)
+    const uid = profile?.id
+    if (!uid) return
+    const cur = getSlip()
+    if (cur.uid === uid && cur.busyMonth) return
+    // keep a built slip for this user; start fresh for a different user
+    const keepReady = cur.uid === uid ? cur.ready : null
+    setSlip({ uid, slipErr: null, busyMonth: row.month_year, ready: keepReady })
     try {
+      // Second tap on an already-built slip: NO await before the share call, so
+      // the browser still sees the user's tap. allowNeedsTap:false = it can
+      // never loop — if sharing is refused again it downloads instead.
+      if (keepReady && keepReady.month_year === row.month_year) {
+        await savePdfBlob(keepReady.blob, keepReady.fileName, {
+          title: keepReady.title, allowNeedsTap: false, cacheSweepPrefix: SLIP_SWEEP_PREFIX,
+        })
+        setSlip({ ready: null })
+        return
+      }
+      const { label, year, month } = parseMonth(row.month_year)
       const { data, error } = await supabase.rpc('compute_monthly_salary', {
-        p_user_id: profile.id, p_year: year, p_month: month,
+        p_user_id: uid, p_year: year, p_month: month,
       })
       if (error) throw error
-      await downloadSalarySlip({
+      const { blob, fileName } = await buildSalarySlipBlob({
         rep: { name: profile.name, designation: profile.designation || profile.role },
         monthLabel: label,
         salary: data,
         payout: row.payout || null,   // null → PDF shows "Payment: Pending" (owner 2026-08-31)
       })
+      const title = `Salary slip ${label}`
+      const r = await savePdfBlob(blob, fileName, { title, cacheSweepPrefix: SLIP_SWEEP_PREFIX })
+      setSlip({
+        ready: r.method === 'needs-tap'
+          ? { month_year: row.month_year, blob, fileName, title }
+          : null,
+      })
     } catch (e) {
-      setErr('Could not generate the slip. Try again.')
+      // Never a silent/vague failure: say WHY (the §236 rule).
+      console.error('[SalarySlipsCard] slip failed:', e)
+      const why = String(e?.message || e || '').slice(0, 140)
+      setSlip({ slipErr: 'Could not save the slip' + (why ? ': ' + why : '. Try again.') })
     } finally {
-      setBusyMonth(null)
+      setSlip({ busyMonth: null })
     }
   }
 
   // Hidden until there's at least one paid month (keeps the page clean).
-  if (rows === null || (rows.length === 0 && !err)) return null
+  if (rows === null || (rows.length === 0 && !shownErr)) return null
 
   return (
     <div
@@ -131,7 +184,7 @@ export default function SalarySlipsCard() {
         </div>
       </div>
 
-      {err && (
+      {shownErr && (
         <div
           style={{
             display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
@@ -140,7 +193,7 @@ export default function SalarySlipsCard() {
             background: 'var(--danger-soft, rgba(239,68,68,0.12))',
           }}
         >
-          <AlertTriangle size={14} /> {err}
+          <AlertTriangle size={14} /> {shownErr}
         </div>
       )}
 
@@ -181,7 +234,9 @@ export default function SalarySlipsCard() {
               >
                 {busy
                   ? <><Loader2 size={14} style={{ animation: 'spin 0.7s linear infinite' }} /> Building…</>
-                  : <><Download size={14} /> Slip</>}
+                  : ready && ready.month_year === r.month_year
+                    ? <><Download size={14} /> Tap to open</>
+                    : <><Download size={14} /> Slip</>}
               </button>
             </div>
           )

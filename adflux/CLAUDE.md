@@ -20976,3 +20976,41 @@ Build backlog (no owner decision - ask when wanted)
 23. Site visit is scored only by the nightly 23:45 recompute (the live trigger fires on meeting / call only) (section 328); /quotes list / search / Co-Pilot for inherited quotes; `LeadDetailV2.jsx` ~580
     selects a non-existent `ref` column (section 329); client counters are not idempotent and `ai_build_quote` keeps its own client-sync (section 330).
 24. Old full copies of `team_dashboard_bundle` in the phase 193 / 316 / 323 SQL files revert the canonical arm if re-run - replace with pointers next time those files are touched (sections 339 / 340).
+
+
+---
+
+## 345 · Phase 359 - salary slip "Slip" button did nothing on phones: ONE shared save/share helper (2026-10-12)
+
+Owner forwarded a WhatsApp status video + screenshot of a rep's My Performance -> Salary slips card (October "Payment pending", September "Paid Rs. 21,143", yellow "Slip" button) with the message "they are not able to download salary slip".
+(Phase-number note, section 52: 359 = this batch; disambiguate by SHA. Phase 350-353 / 354-358 are sections 335-342.)
+
+### Root cause (read from code; NOT yet device-verified - the reporting reps' phone type is unconfirmed)
+`downloadSalarySlip` built the PDF with `pdf(...).toBlob()` and then did `URL.createObjectURL` + a hidden `<a download>` click + an IMMEDIATE `URL.revokeObjectURL`. That pattern cannot work on the devices reps use:
+- **Android APK (Capacitor WebView):** no DownloadListener for blob: URLs, so the click does nothing (the same finding as QuoteDetail Phase 95.10).
+- **iPhone Safari / home-screen app:** blob downloads are unreliable and may navigate away from the app.
+- **Anywhere:** the click happens after two awaits (the salary RPC, then the PDF render), so the user gesture is gone, and the instant revoke can cancel the download.
+The card also swallowed the error (`setErr('Could not generate the slip. Try again.')`, no reason) - the section 236 "silent native failure" disease again.
+Secondary risk found and removed: the PDF header `<Image src="/icon-192.png">` was fetched by the PDF renderer itself; if that one request failed, the WHOLE slip failed to render.
+
+### What shipped (JS only - no SQL, no APK rebuild; reaches the APK on next open)
+- NEW `src/utils/savePdf.js` = THE one "hand this PDF to the person" helper (section 71). `savePdfBlob(blob, fileName, {title})` tries, in order:
+  1. native app: write to the Capacitor cache under `pdfs/` (the only folder `file_paths.xml` exposes) -> Share sheet with the real file (the proven QuoteDetail Phase 102.I.1 path);
+  2. touch devices only (phones / tablets: Android Chrome, iOS 15+) with file-share support: the OS share sheet (Save to Files / WhatsApp / Drive). Desktop browsers skip it and download, so a dismissed OS dialog can never leave a desktop user with no file;
+  3. plain download link with a 60 s DELAYED revoke.
+  Returns `{method: native-share | web-share | download | cancelled | needs-tap}`. Cancel is silent (on the native path only the SHARE step can be a cancel). A real native failure THROWS `[read|filesystem|share] reason` so the caller shows it (section 236 rule). `safePdfName()` makes a safe ASCII `*.pdf` name. Options: `allowNeedsTap:false` (second tap, can never loop - falls through to the download) and `cacheSweepPrefix` (native: delete OTHER older files with that prefix in `pdfs/` before writing, so payslips do not pile up in the app cache).
+- `SalarySlipPDF.jsx`: new `buildSalarySlipBlob(data)` (preloads the logo to a data URL - failure just means no logo, never a failed slip); the old `downloadSalarySlip` export was REMOVED (no callers); `SalarySlipDocument` takes an optional `logoSrc`.
+- `SalarySlipsCard.jsx`: builds once, then `savePdfBlob`. If the browser answers `needs-tap` (iPhone: share sheet needs a fresh tap, the old one expired during the render) the built PDF is KEPT and the row's button flips to "Tap to open"; the second tap calls `savePdfBlob` with NO await in front of it and `allowNeedsTap:false`, so it has a live gesture and cannot loop. The error text now says why (`Could not save the slip: [step] reason`) and is logged with `console.error`.
+- **The build/ready/error state lives at MODULE level inside `SalarySlipsCard.jsx` (a tiny external store read with `useSyncExternalStore`, keyed by uid)**, not in component state: `MyPerformanceV2` re-keys this card on every auto-refresh (and `useAutoRefresh` there has no `userId`, so a focus / poll / team realtime event remounts it), which would silently wipe a built slip and its "Tap to open" button. Do not move this state back into `useState`.
+
+### CONTRACTS (do not regress)
+- A salary slip is NEVER uploaded anywhere (no bucket, no share link) - it stays on the device. Do not "fix" a download problem by uploading to storage the way QuoteDetail does for quotes.
+- ONE definition: any NEW "save/share a client-generated PDF" feature calls `savePdfBlob`; do not paste another blob-anchor.
+- The slip still reads `compute_monthly_salary` for `profile.id` only (self-gated); payout row display-only. No money math changed.
+
+### Verification done (and NOT done)
+- DONE: helper behaviour harness 11/11 (web share OK / cancel / iOS gesture-expired -> needs-tap / iOS second tap -> download, no loop / Android NotAllowed -> download / desktop with share API -> download, no dialog / desktop no API -> download / native failure throws a readable step); sales-module-guardian audit: FLAG, 2 P1 + 1 P2 + 2 P3 all fixed in this commit (remount state loss, second-tap loop, desktop share dialog, cancel-regex scope, cache sweep, dead export); real `@react-pdf/renderer` render of the slip in node, both with a logo + paid and with no logo + pending (text read back); esbuild parse; `npm run build` green incl. the SW-denylist tripwire.
+- NOT DONE: no real phone / emulator run. Owner smoke test on a rep phone = open My Performance -> Salary slips -> tap Slip. APK: the share sheet should open with the PDF. iPhone: share sheet, or "Tap to open" then the share sheet. Desktop: the file downloads. If a rep still sees a red line it now names the failing step - send that text.
+
+### Still open (separate, owner's call - NOT touched, section 16)
+Same blob-anchor pattern remains in `proposalPdf.js`, `OtherMediaQuotePDF.jsx`, `QuotePDFHtml.jsx`, `OfferLetterPDF.jsx` (quotes already take the native share branch in QuoteDetail, so those are web/desktop only; HR offer letters are desktop) and the CSV / PNG exports (LeadsV2, SalaryAdminV2, AgencyCommissionAdminV2, TaPayoutsAdminV2, CampaignsV2, CampaignQrV2, CampaignClientQrV2). Move them onto a helper when each is next touched; a CSV/PNG sibling of `savePdfBlob` is the natural next step.
