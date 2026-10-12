@@ -20770,3 +20770,38 @@ Resolves the OPEN item 3 of section 339. Owner (asked, plain options): **"Hide +
 - "Closed today" counts in `TodaySummaryCard`, `AdminDashboardDesktop`, `SalesDashboardDesktop` read `done_at` without `isSystemClose`, so born-closed rows (Lost already did this) inflate them slightly. Display only; fix when those files are next touched.
 - `lead_activity_aftermath` step 5 updates the earliest open follow-up: on a Won lead that can only be a HOT task, so a later activity with `next_action_date` overwrites its note and strips `HOT —`. Rare.
 - A rep who picks "call back tomorrow" on a Won lead now gets the toast and NO reminder - by design.
+
+
+---
+
+## 341 · Phase 357 - TC weekly tiles counted from Monday 11:00 IST, not 00:00 (fixed live) + what else Aayushi's / Dhara's screen shows (2026-10-12)
+
+Owner (screenshot of Aayushi's My Performance, Monday 11:18 IST): "we have removed 2nd oct leave but still ayush n dhara has the same issues". The message did not say WHICH number was wrong, so
+the live data was read first. (Phase-number note, section 52: 357 = this batch; disambiguate by SHA.)
+
+### Fixed + applied live: `tc_weekly_stats` week window (display-only)
+- Bug: the window was `(v_week_start::timestamptz AT TIME ZONE 'Asia/Kolkata')` - 14 places. The database session runs in UTC (no role timezone is set), so "Monday 00:00" became Monday 05:30 UTC =
+  **Monday 11:00 IST**. Every Monday the first 11 hours of calls and quotes were missing from "this week" (they fell into the previous week's window). Proof: Aayushi had 18 calls that morning, 9 before 11:00,
+  and the tile said 9 / "No calls yet this week" / connect rate 0% / "Weekly gate is reducing variable salary to 0%".
+- Fix: `(v_week_start::timestamp AT TIME ZONE 'Asia/Kolkata')` = wall-clock time IN IST. New canonical `db/functions/tc_weekly_stats.sql` (captured from the live body, 14 replacements, nothing else
+  changed); the two old bodies in `supabase_phase53_tc_weekly_gates.sql` and `supabase_phase149_tc_weekly_quotes_attribution.sql` are now pointers (section 72). Dry-run in a rolled-back transaction, then applied:
+  the tile now equals the real call count (Aayushi 18 / Sneha 21 / Rima 18 / Dhara 0). ACL unchanged, SECURITY DEFINER + search_path kept.
+- DISPLAY ONLY: the only consumer is `TcWeeklyTiles.jsx`; no DB function calls it; pay reads compute_monthly_salary (ungated). No other live function uses the `::timestamptz AT TIME ZONE` pattern (checked).
+- FOOT-GUN: `date::timestamptz AT TIME ZONE 'Asia/Kolkata'` is the REVERSE of what it looks like; to mean "this date at 00:00 IST" write `date::timestamp AT TIME ZONE 'Asia/Kolkata'` (section 42 / 47.9).
+  Test timezone-sensitive SQL from a UTC session (that is what the CLI and the API use).
+
+### What else the live data shows for the two reps (NOT changed - owner decisions)
+1. **2 Oct 2026 is still a holiday.** The `holidays` row "Gandhi Jayanti" (national, active) was re-inserted on 2 Oct to protect the telecallers (section 302.1) and is still there; nobody has a 2 Oct leave.
+   Their 2 Oct calls (Aayushi 72, Dhara 173, Rima 190, Sneha 138) sit in a row stored as "Holiday: Gandhi Jayanti - not counted". If the company really worked that day: delete the holiday row (Master -> Holidays) AND
+   re-score 2 Oct. Rolled-back what-if over the 13 scored people: telecallers unchanged in pay; Jani -Rs 100 and Salpesh -Rs 188 variable (their 2 Oct meetings were low). So this is the owner's choice, small money.
+2. **APPROVED LEAVE DAYS ARE SCORED AS ZERO DAYS, NOT EXCLUDED (since 15 May 2026).** Phase 33G made compute_daily_score read `leaves` (via `is_leave_day`). Phase 34Z.66 (ba89ba6) rewrote the function
+   and dropped that read; every later copy (34Z.70, 52, 97.2, 110, 113, 127) and the Phase 178 capture inherited it (same disease as section 82: a capture can photograph an already-regressed body).
+   Today the only thing that excludes a leave day is `work_sessions.is_off_day`, which only the auto-absent job sets; nothing links `leaves` -> `work_sessions` (no trigger on `leaves`). Result: a leave costs a
+   day's salary (section 78, intended) AND counts as 0% in the monthly average (not intended - section 44.8 says "approved leave excluded").
+   Shadow (read-only, Aug-Oct 2026, 12 rep-months affected): Aayushi Sep avg 49.6 -> 56.7, variable Rs 0 -> 2,211; Dhara Aug/Sep 87/88 -> 95/100 (already full variable, no money); Jani Aug +471, Oct +1,500
+   (month in progress); Kirti Sep +258. Only ever UPWARD. Fixing = a money change to the section 72 canonical (re-add the `is_leave_day` branch) + re-score past leave days; needs the owner's plain yes and the
+   section 71 shadow-compare (shadow above). Not applied.
+3. **The weekly-gate banner reads like a pay cut but is not one.** TcWeeklyTiles says "Weekly gate is reducing variable salary to N%" while the same page says "On track for full variable payout"; the gate is
+   display-only (section 49 / 68 / 115 - Phase 53b promotion never shipped). Decision for the owner: really apply the weekly quotes gate to pay, or reword/hide the banner.
+4. Context for the screenshot: month average 90.2% = 8 days at 100% plus TODAY's in-progress day (about 12% at 11:18); it climbs as she calls. Aayushi's "Sep 50%" is real arithmetic: her role was `sales`
+   until 11 Sep (section 288) so 1-10 Sep scored as 0 meeting days, plus 3 leave days counted as zero (item 2). Dhara is on an approved personal leave TODAY (12 Oct, entered by Riya 10:23) = 0 calls, Rs 885 deduction.
