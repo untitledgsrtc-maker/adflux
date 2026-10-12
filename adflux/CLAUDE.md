@@ -2230,7 +2230,7 @@ compute_daily_ta without owner sign-off + real-ping evidence.
 lead_activities) → daily_performance.score_pct → feeds monthly
 incentive. Telecaller branch counts activity_type='call';
 sales/agency branch counts 'meeting'. Sunday/holiday/approved-leave
-excluded.
+excluded [NOTE 12 Oct 2026 - an approved FULL-DAY leave is excluded only from 1 Sep 2026 (Phase 358, section 342); half-day still scored; from 15 May to 31 Aug 2026 it was NOT excluded].
 - **Phase 110 #5:** the TC `call` count now only counts a call that
   REALLY happened — `outcome IS NOT NULL` OR a matching call_logs
   row with `duration_seconds >= 10` and direction ≠ 'missed'. A
@@ -2244,7 +2244,7 @@ excluded.
   compute_daily_score.sql` (2026-06-23). The forward inflation is FIXED; every
   score computed since ~5 Jun 2026 is clean. The only genuine remainders are a
   historical daily_performance backfill (pre-Jun rows, feeds already-PAID months)
-  + a SEPARATE `site_visit`-not-scored under-count — both money-gated, see §291.
+  + a SEPARATE `site_visit`-not-scored under-count — both money-gated, see §291. [site_visit under-count FIXED 6 Oct 2026 - section 328 #4]
 
 ### 44.9 · Quote → PDF → WhatsApp share flow (Phase 111, money flow)
 
@@ -4201,7 +4201,7 @@ shadow-compared + owner-verified. `check-duplication.sh` flips to a HARD gate on
 | Phase | Rule (frozen) | Tripwire |
 |---|---|---|
 | **173** | Call dedup is DIRECTION-AWARE: incoming + outgoing NEVER merge; only an outgoing folds into a tel-tap. Enforced in BOTH the DB trigger AND `callHistoryIngest.js` PRIMARY dedup — change one, change both. | `supabase_phase173_TEST_call_dedup.sql` (PASS) + V2 `direction_guarded` |
-| **174** | A Lost lead has NO open follow-up: `followup_block_on_lost_lead` born-closes ALL (incl cadence); `followup_after_done` has NO `lost_nurture` respawn. | monitor: open FUs on Lost = 0 |
+| **174** | [EXTENDED 11 Oct 2026 - the same guard also born-closes follow-ups on a WON lead; HOT and handoff-landing tasks exempt, section 340] A Lost lead has NO open follow-up: `followup_block_on_lost_lead` born-closes ALL (incl cadence); `followup_after_done` has NO `lost_nurture` respawn. | monitor: open FUs on Lost = 0 |
 | **175** | ONE `isSystemClose` (`src/utils/followups.js`) decides rep-done vs system-closed — used by BOTH the team report AND the rep card. | shared util; change once |
 
 A diff that re-introduces a cross-direction call merge, a `lost_nurture` respawn,
@@ -4540,7 +4540,7 @@ The dedup count from here down is noise, not disease. If a future session wants 
 keep going, it should ONLY pick a function that (a) is a real >=2 phase-file duplicate,
 (b) is single-signature (not an overload — check pg_proc), and (c) carries real logic.
 
-### Phase 178 #19 — followup_block_on_lost_lead (§174-FROZEN Lost guard) (`HEAD`)
+### Phase 178 #19 — followup_block_on_lost_lead (§174-FROZEN Lost guard) (`HEAD`) [EXTENDED 11 Oct 2026 - also covers Won leads, section 340]
 The BEFORE-INSERT guard that born-closes any follow-up created on a Lost lead.
 Canonical: db/functions/followup_block_on_lost_lead.sql (live phase174 body).
 Guardian PASS (strict): born-close ALL on Lost (NO cadence_type skip — §174 over
@@ -4605,7 +4605,7 @@ Scoreboard: 29 functions single-source + 1 dropped.
   are now done. Remaining real 2-copy worth-it: HR/security (admin_create_user,
   approve_leave, accept/unaccept_user_profile, eligible_for_paid_leave,
   auto_create_incentive_profile), create_payment_collection_followups,
-  refresh_expired_quotes, tc_weekly_stats.
+  refresh_expired_quotes, tc_weekly_stats [tc_weekly_stats DONE 12 Oct 2026 - canonical db/functions/tc_weekly_stats.sql, section 341].
 
 ### Phase 178 #24 — 6 HR/security fns (batch) + 2 rollback hazards neutralized (`8f023bc`)
 Security cluster. Six real 2-copy phase duplicates, captured byte-for-byte. Canonicals:
@@ -4626,7 +4626,7 @@ _assert_self_or_admin, 9-month tenure, PLAIN-not-DEFINER — all byte-faithful.
   signal that surfaced these.
 Scoreboard: 35 functions single-source + 1 dropped. HR/security cluster done.
 - Remaining real 2-copy worth-it tail: create_payment_collection_followups,
-  refresh_expired_quotes, tc_weekly_stats. After those it's overloads (NEVER merge) +
+  refresh_expired_quotes, tc_weekly_stats [tc_weekly_stats DONE 12 Oct 2026 - canonical db/functions/tc_weekly_stats.sql, section 341]. After those it's overloads (NEVER merge) +
   trivial tg_/touch_updated_at wrappers. Near the honest end of the worth-it list.
 
 ---
@@ -13331,7 +13331,7 @@ lands (a visibilitychange/focus re-check fires when they switch back from WhatsA
   reuses `.lead-modal-back`).
 - FROZEN §28 (guardian PASS, purely additive — 1 import + 1 mount each):
   `WorkV2.jsx` (`<MorningGreetGate enabled={!checkedIn} />`) +
-  `TelecallerV2.jsx` (`<MorningGreetGate />` — TC has no check-in step, shows on
+  `TelecallerV2.jsx` (`<MorningGreetGate />` — TC has no check-in step on this page [CLARIFY 12 Oct 2026: telecallers check in at the /check-in morning gate, section 343], shows on
   open until greeted). NO check-in / PostCallOutcomeModal / useAutoRefresh / push
   / render logic touched.
 
@@ -18906,7 +18906,7 @@ high" inflation is closed since ~5 Jun 2026.
 
 ### OWNER — the one thing to run (read-only, confirms live == canonical)
 The canonical's VERIFY block (bottom of the file) proves the LIVE function still carries every
-fix. Paste in Supabase Studio — all six must be TRUE:
+fix. Paste in Supabase Studio — all six must be TRUE [NOTE 12 Oct 2026 - the canonical VERIFY now has 9 tripwires (sections 328 #4, 342); run the file's own bottom block, not this 6-check copy]:
 ```sql
 SELECT
   pg_get_functiondef(p.oid) LIKE '%_assert_self_or_admin%'              AS has_97_2_self_gate,
@@ -18933,7 +18933,7 @@ is how you KNOW, not assume.) All six TRUE → the inflation fix is confirmed li
    change ALREADY-PAID months. **Recommend LEAVE IT** — same no-clawback stance the owner took
    for D1 (Aug & earlier untouched, §290). Only revisit on his explicit sign-off; it is a
    backward pay change, never mid-workday (§71 rule 3).
-2. **`site_visit` earns ZERO score (a SEPARATE divergence, an UNDER-count not inflation).**
+2. [FIXED 6 Oct 2026 - section 328 #4: site_visit now scores as a meeting; only the live-display lag remains] **`site_visit` earns ZERO score (a SEPARATE divergence, an UNDER-count not inflation).**
    The score counts `activity_type = 'meeting'` ONLY; the §33 counter + delete-heal count
    `IN ('meeting','site_visit')`. `site_visit` IS a real rep-selectable activity
    (`LogActivityModal.jsx:76` "Site visit", MapPin; rendered in WorkV2/RepMapPanel). So a rep
@@ -19440,7 +19440,7 @@ the 4 TCs had 106/241/214/142 calls and ONLINE ON. Why they had no check-in on 2
 - The `holidays` table had `2026-10-02 Gandhi Jayanti` (Phase 12 seed, `is_active=true`). On a holiday
   `is_workday_for()` = false → `CheckInGate` stops redirecting to `/check-in` for EVERYONE.
 - Sales reps still checked in via WorkV2's own `doCheckIn` ("Start My Day", writes `check_in_at`).
-  **TelecallerV2 has NO check-in writer** (it only reads/updates `check_out_at`) — the morning gate is the
+  [NOTE 12 Oct 2026 - section 343: by design; the /check-in morning gate is the telecaller check-in and it works] **TelecallerV2 has NO check-in writer** (it only reads/updates `check_out_at`) — the morning gate is the
   TC's only way to check in. Gate off ⇒ TC never checks in ⇒ "off".
 - `bump_daily_counter` auto-creates a `work_sessions` row (counters only, `check_in_at` NULL) on every
   logged call, so a TC with 241 calls has a row today and still reads "off".
@@ -19484,12 +19484,12 @@ check, frozen-adjacent), `push_followup_due_reminders` / per-task triggers (quie
 WhatsApp assistant 2-hourly nudge (`team-nudge.js` skips Sunday only). The tab's footer copy says so.
 
 ### Still open
-- **"Start my day" for TCs on `/telecaller`** (option B) — NOT built; TelecallerV2 is §28-frozen →
+- [WITHDRAWN 12 Oct 2026 - see section 343: do NOT build; the /check-in gate IS the telecaller check-in] **"Start my day" for TCs on `/telecaller`** (option B) — NOT built; TelecallerV2 is §28-frozen →
   guardian first. Until then a TC shows "off" on any day the gate is off.
-- Decide which of Republic Day / Independence Day / Gandhi Jayanti / Christmas the company really closes;
+- [SUPERSEDED 12 Oct 2026 - section 328 #3 deleted the 5 future national rows; section 342 (2) deleted the 2 Oct 2026 row] Decide which of Republic Day / Independence Day / Gandhi Jayanti / Christmas the company really closes;
   delete the rest in the new tab (2 Oct 2026 itself was left as-is: flipping it mid-day would have
   auto-marked Kamina absent at 20:30 for a day the app told her was a holiday).
-- Owner to add Dussehra (20 Oct 2026) and the other festival dates BEFORE the day.
+- [DONE - the 10 festival rows incl. Dussehra and the Diwali block are live, sections 302 and 328 #3] Owner to add Dussehra (20 Oct 2026) and the other festival dates BEFORE the day.
 
 
 ---
@@ -19518,9 +19518,9 @@ owner: "8 to 12 holiday"; the five days = the five Diwali-block entries on the l
 Mon 9 + Thu 12) · Makar Sankranti 14 Jan 2027 · Holi 22 Mar 2027. Dates from the Gujarat government 2026 holiday
 notification and Gujarat 2027 calendars (weekdays machine-checked). Owner said "ok go" without changing the two
 dates flagged for confirmation (Makar Sankranti 14 vs 15 Jan; Holi 22 vs 23 Mar) → shipped as 14 Jan / 22 Mar.
-- The 4 seeded national rows (Republic Day, Independence Day, Gandhi Jayanti, Christmas) are untouched; a commented
+- [SUPERSEDED 12 Oct 2026 - section 328 #3 deleted the future national rows; section 342 (2) deleted the 2 Oct 2026 row] The 4 seeded national rows (Republic Day, Independence Day, Gandhi Jayanti, Christmas) are untouched; a commented
   future-dated DELETE block is in the file for when the owner decides the company works them.
-- Owner runs the file in Studio (the sandbox cannot run SQL). Until he does, the live table still has NO festival days
+- [DONE - the festival rows are live (10 festival rows per section 328 #3, 6 Oct 2026); the sandbox CAN run SQL since section 327] Owner runs the file in Studio (the sandbox cannot run SQL). Until he does, the live table still has NO festival days
   and Dussehra (20 Oct) would auto-absent-mark everyone who does not check in.
 
 ### Why the letter does NOT read the table (decision, so it isn't re-litigated)
@@ -19539,15 +19539,15 @@ After the Holidays tab shipped (§301) the 2 Oct 2026 `Gandhi Jayanti` row was m
 VERIFY grid showed 13 rows and no 2 Oct). Effect: 2 Oct became a normal working day for `is_workday_for`, so the 20:30
 IST `tick_attendance` 7e job would have inserted `unpaid_absent` leaves (§78 = full-day salary cut) for everyone with no
 `check_in_at`. At-risk list (owner ran the query): the 4 telecallers — Aayushi, Dhara, Rima, Sneha (100–241 calls each,
-no check-in because TelecallerV2 has no check-in writer, §301) — plus Kamina (sales, no activity). Fix applied by the owner
+no check-in because TelecallerV2 has no check-in writer, §301) [CORRECTED 12 Oct 2026 - section 343: they had no check-in because the holiday row switched the gate off ALL day, not because of a missing writer] — plus Kamina (sales, no activity). Fix applied by the owner
 at ~20:08, 22 min before the job: re-inserted `('2026-10-02','Gandhi Jayanti','national',true,true)` — a holiday is
 read live every minute, so the job short-circuits (`skipped: holiday`) and nobody is marked. No pay effect.
 - **Lesson / rule: never delete or add a holiday row for TODAY before 20:30 IST without checking who has not checked in.**
   The tab's delete confirm already says so for today; deleting a PAST date is harmless (the job only acts on today).
-- **Root cause still open:** TCs have no way to check in when the gate is off, so any holiday-on / gate-off day (or any
+- [CORRECTED 12 Oct 2026 - section 343: no missing button exists; only the rule 'never add or delete a holiday row for TODAY before 20:30' stands] **Root cause still open:** TCs have no way to check in when the gate is off, so any holiday-on / gate-off day (or any
   day the owner flips it) makes working telecallers look absent. Option B ("Start my day" on `/telecaller`, TelecallerV2
   is §28-frozen → guardian first) is the real fix and is NOT built. Until it is, treat every holiday toggle as a pay event.
-- Gandhi Jayanti 2026 stays as a (past) holiday row; whether the company really closes Republic Day / Independence Day /
+- [SUPERSEDED 12 Oct 2026 - section 328 #3 deleted the 2027 national days; section 342 (2) deleted the 2 Oct 2026 row] Gandhi Jayanti 2026 stays as a (past) holiday row; whether the company really closes Republic Day / Independence Day /
   Christmas / Gandhi Jayanti in 2027 is still the owner's decision.
 
 
@@ -20383,7 +20383,7 @@ Safe: SECURITY DEFINER, EXCEPTION-wrapped + 2 s lock_timeout, fires only on a re
 KNOWN: `supabase_ops_assign_stations.sql` (bulk assign) now also moves tickets - intended.
 
 ### 3. Five future national holidays deleted (Phase 341, `supabase_phase341_holidays_remove_national_not_closed.sql`) - APPLIED LIVE
-2026-12-25 Christmas, 2027-01-26 Republic Day, 2027-08-15 Independence Day, 2027-10-02 Gandhi Jayanti, 2027-12-25 Christmas (the company works those days). Backup `_bak_holidays_p341`. 2 Oct 2026 + the past 2026 rows and every festival row stay (FY2026-27 = 12 rows: 10 festival + 2 national). `supabase_phase12_m1_m7_foundation.sql` no longer re-seeds the 5 deleted dates.
+2026-12-25 Christmas, 2027-01-26 Republic Day, 2027-08-15 Independence Day, 2027-10-02 Gandhi Jayanti, 2027-12-25 Christmas (the company works those days). Backup `_bak_holidays_p341`. 2 Oct 2026 + the past 2026 rows and every festival row stay (FY2026-27 = 12 rows: 10 festival + 2 national) [AMENDED 12 Oct 2026 - the 2 Oct 2026 row was deleted, section 342 (2); FY2026-27 now holds 11 rows: 10 festival + 1 national]. `supabase_phase12_m1_m7_foundation.sql` no longer re-seeds the 5 deleted dates.
 UNDO: `INSERT INTO holidays (id,holiday_date,name,type,is_recurring,is_active,notes,created_by,created_at) SELECT id,holiday_date,name,type,is_recurring,is_active,notes,created_by,created_at FROM _bak_holidays_p341 ON CONFLICT DO NOTHING;`
 
 ### 4. Site visit counts as a meeting for the pay score (owner decision) - APPLIED LIVE 2026-10-06 14:13 IST
@@ -20726,6 +20726,7 @@ The auto-memory files live in `~/.claude/projects/.../memory/` and do NOT travel
 - **Push without asking (owner 2026-08-06):** after verified work, commit only the intended files and `git push origin untitled-os`; never ask "want me to push"; never push `main`; no force-push; verify `git rev-list --count origin/untitled-os..HEAD` is 0 (section 211).
 - **Run SQL myself (owner 2026-10-06, section 327):** `supabase db query --linked [-f file] [-o json]` from the repo dir; Edge functions `supabase functions deploy <name> --project-ref kompjctmisnitjpbjalh`. Writes: dry-run in `BEGIN; ...; ROLLBACK;` or a DO block ending in `RAISE EXCEPTION`, confirm live unchanged, apply, verify read-only. Ask ONE plain yes only for money / pay / incentive / salary functions, security / RLS on sensitive data, or destructive steps. Fallback only if the CLI fails: `open -a "Visual Studio Code" <abs path>`.
 - **UI self-verify (owner 2026-08-28):** after a UI change deploys, open the live app in the owner's Chrome (claude-in-chrome), clear the PWA service worker + caches (`navigator.serviceWorker.getRegistrations()` + `caches.keys()`), reload, screenshot, report with the screenshot; owner must not have to send screenshots. Role-specific screens are empty on the admin login - need a tab logged in as the right test account.
+- **Verify a feature exists before saying it is missing (feedback 2026-10-12, section 343):** before telling the owner a button/feature is missing or a flow is broken, check (1) route guards and gates (CheckInGate sends sales + telecaller to /check-in), (2) `git log -S <symbol>`, (3) live data that would show it working. If it was wrong, append a CORRECTION section in the same turn (section 343 is the pattern). Memory file: `verify-feature-exists-first.md`.
 - Owner is non-technical and UI-oriented: plain words, first sentence = the answer, no glazing.
 
 ---
@@ -20745,7 +20746,7 @@ Owner forwarded two rep reports with screenshots. (Phase-number note, section 52
 - Display only: no DB write, pay score untouched (`compute_daily_score` not edited). The day-report display score's follow-up slot can only rise or stay (guardian note) - a rep near the 70 "km justified" line may flip up; intended.
 - Known/open P3: `supabase_phase193_*`, `supabase_phase316_*`, `supabase_phase323_dashboard_agg_rpcs.sql` still hold old full copies of `team_dashboard_bundle`; re-running any reverts this arm (and M21). The canonical file's header says so; bodies were NOT replaced with pointers (section 72) - do that next time those files are touched.
 
-### 3 - Ajay's "Won lead still in follow-ups" (OPEN - needs an owner decision, NOT changed)
+### 3 - Ajay's "Won lead still in follow-ups" (RESOLVED 11 Oct 2026 - see section 340 / Phase 356; was: needs an owner decision, NOT changed)
 - Lead "a to z the home store" is Won (24 Sep) with an open MANUAL follow-up created 5 Oct ("Not receive call", due 12 Oct) by Ajay himself. Four follow-ups were created after the win (26 Sep, 30 Sep, 3 Oct, 5 Oct), some with real delivery notes ("video customer side shoot editing ma se 2 day ma final").
 - Why it shows: `trg_z_close_followups_on_terminal` closes follow-ups only ON the Won transition; the guard that blocks new ones (`followup_block_on_lost_lead`, section 135/174) covers LOST only; `keepInFollowupQueue` hides Lost + Nurture only. Fleet-wide there are exactly 2 such rows (Ajay 1, Kirti Kotak 1), both created after the win.
 - Why it can't be cleared by the rep: the section 128 "Done needs a call today" gate blocks Done on a lead with no call today.
@@ -20790,21 +20791,21 @@ the live data was read first. (Phase-number note, section 52: 357 = this batch; 
 - FOOT-GUN: `date::timestamptz AT TIME ZONE 'Asia/Kolkata'` is the REVERSE of what it looks like; to mean "this date at 00:00 IST" write `date::timestamp AT TIME ZONE 'Asia/Kolkata'` (section 42 / 47.9).
   Test timezone-sensitive SQL from a UTC session (that is what the CLI and the API use).
 
-### What else the live data shows for the two reps (NOT changed - owner decisions)
-1. **2 Oct 2026 is still a holiday.** The `holidays` row "Gandhi Jayanti" (national, active) was re-inserted on 2 Oct to protect the telecallers (section 302.1) and is still there; nobody has a 2 Oct leave.
+### What else the live data shows for the two reps (ALL THREE APPLIED 12 Oct 2026 - see section 342 (1)(2)(3); was: NOT changed - owner decisions)
+1. [RESOLVED 12 Oct 2026 - section 342 (2): row deleted, 2 Oct is a working day and re-scored] **2 Oct 2026 is still a holiday.** The `holidays` row "Gandhi Jayanti" (national, active) was re-inserted on 2 Oct to protect the telecallers (section 302.1) and is still there; nobody has a 2 Oct leave.
    Their 2 Oct calls (Aayushi 72, Dhara 173, Rima 190, Sneha 138) sit in a row stored as "Holiday: Gandhi Jayanti - not counted". If the company really worked that day: delete the holiday row (Master -> Holidays) AND
    re-score 2 Oct. Rolled-back what-if over the 13 scored people: telecallers unchanged in pay; Jani -Rs 100 and Salpesh -Rs 188 variable (their 2 Oct meetings were low). So this is the owner's choice, small money.
-2. **APPROVED LEAVE DAYS ARE SCORED AS ZERO DAYS, NOT EXCLUDED (since 15 May 2026).** Phase 33G made compute_daily_score read `leaves` (via `is_leave_day`). Phase 34Z.66 (ba89ba6) rewrote the function
+2. [FIXED 12 Oct 2026 - section 342 (1): approved full-day leave is excluded from the score from 1 Sep 2026; half-day still scored] **APPROVED LEAVE DAYS ARE SCORED AS ZERO DAYS, NOT EXCLUDED (since 15 May 2026).** Phase 33G made compute_daily_score read `leaves` (via `is_leave_day`). Phase 34Z.66 (ba89ba6) rewrote the function
    and dropped that read; every later copy (34Z.70, 52, 97.2, 110, 113, 127) and the Phase 178 capture inherited it (same disease as section 82: a capture can photograph an already-regressed body).
    Today the only thing that excludes a leave day is `work_sessions.is_off_day`, which only the auto-absent job sets; nothing links `leaves` -> `work_sessions` (no trigger on `leaves`). Result: a leave costs a
    day's salary (section 78, intended) AND counts as 0% in the monthly average (not intended - section 44.8 says "approved leave excluded").
    Shadow (read-only, Aug-Oct 2026, 12 rep-months affected): Aayushi Sep avg 49.6 -> 56.7, variable Rs 0 -> 2,211; Dhara Aug/Sep 87/88 -> 95/100 (already full variable, no money); Jani Aug +471, Oct +1,500
    (month in progress); Kirti Sep +258. Only ever UPWARD. Fixing = a money change to the section 72 canonical (re-add the `is_leave_day` branch) + re-score past leave days; needs the owner's plain yes and the
    section 71 shadow-compare (shadow above). Not applied.
-3. **The weekly-gate banner reads like a pay cut but is not one.** TcWeeklyTiles says "Weekly gate is reducing variable salary to N%" while the same page says "On track for full variable payout"; the gate is
+3. [RESOLVED 12 Oct 2026 - section 342 (3): banner reworded to a target note; the old "reducing variable salary" text is gone] **The weekly-gate banner reads like a pay cut but is not one.** TcWeeklyTiles says "Weekly gate is reducing variable salary to N%" while the same page says "On track for full variable payout"; the gate is
    display-only (section 49 / 68 / 115 - Phase 53b promotion never shipped). Decision for the owner: really apply the weekly quotes gate to pay, or reword/hide the banner.
 4. Context for the screenshot: month average 90.2% = 8 days at 100% plus TODAY's in-progress day (about 12% at 11:18); it climbs as she calls. Aayushi's "Sep 50%" is real arithmetic: her role was `sales`
-   until 11 Sep (section 288) so 1-10 Sep scored as 0 meeting days, plus 3 leave days counted as zero (item 2). Dhara is on an approved personal leave TODAY (12 Oct, entered by Riya 10:23) = 0 calls, Rs 885 deduction.
+   until 11 Sep (section 288) so 1-10 Sep scored as 0 meeting days, plus 3 leave days counted as zero (item 2) [no longer true from 12 Oct 2026: leave days are excluded, section 342; Aayushi Sep avg is now 56.7]. Dhara is on an approved personal leave TODAY (12 Oct, entered by Riya 10:23) = 0 calls, Rs 885 deduction.
 
 
 ---
@@ -20846,7 +20847,7 @@ promoted later (Phase 53b). Green line now "Weekly goal met. Your variable salar
 - **September was ALREADY PAID IN FULL** (`salary_payouts.is_full_payment=true` for Aayushi 7,618, Kirti 29,459 and 5 more). The corrected September net is higher by **Rs 2,210 (Aayushi)** and **Rs 258 (Kirti)**;
   accounts must pay that difference by hand. A full-payment row makes the Salary sheet show "View", so the sheet will NOT flag the shortfall.
 - October is unpaid, so its numbers simply flow into the normal payout.
-- Still unfixed root: TelecallerV2 has no check-in writer (section 301), so a telecaller who works but is never "checked in" is auto-marked `unpaid_absent` at 20:30 and loses a day's salary (section 78). The leave rule does
+- [CORRECTED 12 Oct 2026 - see section 343: telecallers DO check in at the /check-in morning gate; this is NOT a risk and nothing is to be built] Still unfixed root: TelecallerV2 has no check-in writer (section 301), so a telecaller who works but is never "checked in" is auto-marked `unpaid_absent` at 20:30 and loses a day's salary (section 78). The leave rule does
   not change that (those days were already excluded as "No check-in (auto-absent)").
 - Salpesh shows Sep "0 days = full variable 4,500, net 15,000" (section 184 trap) only because he joined in October; there is no real September payroll for him.
 
@@ -20871,3 +20872,107 @@ was wrong as a statement about the product. Checked against code and live data:
 - Side effect of owner decision 2 of section 342 (2 Oct = working day): 2 Oct now reads "not checked in" for everyone in attendance-style views. Pay is unaffected (pay reads the `leaves` table only, and
   there is no 2 Oct leave for anyone).
 - Rule (unchanged, now also here): never add or delete a holiday row for TODAY before 20:30 IST without checking who has not checked in (section 302.1).
+
+
+---
+
+## 344 · Housekeeping 12 Oct 2026 - stale claims annotated, new frozen contracts, backup + open-item register (2026-10-12)
+
+Docs only (no code, no SQL). A read-only audit of this file against git and the live DB found 22 stale or wrong claims plus gaps. The stale claims were
+annotated IN PLACE with a bracketed marker (CORRECTED / SUPERSEDED / RESOLVED / FIXED / DONE / NOTE) at: sections 44.8, 71 (row 174), 72 (#19 header, the
+tc_weekly_stats tail), 198, 291, 301, 302, 302.1, 328 #3, 339 item 3, 341 (heading + items 1-4), 342 ("Still unfixed root"). Do not re-cite the old text.
+
+### Guardian result for Phases 357 / 358 (all fixed before commit)
+sales-module-guardian FLAG on the compute_daily_score + TcWeeklyTiles change: P2 the UNDO pointer said HEAD~0 (now pinned to `git show 405be1f:adflux/db/functions/
+compute_daily_score.sql`); P3 reason-string header; P3 loose tripwire (now `has_358_leave_excl` checks the status guard AND the half-day guard AND the 2026-09-01 date);
+P3 an unenforced "only raises" comment; P3 "gate" wording in TcWeeklyTiles. The re-run of the migration was proven a no-op. `check-sql-schema.sh` flags on
+`v_targets_row.*` are the documented PL/pgSQL record-field false positives (section 72 #15).
+
+### New FROZEN contracts (a diff that breaks one is a BLOCK)
+1. **Approved-leave score exclusion (section 342).** `compute_daily_score` excludes an approved FULL-DAY leave on or after `DATE '2026-09-01'`. Removing the exclusion,
+   or moving / removing the hardcoded cut-off, is a BLOCK. Half-day leaves keep their score. Any rewrite of the function from an older copy silently drops it (same disease
+   as section 82); tripwire `has_358_leave_excl` in the canonical file's VERIFY (9 checks, all TRUE live on 12 Oct).
+2. **Won-lead follow-up guard (section 340).** `followup_block_on_lost_lead` (trigger name kept) also born-closes follow-ups on a WON lead, exempting `'HOT —%'` (em dash),
+   `'New lead handed to you%'` and quote-linked payment rows. Removing the Won branch or an exemption is a BLOCK. Monitor: open lead-linked follow-ups on Won leads,
+   excluding HOT / handoff, must be 0. Revert recipe: `git show 64c0580:adflux/db/functions/followup_block_on_lost_lead.sql`.
+3. **tc_weekly_stats window (section 341).** Canonical `db/functions/tc_weekly_stats.sql`; the week window is `(date::timestamp AT TIME ZONE 'Asia/Kolkata')`.
+   Re-introducing `::timestamptz AT TIME ZONE` is a BLOCK (it makes Monday start at 11:00 IST in a UTC session). Tripwire `no_utc_window_bug`. The section 68 HOLD
+   (hero vs tile connect-rate denominator) is STILL open - this fix did not touch it.
+4. **Frozen UI contracts the guardian agent file does not list.** WorkV2 `StickyPrimaryCta` `isActiveState = checkedIn && !dayDone` (Phase 355, section 339) and the
+   PostCallOutcomeModal "born-closed row -> no alarm + toast" skip (Phase 356, section 340). `.claude/agents/sales-module-guardian.md` lives in the workspace `.claude`
+   folder and is NOT in git - copy it to the second Mac by hand (section 338).
+
+### Clarifications
+- Section 342 "re-scored the 15 Sept+ leave days": the 15 leave rows are dated 1 Sep to 8 Oct 2026 (from 1 Sep, NOT from 15 Sep). The 32-row backup `_bak_daily_performance_p358`
+  = those 15 + 17 rows for 2 Oct.
+- Phase-number collisions (section 52): commit `6167ac6` is titled "Phase 356 note" but is section 338 (two Macs); the real Phase 356 is `644d598` (section 340); section 337 also
+  used the label 355 (ticket-wa 91 prefix) besides section 339. Disambiguate by SHA. Next free number is 359 or higher.
+- Live DB check 12 Oct: `holidays` has 0 rows for 2026-10-02 and 11 rows in FY2026-27 (matches the section 328 amendment).
+
+### Foot-gun still live - re-running the phase 12 seed brings back the 2 Oct holiday
+`supabase_phase12_m1_m7_foundation.sql` (line ~86) still seeds `('2026-10-02','Gandhi Jayanti','national')` with ON CONFLICT DO NOTHING (its header says "the 3 past/current 2026 rows
+stay", written 6 Oct, before the owner deleted that row on 12 Oct). Re-running that file recreates the row, turns 2 Oct back into a holiday and re-scores nothing by itself. Fix when that
+file is next touched: delete that one seed row, exactly as Phase 341 did for the other five dates.
+
+### Backup tables on the live DB (17, verified from information_schema on 12 Oct 2026) - KEEP 30 days, then `DROP TABLE IF EXISTS public.<name>;`
+| table | rows | created | drop on or after | section |
+|---|---|---|---|---|
+| `_bak_followups_p333` | 980 | 5 Oct | 4 Nov 2026 | 322 |
+| `_bak_followups_p334` | 17 | 5 Oct | 4 Nov | 323 |
+| `_bak_designations_salary_20261005` | 15 | 5 Oct | 4 Nov | 305 |
+| `_bak_followups_p336` | 11 | 6 Oct | 5 Nov | 324 |
+| `_bak_followups_p336_new` | 2 | 6 Oct | 5 Nov | 324 |
+| `_bak_ops_tickets_p338` | 57 | 6 Oct | 5 Nov | 326 |
+| `_bak_ops_tickets_p339` | 29 | 6 Oct | 5 Nov | 328 |
+| `_bak_holidays_p341` | 5 | 6 Oct | 5 Nov | 328 |
+| `_bak_clients_p345` | 12 | 6 Oct | 5 Nov | 330 |
+| `_bak_push_subs_p350` | 2 | by 8 Oct | 7 Nov | 335 |
+| `_bak_ops_tickets_p353` | 22 | 8 Oct | 7 Nov | 335 |
+| `_bak_rename_p354` | 1 | 9 Oct | 8 Nov | 336 |
+| `_bak_followups_p356` | 2 | 11 Oct | 10 Nov | 340 |
+| `_bak_daily_performance_p358` | 32 | 12 Oct | 11 Nov | 342 |
+| `_bak_holidays_p358` | 1 | 12 Oct | 11 Nov | 342 |
+| `_bak_sip_20261002` | 28 | by 5 Oct | confirm first ("locked backup", no keep rule written) | 303 / 304 |
+| `_bak_designations_20261002` | 15 | by 5 Oct | confirm first (same) | 303 / 304 |
+UNDO recipes sit in each phase file header. Do not drop one before its date, and check nobody needs the undo first.
+
+### Open-items register as of 12 Oct 2026 (none was resolved by a later section; "owner" = needs his plain decision)
+Money / payroll
+1. **September difference not paid:** Aayushi +Rs 2,210 and Kirti +Rs 258 (section 342). NEW FINDING: the Salary Payout modal REFUSES a second payout once a full payment exists
+   (`SalaryPayoutModal.jsx` line ~70 "A full payment already exists for this month." and the entry form is hidden when `hasFull`), so accounts cannot record the difference there, and
+   the sheet keeps showing "View". Options: one extra `salary_payouts` row per person added by SQL (Claude can run it with one plain yes - it is money), or pay by bank and leave the
+   sheet. Do NOT delete the existing full-payment row.
+2. Salpesh's September row (0 days = full variable 4,500, net 15,000, section 184 trap) is only because he joined in October - accounts must not treat it as payable.
+3. **Quote incentive credit (owner, section 329):** credit stays with the quote creator. UA-2026-0596 (Rs 3,43,000 before GST) was created by Brijesh (admin, all-zero incentive profile),
+   so nobody earns incentive if it closes. Choose: (a) leave, or (b) a separate guarded `credited_to` sprint across about 10 money functions with a shadow-compare - decide before that payment lands.
+   Related: Rima cannot mark Won / record a payment (admin does); GOVERNMENT quotes are not covered by the new-owner access; that quote's own auto follow-up (due 8 Oct) is still with Brijesh.
+Security / hardening (owner yes needed)
+4. **Anon-execute sweep (sections 328, 211, 86):** 123 SECURITY DEFINER functions in `public` are executable by anon, including `compute_daily_score` (a no-login call can re-trigger a score
+   recompute, it cannot write an arbitrary value). Fix = re-run the section 211 REVOKE sweep + a NULL-role guard, shadow-test first. `ALTER DEFAULT PRIVILEGES` was never added, so a new
+   function re-gets the PUBLIC default.
+5. Deactivating a user does not block sign-in (login is not gated by `users.is_active`; section 326 / 304 #2) - the old `test` account is still logged into.
+WhatsApp / ops (owner)
+6. Ops engine WhatsApp has no 20-minute debounce (fires as soon as one screen reads offline, 09:00-20:59) - sections 335 / 337.
+7. The resolved-ticket push says "awaiting approval" while sections 244 / 246 say fixes need no head sign-off - keep, or reword to an FYI pointing at `/ops-tickets?tab=fixed` (section 335).
+8. The ops evening head push no longer carries a per-technician "not checked in" line (check-in drives no pay) - confirm that is acceptable (section 335).
+9. Gohil has no `users.whatsapp_number` (and section 335 also lists Dixita), so ops ticket WhatsApp skips them - owner to give the numbers (sections 326 / 335 / 337).
+10. Meta template `ops_ticket_alert` (language gu) must be approved - cannot be checked from the sandbox (section 337, owner-held).
+11. Dixita (ops head) has only stale WEB push registrations from 28 Aug -> she receives no head alerts until she reopens the app and taps Allow notifications (section 335).
+12. WhatsApp follow-up restart is stage 1 only (section 328): `ai_nudge_enabled` ON, welcome image NULL; `ai_followup_enabled` and `ai_cadence_enabled` stay OFF. Re-evaluate about 13-16 Oct
+    after 10-14 clean quality days; do not re-arm followup / cadence / cold image without his OK (section 297 contract). Check the live flags, do not trust this line (section 216).
+13. Technicians' Home and Tickets list only MANUAL tickets; auto faults appear only on `/ops`, which is not in the nav - tell Gohil / Gulshan to open /ops, or ask for an
+    "auto faults assigned to you" section / nav link (sections 326 / 328).
+14. The ticket-resolve guard refuses while ANY screen at the depot is offline (camera tickets included) - decide whether it should ignore offline screens for camera tickets (sections 326 / 328 / 335).
+Data / people to confirm
+15. The CSV lead upload real-phone test is NOT confirmed (the owner said "done" on 6 Oct but the live DB had no import row / test leads) - say which account / phone, or redo (sections 326 / 328).
+16. Shared / wrong depot phones: 7043299704 (Junagadh + Porbandar), 8780162552 (Chikli + Surat), 9428716375 (Chikli + Valsad); Godhra control-room number dials wrong on the APK (sections 325 / 328).
+17. Kirti Kotak lost the Nova IVF client card (Salpesh owns it); her quote UA-2026-0185 is still "negotiating" at Rs 2,86,740 on a LOST lead (section 330).
+18. The GSRTC deck video (blob autoplay, muted) is not tested on a real Android WebView; hero sharpness is capped by the 720p WhatsApp copy (sections 331 / 332 / 334).
+19. Two-Mac setup: the `Untitled.nosync` + symlink rename is agreed but NOT applied; the second Mac is not set up (section 338).
+Build backlog (no owner decision - ask when wanted)
+20. Ops push acceptance check: read `push_log` after the 9 Oct 09:00 sync (one ops-outage push per technician, ops-digest rows at 09:30, one fresh auto ticket per station) and record it (section 335).
+21. The 20:00 IST `attendance-tick` cron fails (`enforce_evening_before_checkout` raises and rolls back that minute's auto-checkout batch) (sections 325 / 328 / 335).
+22. Ops display bugs: avg-fix reads about 800 h, "overdue > 48h" lists all, OpsDownV2 "down Xd" uses ticket age (use the screens' last_response_at), priority sorts as text (sections 326 / 335).
+23. Site visit is scored only by the nightly 23:45 recompute (the live trigger fires on meeting / call only) (section 328); /quotes list / search / Co-Pilot for inherited quotes; `LeadDetailV2.jsx` ~580
+    selects a non-existent `ref` column (section 329); client counters are not idempotent and `ai_build_quote` keeps its own client-sync (section 330).
+24. Old full copies of `team_dashboard_bundle` in the phase 193 / 316 / 323 SQL files revert the canonical arm if re-run - replace with pointers next time those files are touched (sections 339 / 340).
