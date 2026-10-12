@@ -20853,3 +20853,21 @@ promoted later (Phase 53b). Green line now "Weekly goal met. Your variable salar
 ### Foot-guns
 - A rule that exists in the DESIGN doc (section 44.8 "approved leave excluded") can be absent from the live function for months - verify the live body (`pg_get_functiondef`), not the note (same lesson as sections 82 / 291).
 - Any new "leave" feature must update `leaves` and then call `compute_daily_score(user, date)` (LeavesAdminV2 and the approve/reject RPCs already do) - the nightly job only scores TODAY.
+
+
+---
+
+## 343 · CORRECTION to sections 341/342 - telecallers DO have a check-in (owner, 2026-10-12)
+
+Owner: "it was there before." Right. The sentence "telecallers have no check-in button (the 2 Oct root cause); a telecaller who works but is never checked in is auto-marked absent" in section 342
+was wrong as a statement about the product. Checked against code and live data:
+- **The telecaller check-in is the morning gate**: `CheckInGate` redirects `sales` AND `telecaller` to `/check-in` (CheckInV2 swipe -> `record_checkin`) on every workday until they check in. TelecallerV2 has never
+  had its own check-in code (git history: zero commits) - it was never supposed to; the gate is the check-in.
+- **It works for them**: since 1 Sep, on non-Sunday non-holiday days, Aayushi checked in 30 days, Dhara 30, Rima 33, Sneha 15. NO telecaller was ever auto-marked absent on a day they made calls
+  (`auto_absent_but_made_calls` = 0 for all four; one auto-absent total, Rima 5 Sep, with under 10 calls).
+- **What 2 Oct really was** (section 302.1): the holiday row was active ALL DAY, so the gate was off for everyone and nobody checked in; the row was then DELETED in the evening (testing the new Holidays tab), which would
+  have made it a workday for the 20:30 job. The missing piece was "do not toggle a holiday row for today after the day has run", not a missing button.
+- So: do NOT build a "Start my day" for /telecaller. The earlier offer was withdrawn.
+- Side effect of owner decision 2 of section 342 (2 Oct = working day): 2 Oct now reads "not checked in" for everyone in attendance-style views. Pay is unaffected (pay reads the `leaves` table only, and
+  there is no 2 Oct leave for anyone).
+- Rule (unchanged, now also here): never add or delete a holiday row for TODAY before 20:30 IST without checking who has not checked in (section 302.1).
