@@ -58,6 +58,17 @@
 --                             (section 291 remainder #2). At the time of the change NO rep
 --                             had ever logged a site visit, so no existing score moved.
 --
+--      • Approved leave (12 Oct 2026, Phase 358) - from 1 SEP 2026 an APPROVED FULL-DAY leave
+--                             (public.leaves status='approved', is_half_day false) EXCLUDES that day
+--                             from the score, exactly like a Sunday / holiday (reason = the leave's own
+--                             text if it has one, else 'Approved leave (<type>)'). This is the Phase 33G design (is_leave_day) that Phase 34Z.66
+--                             (15 May 2026) silently dropped, so a leave day used to count as a 0% day on
+--                             top of the salary deduction (section 78). Days BEFORE 2026-09-01 are left as
+--                             they were (August stays as paid - same cut-off rule as the section 290
+--                             earned-incentive change). Half-day leaves are NOT excluded (the rep worked).
+--                             Owner decision 2026-10-12. Re-score of past Sept+ leave days =
+--                             supabase_phase358_leave_score_and_oct2.sql.
+--
 -- OWNER DECISION (do NOT "fix" without his sign-off): the CALL branch counts a
 --    call on  outcome IS NOT NULL OR ≥10s  — looser than the ≥10s-only counter.
 --    Tightening it to ≥10s-only would lower some reps' scores/pay. Owner said
@@ -86,6 +97,8 @@ DECLARE
   v_off_day    boolean := false;
   v_dow        int;
   v_activity   text;
+  v_lv_type    text;
+  v_lv_reason  text;
 BEGIN
   -- Phase 97.2 F-102 — caller may only compute their own score (admin/
   -- co_owner exempt). PRESERVED.
@@ -105,6 +118,23 @@ BEGIN
     SELECT name INTO v_reason FROM holidays
       WHERE holiday_date = p_date AND is_active = true LIMIT 1;
     v_reason := COALESCE('Holiday: ' || v_reason, 'Holiday');
+  END IF;
+
+  -- Phase 358 (owner 2026-10-12): an APPROVED full-day leave is not a scored day, from
+  -- 2026-09-01 on. See the header contract. Half-day leaves keep their score.
+  IF NOT v_excluded AND p_date >= DATE '2026-09-01' THEN
+    SELECT l.leave_type, l.reason
+      INTO v_lv_type, v_lv_reason
+      FROM public.leaves l
+     WHERE l.user_id = p_user_id
+       AND l.leave_date = p_date
+       AND l.status = 'approved'
+       AND COALESCE(l.is_half_day, false) = false
+     LIMIT 1;
+    IF FOUND THEN
+      v_excluded := true;
+      v_reason   := COALESCE(NULLIF(v_lv_reason, ''), 'Approved leave (' || v_lv_type || ')');
+    END IF;
   END IF;
 
   IF NOT v_excluded THEN
@@ -228,7 +258,7 @@ GRANT EXECUTE ON FUNCTION public.compute_daily_score(uuid, date) TO authenticate
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All eight must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All nine must be TRUE.
 -- A FALSE means an older copy of compute_daily_score was re-run and stripped a
 -- locked fix → re-run this file to restore the canonical version.
 -- ============================================================================
@@ -240,6 +270,9 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%auto-check-in%'                      AS has_33_autocheckin_excl,
 --   pg_get_functiondef(p.oid) LIKE '%COUNT(DISTINCT COALESCE(la.lead_id%' AS has_127_lead_dedup,
 --   pg_get_functiondef(p.oid) LIKE '%IF v_role IN (''operation_executive''%' AS has_bops_early_return,
---   pg_get_functiondef(p.oid) LIKE '%IN (''meeting'', ''site_visit'')%'      AS has_site_visit_scored
+--   pg_get_functiondef(p.oid) LIKE '%IN (''meeting'', ''site_visit'')%'      AS has_site_visit_scored,
+--   (pg_get_functiondef(p.oid) LIKE '%l.status = ''approved''%'
+--     AND pg_get_functiondef(p.oid) LIKE '%is_half_day, false) = false%'
+--     AND pg_get_functiondef(p.oid) LIKE '%DATE ''2026-09-01''%')            AS has_358_leave_excl
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'compute_daily_score';

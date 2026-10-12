@@ -20805,3 +20805,51 @@ the live data was read first. (Phase-number note, section 52: 357 = this batch; 
    display-only (section 49 / 68 / 115 - Phase 53b promotion never shipped). Decision for the owner: really apply the weekly quotes gate to pay, or reword/hide the banner.
 4. Context for the screenshot: month average 90.2% = 8 days at 100% plus TODAY's in-progress day (about 12% at 11:18); it climbs as she calls. Aayushi's "Sep 50%" is real arithmetic: her role was `sales`
    until 11 Sep (section 288) so 1-10 Sep scored as 0 meeting days, plus 3 leave days counted as zero (item 2). Dhara is on an approved personal leave TODAY (12 Oct, entered by Riya 10:23) = 0 calls, Rs 885 deduction.
+
+
+---
+
+## 342 · Phase 358 - approved leave no longer scores as a 0% day (from 1 Sep 2026) + 2 Oct = a working day + weekly banner reworded (2026-10-12)
+
+The three owner answers to the open items of section 341 (asked in chat, plain yes). APPLIED LIVE the same day (dry-run in a rolled-back transaction first, then applied, then verified).
+(Phase-number note, section 52: 358 = this batch; disambiguate by SHA.)
+
+### (1) Approved leave days are excluded from the score - from 1 Sep 2026
+- `db/functions/compute_daily_score.sql` (section 72 canonical, edited in place): after the holiday block, an APPROVED FULL-DAY leave (`leaves.status='approved'`, `is_half_day` false) on or after
+  `2026-09-01` sets `v_excluded` with reason `Approved leave (<type>)` - exactly like Sunday / holiday. Half-day leaves keep their score (the rep worked). Dates before 1 Sep 2026 behave as before
+  (August stays as paid - same cut-off rule as section 290). 9th tripwire `has_358_leave_excl`; all nine TRUE live.
+- It restores the Phase 33G design (`is_leave_day`) that Phase 34Z.66 (15 May 2026) silently dropped (section 341 item 2). Result: a leave costs the day's salary (section 78, unchanged) but no longer ALSO drags
+  the monthly average down. Only ever raises an average.
+- `supabase_phase358_leave_score_and_oct2.sql` re-scored the 15 Sept+ leave days that were stored as scored days. Backup `_bak_daily_performance_p358` (32 rows), `_bak_holidays_p358` (1 row) - KEEP 30 days then DROP;
+  UNDO recipe in the file header. Re-run safe (append-once backups, scope abort guard).
+
+### (2) 2 Oct 2026 was a working day
+The `holidays` row "Gandhi Jayanti" for 2026-10-02 is deleted and 2 Oct re-scored for sales / telecaller / agency (13 people) and, by touching the `ops_uptime_daily` rows (re-fires `trg_ops_uptime_to_dp`), for the ops people.
+Deleting a PAST holiday row is harmless for attendance (the 20:30 absent job only acts on today).
+
+### (3) TcWeeklyTiles banner reworded
+"Weekly gate is reducing variable salary to N%" -> "Weekly goal: 2 quotes (N so far). This is a target, not a pay cut. ..." (Target icon). The gate is still display-only; `gatePct`/`gateBiting` are still computed so it can be
+promoted later (Phase 53b). Green line now "Weekly goal met. Your variable salary follows your daily call score."
+
+### Live result (verified from compute_monthly_salary, identical to the dry run)
+| | before -> after |
+|---|---|
+| Sept Aayushi parmar | avg 49.6 -> 56.7, variable 0 -> 2,210, net 7,618 -> **9,828** |
+| Sept Kirti Kotak | avg 68.8 -> 71.7, variable 6,192 -> 6,450, net 29,459 -> **29,717** |
+| Sept Dhara / Jani / Rima | average rises (88->100 / 85->92.7 / 95.8->100), variable already full, pay unchanged |
+| Oct Jani Ajaykumar | avg 75.0 -> 82.5, variable 4,500 -> **6,000** (his 8 Oct leave excluded; month in progress) |
+| Oct Salpesh Sakhareliya | avg 57.5 -> 53.3, variable 2,588 -> **2,400** (-188: his low 2 Oct now counts) |
+| Oct Dixita (ops head) | variable 4,332 -> 4,399 (+67) |
+| Oct Gohil / Gulshan / telecallers / others | no pay change (Gohil still 0 variable at 47.7%) |
+
+### OPEN - needs a human (not code)
+- **September was ALREADY PAID IN FULL** (`salary_payouts.is_full_payment=true` for Aayushi 7,618, Kirti 29,459 and 5 more). The corrected September net is higher by **Rs 2,210 (Aayushi)** and **Rs 258 (Kirti)**;
+  accounts must pay that difference by hand. A full-payment row makes the Salary sheet show "View", so the sheet will NOT flag the shortfall.
+- October is unpaid, so its numbers simply flow into the normal payout.
+- Still unfixed root: TelecallerV2 has no check-in writer (section 301), so a telecaller who works but is never "checked in" is auto-marked `unpaid_absent` at 20:30 and loses a day's salary (section 78). The leave rule does
+  not change that (those days were already excluded as "No check-in (auto-absent)").
+- Salpesh shows Sep "0 days = full variable 4,500, net 15,000" (section 184 trap) only because he joined in October; there is no real September payroll for him.
+
+### Foot-guns
+- A rule that exists in the DESIGN doc (section 44.8 "approved leave excluded") can be absent from the live function for months - verify the live body (`pg_get_functiondef`), not the note (same lesson as sections 82 / 291).
+- Any new "leave" feature must update `leaves` and then call `compute_daily_score(user, date)` (LeavesAdminV2 and the approve/reject RPCs already do) - the nightly job only scores TODAY.

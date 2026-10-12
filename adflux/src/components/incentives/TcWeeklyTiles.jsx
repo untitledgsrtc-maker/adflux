@@ -19,13 +19,14 @@
 //   variable_after_gate = variable_earned
 //     × min(1, quotes_count / quotes_target)
 //
-// The displayed banner tells the rep when the gate is biting and
-// by how much. /people Salary tab still surfaces the un-gated
-// figure until owner promotes the gate into compute_monthly_salary
+// The displayed banner is a weekly TARGET note (Phase 358, owner
+// 2026-10-12): it does NOT say pay is cut, because the gate is not applied to
+// pay. /people Salary tab shows the real figure; the gate would only be
+// promoted into compute_monthly_salary by a separate owner decision
 // (Phase 53b, deferred).
 
 import { useEffect, useState } from 'react'
-import { Loader2, Phone, CheckCircle2, AlertTriangle, FileText, Activity } from 'lucide-react'
+import { Loader2, Phone, CheckCircle2, Target, FileText, Activity } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -141,34 +142,42 @@ export default function TcWeeklyTiles() {
           hit={quotesHit}
           gates
           sub={quotesHit
-            ? 'Target hit — gate clear'
-            : `${quotesTarget - quotesCount} more to clear gate`}
+            ? 'Target hit — weekly goal met'
+            : `${quotesTarget - quotesCount} more to reach the goal`}
         />
       </div>
 
-      {/* Variable-unlock gate banner — only renders when biting. */}
-      {gateBiting && (
-        <div style={{
-          marginTop: 12, padding: '10px 12px',
-          background: 'var(--warning-soft, rgba(245,158,11,.12))',
-          border: '1px solid var(--warning)',
-          borderRadius: 10,
-          fontSize: 12, color: 'var(--warning)',
-          display: 'flex', alignItems: 'flex-start', gap: 8,
-        }}>
-          <AlertTriangle size={14} strokeWidth={1.6} style={{ marginTop: 1, flexShrink: 0 }} />
-          <div>
-            <div style={{ fontWeight: 600, marginBottom: 2, color: 'var(--text)' }}>
-              Weekly gate is reducing variable salary to {gatePct}%.
-            </div>
-            <div style={{ color: 'var(--text-muted)', lineHeight: 1.45 }}>
-              Variable salary scales with your weekly quotes alongside daily
-              calls. Hit the weekly quotes target to unlock 100% of variable.
-              Connect rate + leads worked are observability only and don't gate.
+      {/* Weekly quotes goal — only renders while the target is not met.
+          Phase 358 (owner 2026-10-12): this is a TARGET, not a pay cut. The
+          weekly gate is display-only (pay reads compute_monthly_salary,
+          ungated - Phase 53b promotion never shipped), so the banner must not
+          say "reducing variable salary". gatePct stays computed so the gate can
+          be promoted later without touching this file's maths. */}
+      {gateBiting && (() => {
+        const left = Math.max(0, quotesTarget - quotesCount)
+        return (
+          <div style={{
+            marginTop: 12, padding: '10px 12px',
+            background: 'var(--warning-soft, rgba(245,158,11,.12))',
+            border: '1px solid var(--warning)',
+            borderRadius: 10,
+            fontSize: 12, color: 'var(--warning)',
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+          }}>
+            <Target size={14} strokeWidth={1.6} style={{ marginTop: 1, flexShrink: 0 }} />
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: 2, color: 'var(--text)' }}>
+                Weekly goal: {quotesTarget} quotes ({quotesCount} so far).
+              </div>
+              <div style={{ color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                This is a target, not a pay cut. Your variable salary follows your
+                daily call score. {left} more quote{left === 1 ? '' : 's'} to
+                clear the weekly goal.
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
       {!gateBiting && (qualifiedCount + quotesCount > 0) && (
         <div style={{
           marginTop: 12, padding: '10px 12px',
@@ -179,7 +188,7 @@ export default function TcWeeklyTiles() {
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           <Activity size={14} strokeWidth={1.6} />
-          <span style={{ color: 'var(--text)' }}>Weekly gates clear — variable salary scales 1:1 with your daily call score.</span>
+          <span style={{ color: 'var(--text)' }}>Weekly goal met. Your variable salary follows your daily call score.</span>
         </div>
       )}
     </div>
