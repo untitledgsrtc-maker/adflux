@@ -17,6 +17,10 @@
 -- Agency partners are not employees and are not listed.
 -- NOTE: incentive is "paid so far" before Sept 2026 and "earned" from Sept 2026
 -- (section 290 gate) - the engine's own rule, not changed here.
+-- EMPLOYMENT WINDOW (Phase 364.2): the salary engine returns a full month for EVERY month, even
+-- before the person existed, so cost is counted only for months from the person's START month
+-- (hr_offers.joining_date, else users.created_at) to their END month (only if inactive: the month of
+-- their last work session). Nobody is charged before they joined or after they left.
 -- SECURITY DEFINER because RLS shows a user only their own quotes / pay. Read-only;
 -- changes no pay. Fail-closed: no login / NULL role / not admin or accounts -> no rows.
 -- =====================================================================
@@ -63,6 +67,13 @@ BEGIN
      GROUP BY q.created_by, q.segment
   ),
   qs_t AS (SELECT uid, sum(n) AS tot FROM qs GROUP BY uid),
+  ub AS (
+    SELECT u2.id AS uid,
+           date_trunc('month', COALESCE((SELECT min(h.joining_date) FROM public.hr_offers h WHERE h.converted_user_id = u2.id), u2.created_at::date))::date AS sm,
+           CASE WHEN u2.is_active THEN NULL
+                ELSE date_trunc('month', COALESCE((SELECT max(w.work_date) FROM public.work_sessions w WHERE w.user_id = u2.id), u2.created_at::date))::date END AS em
+      FROM public.users u2
+  ),
   cost AS (
     SELECT (r.result->>'user_id')::uuid AS uid,
            sum(COALESCE((r.result->>'base')::numeric,0))             AS b,
@@ -72,8 +83,10 @@ BEGIN
            sum(COALESCE((r.result->>'unpaid_deduction')::numeric,0)) AS l,
            sum(COALESCE((r.result->>'net_payable')::numeric,0))      AS n,
            sum(CASE WHEN COALESCE((r.result->>'monthly_salary')::numeric,0) > 0 THEN 1 ELSE 0 END)::int AS mo
-      FROM generate_series(v_from::timestamp, (v_to - 1)::timestamp, interval '1 month') AS gs(m),
-           LATERAL public.compute_monthly_salaries(EXTRACT(year FROM gs.m)::int, EXTRACT(month FROM gs.m)::int) AS r
+      FROM generate_series(v_from::timestamp, (v_to - 1)::timestamp, interval '1 month') AS gs(m)
+      CROSS JOIN LATERAL public.compute_monthly_salaries(EXTRACT(year FROM gs.m)::int, EXTRACT(month FROM gs.m)::int) AS r
+      JOIN ub ON ub.uid = (r.result->>'user_id')::uuid
+             AND gs.m::date >= ub.sm AND (ub.em IS NULL OR gs.m::date <= ub.em)
      GROUP BY 1
   ),
   j AS (
@@ -111,10 +124,87 @@ REVOKE ALL ON FUNCTION public.employee_profitability(date, date, text) FROM PUBL
 GRANT EXECUTE ON FUNCTION public.employee_profitability(date, date, text) TO authenticated, service_role;
 NOTIFY pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- employee_profit_monthly(p_user_id, p_from, p_to)  - the per-person chart
+-- One row per month in the person's EMPLOYMENT window (see above) inside the range:
+-- income (ex-GST) and the pay pieces. TA/DA is split exactly from daily_ta (the same
+-- rows the engine sums): ta = bike amount, da = daily allowance, hotel, other = the rest.
+-- Same gate as employee_profitability (admin + accounts only, fail-closed).
+-- =====================================================================
+CREATE OR REPLACE FUNCTION public.employee_profit_monthly(p_user_id uuid, p_from date, p_to date)
+RETURNS TABLE(
+  month date, income_ex_gst numeric,
+  base numeric, variable numeric, incentive numeric,
+  ta numeric, da numeric, hotel numeric, other numeric,
+  leave_cut numeric, net_cost numeric, profit numeric
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $fn$
+DECLARE
+  v_role text;
+  v_from date;
+  v_to   date;
+  v_sm   date;
+  v_em   date;
+BEGIN
+  SELECT u.role INTO v_role FROM public.users u WHERE u.id = auth.uid() AND u.is_active = true;
+  IF v_role IS NULL OR v_role NOT IN ('admin','accounts') THEN RETURN; END IF;
+  IF p_user_id IS NULL OR p_from IS NULL OR p_to IS NULL OR p_to <= p_from THEN RETURN; END IF;
+
+  SELECT date_trunc('month', COALESCE((SELECT min(h.joining_date) FROM public.hr_offers h WHERE h.converted_user_id = u.id), u.created_at::date))::date,
+         CASE WHEN u.is_active THEN NULL
+              ELSE date_trunc('month', COALESCE((SELECT max(w.work_date) FROM public.work_sessions w WHERE w.user_id = u.id), u.created_at::date))::date END
+    INTO v_sm, v_em
+    FROM public.users u WHERE u.id = p_user_id;
+  IF v_sm IS NULL THEN RETURN; END IF;
+
+  v_from := GREATEST(date_trunc('month', p_from)::date, v_sm);
+  v_to   := (date_trunc('month', p_to - 1)::date + interval '1 month')::date;
+  IF v_em IS NOT NULL THEN v_to := LEAST(v_to, (v_em + interval '1 month')::date); END IF;
+  IF v_to > (v_from + interval '36 months')::date THEN v_to := (v_from + interval '36 months')::date; END IF;
+  IF v_to <= v_from THEN RETURN; END IF;
+
+  RETURN QUERY
+  SELECT gs.m::date,
+         COALESCE((SELECT round(sum(p.amount_received * COALESCE(NULLIF(q.subtotal,0)/NULLIF(q.total_amount,0), 1)))
+                     FROM public.payments p JOIN public.quotes q ON q.id = p.quote_id
+                    WHERE p.approval_status = 'approved' AND q.created_by = p_user_id
+                      AND p.payment_date >= gs.m::date AND p.payment_date < (gs.m + interval '1 month')::date), 0)::numeric,
+         COALESCE((r.result->>'base')::numeric,0),
+         COALESCE((r.result->>'variable')::numeric,0),
+         COALESCE((r.result->>'incentive')::numeric,0),
+         COALESCE(t.bike,0), COALESCE(t.da,0), COALESCE(t.hotel,0),
+         COALESCE((r.result->>'ta_da')::numeric,0) - COALESCE(t.bike,0) - COALESCE(t.da,0) - COALESCE(t.hotel,0),
+         COALESCE((r.result->>'unpaid_deduction')::numeric,0),
+         COALESCE((r.result->>'net_payable')::numeric,0),
+         COALESCE((SELECT round(sum(p.amount_received * COALESCE(NULLIF(q.subtotal,0)/NULLIF(q.total_amount,0), 1)))
+                     FROM public.payments p JOIN public.quotes q ON q.id = p.quote_id
+                    WHERE p.approval_status = 'approved' AND q.created_by = p_user_id
+                      AND p.payment_date >= gs.m::date AND p.payment_date < (gs.m + interval '1 month')::date), 0)::numeric
+           - COALESCE((r.result->>'net_payable')::numeric,0)
+    FROM generate_series(v_from::timestamp, (v_to - 1)::timestamp, interval '1 month') AS gs(m)
+    CROSS JOIN LATERAL public.compute_monthly_salaries(EXTRACT(year FROM gs.m)::int, EXTRACT(month FROM gs.m)::int) AS r
+    LEFT JOIN LATERAL (
+      SELECT sum(d.bike_amount) AS bike, sum(d.da_amount) AS da, sum(d.hotel_amount) AS hotel
+        FROM public.daily_ta d
+       WHERE d.user_id = p_user_id AND d.ta_date >= gs.m::date AND d.ta_date < (gs.m + interval '1 month')::date
+    ) t ON true
+   WHERE (r.result->>'user_id')::uuid = p_user_id
+   ORDER BY gs.m;
+END
+$fn$;
+
+REVOKE ALL ON FUNCTION public.employee_profit_monthly(uuid, date, date) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.employee_profit_monthly(uuid, date, date) TO authenticated, service_role;
+NOTIFY pgrst, 'reload schema';
+
 -- VERIFY (tripwire - all TRUE):
 -- SELECT pg_get_functiondef(p.oid) LIKE '%IN (''admin'',''accounts'')%'       AS admin_accounts_only,
 --        pg_get_functiondef(p.oid) LIKE '%compute_monthly_salaries%'           AS uses_salary_engine,
 --        pg_get_functiondef(p.oid) LIKE '%approval_status = ''approved''%'     AS counts_only_paid,
 --        pg_get_functiondef(p.oid) LIKE '%role <> ''agency''%'                 AS agency_excluded,
+--        pg_get_functiondef(p.oid) LIKE '%hr_offers%'                          AS employment_window,
 --        p.prosecdef AS is_definer, NOT has_function_privilege('anon', p.oid, 'EXECUTE') AS anon_locked
 --   FROM pg_proc p WHERE p.proname = 'employee_profitability';

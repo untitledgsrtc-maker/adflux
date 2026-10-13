@@ -21169,3 +21169,15 @@ Owner: "filter from private, give and all too." The tab gains the shared `Segmen
 - `employee_profitability(p_from, p_to, p_segment DEFAULT NULL)` (old 2-arg signature dropped, caller updated). For a segment: income = that segment's income (by the quote's `segment`); the person's pay is ATTRIBUTED in proportion to the income they brought from it (if none in the period: by their non-draft quotes created that period; if neither: not attributed).
 - The screen loads All, Private and Government in one go, so switching is instant. Private + Government income = All exactly (live check Apr-Oct 2026: Rs 8,96,326 + Rs 96,35,220 = Rs 1,05,31,546). Pay that cannot be tied to a segment (support staff, people with no quotes) is shown as a note under a segment view and is included under All.
 - Contract: a segment view shows only earning-team people; support staff appear under All only. Do not "allocate" support pay by guess.
+
+
+### 351.2 - person chart + employment window (13 Oct 2026, same phase)
+Owner: "individual person chart: e.g. Viral monthly salary + incentive + TA/DA + other; and someone who joined in Sept must not show before it - right now it shows all the time."
+- **BUG FOUND + FIXED (my all-time numbers were overstated):** the salary engine (`compute_monthly_salaries`) returns a FULL month for EVERY month, even before the person's account existed
+  (Salpesh, joined 1 Oct, showed Rs 15,000 for Apr-Sep; Gohil, joined 9 Sep, showed 7 months). `employee_profitability` now counts a month only inside the person's EMPLOYMENT WINDOW:
+  start = month of `hr_offers.joining_date` (else `users.created_at`); end = month of the last `work_sessions` row, only when the user is inactive. Nobody is charged before joining or after leaving.
+  Note: the engine itself still shows pre-joining months on the Salary sheet - that sheet was not changed. The joining month is the engine's full figure (no pro-rating), as accounts pays it.
+- **NEW `employee_profit_monthly(p_user_id, p_from, p_to)`** (same canonical file, same admin + accounts gate): per month in the window - income ex-GST, base, variable, incentive, TA (bike), DA, hotel, other, leave cut, total cost, profit.
+  TA/DA is split exactly from `daily_ta` (the rows the engine sums): other = ta_da - bike - da - hotel, so the pieces add to the engine's number.
+- **Screen:** a "Person view" card under the summary cards: pick a person (or click a name in the tables) -> stacked bars per month (base 70%, variable 30%, incentive, travel, daily allowance, hotel/other) with a dashed income line, plus a month table. The chart always shows the person's whole history from the month they joined; the Monthly filter's month is highlighted. Leave cut is shown in the table (it reduces total cost) and is not stacked in the bars.
+- Verified live: Viral = Jun-Oct 2026 (5 months, joining date 1 Jun); Gohil 2 months; Salpesh 1; Aayushi 3 (Aug-Oct, offer date 17 Aug); Mayur 6. Chart rendered with Viral's real numbers before pushing.
