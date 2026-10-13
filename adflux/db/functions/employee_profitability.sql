@@ -9,13 +9,19 @@
 --                   (= net_payable of compute_monthly_salaries, the ONE pay definition).
 --   profit        = income_ex_gst - net_cost.
 -- The range is rounded OUT to whole months (pay is monthly). Max 36 months.
+-- p_segment = NULL (all) | 'PRIVATE' | 'GOVERNMENT'. For a segment, income = that segment's
+-- income, and the person's pay is ATTRIBUTED to the segment in proportion to the income they
+-- brought from it (if no income in the period: by the share of quotes they created, not drafts;
+-- if neither: not attributed). So Private + Government cost add up to All for the earning team.
+-- Support staff (no income, no quotes) appear only under All - their pay is overhead.
 -- Agency partners are not employees and are not listed.
 -- NOTE: incentive is "paid so far" before Sept 2026 and "earned" from Sept 2026
 -- (section 290 gate) - the engine's own rule, not changed here.
 -- SECURITY DEFINER because RLS shows a user only their own quotes / pay. Read-only;
 -- changes no pay. Fail-closed: no login / NULL role / not admin or accounts -> no rows.
 -- =====================================================================
-CREATE OR REPLACE FUNCTION public.employee_profitability(p_from date, p_to date)
+DROP FUNCTION IF EXISTS public.employee_profitability(date, date);
+CREATE OR REPLACE FUNCTION public.employee_profitability(p_from date, p_to date, p_segment text DEFAULT NULL)
 RETURNS TABLE(
   user_id uuid, name text, role text, designation text,
   income_ex_gst numeric,
@@ -29,6 +35,7 @@ DECLARE
   v_role text;
   v_from date;
   v_to   date;
+  v_seg  text := CASE WHEN upper(coalesce(p_segment,'')) IN ('PRIVATE','GOVERNMENT') THEN upper(p_segment) ELSE NULL END;
 BEGIN
   SELECT u.role INTO v_role FROM public.users u WHERE u.id = auth.uid() AND u.is_active = true;
   IF v_role IS NULL OR v_role NOT IN ('admin','accounts') THEN RETURN; END IF;
@@ -40,14 +47,22 @@ BEGIN
 
   RETURN QUERY
   WITH inc AS (
-    SELECT q.created_by AS uid,
+    SELECT q.created_by AS uid, q.segment AS seg,
            round(sum(p.amount_received * COALESCE(NULLIF(q.subtotal,0)/NULLIF(q.total_amount,0), 1)))::numeric AS ex_gst
       FROM public.payments p
       JOIN public.quotes q ON q.id = p.quote_id
      WHERE p.approval_status = 'approved'
        AND p.payment_date >= v_from AND p.payment_date < v_to
-     GROUP BY q.created_by
+     GROUP BY q.created_by, q.segment
   ),
+  inc_t AS (SELECT uid, sum(ex_gst) AS tot FROM inc GROUP BY uid),
+  qs AS (
+    SELECT q.created_by AS uid, q.segment AS seg, count(*)::numeric AS n
+      FROM public.quotes q
+     WHERE q.status <> 'draft' AND q.created_at >= v_from AND q.created_at < v_to
+     GROUP BY q.created_by, q.segment
+  ),
+  qs_t AS (SELECT uid, sum(n) AS tot FROM qs GROUP BY uid),
   cost AS (
     SELECT (r.result->>'user_id')::uuid AS uid,
            sum(COALESCE((r.result->>'base')::numeric,0))             AS b,
@@ -60,24 +75,40 @@ BEGIN
       FROM generate_series(v_from::timestamp, (v_to - 1)::timestamp, interval '1 month') AS gs(m),
            LATERAL public.compute_monthly_salaries(EXTRACT(year FROM gs.m)::int, EXTRACT(month FROM gs.m)::int) AS r
      GROUP BY 1
+  ),
+  j AS (
+    SELECT u.id, u.name, u.role, u.designation,
+           COALESCE(it.tot,0) AS inc_all,
+           COALESCE((SELECT i2.ex_gst FROM inc i2 WHERE i2.uid = u.id AND i2.seg = v_seg),0) AS inc_seg,
+           -- share of this person's pay that belongs to the chosen segment
+           CASE WHEN v_seg IS NULL THEN 1::numeric
+                WHEN COALESCE(it.tot,0) > 0
+                  THEN COALESCE((SELECT i2.ex_gst FROM inc i2 WHERE i2.uid = u.id AND i2.seg = v_seg),0) / it.tot
+                WHEN COALESCE(qt.tot,0) > 0
+                  THEN COALESCE((SELECT q2.n FROM qs q2 WHERE q2.uid = u.id AND q2.seg = v_seg),0) / qt.tot
+                ELSE 0 END AS w,
+           COALESCE(c.b,0) b, COALESCE(c.v,0) v, COALESCE(c.i,0) i, COALESCE(c.t,0) t,
+           COALESCE(c.l,0) l, COALESCE(c.n,0) n, COALESCE(c.mo,0) mo
+      FROM public.users u
+      LEFT JOIN inc_t it ON it.uid = u.id
+      LEFT JOIN qs_t  qt ON qt.uid = u.id
+      LEFT JOIN cost  c  ON c.uid  = u.id
+     WHERE u.role <> 'agency'
   )
-  SELECT u.id, u.name::text, u.role::text, u.designation::text,
-         COALESCE(inc.ex_gst,0),
-         COALESCE(cost.b,0), COALESCE(cost.v,0), COALESCE(cost.i,0), COALESCE(cost.t,0),
-         COALESCE(cost.l,0), COALESCE(cost.n,0),
-         COALESCE(inc.ex_gst,0) - COALESCE(cost.n,0),
-         COALESCE(cost.mo,0)
-    FROM public.users u
-    LEFT JOIN inc  ON inc.uid  = u.id
-    LEFT JOIN cost ON cost.uid = u.id
-   WHERE u.role <> 'agency'
-     AND (COALESCE(inc.ex_gst,0) <> 0 OR COALESCE(cost.n,0) <> 0)
-   ORDER BY COALESCE(inc.ex_gst,0) - COALESCE(cost.n,0) DESC;
+  SELECT j.id, j.name::text, j.role::text, j.designation::text,
+         CASE WHEN v_seg IS NULL THEN j.inc_all ELSE j.inc_seg END,
+         round(j.b * j.w, 2), round(j.v * j.w, 2), round(j.i * j.w, 2), round(j.t * j.w, 2),
+         round(j.l * j.w, 2), round(j.n * j.w, 2),
+         (CASE WHEN v_seg IS NULL THEN j.inc_all ELSE j.inc_seg END) - round(j.n * j.w, 2),
+         j.mo
+    FROM j
+   WHERE (CASE WHEN v_seg IS NULL THEN j.inc_all ELSE j.inc_seg END) <> 0 OR round(j.n * j.w, 2) <> 0
+   ORDER BY (CASE WHEN v_seg IS NULL THEN j.inc_all ELSE j.inc_seg END) - round(j.n * j.w, 2) DESC;
 END
 $fn$;
 
-REVOKE ALL ON FUNCTION public.employee_profitability(date, date) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.employee_profitability(date, date) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.employee_profitability(date, date, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.employee_profitability(date, date, text) TO authenticated, service_role;
 NOTIFY pgrst, 'reload schema';
 
 -- VERIFY (tripwire - all TRUE):

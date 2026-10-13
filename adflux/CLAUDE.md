@@ -21162,3 +21162,10 @@ Owner: "per employee profitability - income (without GST) vs salary, incentive, 
   * Cost is what is OWED that month (after leave cuts), not cash actually paid out; payouts may lag.
   * Income by `payment_date` is cash-in-month; a deal won in one month and paid in another counts in the paid month.
 - Display only: no pay, score or incentive path changed. Not section 28 frozen. No APK. Phase-number note (section 52): 364 = this batch.
+
+
+### 351.1 - segment filter All / Private / Government (13 Oct 2026, same phase)
+Owner: "filter from private, give and all too." The tab gains the shared `SegmentToggle` (All / Private / Government).
+- `employee_profitability(p_from, p_to, p_segment DEFAULT NULL)` (old 2-arg signature dropped, caller updated). For a segment: income = that segment's income (by the quote's `segment`); the person's pay is ATTRIBUTED in proportion to the income they brought from it (if none in the period: by their non-draft quotes created that period; if neither: not attributed).
+- The screen loads All, Private and Government in one go, so switching is instant. Private + Government income = All exactly (live check Apr-Oct 2026: Rs 8,96,326 + Rs 96,35,220 = Rs 1,05,31,546). Pay that cannot be tied to a segment (support staff, people with no quotes) is shown as a note under a segment view and is included under All.
+- Contract: a segment view shows only earning-team people; support staff appear under All only. Do not "allocate" support pay by guess.

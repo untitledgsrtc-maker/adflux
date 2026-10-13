@@ -15,6 +15,7 @@ import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { istCurrentMonthYM } from '../../utils/istDate'
+import SegmentToggle from '../../components/v2/SegmentToggle'
 import { formatCurrency } from '../../utils/formatters'
 
 const ALL_TIME_FROM = '2026-04-01'   // start of FY 2026-27 (first month with data)
@@ -40,7 +41,8 @@ export default function EmployeeProfitV2() {
 
   const [mode, setMode]   = useState('month')          // 'month' | 'all'
   const [month, setMonth] = useState(nowYM)
-  const [rows, setRows]   = useState(null)
+  const [seg, setSeg]     = useState('all')            // 'all' | 'private' | 'government'
+  const [data, setData]   = useState(null)             // { all, private, government }
   const [err, setErr]     = useState('')
   const [busy, setBusy]   = useState(false)
 
@@ -52,27 +54,38 @@ export default function EmployeeProfitV2() {
   const load = useCallback(async () => {
     if (!allowed) return
     setBusy(true); setErr('')
-    const { data, error } = await supabase.rpc('employee_profitability', { p_from: range.from, p_to: range.to })
-    if (error) { setErr(error.message || 'Could not load profitability.'); setRows(null) }
-    else setRows((data || []).map(r => ({
+    const norm = (data) => (data || []).map(r => ({
       id: r.user_id, name: r.name, role: r.role,
       income: Number(r.income_ex_gst) || 0,
       base: Number(r.base) || 0, variable: Number(r.variable) || 0, incentive: Number(r.incentive) || 0,
       tada: Number(r.ta_da) || 0, cut: Number(r.leave_cut) || 0,
       cost: Number(r.net_cost) || 0, profit: Number(r.profit) || 0, months: Number(r.months) || 0,
-    })))
+    }))
+    // All three views in one go so switching the segment is instant and the
+    // "not split by segment" overhead can be worked out (All - Private - Government).
+    const call = (segment) => supabase.rpc('employee_profitability', { p_from: range.from, p_to: range.to, p_segment: segment })
+    const [a, p, g] = await Promise.all([call(null), call('PRIVATE'), call('GOVERNMENT')])
+    const bad = a.error || p.error || g.error
+    if (bad) { setErr(bad.message || 'Could not load profitability.'); setData(null) }
+    else setData({ all: norm(a.data), private: norm(p.data), government: norm(g.data) })
     setBusy(false)
   }, [allowed, range.from, range.to])
 
   useEffect(() => { load() }, [load])
 
+  const rows = data ? data[seg] : null
   const earning = useMemo(() => (rows || []).filter(r => EARNING.has(r.role) || r.income > 0), [rows])
-  const support = useMemo(() => (rows || []).filter(r => !EARNING.has(r.role) && r.income === 0), [rows])
+  const support = useMemo(() => (seg === 'all' ? (rows || []).filter(r => !EARNING.has(r.role) && r.income === 0) : []), [rows, seg])
   const sum = (arr, k) => arr.reduce((s, r) => s + r[k], 0)
   const totals = useMemo(() => {
     const income = sum(rows || [], 'income'), cost = sum(rows || [], 'cost')
     return { income, cost, profit: income - cost }
   }, [rows])
+  // pay that cannot be tied to a segment (support staff, people with no quotes yet)
+  const unsplit = useMemo(() => {
+    if (!data || seg === 'all') return 0
+    return Math.max(0, sum(data.all, 'cost') - sum(data.private, 'cost') - sum(data.government, 'cost'))
+  }, [data, seg])
 
   if (!allowed) {
     return <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>This tab is for admin and accounts only.</div>
@@ -92,6 +105,7 @@ export default function EmployeeProfitV2() {
             }}>{l}</button>
           ))}
         </div>
+        <SegmentToggle value={seg} onChange={setSeg} style={{ marginBottom: 0 }} />
         {mode === 'month' && (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <button type="button" aria-label="Previous month" onClick={() => setMonth(m => addMonths(m, -1))} style={navBtn}><ChevronLeft size={16} /></button>
@@ -116,7 +130,7 @@ export default function EmployeeProfitV2() {
         </div>
       )}
 
-      {!err && rows === null && <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>Loading profitability...</div>}
+      {!err && data === null && <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>Loading profitability...</div>}
 
       {rows && (
         <>
@@ -127,8 +141,20 @@ export default function EmployeeProfitV2() {
               sub={totals.income > 0 ? `${Math.round((totals.profit / totals.income) * 100)}% of income` : ''} />
           </div>
 
-          <Block title="Earning team" sub="Sales and telecallers - income each person brought in" rows={earning} withIncome />
-          <Block title="Support team" sub="Operations, HR, accounts - cost only (no sales income)" rows={support} />
+          <Block
+            title={seg === 'all' ? 'Earning team' : `Earning team - ${seg === 'private' ? 'Private' : 'Government'} only`}
+            sub={seg === 'all'
+              ? 'Sales and telecallers - income each person brought in'
+              : "Income from this segment. A person's pay is attributed in proportion to the income they brought from it."}
+            rows={earning} withIncome />
+          {seg === 'all' ? (
+            <Block title="Support team" sub="Operations, HR, accounts - cost only (no sales income)" rows={support} />
+          ) : unsplit >= 1 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 16px' }}>
+              Not split by segment: {formatCurrency(unsplit)} of pay (support staff such as operations, HR and accounts, and
+              people with no quotes yet). It is included under <b>All</b>.
+            </div>
+          ) : null}
 
           <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
             Income counts a quote against the person who created it, by the date its payment was approved, with GST taken out (TDS stays in).
