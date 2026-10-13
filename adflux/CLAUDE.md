@@ -21126,6 +21126,18 @@ The forecast summed EVERY open quote ever created (incl. drafts, months old) for
 
 ### Notes / open
 - Applied live 13 Oct 2026 (new function, additive). Live Oct check: Mayur 4 won & paid Rs 89,617 of 9 sent; Salpesh 2; Viral 1; Rima 2 (+3 awaiting payment); Jani 1; Gandhinagar 0 won & paid of 7 sent (Rs 2.08 cr sent, +2 awaiting payment).
-- Gandhinagar (ex-Kamina) still carries 197 open quotes worth Rs 49 crore (59 drafts, Rs 14 cr) - almost certainly test/junk data; not touched, owner to confirm before any clean-up.
+- [CORRECTED 13 Oct 2026 - NOT junk, see section 350] Gandhinagar (ex-Kamina) carries 197 open quotes worth Rs 49 crore (59 drafts, Rs 14 cr): this is the REAL government proposal account. Do NOT clean it up.
 - Dead code left for the next touch of AdminDashboardDesktop (`repPipeline`, `profileByUser`, `msdByUser`) and stale comments mentioning `get_team_leaderboard` in SalesDashboard*.jsx. The admin `lbMax` now means team total, not leader.
 - sales-module-guardian: PASS (6 P3 only). Phase-number note (section 52): 363 = this batch.
+
+
+---
+
+## 350 · CORRECTION to section 349 - the "Gandhinagar" account is the real GOVERNMENT proposal pipeline, not junk (2026-10-13)
+
+I called its 197 open quotes (Rs 49 crore) "almost certainly test / junk" from the totals alone, and the owner replied "ok go". Before deleting anything I read the data:
+- 212 quotes, ALL `segment = GOVERNMENT` (AUTO_HOOD 100 + GSRTC_LED 112), all with `lead_id`, created 5 Jun - 13 Oct 2026.
+- Addressed to real officials in Gujarati ("Hon. Dr. ... Sahib", "Secretary Shri"), 74 sent, 61 draft, 9 WON (Rs 3.12 crore), 4 lost; 2 approved payments totalling Rs 74.76 lakh. Typical size Rs 97 lakh per Auto Hood district proposal.
+- It is the login the government-proposal work is done from (the old "Kamina" account, section 336).
+Nothing was changed or deleted. Rules: never judge data "junk" from totals - read status / segment / addressee / payments first (section 17 verify-before-acting); a big-number account on a segment-scoped module is usually the real business.
+Side effects worth knowing (display only): its Rs-crore proposals dominate any "sent amount" / pipeline total for the sales team, and on the new leaderboard (section 349) it shows as a normal rep with 0 won-and-paid in October (its 9 wins were earlier; 2 won this month await payment).
