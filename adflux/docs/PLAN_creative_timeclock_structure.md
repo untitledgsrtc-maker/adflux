@@ -36,14 +36,55 @@ Access is enforced in the database (RLS), not only hidden in the screen.
 3. **Delivery**: send file -> checker verdict -> push to the sales rep with the approved file.
 4. **Reports**: hours per client against what that client pays us (the one number Trackdek cannot give).
 
-## 6. Decisions needed before UI/UX (STEP 2)
-1. Replace Trackdek fully by 30 Nov, timeclock first? (recommended: yes)
-2. Is the first timer start = clock in and last stop = clock out (no separate check-in)? (recommended: yes)
-3. Drop screenshots and keyboard / mouse scoring for good? (recommended: yes - a web app cannot capture them anyway, and it is what makes people game the clock)
-4. Checker per person - confirm: design -> Renuka Vasava; video -> Piyush Kumawat; GSRTC video -> Safika Bansiwala; own work of a checker -> Brijesh.
-5. Task name: free typing with suggestions from past names (recommended), or a fixed list from the 11 core jobs?
+## 6. DECISIONS LOCKED (owner, 2026-10-13)
+1. Replace Trackdek fully by 30 Nov; timeclock first. YES.
+2. First timer start = clock in; last stop = clock out; no separate check-in. YES.
+3. No screenshots, no keyboard / mouse counts, no productivity %. YES, for good.
+4. Checker is NOT fixed per person. It is chosen per job, at the time, by whoever assigns the job (phase 2). Phase 1 has no checker at all.
+5. Task name = free typing with suggestions from past names. YES.
 
-## 7. Risks
-- The team must find it as fast as Trackdek (two taps to start). That is the whole test; UI/UX is step 2.
-- 142 projects is long; the list needs "recent first" + search, and archive the dead ones.
-- A running timer left on overnight: auto-stop at a set time (to decide in UI/UX).
+## 7. STRUCTURE DESIGN (detail)
+### 7.1 Who is on the timeclock
+Not by role - by a switch. Trackdek's 8 daily users are a mix (HR, ops, designers, video, a campaign team), and only ONE of them (Riya, HR) has a login in our app today.
+So: a per-user flag `users.uses_timeclock` (admin sets it; same pattern as `can_view_team_dashboard`). It MUST be pinned in the `users_self_update_avatar` policy
+(section 172 contract) or a person could switch it on for themselves. People who are not in the app yet are created first (Add Member, role "staff" for designer / video / creative).
+Open: map Trackdek names to logins - confirm "Dixita" (ops head, dixita@untitledad.in) vs "Dixita Rana" / "DIXITA GOHEL" are who.
+
+### 7.2 Tables
+`work_projects`  id, name (unique ignoring case), kind client | internal | govt, client_id -> clients (nullable), is_active, created_by, created_at.
+  Seeded from the 142 Trackdek names (duplicates like MAHANT INVESTMENT merged). Anyone on the timeclock may add one by typing; the head can rename, merge, archive.
+`work_time_entries`  id, user_id, project_id, task_label (text, 80), started_at, ended_at (null while running), source timer | added_later,
+  status approved | pending | declined (timer entries are approved; added_later start pending), decided_by, decided_at, note, job_id (nullable, phase 2), created_at.
+  Rules in the database: ONE running entry per person (partial unique index); ended_at after started_at; an entry never crosses midnight IST (split at midnight);
+  added_later must be in the past, at most 12 h, must not overlap another entry; a person edits or deletes only their OWN entries of the last 7 days that are not approved-by-head.
+Day figures are DERIVED, not stored: clock in = first start of the IST day, clock out = last end, total = sum of slices.
+Task suggestions are DERIVED: most recent distinct `task_label` for that project (then that person), no table.
+Phase 2: `work_jobs` (project, title, due date, maker, checker - empty until chosen, status Assigned / Sent / Approved / Changes asked, timestamps) and `work_reviews` (verdict + chip reason).
+
+### 7.3 Rules for the clock
+- Starting a timer on another task stops the current one in the same step (switch = one tap).
+- A timer left running is stopped automatically at a cut-off (proposal 21:30 IST) and marked "auto-stopped" so the person can correct it next morning.
+- Leave / holiday days: timer still allowed (a person may work a holiday); no warning, no blocking.
+- NO PAY EFFECT. Hours are a display and a report. They do not feed salary, score, incentive, absent-marking or the 20:30 attendance job (that job only touches sales / telecaller and is untouched).
+
+### 7.4 Access (enforced in the database)
+- Person: reads / writes own entries. Added-later entries need the head's approve / decline.
+- Head (admin, or a person the admin flags): reads everyone on the timeclock; approves added-later; manages projects.
+- co_owner, sales, telecaller, agency and everyone else not flagged: no access. No segment data is involved.
+
+### 7.5 What it reuses / what it must not touch
+Reuses: users, roles, Add Member + convert, push notifications, clients list, the role landing redirect.
+Must not touch (section 28 / 45): check-in gate for sales / telecaller, compute_daily_score, compute_monthly_salary, attendance cron, any frozen sales page.
+A new route + a new nav entry only (additive). New tables only.
+
+### 7.6 Phase 1 acceptance (what "done" means)
+1. A flagged person starts, switches and stops a timer in two taps each, on phone and on desktop.
+2. Today list + day total match the sum of slices; forgotten timer auto-stops.
+3. Head sees every person's day and hours per client for any date range.
+4. Added-later entry goes pending, head approves, it counts.
+5. Switch-over: the 142 projects exist; a week of both systems side by side; Trackdek can end 30 Nov.
+
+## 8. Still open (small, needed before UI/UX)
+A. Confirm who is on the timeclock and map the names (7.1).
+B. Auto-stop time for a forgotten timer (proposal 21:30 IST).
+C. May anyone add a new project, or only the head? (proposal: anyone adds, head merges.)
