@@ -21090,3 +21090,15 @@ cut off ("Kirt Kota...", "Jani Ajaykumar" wrapped) and the chips wrapped into a 
 - `src/pages/v2/TeamDashboardV2.jsx`: the name block gets `className="lead-rep-id"`, the chips wrapper swaps its inline flex style for `className="lead-rep-chips"`. Chip content, colours and logic unchanged.
 - Display only, JS/CSS only, no SQL, no APK; TeamDashboardV2 is not section 28 frozen. Verified: esbuild parse, brand check, `npm run build`, and a static render with the real stylesheet at the worst case (long name + 3 chips + status).
 - Contract: a card header is TWO rows - identity + status on top, chips beneath. Do not put new chips back inside the name row; add them to `.lead-rep-chips`.
+
+
+---
+
+## 348 · Phase 362 - Master page: tab strip wraps + text inputs left-aligned (2026-10-13)
+
+Owner screenshot of /master: the tab strip (12 tabs) ran off the right edge ("Docum..." cut, "Media Types" wrapped inside its button) and the attachment label boxes showed text
+RIGHT-aligned. Causes: the strip was `maxWidth: fit-content` with no wrap; `.govt-input-cell` (govt.css) is the NUMERIC cell (right-aligned, 90px cap) and 8 text inputs in MasterV2 used it without
+the `--wide` modifier. Fix (`MasterV2.jsx` only, display only): strip `flexWrap: wrap; maxWidth: 100%`, tab buttons `whiteSpace: nowrap`; the 8 text inputs/selects (attachment label + new label, signer picker
+x4, signer title + mobile) now `govt-input-cell govt-input-cell--wide`.
+- Contract: `.govt-input-cell` alone = a NUMBER cell. Any text/select field must add `govt-input-cell--wide`. Same bug class still exists elsewhere (Step3Stations, GsrtcStationsV2, AutoDistrictsV2 use it for numeric fields - correct).
+- Phase-number note (section 52): 362 = this batch. No SQL, no APK.

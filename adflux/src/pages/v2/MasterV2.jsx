@@ -110,10 +110,10 @@ export default function MasterV2() {
 
       {/* Tab strip */}
       <div style={{
-        display: 'flex', gap: 4, marginBottom: 18, marginTop: 4,
+        display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 18, marginTop: 4,
         background: 'var(--surface-2)',
         border: '1px solid var(--surface-3)',
-        borderRadius: 10, padding: 5, maxWidth: 'fit-content',
+        borderRadius: 10, padding: 5, maxWidth: '100%', width: 'fit-content',
       }}>
         {TABS.map(t => {
           const Icon = t.icon
@@ -128,6 +128,7 @@ export default function MasterV2() {
                 background: activeTab === t.key ? 'var(--accent, #FFE600)' : 'transparent',
                 color:      activeTab === t.key ? 'var(--accent-fg, #0f172a)' : 'var(--text-muted)',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                whiteSpace: 'nowrap',
               }}
             >
               <Icon size={14} /> {t.label}
@@ -483,7 +484,7 @@ function AttachmentsTab() {
                   value={r.label || ''}
                   onChange={e => setRowField(idx, 'label', e.target.value)}
                   onBlur={() => persistRow(idx)}
-                  className="govt-input-cell"
+                  className="govt-input-cell govt-input-cell--wide"
                   style={{ maxWidth: 'unset', width: '100%' }}
                 />
                 <button
@@ -607,7 +608,7 @@ function AttachmentsTab() {
               onChange={e => setNewLabel(e.target.value)}
               placeholder="New attachment label…"
               onKeyDown={e => { if (e.key === 'Enter') handleAddRow() }}
-              className="govt-input-cell"
+              className="govt-input-cell govt-input-cell--wide"
               style={{ maxWidth: 'unset', width: '100%' }}
             />
             <span></span>
@@ -1278,7 +1279,7 @@ function SignersTab() {
             <select
               value={pickedUserId}
               onChange={e => setPickedUserId(e.target.value)}
-              className="govt-input-cell"
+              className="govt-input-cell govt-input-cell--wide"
               style={{ minWidth: 200 }}
             >
               <option value="">Pick a user (sales role) —</option>
@@ -1289,7 +1290,7 @@ function SignersTab() {
             <select
               value={pickedRole}
               onChange={e => setPickedRole(e.target.value)}
-              className="govt-input-cell"
+              className="govt-input-cell govt-input-cell--wide"
               style={{ minWidth: 130 }}
             >
               {/* Phase 11i — owner role removed. Existing owner users
@@ -1303,7 +1304,7 @@ function SignersTab() {
               value={pickedTitle}
               onChange={e => setPickedTitle(e.target.value)}
               placeholder="Signature title"
-              className="govt-input-cell"
+              className="govt-input-cell govt-input-cell--wide"
               style={{ minWidth: 140 }}
             />
             <input
@@ -1311,7 +1312,7 @@ function SignersTab() {
               value={pickedMobile}
               onChange={e => setPickedMobile(e.target.value)}
               placeholder="Mobile (optional)"
-              className="govt-input-cell"
+              className="govt-input-cell govt-input-cell--wide"
               style={{ minWidth: 130 }}
             />
             <button
@@ -1385,7 +1386,7 @@ function SignersTab() {
                 onChange={e => setUserField(u.id, 'signature_title', e.target.value)}
                 onBlur={() => persistUser(u.id)}
                 placeholder="e.g. CEO, Director, Manager"
-                className="govt-input-cell"
+                className="govt-input-cell govt-input-cell--wide"
                 style={{ maxWidth: 'unset', width: '100%' }}
               />
               <input
@@ -1394,7 +1395,7 @@ function SignersTab() {
                 onChange={e => setUserField(u.id, 'signature_mobile', e.target.value)}
                 onBlur={() => persistUser(u.id)}
                 placeholder="10-digit number"
-                className="govt-input-cell"
+                className="govt-input-cell govt-input-cell--wide"
                 style={{ maxWidth: 'unset', width: '100%' }}
               />
               <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, alignItems: 'center' }}>
