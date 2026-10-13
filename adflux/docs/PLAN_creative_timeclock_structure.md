@@ -123,3 +123,9 @@ DESIGN (mockups shown, awaiting approval - NOTHING built):
 - Existing ops photo-request flow (section 232) is left as is; this is the general version.
 Data: `work_tasks` (title, project_id null, note, created_by, recurrence null, status, created_at), `work_task_parts` (task_id, assignee_id, label, due_date, status, started_at, finished_at), `work_time_entries.part_id` nullable.
 OPEN: anyone-to-anyone assignment OK? (risk: noise; mitigated by name always shown + admin reassign). Parallel only in v1 OK?
+
+## 12. UI/UX REDESIGN with the ui-ux-pro-max skill (2026-10-13)
+Owner: "not happy with UI/UX - add skill ui ux pro max". Skill installed locally (`.claude/skills/ui-ux-pro-max`, uipro-cli 2.2.3 from GitHub nextlevelbuilder/ui-ux-pro-max-skill, files read, no network/exec calls in its scripts; outside git, per machine).
+Findings against its rules: text 11-13 px (min 16 px body on mobile), buttons about 28 px high (min 44 px), gaps under 8 px, colour-only status, too many small boxes per screen.
+Applied: 16 px body / 14 px meta, 48-56 px primary buttons, 8-16 px gaps, status = icon + word + colour, one focus per screen (big running card; "Needs you" first on admin), 44 px tabs, Lucide / Tabler icons (no emoji). Brand LOCKED (navy + #FFE600, DM Sans / Space Grotesk): the skill's generic red / gold palette was NOT used.
+Mockups re-shown: person phone (My Work + Start the clock) and admin dashboard (Needs you, 4 numbers, 3-column tasks, who is working, fired this morning).
