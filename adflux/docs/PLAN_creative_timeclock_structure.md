@@ -89,3 +89,12 @@ A. Our "Dixita" (ops head, dixita@untitledad.in) is a DIFFERENT person from Trac
 B. Forgotten timer auto-stops at 21:30 IST. YES.
 C. Anyone on the timeclock may add a project by typing it; the head merges / archives. YES.
 Next: STEP 2 = UI/UX (real app screens, approved before any build).
+
+## 9. SCOPE CHANGE (owner, 2026-10-13, mid-design): tasks are IN phase 1
+Owner: "first make the admin dashboard design and the individual person design; task assigned, in process, finished - this also wanted."
+- A **task** (the phase-2 "job") moves into phase 1. Statuses are the owner's words: **Assigned -> In process -> Finished** (replaces the earlier four-word set; no checker / approval yet - decided later).
+- Admin creates a task: client, what, person, due date. Person sees it under Assigned; Start moves it to In process AND starts the clock on it; Pause stops the clock; Finish stops the clock and moves it to Finished (optional note).
+- Anyone can still start the clock on a client without a task (free work, as Trackdek).
+- Admin dashboard = team hours, working now, late tasks, time to approve, a 3-column task board, who is working, hours per client, New task form.
+- Order unchanged: design approved -> then SQL + build. NOTHING built yet (the timeclock SQL was not run).
+Data impact: new `work_tasks` (project, title, assigned_to, assigned_by, due_date, status, started_at, finished_at, note); `work_time_entries.task_id` nullable.
