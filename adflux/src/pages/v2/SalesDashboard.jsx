@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom'
 import { Bell, Flame, Home, FileText, Plus, BarChart3, AlertTriangle, RefreshCw, LogOut, Trophy } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { fetchTeamLeaderboard } from '../../utils/teamLeaderboard'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
 import { thisMonthISO, initials, todayISO } from '../../utils/formatters'
@@ -103,59 +104,12 @@ export default function SalesDashboardV2() {
     // server-side RPC (get_my_settled_this_month), replacing the whole-org
     // quotes+payments download that PostgREST silently capped at ~1000 rows and
     // that fed ONLY this one KPI (the leaderboard is get_team_leaderboard).
-    const [lbRpcRes, lbUsersRes, mySettledRes] = await Promise.all([
-      supabase.rpc('get_team_leaderboard', { p_month_keys: [monthKey] }),
-      // Names-only fallback when the RPC isn't deployed yet
-      supabase.from('users').select('id, name').eq('role', 'sales'),
+    const [mySettledRes] = await Promise.all([
       supabase.rpc('get_my_settled_this_month', { p_month_start: monthStartIso, p_month_end: monthEndIso }),
     ])
 
-    let leaderboard
-    if (lbRpcRes?.data && lbRpcRes.data.length > 0) {
-      leaderboard = lbRpcRes.data
-        .map(r => {
-          const cfg = {
-            monthlySalary:   Number(r.monthly_salary)   || 0,
-            salesMultiplier: Number(r.sales_multiplier) || 5,
-            newClientRate:   Number(r.new_client_rate)  || 0.05,
-            renewalRate:     Number(r.renewal_rate)     || 0.02,
-            flatBonus:       Number(r.flat_bonus)       || 10000,
-          }
-          const repEarned = calculateIncentive({
-            ...cfg,
-            newClientRevenue: Number(r.msd_new)     || 0,
-            renewalRevenue:   Number(r.msd_renewal) || 0,
-          })
-          const repForecast = calculateIncentive({
-            ...cfg,
-            newClientRevenue: (Number(r.msd_new)     || 0) + (Number(r.open_new)     || 0) + (Number(r.wu_new)     || 0),
-            renewalRevenue:   (Number(r.msd_renewal) || 0) + (Number(r.open_renewal) || 0) + (Number(r.wu_renewal) || 0),
-          })
-          return {
-            id: r.user_id,
-            name: r.name,
-            earned:   repEarned.incentive   || 0,
-            proposed: repForecast.incentive || 0,
-            wonCount: Number(r.won_count) || 0,
-          }
-        })
-        .sort((a, b) => b.proposed - a.proposed)
-    } else {
-      // RPC unavailable — render names with zeros so the leaderboard
-      // doesn't read "No sales reps yet". Apply supabase_phase3d.sql
-      // to populate real numbers.
-      if (lbRpcRes?.error) {
-        console.warn('[leaderboard] RPC unavailable, using fallback. Apply supabase_phase3d.sql.', lbRpcRes.error)
-      }
-      leaderboard = (lbUsersRes?.data || []).map(u => ({
-        id: u.id,
-        name: u.name,
-        earned: 0,
-        proposed: 0,
-        wonCount: 0,
-        _fallback: true,
-      }))
-    }
+    // Phase 363 - quotes SENT vs WON AND PAID this month (one shared definition).
+    const leaderboard = (await fetchTeamLeaderboard(supabase, monthStartIso, monthEndIso)) || []
 
     // My settled-this-month total (drives the "Settled" KPI). Server-side RPC;
     // on RPC error (missing pre-SQL) fall back to the byte-identical client math
@@ -631,15 +585,13 @@ function Leaderboard({ rows, meId }) {
         <div>
           <div className="v2-card-t">Team leaderboard · {new Date().toLocaleDateString('en-IN', { month: 'short' })}</div>
           <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2 }}>
-            {rows.length > 0 && rows.every(r => r._fallback)
-              ? 'Names only — apply supabase_phase3d.sql for numbers'
-              : 'Proposed incentive + total won quotes'}
+            Quotes sent vs won &amp; paid · approved payments only
           </div>
         </div>
-        {myRank && !rows.every(r => r._fallback) && <div className="v2-badge v2-badge--neutral">Rank #{myRank}</div>}
+        {myRank && <div className="v2-badge v2-badge--neutral">Rank #{myRank}</div>}
       </div>
       {rows.length === 0 ? (
-        <div className="v2-empty-hint" style={{ padding: '8px 0' }}>No sales reps yet.</div>
+        <div className="v2-empty-hint" style={{ padding: '8px 0' }}>No sales reps yet, or the leaderboard could not load.</div>
       ) : (
         <>
           {top3.map((r, i) => (
@@ -663,20 +615,20 @@ function Row({ rank, row, isYou }) {
       <div className="v2-lb-name">
         {row.name}{isYou && <span className="v2-lb-you">· you</span>}
         <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 1 }}>
-          {row.wonCount} won quote{row.wonCount === 1 ? '' : 's'}
+          {row.sent} sent · {row.wonPaid} won &amp; paid
+          {row.wonUnpaid > 0 && <span style={{ opacity: .8 }}> · +{row.wonUnpaid} awaiting</span>}
         </div>
       </div>
-      {/* Earned ↑ Proposed stacked — phone widths can't fit two
-          horizontal columns of money so we double them up. */}
+      {/* Won-and-paid value over conversion % — stacked, phone widths. */}
       <div className="v2-lb-val" style={{ textAlign: 'right', lineHeight: 1.3 }}>
         <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13, color: 'var(--v2-green)' }}>
-          <Money value={row.earned} />
+          <Money value={row.wonPaidAmt} />
         </div>
-        <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', fontWeight: 600, letterSpacing: '.04em' }}>earned</div>
+        <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', fontWeight: 600, letterSpacing: '.04em' }}>won &amp; paid</div>
         <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13, color: 'var(--v2-ink-0)', marginTop: 2 }}>
-          <Money value={row.proposed} />
+          {row.conv == null ? '—' : `${row.conv}%`}
         </div>
-        <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', fontWeight: 600, letterSpacing: '.04em' }}>proposed</div>
+        <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', fontWeight: 600, letterSpacing: '.04em' }}>converted</div>
       </div>
     </div>
   )

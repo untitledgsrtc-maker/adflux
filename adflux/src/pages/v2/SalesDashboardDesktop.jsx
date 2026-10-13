@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { fetchTeamLeaderboard } from '../../utils/teamLeaderboard'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
 import { initials, formatCompact, todayISO } from '../../utils/formatters'
@@ -146,67 +147,16 @@ export default function SalesDashboardDesktop() {
     // We still fetch lbQuotes + lbPayments separately because the
     // settlement map (used for the rep's own settled-this-period KPI)
     // needs payment_date data the RPC doesn't expose.
-    const [{ data: lbQuotes }, { data: lbPayments }, lbRpcRes, lbUsersRes] = await Promise.all([
+    const [{ data: lbQuotes }, { data: lbPayments }] = await Promise.all([
       supabase.from('quotes').select('id, created_by, total_amount, status, updated_at, created_at'),
       supabase.from('payments')
         .select('quote_id, amount_received, payment_date, created_at, is_final_payment')
         .eq('approval_status', 'approved'),
-      supabase.rpc('get_team_leaderboard', { p_month_keys: monthKeys }),
-      // Names-only fallback for when the RPC isn't deployed yet —
-      // RLS on users normally lets sales read the team list, so we
-      // can at least populate the leaderboard with names + ₹0 until
-      // supabase_phase3d.sql is applied.
-      supabase.from('users').select('id, name').eq('role', 'sales'),
     ])
     const lbSettleMap = buildSettlementMap(lbQuotes || [], lbPayments || [])
 
-    let leaderboard
-    if (lbRpcRes?.data && lbRpcRes.data.length > 0) {
-      leaderboard = lbRpcRes.data
-        .map(r => {
-          const cfg = {
-            monthlySalary:   Number(r.monthly_salary)   || 0,
-            salesMultiplier: Number(r.sales_multiplier) || 5,
-            newClientRate:   Number(r.new_client_rate)  || 0.05,
-            renewalRate:     Number(r.renewal_rate)     || 0.02,
-            flatBonus:       Number(r.flat_bonus)       || 10000,
-          }
-          const repEarned = calculateIncentive({
-            ...cfg,
-            newClientRevenue: Number(r.msd_new)     || 0,
-            renewalRevenue:   Number(r.msd_renewal) || 0,
-          })
-          const repForecast = calculateIncentive({
-            ...cfg,
-            newClientRevenue: (Number(r.msd_new)     || 0) + (Number(r.open_new)     || 0) + (Number(r.wu_new)     || 0),
-            renewalRevenue:   (Number(r.msd_renewal) || 0) + (Number(r.open_renewal) || 0) + (Number(r.wu_renewal) || 0),
-          })
-          return {
-            id: r.user_id,
-            name: r.name,
-            earned:   repEarned.incentive   || 0,
-            proposed: repForecast.incentive || 0,
-            wonCount: Number(r.won_count) || 0,
-          }
-        })
-        .sort((a, b) => b.proposed - a.proposed)
-    } else {
-      // RPC failed (function not deployed) or returned empty — fall
-      // back to the user list so names still render with zeros. The
-      // current rep is patched with their own forecast incentive
-      // computed from already-fetched data so they see SOMETHING.
-      if (lbRpcRes?.error) {
-        console.warn('[leaderboard] RPC unavailable, using fallback. Apply supabase_phase3d.sql.', lbRpcRes.error)
-      }
-      leaderboard = (lbUsersRes?.data || []).map(u => ({
-        id: u.id,
-        name: u.name,
-        earned: 0,
-        proposed: 0,
-        wonCount: 0,
-        _fallback: true,
-      }))
-    }
+    // Phase 363 - quotes SENT vs WON AND PAID this period (one shared definition).
+    const leaderboard = (await fetchTeamLeaderboard(supabase, monthStartIso, monthEndIso)) || []
 
     // My settled-this-period revenue — the actually-paid number.
     // Read from the same settle map the leaderboard uses so the rep's
@@ -761,9 +711,8 @@ function LeaderboardPanel({ rows, meId }) {
   const meIn = top.some(r => r.id === meId)
   const me = rows.find(r => r.id === meId)
   const myRank = me ? rows.findIndex(r => r.id === meId) + 1 : null
-  const leader = rows[0]
-  const myPct = me && leader?.proposed ? Math.min(100, Math.round((me.proposed / leader.proposed) * 100)) : 0
-  const usingFallback = rows.length > 0 && rows.every(r => r._fallback)
+  const teamTotal = rows.reduce((sum, r) => sum + (r.wonPaidAmt || 0), 0)
+  const myPct = me && teamTotal > 0 ? Math.round((me.wonPaidAmt / teamTotal) * 100) : 0
 
   return (
     <div className="v2d-panel">
@@ -771,30 +720,28 @@ function LeaderboardPanel({ rows, meId }) {
         <div>
           <div className="v2d-panel-t">Team leaderboard · {new Date().toLocaleDateString('en-IN', { month: 'short' })}</div>
           <div className="v2d-panel-s">
-            {usingFallback
-              ? 'Names only — apply supabase_phase3d.sql to populate numbers'
-              : 'Proposed incentive + total won quotes'}
+            Quotes sent vs won &amp; paid · only deals with an approved payment count
           </div>
         </div>
-        {myRank && !usingFallback && <div className="v2d-badge v2d-badge--neutral">Rank #{myRank} · {myPct}% of leader</div>}
+        {myRank && <div className="v2d-badge v2d-badge--neutral">Rank #{myRank} · {myPct}% of team won</div>}
       </div>
 
       {rows.length === 0 ? (
-        <div className="v2d-q-empty">No sales reps yet.</div>
+        <div className="v2d-q-empty">No sales reps yet, or the leaderboard could not load.</div>
       ) : (
         <div className="v2d-lb">
           {top.map((r, i) => (
-            <LbRow key={r.id} rank={i + 1} row={r} isYou={r.id === meId} leader={leader?.proposed || 0} />
+            <LbRow key={r.id} rank={i + 1} row={r} isYou={r.id === meId} total={teamTotal} />
           ))}
-          {!meIn && me && <LbRow rank={myRank} row={me} isYou leader={leader?.proposed || 0} />}
+          {!meIn && me && <LbRow rank={myRank} row={me} isYou total={teamTotal} />}
         </div>
       )}
     </div>
   )
 }
 
-function LbRow({ rank, row, isYou, leader }) {
-  const pct = leader ? Math.min(100, Math.round((row.proposed / leader) * 100)) : 0
+function LbRow({ rank, row, isYou, total }) {
+  const pct = total ? Math.round(((row.wonPaidAmt || 0) / total) * 100) : 0
   const rankCls = rank === 1 ? 'v2d-lb-rank-1' : rank === 2 ? 'v2d-lb-rank-2' : rank === 3 ? 'v2d-lb-rank-3' : 'v2d-lb-rank-n'
   return (
     <div className={`v2d-lb-row ${isYou ? 'v2d-lb-row--you' : ''}`} style={{ alignItems: 'center' }}>
@@ -803,20 +750,20 @@ function LbRow({ rank, row, isYou, leader }) {
       <div className="v2d-lb-name">
         {row.name}{isYou && <span className="v2d-lb-you">· you</span>}
         <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 2 }}>
-          {row.wonCount} won quote{row.wonCount === 1 ? '' : 's'}
+          {row.sent} sent · {row.wonPaid} won &amp; paid
+          {row.wonUnpaid > 0 && <span style={{ opacity: .8 }}> · +{row.wonUnpaid} awaiting payment</span>}
         </div>
       </div>
-      {/* Earned column — what's already cleared and credited */}
+      {/* Won & paid value — deals with an approved payment this period */}
       <div style={{ textAlign: 'right', minWidth: 90 }}>
-        <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase' }}>Earned</div>
+        <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase' }}>Won &amp; paid</div>
         <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13, color: 'var(--v2-green)' }}>
-          <Money value={row.earned} />
+          <Money value={row.wonPaidAmt} />
         </div>
       </div>
-      {/* Proposed (forecast) column — what they're projected to earn */}
       <div className="v2d-lb-val" style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>Proposed</div>
-        <Money value={row.proposed} />
+        <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>Converted</div>
+        {row.conv == null ? '—' : `${row.conv}%`}
       </div>
       <div className="v2d-lb-pct">{pct}%</div>
     </div>

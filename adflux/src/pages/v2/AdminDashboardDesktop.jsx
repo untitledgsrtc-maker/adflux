@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { fetchTeamLeaderboard } from '../../utils/teamLeaderboard'
 import { calculateIncentive } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
 import {
@@ -575,39 +576,11 @@ export default function AdminDashboardDesktop() {
       a.renRev += m.renewal_revenue    || 0
     })
 
-    const leaderboard = salesUsers
-      .map(u => {
-        const pipe = ensurePipe(u.id)
-        const monthRev = msdByUser[u.id] || { newRev: 0, renRev: 0 }
-        const p = profileByUser[u.id] || {}
-        const cfg = {
-          monthlySalary:   p.monthly_salary || 0,
-          salesMultiplier: p.sales_multiplier ?? settings.default_multiplier ?? 5,
-          newClientRate:   p.new_client_rate  ?? settings.new_client_rate    ?? 0.05,
-          renewalRate:     p.renewal_rate     ?? settings.renewal_rate       ?? 0.02,
-          flatBonus:       p.flat_bonus       ?? settings.default_flat_bonus ?? 10000,
-        }
-        const earned = calculateIncentive({
-          ...cfg,
-          newClientRevenue: monthRev.newRev,
-          renewalRevenue:   monthRev.renRev,
-        })
-        const proposed = calculateIncentive({
-          ...cfg,
-          newClientRevenue: monthRev.newRev + pipe.openNew + pipe.wuNew,
-          renewalRevenue:   monthRev.renRev + pipe.openRen + pipe.wuRen,
-        })
-        return {
-          id:       u.id,
-          name:     u.name,
-          earned:   earned.incentive   || 0,
-          proposed: proposed.incentive || 0,
-          wonCount: pipe.wonCount,
-          settled:  settledByUser[u.id] || 0, // legacy — kept for reference
-        }
-      })
-      .sort((a, b) => b.proposed - a.proposed)
-    const lbMax = Math.max(1, ...leaderboard.map(p => p.proposed))
+    // Phase 363 - leaderboard = quotes SENT vs quotes WON AND PAID in the period
+    // (owner rule 13 Oct 2026). One definition for all dashboards: the
+    // team_leaderboard_month function via utils/teamLeaderboard. No forecast.
+    const leaderboard = (await fetchTeamLeaderboard(supabase, monthStartIso, monthEndIso)) || []
+    const lbMax = Math.max(1, leaderboard.reduce((sum, r) => sum + r.wonPaidAmt, 0))
 
     // Incentive liability — monthly_sales_data is keyed by YYYY-MM, so
     // for a custom range we iterate every month the period touches and
@@ -1617,15 +1590,15 @@ function LeaderboardPanel({ rows, max, period }) {
       <div className="v2d-panel-h">
         <div>
           <div className="v2d-panel-t">Team leaderboard · {label}</div>
-          <div className="v2d-panel-s">Proposed incentive + total won quotes</div>
+          <div className="v2d-panel-s">Quotes sent vs won &amp; paid · only deals with an approved payment count</div>
         </div>
       </div>
       {top.length === 0 ? (
-        <div className="v2d-q-empty">No sales reps on the team yet.</div>
+        <div className="v2d-q-empty">No sales reps on the team yet, or the leaderboard could not load.</div>
       ) : (
         <div className="v2d-lb">
           {top.map((r, i) => {
-            const pct = max > 0 ? Math.round((r.proposed / max) * 100) : 0
+            const pct = max > 0 ? Math.round((r.wonPaidAmt / max) * 100) : 0
             const rankCls = i === 0 ? 'v2d-lb-rank-1' : i === 1 ? 'v2d-lb-rank-2' : i === 2 ? 'v2d-lb-rank-3' : 'v2d-lb-rank-n'
             return (
               <div key={r.id} className="v2d-lb-row" style={{ alignItems: 'center' }}>
@@ -1642,18 +1615,21 @@ function LeaderboardPanel({ rows, max, period }) {
                 <div className="v2d-lb-name" title={r.name}>
                   {r.name}
                   <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 2 }}>
-                    {r.wonCount} won quote{r.wonCount === 1 ? '' : 's'}
+                    {r.sent} sent · {r.wonPaid} won &amp; paid
+                    {r.wonUnpaid > 0 && (
+                      <span style={{ color: 'var(--v2-ink-2)', opacity: .8 }}> · +{r.wonUnpaid} awaiting payment</span>
+                    )}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', minWidth: 90 }}>
-                  <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase' }}>Earned</div>
+                  <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase' }}>Won &amp; paid</div>
                   <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13, color: 'var(--v2-green)' }}>
-                    <Money value={r.earned} />
+                    <Money value={r.wonPaidAmt} />
                   </div>
                 </div>
                 <div className="v2d-lb-val" style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>Proposed</div>
-                  <Money value={r.proposed} />
+                  <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>Converted</div>
+                  {r.conv == null ? '—' : `${r.conv}%`}
                 </div>
                 <div className="v2d-lb-pct">{pct}%</div>
               </div>

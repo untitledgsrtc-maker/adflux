@@ -21102,3 +21102,30 @@ the `--wide` modifier. Fix (`MasterV2.jsx` only, display only): strip `flexWrap:
 x4, signer title + mobile) now `govt-input-cell govt-input-cell--wide`.
 - Contract: `.govt-input-cell` alone = a NUMBER cell. Any text/select field must add `govt-input-cell--wide`. Same bug class still exists elsewhere (Step3Stations, GsrtcStationsV2, AutoDistrictsV2 use it for numeric fields - correct).
 - Phase-number note (section 52): 362 = this batch. No SQL, no APK.
+
+
+---
+
+## 349 · Phase 363 - Team leaderboard = quotes SENT vs WON AND PAID (2026-10-13)
+
+Owner (after the section 347 analysis of the "wrong data" board): "only won with payment show in leaderboard - Oct month total quotes sent vs won."
+Replaces the forecast "Proposed incentive" + lifetime "N won quotes" on ALL THREE boards (admin dashboard, sales desktop, sales mobile).
+
+### The rule (ONE definition, section 71)
+`db/functions/team_leaderboard_month.sql` -> `team_leaderboard_month(p_from, p_to)`, used through `src/utils/teamLeaderboard.js` by all three dashboards. Per ACTIVE sales + telecaller rep, for the period:
+- **sent** = quotes created in the period, status not draft.
+- **won & paid** = status won, `won_at` in the period, at least one APPROVED payment (amount > 0). Ranked by the value of these.
+- **awaiting payment** = won in the period but no approved payment: shown as a muted "+N awaiting payment", never counted.
+- **converted** = won & paid / sent. Bar = share of the team's won-and-paid value (not share of #1).
+- Agency partners and inactive users are not on the board; an agency caller gets no rows; a government-partner co_owner sees GOVERNMENT-segment quotes only (sections 42/152). Fail-closed on no login / NULL role.
+- Display only: no pay, score, TA or incentive path touched. The old `get_team_leaderboard` RPC is no longer called by the app (left in the DB).
+
+### Why the old board was wrong (kept so it is not re-built)
+The forecast summed EVERY open quote ever created (incl. drafts, months old) for every `sales/telecaller/agency` user incl. an agency partner with salary 0 (threshold 0 -> everything counts + the Rs 10,000 bonus) and an inactive leaver, and "won quotes" was a lifetime count under an "Oct 2026" title.
+"Earned Rs 0" on most rows was correct (needs revenue of at least 2x salary) - the new board no longer shows it.
+
+### Notes / open
+- Applied live 13 Oct 2026 (new function, additive). Live Oct check: Mayur 4 won & paid Rs 89,617 of 9 sent; Salpesh 2; Viral 1; Rima 2 (+3 awaiting payment); Jani 1; Gandhinagar 0 won & paid of 7 sent (Rs 2.08 cr sent, +2 awaiting payment).
+- Gandhinagar (ex-Kamina) still carries 197 open quotes worth Rs 49 crore (59 drafts, Rs 14 cr) - almost certainly test/junk data; not touched, owner to confirm before any clean-up.
+- Dead code left for the next touch of AdminDashboardDesktop (`repPipeline`, `profileByUser`, `msdByUser`) and stale comments mentioning `get_team_leaderboard` in SalesDashboard*.jsx. The admin `lbMax` now means team total, not leader.
+- sales-module-guardian: PASS (6 P3 only). Phase-number note (section 52): 363 = this batch.
