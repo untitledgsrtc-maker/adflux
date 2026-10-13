@@ -110,3 +110,16 @@ DESIGN (shown as mockups, awaiting approval - NOTHING built):
 - "Invoice to accounts" = a TASK for Accounts with client, amount and dates; the invoice itself is the separate unbuilt Govt/Private invoice module (section 23).
 PROPOSED SPLIT (Trackdek ends 30 Nov): Phase 1 = timeclock + one-time and recurring tasks + admin dashboard (live by ~15 Nov). Phase 2 = campaign pipeline from a won quote.
 OPEN QUESTIONS: invoice once or every month? who may assign tasks to others? skip Sunday / holiday for recurring? who is the approver (step 3)?
+
+## 11. GENERAL WORK, NOT ONLY CAMPAIGNS (owner, 2026-10-13)
+Examples: a sales person asks Operations to send photos; a designer gives a task to 2 video editors (sometimes 3); admin assigns ONE task to several people, each with their own part / milestone.
+DESIGN (mockups shown, awaiting approval - NOTHING built):
+- The core object is a TASK. A campaign is only a template that creates a chain of tasks (section 10).
+- A task has 1..N PARTS. Each part = one person + what they do + due date + its own status (Assigned / In process / Finished). A single-person task is a task with one part.
+- The task is Finished when all its parts are Finished; the asker is told (push). Admin / the asker can add a person, reassign.
+- Parts run in PARALLEL in v1 (no ordering / dependencies; "start after" can come later).
+- Anyone logged in can create a task and assign it to any active colleague (not only the timeclock members): sales / telecaller reps can ASK, they do not need a timer. People see only tasks they asked for or got a part of; admin sees all.
+- Screens: New task (what, client optional, note, people + part + due, Assign, Repeat), Task detail (progress, each part's status), "Tasks I asked for", and the assignee's Assigned / In process / Finished on My Work.
+- Existing ops photo-request flow (section 232) is left as is; this is the general version.
+Data: `work_tasks` (title, project_id null, note, created_by, recurrence null, status, created_at), `work_task_parts` (task_id, assignee_id, label, due_date, status, started_at, finished_at), `work_time_entries.part_id` nullable.
+OPEN: anyone-to-anyone assignment OK? (risk: noise; mitigated by name always shown + admin reassign). Parallel only in v1 OK?
