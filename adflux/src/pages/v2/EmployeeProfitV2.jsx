@@ -11,7 +11,7 @@
 // Display only; admin + accounts only (the function returns nothing for anyone else).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { istCurrentMonthYM } from '../../utils/istDate'
@@ -168,7 +168,13 @@ export default function EmployeeProfitV2() {
         <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
           {mode === 'all' ? `Apr 2026 to ${monthLabel(nowYM)}` : monthLabel(month)}
         </span>
-        <button type="button" onClick={load} disabled={busy} style={{ ...navBtn, width: 'auto', padding: '0 12px', gap: 6, marginLeft: 'auto' }}>
+        {(team !== 'all' || seg !== 'all' || sel) && (
+          <button type="button" onClick={() => { setTeam('all'); setSeg('all'); setSel(null) }}
+            style={{ ...navBtn, width: 'auto', padding: '0 12px', gap: 6, marginLeft: 'auto', color: 'var(--accent, #FFE600)', borderColor: 'var(--accent, #FFE600)' }}>
+            <X size={14} /> Clear filters
+          </button>
+        )}
+        <button type="button" onClick={load} disabled={busy} style={{ ...navBtn, width: 'auto', padding: '0 12px', gap: 6, marginLeft: (team !== 'all' || seg !== 'all' || sel) ? 0 : 'auto' }}>
           <RefreshCw size={14} /> Refresh
         </button>
       </div>
