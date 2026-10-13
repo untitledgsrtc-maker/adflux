@@ -98,3 +98,15 @@ Owner: "first make the admin dashboard design and the individual person design; 
 - Admin dashboard = team hours, working now, late tasks, time to approve, a 3-column task board, who is working, hours per client, New task form.
 - Order unchanged: design approved -> then SQL + build. NOTHING built yet (the timeclock SQL was not run).
 Data impact: new `work_tasks` (project, title, assigned_to, assigned_by, due_date, status, started_at, finished_at, note); `work_time_entries.task_id` nullable.
+
+## 10. OWNER'S FLOW (2026-10-13): one campaign, start to close + one-time and recurring tasks
+Flow: Lead won -> assigned to designer -> video approved -> campaign live -> monthly report sent -> invoice to accounts -> campaign end photo -> closed.
+Anyone can create a one-time or a recurring task; recurring tasks fire every morning.
+DESIGN (shown as mockups, awaiting approval - NOTHING built):
+- A campaign has 7 steps; each step is a task for a person; Finish on a step opens the next one. Campaign card per won quote.
+- Recurring task template: title, client (optional), person, repeat (daily / weekly / monthly), start / end date, time. A 7 AM IST job creates today's tasks, idempotent per (template, date), skips Sundays and holidays (reuse `is_off_day`).
+- Admin dashboard tabs: Campaigns (7-step tracker per client, stuck / late first), Tasks, People, Hours.
+- Won-quote -> campaign must NOT be a trigger on the live quotes table (section 45): created by a guarded RPC / cron that reads newly won quotes.
+- "Invoice to accounts" = a TASK for Accounts with client, amount and dates; the invoice itself is the separate unbuilt Govt/Private invoice module (section 23).
+PROPOSED SPLIT (Trackdek ends 30 Nov): Phase 1 = timeclock + one-time and recurring tasks + admin dashboard (live by ~15 Nov). Phase 2 = campaign pipeline from a won quote.
+OPEN QUESTIONS: invoice once or every month? who may assign tasks to others? skip Sunday / holiday for recurring? who is the approver (step 3)?
