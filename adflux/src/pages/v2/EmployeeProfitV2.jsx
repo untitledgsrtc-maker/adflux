@@ -325,7 +325,6 @@ const shortMon = (ym) => {
   const [y, m] = ym.split('-').map(Number)
   return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-IN', { month: 'short', timeZone: 'UTC' })
 }
-const ALL_PEOPLE = '__all__'
 const compact = (v) => {
   const a = Math.abs(v), sgn = v < 0 ? '-' : ''
   if (a >= 1e7) return `${sgn}${(a / 1e7).toFixed(1)}Cr`
@@ -341,7 +340,7 @@ function PersonPanel({ people, sel, seg, series, err, highlightYM }) {
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 200px' }}>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>Month by month{isAll ? ' - everyone in this view' : person ? ` - ${person.name}` : ''}{seg === 'private' ? ' - Private' : seg === 'government' ? ' - Government' : ''}</div>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>Trend{isAll ? ' - everyone in this view' : person ? ` - ${person.name}` : ''}{seg === 'private' ? ' - Private' : seg === 'government' ? ' - Government' : ''}</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             Month by month, from the month they joined: what they cost vs what they brought in
           </div>

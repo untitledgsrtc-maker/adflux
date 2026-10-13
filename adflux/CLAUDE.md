@@ -21189,3 +21189,9 @@ Client-side only: calls `employee_profit_monthly` once per person (same admin + 
 
 ### 351.4 - Team filter on the Profitability tab (13 Oct 2026, same phase)
 Owner: "i want team filter here" (the filter row). A **Team** dropdown (All teams / Sales / Telecaller / Operations / HR-Accounts-Admin) next to the segment pill. Client-side by role (`teamOf`): filters the summary cards, both tables, the person list and the "All people" chart sum. No SQL change. The "pay not split by segment" note shows only under All teams.
+
+### 351.5 - Person filter in the filter row + chart follows the segment (13 Oct 2026, same phase)
+Owner: "filter not working properly - name filter beside date, and when I select a person show only that person's data." Two real defects fixed:
+1. **Person filter** (All people / each name) now sits in the filter row next to the date. It drives the WHOLE tab: the 3 cards, both tables and the chart show only that person. Replaces the dropdown inside the chart card (and the auto-pick of the first person). Clicking a name in a table sets the same filter.
+2. **The chart ignored the Private / Government pill** (it always showed all income). `employee_profit_monthly` gained `p_segment` (old 3-arg signature dropped): income = that segment's payments; the month's pay is attributed by the same rule as `employee_profitability` (income share that month, else non-draft quotes created that month, else 0). Verified live (Viral, rolled back): no segment = same numbers as before; Private + Government = All, income and cost, every month. Applied live; canonical file `db/functions/employee_profitability.sql` updated.
+Contract: the chart is still a multi-month trend (it ignores the Monthly / All-time switch by design); it does follow Team, Segment and Person.
