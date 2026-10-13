@@ -21077,3 +21077,16 @@ Applied: won/lost quote with an uncovered low line now says "closed, ask admin t
 reject-dialog close X padded to a 36px tap target; the approvals queue no longer blanks while a refresh runs; approve/reject buttons stay disabled until the reload finishes (a second tap could hit a decided row).
 NOT changed (accepted, owner-aware): approve pins on `min_rate` only, so a SECOND low line added at a higher rate between card load and tap is approved with the request - the approver sees the lowest price; pin `line_rates` too if that ever matters.
 LOCKSTEP NOTE: "Rs 600" is hardcoded in THREE server messages (`api/wa/send.js`, `api/email/send.js`, `api/wa/team-assistant.js`) besides `qpa_price_floor()` and `quotePriceGate.js PRICE_FLOOR`; change the floor in all five places.
+
+
+---
+
+## 347 · Phase 361 - Team Dashboard rep-card header no longer squeezes the name (2026-10-13)
+
+Owner screenshot of /team-dashboard: on the sales cards the name, three month chips (quotes / won / no outcome) and the "in field" pill shared ONE row, so names were
+cut off ("Kirt Kota...", "Jani Ajaykumar" wrapped) and the chips wrapped into a ragged cluster. (Phase-number note, section 52: 361 = this batch; disambiguate by SHA.)
+- `src/styles/leads.css`: `.lead-rep-head` is now `flex-wrap: wrap`; NEW `.lead-rep-id` (name block, `flex:1 1 0; min-width:0`) and `.lead-rep-chips` (`flex: 0 0 100%`, its own second row);
+  `.lead-rep-status` keeps the right edge of row 1; name gets `overflow-wrap:anywhere`.
+- `src/pages/v2/TeamDashboardV2.jsx`: the name block gets `className="lead-rep-id"`, the chips wrapper swaps its inline flex style for `className="lead-rep-chips"`. Chip content, colours and logic unchanged.
+- Display only, JS/CSS only, no SQL, no APK; TeamDashboardV2 is not section 28 frozen. Verified: esbuild parse, brand check, `npm run build`, and a static render with the real stylesheet at the worst case (long name + 3 chips + status).
+- Contract: a card header is TWO rows - identity + status on top, chips beneath. Do not put new chips back inside the name row; add them to `.lead-rep-chips`.

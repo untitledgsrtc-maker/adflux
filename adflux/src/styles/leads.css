@@ -897,15 +897,23 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   position: relative; overflow: hidden;
 }
 .lead-rep-card.live { border-color: var(--success); box-shadow: 0 0 0 1px var(--success-soft, rgba(16,185,129,.12)); }
-.lead-rep-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+/* Two-row header: row 1 = avatar + name + status pill, row 2 = the month chips
+   (quotes / won / no outcome) on their own line so a long name is never squeezed. */
+.lead-rep-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.lead-rep-id    { flex: 1 1 0; min-width: 0; order: 1; }
+.lead-rep-chips {
+  order: 3; flex: 0 0 100%;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start;
+  gap: 6px;
+}
 .lead-rep-big-av {
   width: 44px; height: 44px; border-radius: 50%;
   display: grid; place-items: center;
   font-family: var(--font-display); font-weight: 700; font-size: 15px;
 }
-.lead-rep-name   { font-weight: 600; font-size: 15px; }
+.lead-rep-name   { font-weight: 600; font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
 .lead-rep-meta   { font-size: 11px; color: var(--text-subtle); }
-.lead-rep-status { margin-left: auto; }
+.lead-rep-status { margin-left: auto; order: 2; flex: 0 0 auto; }
 .lead-rep-kpis {
   display: grid; grid-template-columns: repeat(3, 1fr);
   gap: 8px; margin-bottom: 12px;

@@ -1521,7 +1521,7 @@ export default function TeamDashboardV2() {
             >
               <div className="lead-rep-head">
                 <LeadAvatar name={r.name} userId={r.id} imageUrl={r.profile_image_url} />
-                <div>
+                <div className="lead-rep-id">
                   <div className="lead-rep-name">{r.name}</div>
                   <div className="lead-rep-meta">
                     {r.team_role}{r.city ? ` · ${r.city}` : ''}
@@ -1542,11 +1542,7 @@ export default function TeamDashboardV2() {
                     border: `1px solid ${color}`, background: bg, color,
                   })
                   return (
-                    <div style={{
-                      marginLeft: 'auto', display: 'flex', gap: 6,
-                      alignItems: 'center', flexWrap: 'wrap',
-                      justifyContent: 'flex-end',
-                    }}>
+                    <div className="lead-rep-chips">
                       <span
                         style={chip('var(--blue, #3B82F6)', 'rgba(59,130,246,0.12)')}
                         title={`${mq} quote${mq === 1 ? '' : 's'} this month · ${formatCurrency(mqA)}`}
