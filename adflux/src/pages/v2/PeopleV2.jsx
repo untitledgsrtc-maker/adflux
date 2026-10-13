@@ -25,7 +25,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-import { Users, Gift, Wallet, Clock as ClockIcon, MapPin, UserCheck } from 'lucide-react'
+import { Users, Gift, Wallet, Clock as ClockIcon, MapPin, UserCheck, TrendingUp } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 
@@ -36,6 +36,7 @@ import LeavesAdminV2     from './LeavesAdminV2'
 // Phase 39 — TA Claims tab also lives inside People.
 import TaPayoutsAdminV2  from './TaPayoutsAdminV2'
 import TeamManagerAssignV2 from './TeamManagerAssignV2'   // Phase 61
+import EmployeeProfitV2 from './EmployeeProfitV2'          // Phase 364
 
 // Phase 47.9 — IST month label via shared util.
 import { istCurrentMonthLabel } from '../../utils/istDate'
@@ -52,6 +53,7 @@ const TABS = [
   { key: 'team',       label: 'Team',       icon: Users,     Comp: TeamV2 },
   { key: 'incentives', label: 'Incentives', icon: Gift,      Comp: IncentivesV2 },
   { key: 'salary',     label: 'Salary',     icon: Wallet,    Comp: SalaryAdminV2 },
+  { key: 'profit',     label: 'Profitability', icon: TrendingUp, Comp: EmployeeProfitV2, payrollOnly: true },
   { key: 'leaves',     label: 'Leaves',     icon: ClockIcon, Comp: LeavesAdminV2 },
   { key: 'ta',         label: 'TA Claims',  icon: MapPin,    Comp: TaPayoutsAdminV2 },
   { key: 'assign',     label: 'Assign',     icon: UserCheck, Comp: TeamManagerAssignV2 },
@@ -70,9 +72,15 @@ export default function PeopleV2() {
   // editOf/renewalOf. setParams round-trip (internal use) still works
   // because that goes through useSearchParams' history.replaceState.
   const requested = location.state?.tab || params.get('tab') || 'team'
+  // Phase 364 - the Profitability tab shows pay data: admin + accounts only
+  // (a co-owner on the government desk never sees org-wide pay, section 153).
+  const visibleTabs = useMemo(
+    () => TABS.filter(t => !t.payrollOnly || ['admin', 'accounts'].includes(profile?.role)),
+    [profile?.role]
+  )
   const active = useMemo(
-    () => TABS.find(t => t.key === requested) || TABS[0],
-    [requested]
+    () => visibleTabs.find(t => t.key === requested) || visibleTabs[0],
+    [requested, visibleTabs]
   )
 
   // Phase 38.2 — live counts for tab badges. Two cheap COUNT queries
@@ -140,7 +148,7 @@ export default function PeopleV2() {
           overflowX: 'auto',
         }}
       >
-        {TABS.map(t => {
+        {visibleTabs.map(t => {
           const Icon = t.icon
           const on = t.key === active.key
           // Phase 38.2 — badge content per tab.

@@ -21141,3 +21141,24 @@ I called its 197 open quotes (Rs 49 crore) "almost certainly test / junk" from t
 - It is the login the government-proposal work is done from (the old "Kamina" account, section 336).
 Nothing was changed or deleted. Rules: never judge data "junk" from totals - read status / segment / addressee / payments first (section 17 verify-before-acting); a big-number account on a segment-scoped module is usually the real business.
 Side effects worth knowing (display only): its Rs-crore proposals dominate any "sent amount" / pipeline total for the sales team, and on the new leaderboard (section 349) it shows as a normal rep with 0 won-and-paid in October (its 9 wins were earlier; 2 won this month await payment).
+
+
+---
+
+## 351 · Phase 364 - People -> "Profitability" tab: income vs pay cost per employee (2026-10-13)
+
+Owner: "per employee profitability - income (without GST) vs salary, incentive, TA/DA and other paid - monthly filter and all-time filter."
+- **Where:** People -> new **Profitability** tab (between Salary and Leaves). Visible to **admin + accounts only** (`payrollOnly`); a co-owner (government desk) never sees org-wide pay (section 153).
+- **ONE definition (section 71):** `db/functions/employee_profitability.sql` -> `employee_profitability(p_from, p_to)`, read by `EmployeeProfitV2.jsx`.
+  * income (ex-GST) = approved payments received in the period (by `payment_date`) on quotes the person CREATED, x `subtotal/total_amount` (same GST strip as the finance P&L, section 218; TDS stays in).
+  * cost = the salary engine's own `net_payable` per month (`compute_monthly_salaries`): base + variable + incentive + TA/DA - leave deduction. No second pay formula.
+  * profit = income - cost. The range is rounded out to whole months; max 36 months. Agency partners are not listed.
+  * Monthly filter (month picker + arrows) and **All time** (Apr 2026 to this month). Two blocks: **Earning team** (sales/telecaller or anyone with income) and **Support team** (ops, HR, accounts: cost only, so they are not shown as a "loss").
+- **Gate:** SECURITY DEFINER, `search_path` pinned, REVOKEd from anon; returns no rows unless the caller is an ACTIVE `admin` or `accounts` (fail-closed on NULL role / no login). Verified live: accounts sees data, a sales rep gets 0 rows.
+- **Live check (13 Oct 2026):** all-time Apr-Oct 2026: income Rs 1,05,31,546 (ex-GST), pay cost Rs 20,74,680, profit Rs 84,56,866 across 17 people.
+- **Known behaviours (not bugs):**
+  * Incentive is "paid so far" before Sept 2026 and "earned" from Sept 2026 (the section 290 gate in the engine) - the all-time total mixes the two by design.
+  * The government desk login ("Gandhinagar", section 350) has no salary on file, so it shows its full income with a "No salary on file" chip; income follows the quote CREATOR, not who nurtured it.
+  * Cost is what is OWED that month (after leave cuts), not cash actually paid out; payouts may lag.
+  * Income by `payment_date` is cash-in-month; a deal won in one month and paid in another counts in the paid month.
+- Display only: no pay, score or incentive path changed. Not section 28 frozen. No APK. Phase-number note (section 52): 364 = this batch.
