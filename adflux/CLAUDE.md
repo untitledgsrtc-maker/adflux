@@ -21186,3 +21186,6 @@ Owner: "individual person chart: e.g. Viral monthly salary + incentive + TA/DA +
 ### 351.3 - "All people (whole team)" option in the Person view (13 Oct 2026, same phase)
 Owner (screenshot of the person dropdown): "i want all." The Person-view dropdown gains **All people (whole team)**: the chart + month table add every listed person's month together (income vs salary / incentive / TA-DA / other), from each person's own joining month.
 Client-side only: calls `employee_profit_monthly` once per person (same admin + accounts gate) and sums by month; no SQL change. Agency partners stay excluded, as in the tables.
+
+### 351.4 - Team filter on the Profitability tab (13 Oct 2026, same phase)
+Owner: "i want team filter here" (the filter row). A **Team** dropdown (All teams / Sales / Telecaller / Operations / HR-Accounts-Admin) next to the segment pill. Client-side by role (`teamOf`): filters the summary cards, both tables, the person list and the "All people" chart sum. No SQL change. The "pay not split by segment" note shows only under All teams.

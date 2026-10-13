@@ -20,6 +20,10 @@ import { formatCurrency } from '../../utils/formatters'
 
 const ALL_TIME_FROM = '2026-04-01'   // start of FY 2026-27 (first month with data)
 const EARNING = new Set(['sales', 'telecaller'])
+// team filter: which group a role belongs to
+const teamOf = (role) => role === 'sales' ? 'sales' : role === 'telecaller' ? 'telecaller'
+  : (role === 'operation_executive' || role === 'operation_head') ? 'ops' : 'support'
+const TEAMS = [['all', 'All teams'], ['sales', 'Sales'], ['telecaller', 'Telecaller'], ['ops', 'Operations'], ['support', 'HR / Accounts / Admin']]
 
 // pure string month math (no Date -> no timezone drift)
 function addMonths(ym, delta) {
@@ -41,6 +45,7 @@ export default function EmployeeProfitV2() {
 
   const [mode, setMode]   = useState('month')          // 'month' | 'all'
   const [month, setMonth] = useState(nowYM)
+  const [team, setTeam]   = useState('all')            // team filter
   const [seg, setSeg]     = useState('all')            // 'all' | 'private' | 'government'
   const [data, setData]   = useState(null)             // { all, private, government }
   const [err, setErr]     = useState('')
@@ -77,13 +82,14 @@ export default function EmployeeProfitV2() {
   useEffect(() => { load() }, [load])
 
   // people that can be charted (from the All view = everyone with income or pay)
-  const people = useMemo(() => (data?.all || []).map(r => ({ id: r.id, name: r.name, role: r.role })), [data])
+  const people = useMemo(() => (data?.all || []).filter(r => team === 'all' || teamOf(r.role) === team).map(r => ({ id: r.id, name: r.name, role: r.role })), [data, team])
   useEffect(() => {
     if (!sel && people.length) {
-      const first = (data.all || []).find(r => EARNING.has(r.role) || r.income > 0) || data.all[0]
+      const inTeam = (data.all || []).filter(r => team === 'all' || teamOf(r.role) === team)
+      const first = inTeam.find(r => EARNING.has(r.role) || r.income > 0) || inTeam[0]
       if (first) setSel(first.id)
     }
-  }, [people, data, sel])
+  }, [people, data, sel, team])
 
   // the chart always shows the person's whole history from the month they joined.
   // sel === ALL_PEOPLE adds every person's month together = the whole team in one chart.
@@ -115,7 +121,7 @@ export default function EmployeeProfitV2() {
     return () => { off = true }
   }, [allowed, sel, nowYM, peopleKey])
 
-  const rows = data ? data[seg] : null
+  const rows = data ? data[seg].filter(r => team === 'all' || teamOf(r.role) === team) : null
   const earning = useMemo(() => (rows || []).filter(r => EARNING.has(r.role) || r.income > 0), [rows])
   const support = useMemo(() => (seg === 'all' ? (rows || []).filter(r => !EARNING.has(r.role) && r.income === 0) : []), [rows, seg])
   const sum = (arr, k) => arr.reduce((s, r) => s + r[k], 0)
@@ -125,7 +131,7 @@ export default function EmployeeProfitV2() {
   }, [rows])
   // pay that cannot be tied to a segment (support staff, people with no quotes yet)
   const unsplit = useMemo(() => {
-    if (!data || seg === 'all') return 0
+    if (!data || seg === 'all' || team !== 'all') return 0
     return Math.max(0, sum(data.all, 'cost') - sum(data.private, 'cost') - sum(data.government, 'cost'))
   }, [data, seg])
 
@@ -148,6 +154,10 @@ export default function EmployeeProfitV2() {
           ))}
         </div>
         <SegmentToggle value={seg} onChange={setSeg} style={{ marginBottom: 0 }} />
+        <select value={team} onChange={e => { setTeam(e.target.value); setSel(null) }} aria-label="Team"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 10, padding: '0 10px', height: 38, fontFamily: 'inherit', fontSize: 13 }}>
+          {TEAMS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select>
         {mode === 'month' && (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <button type="button" aria-label="Previous month" onClick={() => setMonth(m => addMonths(m, -1))} style={navBtn}><ChevronLeft size={16} /></button>
