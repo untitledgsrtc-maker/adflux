@@ -83,24 +83,17 @@ export default function EmployeeProfitV2() {
 
   // people that can be charted (from the All view = everyone with income or pay)
   const people = useMemo(() => (data?.all || []).filter(r => team === 'all' || teamOf(r.role) === team).map(r => ({ id: r.id, name: r.name, role: r.role })), [data, team])
-  useEffect(() => {
-    if (!sel && people.length) {
-      const inTeam = (data.all || []).filter(r => team === 'all' || teamOf(r.role) === team)
-      const first = inTeam.find(r => EARNING.has(r.role) || r.income > 0) || inTeam[0]
-      if (first) setSel(first.id)
-    }
-  }, [people, data, sel, team])
-
   // the chart always shows the person's whole history from the month they joined.
   // sel === ALL_PEOPLE adds every person's month together = the whole team in one chart.
   const peopleKey = people.map(p => p.id).join(',')
   useEffect(() => {
-    if (!allowed || !sel) return
+    if (!allowed) return
     let off = false
     setSerr(''); setSeries(null)
     const to = `${addMonths(nowYM, 1)}-01`
-    const one = (uid) => supabase.rpc('employee_profit_monthly', { p_user_id: uid, p_from: ALL_TIME_FROM, p_to: to })
-    const ids = sel === ALL_PEOPLE ? peopleKey.split(',').filter(Boolean) : [sel]
+    const segArg = seg === 'private' ? 'PRIVATE' : seg === 'government' ? 'GOVERNMENT' : null
+    const one = (uid) => supabase.rpc('employee_profit_monthly', { p_user_id: uid, p_from: ALL_TIME_FROM, p_to: to, p_segment: segArg })
+    const ids = !sel ? peopleKey.split(',').filter(Boolean) : [sel]
     if (!ids.length) { setSeries([]); return }
     Promise.all(ids.map(one)).then(results => {
       if (off) return
@@ -119,9 +112,9 @@ export default function EmployeeProfitV2() {
       setSeries([...byMonth.values()].sort((a, b) => a.ym.localeCompare(b.ym)))
     })
     return () => { off = true }
-  }, [allowed, sel, nowYM, peopleKey])
+  }, [allowed, sel, nowYM, peopleKey, seg])
 
-  const rows = data ? data[seg].filter(r => team === 'all' || teamOf(r.role) === team) : null
+  const rows = data ? data[seg].filter(r => (team === 'all' || teamOf(r.role) === team) && (!sel || r.id === sel)) : null
   const earning = useMemo(() => (rows || []).filter(r => EARNING.has(r.role) || r.income > 0), [rows])
   const support = useMemo(() => (seg === 'all' ? (rows || []).filter(r => !EARNING.has(r.role) && r.income === 0) : []), [rows, seg])
   const sum = (arr, k) => arr.reduce((s, r) => s + r[k], 0)
@@ -131,7 +124,7 @@ export default function EmployeeProfitV2() {
   }, [rows])
   // pay that cannot be tied to a segment (support staff, people with no quotes yet)
   const unsplit = useMemo(() => {
-    if (!data || seg === 'all' || team !== 'all') return 0
+    if (!data || seg === 'all' || team !== 'all' || sel) return 0
     return Math.max(0, sum(data.all, 'cost') - sum(data.private, 'cost') - sum(data.government, 'cost'))
   }, [data, seg])
 
@@ -157,6 +150,11 @@ export default function EmployeeProfitV2() {
         <select value={team} onChange={e => { setTeam(e.target.value); setSel(null) }} aria-label="Team"
           style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 10, padding: '0 10px', height: 38, fontFamily: 'inherit', fontSize: 13 }}>
           {TEAMS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+        </select>
+        <select value={sel || ''} onChange={e => setSel(e.target.value || null)} aria-label="Person"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 10, padding: '0 10px', height: 38, fontFamily: 'inherit', fontSize: 13, maxWidth: 210 }}>
+          <option value="">All people</option>
+          {people.map(pp => <option key={pp.id} value={pp.id}>{pp.name}</option>)}
         </select>
         {mode === 'month' && (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -194,7 +192,7 @@ export default function EmployeeProfitV2() {
           </div>
 
           <PersonPanel
-            people={people} sel={sel} onSel={setSel}
+            people={people} sel={sel} seg={seg}
             series={series} err={serr}
             highlightYM={mode === 'month' ? month : null}
           />
@@ -336,30 +334,22 @@ const compact = (v) => {
   return `${sgn}${Math.round(a)}`
 }
 
-function PersonPanel({ people, sel, onSel, series, err, highlightYM }) {
-  const isAll = sel === ALL_PEOPLE
+function PersonPanel({ people, sel, seg, series, err, highlightYM }) {
+  const isAll = !sel
   const person = people.find(p => p.id === sel)
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 200px' }}>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>Person view{isAll ? ' - Whole team' : person ? ` - ${person.name}` : ''}</div>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>Month by month{isAll ? ' - everyone in this view' : person ? ` - ${person.name}` : ''}{seg === 'private' ? ' - Private' : seg === 'government' ? ' - Government' : ''}</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             Month by month, from the month they joined: what they cost vs what they brought in
           </div>
         </div>
-        <select value={sel || ''} onChange={e => onSel(e.target.value || null)}
-          style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 10, padding: '0 10px', height: 38, fontFamily: 'inherit', fontSize: 13, minWidth: 200 }}>
-          {people.length === 0 && <option value="">No people</option>}
-          {people.length > 0 && <option value={ALL_PEOPLE}>All people (whole team)</option>}
-          {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
       </div>
 
       {err ? (
         <div style={{ padding: 16, color: 'var(--danger)', fontSize: 13 }}>Could not load the chart: {err}</div>
-      ) : !sel ? (
-        <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Pick a person to see their chart.</div>
       ) : series === null ? (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading...</div>
       ) : series.length === 0 ? (

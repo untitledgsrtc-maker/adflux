@@ -132,7 +132,8 @@ NOTIFY pgrst, 'reload schema';
 -- rows the engine sums): ta = bike amount, da = daily allowance, hotel, other = the rest.
 -- Same gate as employee_profitability (admin + accounts only, fail-closed).
 -- =====================================================================
-CREATE OR REPLACE FUNCTION public.employee_profit_monthly(p_user_id uuid, p_from date, p_to date)
+DROP FUNCTION IF EXISTS public.employee_profit_monthly(uuid, date, date);
+CREATE OR REPLACE FUNCTION public.employee_profit_monthly(p_user_id uuid, p_from date, p_to date, p_segment text DEFAULT NULL)
 RETURNS TABLE(
   month date, income_ex_gst numeric,
   base numeric, variable numeric, incentive numeric,
@@ -168,24 +169,37 @@ BEGIN
 
   RETURN QUERY
   SELECT gs.m::date,
-         COALESCE((SELECT round(sum(p.amount_received * COALESCE(NULLIF(q.subtotal,0)/NULLIF(q.total_amount,0), 1)))
-                     FROM public.payments p JOIN public.quotes q ON q.id = p.quote_id
-                    WHERE p.approval_status = 'approved' AND q.created_by = p_user_id
-                      AND p.payment_date >= gs.m::date AND p.payment_date < (gs.m + interval '1 month')::date), 0)::numeric,
-         COALESCE((r.result->>'base')::numeric,0),
-         COALESCE((r.result->>'variable')::numeric,0),
-         COALESCE((r.result->>'incentive')::numeric,0),
-         COALESCE(t.bike,0), COALESCE(t.da,0), COALESCE(t.hotel,0),
-         COALESCE((r.result->>'ta_da')::numeric,0) - COALESCE(t.bike,0) - COALESCE(t.da,0) - COALESCE(t.hotel,0),
-         COALESCE((r.result->>'unpaid_deduction')::numeric,0),
-         COALESCE((r.result->>'net_payable')::numeric,0),
-         COALESCE((SELECT round(sum(p.amount_received * COALESCE(NULLIF(q.subtotal,0)/NULLIF(q.total_amount,0), 1)))
-                     FROM public.payments p JOIN public.quotes q ON q.id = p.quote_id
-                    WHERE p.approval_status = 'approved' AND q.created_by = p_user_id
-                      AND p.payment_date >= gs.m::date AND p.payment_date < (gs.m + interval '1 month')::date), 0)::numeric
-           - COALESCE((r.result->>'net_payable')::numeric,0)
+         round(inc.seg)::numeric,
+         round(COALESCE((r.result->>'base')::numeric,0) * w.w, 2),
+         round(COALESCE((r.result->>'variable')::numeric,0) * w.w, 2),
+         round(COALESCE((r.result->>'incentive')::numeric,0) * w.w, 2),
+         round(COALESCE(t.bike,0) * w.w, 2), round(COALESCE(t.da,0) * w.w, 2), round(COALESCE(t.hotel,0) * w.w, 2),
+         round((COALESCE((r.result->>'ta_da')::numeric,0) - COALESCE(t.bike,0) - COALESCE(t.da,0) - COALESCE(t.hotel,0)) * w.w, 2),
+         round(COALESCE((r.result->>'unpaid_deduction')::numeric,0) * w.w, 2),
+         round(COALESCE((r.result->>'net_payable')::numeric,0) * w.w, 2),
+         round(inc.seg - COALESCE((r.result->>'net_payable')::numeric,0) * w.w)::numeric
     FROM generate_series(v_from::timestamp, (v_to - 1)::timestamp, interval '1 month') AS gs(m)
     CROSS JOIN LATERAL public.compute_monthly_salaries(EXTRACT(year FROM gs.m)::int, EXTRACT(month FROM gs.m)::int) AS r
+    CROSS JOIN LATERAL (
+      SELECT COALESCE(sum(p.amount_received * COALESCE(NULLIF(q.subtotal,0)/NULLIF(q.total_amount,0), 1)), 0) AS allv,
+             COALESCE(sum(p.amount_received * COALESCE(NULLIF(q.subtotal,0)/NULLIF(q.total_amount,0), 1))
+                      FILTER (WHERE p_segment IS NULL OR q.segment = p_segment), 0) AS seg
+        FROM public.payments p JOIN public.quotes q ON q.id = p.quote_id
+       WHERE p.approval_status = 'approved' AND q.created_by = p_user_id
+         AND p.payment_date >= gs.m::date AND p.payment_date < (gs.m + interval '1 month')::date
+    ) inc
+    CROSS JOIN LATERAL (
+      SELECT count(*) AS qall, count(*) FILTER (WHERE p_segment IS NULL OR q.segment = p_segment) AS qseg
+        FROM public.quotes q
+       WHERE q.created_by = p_user_id AND q.status <> 'draft'
+         AND q.created_at >= gs.m::date AND q.created_at < (gs.m + interval '1 month')::date
+    ) qs
+    CROSS JOIN LATERAL (
+      SELECT CASE WHEN p_segment IS NULL THEN 1::numeric
+                  WHEN inc.allv > 0 THEN inc.seg / inc.allv
+                  WHEN qs.qall > 0 THEN qs.qseg::numeric / qs.qall
+                  ELSE 0::numeric END AS w
+    ) w
     LEFT JOIN LATERAL (
       SELECT sum(d.bike_amount) AS bike, sum(d.da_amount) AS da, sum(d.hotel_amount) AS hotel
         FROM public.daily_ta d
@@ -196,8 +210,8 @@ BEGIN
 END
 $fn$;
 
-REVOKE ALL ON FUNCTION public.employee_profit_monthly(uuid, date, date) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.employee_profit_monthly(uuid, date, date) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.employee_profit_monthly(uuid, date, date, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.employee_profit_monthly(uuid, date, date, text) TO authenticated, service_role;
 NOTIFY pgrst, 'reload schema';
 
 -- VERIFY (tripwire - all TRUE):
