@@ -85,25 +85,35 @@ export default function EmployeeProfitV2() {
     }
   }, [people, data, sel])
 
-  // the chart always shows the person's whole history from the month they joined
+  // the chart always shows the person's whole history from the month they joined.
+  // sel === ALL_PEOPLE adds every person's month together = the whole team in one chart.
+  const peopleKey = people.map(p => p.id).join(',')
   useEffect(() => {
     if (!allowed || !sel) return
     let off = false
     setSerr(''); setSeries(null)
-    supabase.rpc('employee_profit_monthly', { p_user_id: sel, p_from: ALL_TIME_FROM, p_to: `${addMonths(nowYM, 1)}-01` })
-      .then(({ data: d, error }) => {
-        if (off) return
-        if (error) { setSerr(error.message || 'Could not load the chart.'); return }
-        setSeries((d || []).map(r => ({
-          ym: String(r.month).slice(0, 7),
-          income: Number(r.income_ex_gst) || 0,
-          base: Number(r.base) || 0, variable: Number(r.variable) || 0, incentive: Number(r.incentive) || 0,
-          ta: Number(r.ta) || 0, da: Number(r.da) || 0, hotel: Number(r.hotel) || 0, other: Number(r.other) || 0,
-          cut: Number(r.leave_cut) || 0, cost: Number(r.net_cost) || 0, profit: Number(r.profit) || 0,
-        })))
-      })
+    const to = `${addMonths(nowYM, 1)}-01`
+    const one = (uid) => supabase.rpc('employee_profit_monthly', { p_user_id: uid, p_from: ALL_TIME_FROM, p_to: to })
+    const ids = sel === ALL_PEOPLE ? peopleKey.split(',').filter(Boolean) : [sel]
+    if (!ids.length) { setSeries([]); return }
+    Promise.all(ids.map(one)).then(results => {
+      if (off) return
+      const bad = results.find(r => r.error)
+      if (bad) { setSerr(bad.error.message || 'Could not load the chart.'); return }
+      const byMonth = new Map()
+      results.forEach(({ data: d }) => (d || []).forEach(r => {
+        const ym = String(r.month).slice(0, 7)
+        const m = byMonth.get(ym) || { ym, income: 0, base: 0, variable: 0, incentive: 0, ta: 0, da: 0, hotel: 0, other: 0, cut: 0, cost: 0, profit: 0 }
+        m.income += Number(r.income_ex_gst) || 0
+        m.base += Number(r.base) || 0; m.variable += Number(r.variable) || 0; m.incentive += Number(r.incentive) || 0
+        m.ta += Number(r.ta) || 0; m.da += Number(r.da) || 0; m.hotel += Number(r.hotel) || 0; m.other += Number(r.other) || 0
+        m.cut += Number(r.leave_cut) || 0; m.cost += Number(r.net_cost) || 0; m.profit += Number(r.profit) || 0
+        byMonth.set(ym, m)
+      }))
+      setSeries([...byMonth.values()].sort((a, b) => a.ym.localeCompare(b.ym)))
+    })
     return () => { off = true }
-  }, [allowed, sel, nowYM])
+  }, [allowed, sel, nowYM, peopleKey])
 
   const rows = data ? data[seg] : null
   const earning = useMemo(() => (rows || []).filter(r => EARNING.has(r.role) || r.income > 0), [rows])
@@ -307,6 +317,7 @@ const shortMon = (ym) => {
   const [y, m] = ym.split('-').map(Number)
   return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-IN', { month: 'short', timeZone: 'UTC' })
 }
+const ALL_PEOPLE = '__all__'
 const compact = (v) => {
   const a = Math.abs(v), sgn = v < 0 ? '-' : ''
   if (a >= 1e7) return `${sgn}${(a / 1e7).toFixed(1)}Cr`
@@ -316,12 +327,13 @@ const compact = (v) => {
 }
 
 function PersonPanel({ people, sel, onSel, series, err, highlightYM }) {
+  const isAll = sel === ALL_PEOPLE
   const person = people.find(p => p.id === sel)
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 200px' }}>
-          <div style={{ fontWeight: 700, fontSize: 14 }}>Person view{person ? ` - ${person.name}` : ''}</div>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>Person view{isAll ? ' - Whole team' : person ? ` - ${person.name}` : ''}</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             Month by month, from the month they joined: what they cost vs what they brought in
           </div>
@@ -329,6 +341,7 @@ function PersonPanel({ people, sel, onSel, series, err, highlightYM }) {
         <select value={sel || ''} onChange={e => onSel(e.target.value || null)}
           style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 10, padding: '0 10px', height: 38, fontFamily: 'inherit', fontSize: 13, minWidth: 200 }}>
           {people.length === 0 && <option value="">No people</option>}
+          {people.length > 0 && <option value={ALL_PEOPLE}>All people (whole team)</option>}
           {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </div>

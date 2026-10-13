@@ -21181,3 +21181,8 @@ Owner: "individual person chart: e.g. Viral monthly salary + incentive + TA/DA +
   TA/DA is split exactly from `daily_ta` (the rows the engine sums): other = ta_da - bike - da - hotel, so the pieces add to the engine's number.
 - **Screen:** a "Person view" card under the summary cards: pick a person (or click a name in the tables) -> stacked bars per month (base 70%, variable 30%, incentive, travel, daily allowance, hotel/other) with a dashed income line, plus a month table. The chart always shows the person's whole history from the month they joined; the Monthly filter's month is highlighted. Leave cut is shown in the table (it reduces total cost) and is not stacked in the bars.
 - Verified live: Viral = Jun-Oct 2026 (5 months, joining date 1 Jun); Gohil 2 months; Salpesh 1; Aayushi 3 (Aug-Oct, offer date 17 Aug); Mayur 6. Chart rendered with Viral's real numbers before pushing.
+
+
+### 351.3 - "All people (whole team)" option in the Person view (13 Oct 2026, same phase)
+Owner (screenshot of the person dropdown): "i want all." The Person-view dropdown gains **All people (whole team)**: the chart + month table add every listed person's month together (income vs salary / incentive / TA-DA / other), from each person's own joining month.
+Client-side only: calls `employee_profit_monthly` once per person (same admin + accounts gate) and sums by month; no SQL change. Agency partners stay excluded, as in the tables.
