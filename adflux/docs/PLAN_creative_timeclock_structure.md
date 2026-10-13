@@ -84,7 +84,8 @@ A new route + a new nav entry only (additive). New tables only.
 4. Added-later entry goes pending, head approves, it counts.
 5. Switch-over: the 142 projects exist; a week of both systems side by side; Trackdek can end 30 Nov.
 
-## 8. Still open (small, needed before UI/UX)
-A. Confirm who is on the timeclock and map the names (7.1).
-B. Auto-stop time for a forgotten timer (proposal 21:30 IST).
-C. May anyone add a new project, or only the head? (proposal: anyone adds, head merges.)
+## 8. Final answers (owner, 2026-10-13) - STRUCTURE CLOSED
+A. Our "Dixita" (ops head, dixita@untitledad.in) is a DIFFERENT person from Trackdek's "Dixita Rana". So 7 of the 8 daily Trackdek users still need a login first (Dixita Rana, DIXITA GOHEL, Damini Rane, Renuka Vasava, Safika Bansiwala, Piyush Kumawat, Akshar Gohil, Shreya Panchal) - Riya (HR) is the only one who has one.
+B. Forgotten timer auto-stops at 21:30 IST. YES.
+C. Anyone on the timeclock may add a project by typing it; the head merges / archives. YES.
+Next: STEP 2 = UI/UX (real app screens, approved before any build).
