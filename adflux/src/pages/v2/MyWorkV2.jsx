@@ -13,7 +13,7 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { istTodayISO } from '../../utils/istDate'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { openWhatsAppShare } from '../../utils/whatsappSummary'
-import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, istHour, dueState, initialsOf } from '../../utils/workUtils'
+import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, istHour, dueState, initialsOf, clientColor } from '../../utils/workUtils'
 import WorkBoard from '../../components/work/WorkBoard'
 import NewTaskModal from '../../components/work/NewTaskModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
@@ -501,6 +501,10 @@ function HoursTab({ entries, projects, projName, secs, onAddManual, onAddProject
         </div>
       </div>
       <div className="wk-c8">
+        <div className="wk-card flush" style={{ marginBottom: 24 }}>
+          <div className="wk-ch"><h3><span className="wk-tile"><Clock size={16} aria-hidden="true" /></span>Today, by hour</h3></div>
+          <DayStrip entries={approved} projName={projName} />
+        </div>
         <div className="wk-card flush">
           <div className="wk-ch"><h3><span className="wk-tile"><Clock size={16} aria-hidden="true" /></span>Days</h3></div>
           {approved.length === 0 ? (
@@ -564,6 +568,35 @@ function HoursTab({ entries, projects, projName, secs, onAddManual, onAddProject
             </div>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// One-person version of the head's Timeline: 08-21 strip, blocks coloured by client,
+// running block outlined, yellow line = now.
+function DayStrip({ entries, projName }) {
+  const H0 = 8, H1 = 21
+  const hourOf = (iso) => { const d = new Date(new Date(iso).getTime() + 5.5 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60 }
+  const pct = (h) => Math.max(0, Math.min(100, (h - H0) / (H1 - H0) * 100))
+  const nowH = hourOf(new Date().toISOString())
+  return (
+    <div style={{ padding: 16, overflowX: 'auto' }}>
+      <div style={{ minWidth: 560 }}>
+        <div style={{ position: 'relative', height: 18, marginBottom: 6 }}>
+          {Array.from({ length: H1 - H0 + 1 }, (_, i) => (
+            <span key={i} className="wk-num wk-mu" style={{ position: 'absolute', left: `${pct(H0 + i)}%`, fontSize: 11, transform: 'translateX(-50%)' }}>{String(H0 + i).padStart(2, '0')}</span>
+          ))}
+        </div>
+        <div style={{ position: 'relative', height: 28, background: 'var(--w-hov)', borderRadius: 6 }}>
+          {entries.map((e) => {
+            const s0 = hourOf(e.started_at), e0 = e.ended_at ? hourOf(e.ended_at) : nowH
+            return <span key={e.id} title={`${projName(e.project_id) || '-'} - ${e.task_label}`}
+              style={{ position: 'absolute', left: `${pct(s0)}%`, width: `${Math.max(0.6, pct(e0) - pct(s0))}%`, top: 3, bottom: 3, borderRadius: 6, background: clientColor(projName(e.project_id)), boxShadow: e.ended_at ? 'none' : '0 0 0 2px var(--accent)' }} />
+          })}
+          <span style={{ position: 'absolute', left: `${pct(nowH)}%`, top: -4, bottom: -4, width: 2, background: 'var(--accent)' }} />
+        </div>
+        <div className="wk-sm" style={{ marginTop: 10 }}>Yellow line is now. Outlined block is running. Colour = client.</div>
       </div>
     </div>
   )
