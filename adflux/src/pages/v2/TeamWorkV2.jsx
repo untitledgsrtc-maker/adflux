@@ -189,13 +189,12 @@ export default function TeamWorkV2() {
 
       {!loading && !err && tab === 'overview' && (
         <>
-          <div className="wk-hero" style={{ marginBottom: 16 }}>
-            <span className="wk-eyb">Team hours · {range === 'today' ? 'today' : range === 'yesterday' ? 'yesterday' : 'selected dates'}</span>
-            <div className="wk-row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <div className="wk-num" style={{ fontSize: 48, fontWeight: 600, lineHeight: 1.1 }}>{fmtDur(teamSecs)}</div>
-              <div className="wk-hs">{running.length} of {memberIds.length} working now · {openCount} open tasks · {finishedToday} finished today</div>
-            </div>
-          </div>
+          <HeroSegs live eyebrow={`Team · ${range === 'today' ? 'today' : range === 'yesterday' ? 'yesterday' : 'selected dates'}`} segs={[
+            ['Team hours', fmtDur(teamSecs), `${Object.keys(byPerson).length} people tracked`],
+            ['Working now', `${running.length} of ${memberIds.length}`, 'Live timers'],
+            ['Open tasks', String(openCount), 'Assigned and in process'],
+            ['Finished today', String(finishedToday)],
+          ]} />
           <div className="wk-card" style={{ marginBottom: 16 }}>
             <b style={{ fontSize: 18 }}>Needs you</b>
             {[
@@ -208,12 +207,6 @@ export default function TeamWorkV2() {
               </div>
             ))}
             {lateParts.length === 0 && pending.length === 0 && <div className="wk-sm" style={{ marginTop: 8 }}>All handled. Nothing is stuck.</div>}
-          </div>
-          <div className="wk-kpis">
-            <div className="wk-card"><div className="wk-sm">Team hours ({range === 'today' ? 'today' : 'range'})</div><div className="wk-kpi-n">{fmtDur(teamSecs)}</div></div>
-            <div className="wk-card"><div className="wk-sm">Working now</div><div className="wk-kpi-n">{running.length}<span className="wk-sm"> of {memberIds.length}</span></div></div>
-            <div className="wk-card"><div className="wk-sm">Open tasks</div><div className="wk-kpi-n">{openCount}</div></div>
-            <div className="wk-card"><div className="wk-sm">Finished today</div><div className="wk-kpi-n" style={{ color: 'var(--success)' }}>{finishedToday}</div></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
             <div className="wk-card"><b style={{ fontSize: 18 }}>Who is working</b>
@@ -254,6 +247,11 @@ export default function TeamWorkV2() {
 
       {!loading && !err && tab === 'tasks' && (
         <>
+          <HeroSegs eyebrow="Board · filtered" segs={[
+            ['In process', String(items.filter((i) => i.status === 'in_process').length), 'Being worked on'],
+            ['Assigned', String(items.filter((i) => i.status === 'assigned').length), 'Not started'],
+            ['Late', String(lateParts.length), lateParts.length ? 'Past due date' : 'None'],
+          ]} />
           <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
             <select className="wk-input" style={{ width: 220 }} value={fPerson} onChange={(e) => setFPerson(e.target.value)} aria-label="Filter by person">
               <option value="">All people</option>{memberIds.map((id) => <option key={id} value={id}>{nameOf(id)}</option>)}
@@ -288,6 +286,8 @@ export default function TeamWorkV2() {
       )}
 
       {!loading && !err && tab === 'approvals' && (
+        <>
+        <HeroSegs eyebrow="Waiting for you" segs={[['Requests', String(pending.length), 'Forgotten time']]} />
         <div className="wk-card" style={{ padding: 0, overflowX: 'auto' }}>
           {pending.length === 0 ? <div className="wk-empty">Nothing waiting. Added-later time shows here for your OK.</div> : (
             <table className="wk-table" style={{ minWidth: 640 }}>
@@ -310,6 +310,7 @@ export default function TeamWorkV2() {
             </table>
           )}
         </div>
+        </>
       )}
 
       {newTask && (
@@ -324,12 +325,30 @@ export default function TeamWorkV2() {
   )
 }
 
+function HeroSegs({ eyebrow, segs, live }) {
+  return (
+    <div className="wk-hero" style={{ marginBottom: 16 }}>
+      <span className="wk-grp">{live && <span className="wk-ldot" aria-hidden="true" />}<span className="wk-eyb">{eyebrow}</span></span>
+      <div className="wk-hsegs" style={{ gridTemplateColumns: `repeat(${segs.length}, minmax(0, 1fr))` }}>
+        {segs.map(([l, v, sub], i) => (
+          <div key={l} className="wk-hseg">
+            <div className="wk-hs">{l}</div>
+            <div className="wk-num" style={{ fontSize: i === 0 ? 34 : 26, fontWeight: 600, color: i === 0 ? 'var(--accent)' : '#fff' }}>{v}</div>
+            {sub && <div className="wk-hs">{sub}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function PeopleTab({ members, users, nameOf, runBy, byPerson, projName, now, isAdmin, busy, onSet }) {
   const [add, setAdd] = useState('')
   const ids = new Set(members.map((m) => m.user_id))
   const candidates = users.filter((u) => u.is_active && !ids.has(u.id) && u.role !== 'agency')
   return (
     <div>
+      <HeroSegs eyebrow="Work team" segs={[['People', String(members.length), `${members.filter((m) => m.is_head).length} head`], ['Working now', String(Object.keys(runBy).length), 'Live timers']]} />
       {isAdmin && (
         <div className="wk-card" style={{ marginBottom: 14 }}>
           <b>Put someone on the timeclock</b>
@@ -379,6 +398,7 @@ function ClientsTab({ projects, report, cost, canCost, onAdd, onUpdate }) {
     .sort((a, b) => (hours[b.id]?.seconds || 0) - (hours[a.id]?.seconds || 0) || a.name.localeCompare(b.name))
   return (
     <div>
+      <HeroSegs eyebrow="Clients worked on" segs={[['Clients', String(projects.filter((p) => p.is_active).length), `${(report?.by_project || []).length} with time in these dates`]]} />
       <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
         <input className="wk-input" style={{ width: 240 }} placeholder="Search clients" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search clients" />
         <input className="wk-input" style={{ width: 240 }} placeholder="New client name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} aria-label="New client name" />
@@ -473,12 +493,12 @@ function HoursTab({ report, cost, canCost, projName, nameOf, taskTitles, onOpen 
   return (
     <div>
       {canCost && cost && cost.total_cost != null && (
-        <div className="wk-kpis">
-          <div className="wk-card"><div className="wk-sm">Team cost (hours x salary rate)</div><div className="wk-kpi-n">Rs {Number(cost.total_cost).toLocaleString('en-IN')}</div></div>
-          <div className="wk-card"><div className="wk-sm">Hours tracked</div><div className="wk-kpi-n">{fmtDur(cost.total_seconds)}</div></div>
-          <div className="wk-card"><div className="wk-sm">Avg cost / hour</div><div className="wk-kpi-n">Rs {cost.total_seconds ? Math.round(cost.total_cost / (cost.total_seconds / 3600)) : 0}</div></div>
-          <div className="wk-card"><div className="wk-sm">Not on any task</div><div className="wk-kpi-n" style={{ color: 'var(--warning)' }}>{cost.total_seconds ? Math.round(cost.unassigned_seconds / cost.total_seconds * 100) : 0}%</div></div>
-        </div>
+        <HeroSegs eyebrow="Cost · selected dates" segs={[
+          ['Team cost', `Rs ${Number(cost.total_cost).toLocaleString('en-IN')}`, 'Salary-based'],
+          ['Hours tracked', fmtDur(cost.total_seconds)],
+          ['Cost per hour', `Rs ${cost.total_seconds ? Math.round(cost.total_cost / (cost.total_seconds / 3600)) : 0}`, 'Average'],
+          ['Not on any task', `${cost.total_seconds ? Math.round(cost.unassigned_seconds / cost.total_seconds * 100) : 0}%`],
+        ]} />
       )}
       <div className="wk-card"><b style={{ fontSize: 18 }}>Hours per client</b>
         {proj.length === 0 && <div className="wk-sm" style={{ marginTop: 8 }}>No time in this range.</div>}
