@@ -32,6 +32,7 @@ import GlobalSearchBar from './GlobalSearchBar'
 import NotificationPanel from './NotificationPanel'
 import ProposedIncentiveCard from '../incentives/ProposedIncentiveCard'
 import SalesTourOverlay from '../training/SalesTourOverlay'
+import MorningGreetGate from '../work/MorningGreetGate'
 import { ToastViewport, pushToast } from './Toast'
 import AppUpdateBanner from './AppUpdateBanner'
 import GpsSetupPrompt from './GpsSetupPrompt'
@@ -1118,6 +1119,8 @@ export function V2AppShell() {
 
       {/* Promise-based confirm dialog viewport. */}
       <ConfirmDialogViewport />
+      {/* Phase 372: sales + telecaller pages mount their own gate; every other role gets it here. */}
+      {['staff', 'operation_executive', 'operation_head', 'hr', 'accounts'].includes(profile?.role) && <MorningGreetGate />}
 
       {/* Phase 56f — first-launch native permission walkthrough.
           Component self-gates on Capacitor.isNativePlatform() +

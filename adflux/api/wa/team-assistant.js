@@ -104,7 +104,7 @@ export default async function handler(req) {
   // ONE parallel wave instead of 7 sequential Edge→Supabase round-trips per
   // greeting/nudge. Derivations stay identical, just after the single await.
   const [userRows, tgtRows, callsDone, fups, renewals, msdRows, quotes] = await Promise.all([
-    sbRows(`users?id=eq.${uid}&select=name&limit=1`),
+    sbRows(`users?id=eq.${uid}&select=name,role&limit=1`),
     sbRows(`daily_targets?user_id=eq.${uid}&select=min_calls&limit=1`),
     sbCount(`call_logs?user_id=eq.${uid}&call_at=gte.${istMidnightUtc}`),
     sbRows(`follow_ups?assigned_to=eq.${uid}&is_done=eq.false&follow_up_date=lte.${istToday}&select=follow_up_date,note,leads(name)&order=follow_up_date.asc&limit=40`),
@@ -156,6 +156,41 @@ export default async function handler(req) {
       body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: text } }),
     })
     if (!gr.ok) { const gd = await gr.json().catch(() => ({})); throw new Error(gd?.error?.message || ('graph_' + gr.status)) }
+  }
+
+  // ── Phase 372: non-sales roles (Work staff, operations, HR, accounts) get a role-shaped day, no Claude ──
+  const ALT_ROLES = ['staff', 'operation_executive', 'operation_head', 'hr', 'accounts', 'office_staff']
+  if (ALT_ROLES.includes(user.role)) {
+    const L = [`Good morning ${firstName} 👋`, '']
+    try {
+      if (user.role === 'staff') {
+        const parts = await sbRows(`work_task_parts?assignee_id=eq.${uid}&status=neq.finished&due_date=lte.${istToday}&select=label,due_date,work_tasks(title)&order=due_date.asc&limit=20`)
+        if (parts.length) {
+          L.push(`📋 Tasks due today or overdue: ${parts.length}`)
+          parts.slice(0, 6).forEach((p) => L.push(`• ${(p.work_tasks && p.work_tasks.title) || p.label || 'task'}${p.due_date < istToday ? ' (overdue)' : ''}`))
+          if (parts.length > 6) L.push(`…and ${parts.length - 6} more`)
+        } else L.push('📋 No tasks due today ✅')
+        L.push('', 'Start your first timer in My Work to clock in.')
+      } else if (user.role === 'operation_executive') {
+        const depots = await sbRows(`ops_depots?assigned_to=eq.${uid}&is_active=eq.true&select=id`)
+        const ids = depots.map((d) => d.id)
+        const tickets = await sbCount(`ops_tickets?assigned_to=eq.${uid}&status=in.(open,in_progress)`)
+        const down = ids.length ? await sbCount(`ops_screens?depot_id=in.(${ids.join(',')})&is_active=eq.true&status=eq.offline`) : 0
+        L.push(`📺 Screens down in your stations: ${down}`)
+        L.push(`🛠 Open faults on you: ${tickets}`)
+        L.push('', 'Open the app: Home shows the worst stations first.')
+      } else if (user.role === 'operation_head') {
+        const down = await sbCount(`ops_screens?is_active=eq.true&status=eq.offline`)
+        const tickets = await sbCount(`ops_tickets?status=in.(open,in_progress)`)
+        L.push(`📺 Screens down across the network: ${down}`)
+        L.push(`🛠 Open faults: ${tickets}`)
+      } else {
+        L.push('Have a good day. Open the app for your pending approvals.')
+      }
+    } catch { L.push('Have a good day.') }
+    try { await sendText(L.join('\n')) } catch (e) { await markDone(rid, 'error'); return nope('send_failed:' + String(e?.message || e), 502) }
+    await markDone(rid, 'handled')
+    return ok({ mode: 'alt_snapshot', role: user.role })
   }
 
   // ── greeting → snapshot, no Claude ──
