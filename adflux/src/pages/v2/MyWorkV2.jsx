@@ -490,6 +490,10 @@ function HoursTab({ entries, projects, projName, secs, onAddManual, onAddProject
   }
   const approved = entries.filter((e) => e.status === 'approved')
   const asks = entries.filter((e) => e.status !== 'approved')
+  const byClient = Object.entries(approved.reduce((m, e) => {
+    const sec = ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000
+    m[e.project_id || ''] = (m[e.project_id || ''] || 0) + sec; return m
+  }, {})).sort((a, b) => b[1] - a[1])
   const longDay = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short' })
   return (
     <div className="wk-grid">
@@ -504,6 +508,17 @@ function HoursTab({ entries, projects, projName, secs, onAddManual, onAddProject
         <div className="wk-card flush" style={{ marginBottom: 24 }}>
           <div className="wk-ch"><h3><span className="wk-tile"><Clock size={16} aria-hidden="true" /></span>Today, by hour</h3></div>
           <DayStrip entries={approved} projName={projName} />
+        </div>
+        <div className="wk-card" style={{ marginBottom: 24 }}>
+          <b style={{ fontSize: 18 }}>Hours per client</b>
+          {byClient.length === 0 && <div className="wk-sm" style={{ marginTop: 8 }}>No time today.</div>}
+          {byClient.map(([pid, sec]) => (
+            <div key={pid || 'none'} className="wk-hrow">
+              <span className="wk-grp" style={{ flexWrap: 'nowrap' }}><span className="wk-dot" style={{ background: clientColor(projName(pid)) }} />{projName(pid) || 'No client'}</span>
+              <div className="wk-bar-h"><i style={{ width: `${sec / byClient[0][1] * 100}%`, background: clientColor(projName(pid)) }} /></div>
+              <span className="wk-num" style={{ textAlign: 'right' }}>{fmtDur(sec)}</span>
+            </div>
+          ))}
         </div>
         <div className="wk-card flush">
           <div className="wk-ch"><h3><span className="wk-tile"><Clock size={16} aria-hidden="true" /></span>Days</h3></div>

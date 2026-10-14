@@ -21300,3 +21300,4 @@ Owner built his own UI in Claude Design (`Work Module (standalone).html`) and as
 - **356.3 (2026-10-14)** Team Work: People "Head" is an on/off switch (`.wk-sw`, same `work_set_member` call); Clients shows a "Possible duplicate - Merge / Not the same" banner (names equal after dropping pvt / ltd / limited / punctuation; Merge uses the existing `work_update_project` merge, "Not the same" is remembered for the page session only).
 - **356.4 (2026-10-14)** My Work: My profile / Leave request / Salary slips moved from the side card into the page header buttons (same links).
 - **356.5 (2026-10-14)** My hours: a 'Today, by hour' strip (same as the head's Timeline, one person) above the Days list.
+- **356.6** My hours also shows 'Hours per client' bars (same as the head's Hours tab, own data).
