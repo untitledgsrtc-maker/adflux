@@ -50,7 +50,7 @@ export default function WorkProfileV2() {
       supabase.from('work_time_entries').select('started_at,ended_at,status').eq('user_id', targetId).eq('status', 'approved').gte('started_at', t0).lt('started_at', t1).limit(1500),
       supabase.from('leaves').select('leave_date,status,is_half_day').eq('user_id', targetId).gte('leave_date', start).lt('leave_date', end).limit(100),
       supabase.from('holidays').select('holiday_date,name').eq('is_active', true).gte('holiday_date', start).lt('holiday_date', end),
-      supabase.from('work_task_parts').select('id,status,due_date,finished_at').eq('assignee_id', targetId).eq('status', 'finished').gte('finished_at', t0).lt('finished_at', t1).limit(500),
+      supabase.from('work_task_parts').select('id,status,due_date,finished_at').eq('assignee_id', targetId).gte('due_date', start).lt('due_date', end).limit(1000),
     ])
     const e = [u, en, lv, ho, pa].find((r) => r.error)
     if (e) { setErr(e.error.message || 'Could not load.'); setLoading(false); return }
@@ -106,7 +106,12 @@ export default function WorkProfileV2() {
   const late = cells.filter((c) => c?.kind === 'late' || c?.kind === 'half').length
   const avgIn = present.length ? Math.round(present.reduce((s, c) => s + days[c.ymd].firstMins, 0) / present.length) : null
   const monthSecs = Object.values(days).reduce((s, d) => s + d.secs, 0)
-  const lateFinish = parts.filter((p) => p.due_date && p.finished_at && istParts(p.finished_at).ymd > p.due_date).length
+  // Tasks DUE this month: total, finished on/before the due date, and overdue (not done, due date passed
+  // or finished after the due date).
+  const taskTotal = parts.length
+  const taskOnTime = parts.filter((p) => p.status === 'finished' && p.finished_at && istParts(p.finished_at).ymd <= p.due_date).length
+  const taskOverdue = parts.filter((p) => (p.status !== 'finished' && p.due_date < today) || (p.status === 'finished' && p.finished_at && istParts(p.finished_at).ymd > p.due_date)).length
+  const tasksFinished = parts.filter((p) => p.status === 'finished').length
   const TONE = { ok: 'var(--success-soft)', late: 'var(--warning-soft)', half: 'var(--warning-soft)', leave: 'var(--danger-soft)', absent: 'var(--danger-soft)', off: 'transparent', future: 'transparent' }
   const COLOR = { ok: 'var(--success)', late: 'var(--warning)', half: 'var(--warning)', leave: 'var(--danger)', absent: 'var(--danger)', off: 'var(--text-muted)', future: 'var(--text-muted)' }
 
@@ -152,6 +157,9 @@ export default function WorkProfileV2() {
               <div className="wk-card"><div className="wk-sm">Present</div><div className="wk-kpi-n">{present.length}</div></div>
               <div className="wk-card"><div className="wk-sm">On time</div><div className="wk-kpi-n" style={{ color: 'var(--success)' }}>{onTime}</div></div>
               <div className="wk-card"><div className="wk-sm">Late</div><div className="wk-kpi-n" style={{ color: 'var(--warning)' }}>{late}</div></div>
+              <div className="wk-card"><div className="wk-sm">Tasks this month</div><div className="wk-kpi-n">{taskTotal}</div></div>
+              <div className="wk-card"><div className="wk-sm">Done on time</div><div className="wk-kpi-n" style={{ color: 'var(--success)' }}>{taskOnTime}</div></div>
+              <div className="wk-card"><div className="wk-sm">Overdue</div><div className="wk-kpi-n" style={{ color: taskOverdue ? 'var(--danger)' : 'var(--text)' }}>{taskOverdue}</div></div>
               <div className="wk-card"><div className="wk-sm">Avg check-in</div><div className="wk-kpi-n">{avgIn == null ? '-' : `${String(Math.floor(avgIn / 60)).padStart(2, '0')}:${String(avgIn % 60).padStart(2, '0')}`}</div></div>
             </div>
             <div className="wk-card" style={{ marginTop: 14 }}>
@@ -166,9 +174,10 @@ export default function WorkProfileV2() {
                 {WD.map((w) => <div key={w} className="wk-sm" style={{ textAlign: 'center' }}>{w}</div>)}
                 {cells.map((c, i) => c ? (
                   <div key={c.ymd} title={c.label ? `${c.d}: ${c.label}` : undefined}
-                    style={{ minHeight: 54, borderRadius: 10, padding: '6px 8px', background: TONE[c.kind], color: COLOR[c.kind], border: `1px solid ${c.ymd === today ? 'var(--accent)' : 'var(--border)'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    style={{ minHeight: 64, borderRadius: 10, padding: '6px 8px', background: TONE[c.kind], color: COLOR[c.kind], border: `1px solid ${c.ymd === today ? 'var(--accent)' : 'var(--border)'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <b className="wk-num" style={{ fontSize: 15 }}>{c.d}</b>
                     <span style={{ fontSize: 11 }}>{c.kind === 'absent' ? 'No clock-in' : c.label}</span>
+                    {c.secs > 0 && <span className="wk-num" style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{fmtDur(c.secs)}</span>}
                   </div>
                 ) : <div key={`e${i}`} />)}
               </div>
@@ -181,8 +190,8 @@ export default function WorkProfileV2() {
             <div className="wk-card" style={{ marginTop: 14 }}>
               <b style={{ fontSize: 18 }}>This month at work</b>
               <div className="wk-row" style={{ marginTop: 10 }}><span className="wk-sm">Hours tracked</span><b className="wk-num">{fmtDur(monthSecs)}</b></div>
-              <div className="wk-row" style={{ marginTop: 8 }}><span className="wk-sm">Tasks finished</span><b className="wk-num">{parts.length}</b></div>
-              <div className="wk-row" style={{ marginTop: 8 }}><span className="wk-sm">Finished after the due date</span><b className="wk-num" style={{ color: lateFinish ? 'var(--warning)' : 'var(--text)' }}>{lateFinish}</b></div>
+              <div className="wk-row" style={{ marginTop: 8 }}><span className="wk-sm">Tasks finished</span><b className="wk-num">{tasksFinished} of {taskTotal}</b></div>
+              <div className="wk-row" style={{ marginTop: 8 }}><span className="wk-sm">Overdue or finished late</span><b className="wk-num" style={{ color: taskOverdue ? 'var(--warning)' : 'var(--text)' }}>{taskOverdue}</b></div>
             </div>
           </div>
         </div>

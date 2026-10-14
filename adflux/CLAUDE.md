@@ -21274,3 +21274,7 @@ SUPERSEDES section 354 (the 19 per-client weekly templates are switched off; thi
 
 - **355.1 (2026-10-14) - My Work date filter** replaces "Show upcoming": `/my-work` opens on **Today** = tasks due today + everything overdue + the ones finished today; a date picker with < > arrows and a Today button shows only that date's tasks
   (plus the ones finished on it). The load now keeps finished tasks for 14 days so past days can be looked at. Display only, `MyWorkV2.jsx`.
+
+- **355.2 (2026-10-14) - My Work range filter + profile task numbers.** `/my-work`: From - To date range (Today = today's + overdue + finished TODAY; yesterday's finished tasks drop off; the evening report counts only tasks
+  finished today). `/work-profile`: monthly cards Tasks this month / Done on time / Overdue (tasks DUE in the month; overdue = not done and past due, or finished after the due date) and every calendar day shows the hours worked.
+  Display only (`MyWorkV2.jsx`, `WorkProfileV2.jsx`).
