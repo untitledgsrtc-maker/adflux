@@ -190,7 +190,7 @@ export default function TeamWorkV2() {
       {!loading && !err && tab === 'overview' && (
         <>
           <HeroSegs live eyebrow={`Team · ${range === 'today' ? 'today' : range === 'yesterday' ? 'yesterday' : 'selected dates'}`} segs={[
-            ['Team hours', fmtDur(teamSecs), `${Object.keys(byPerson).length} people tracked`],
+            ['Team hours', fmtDur(teamSecs), `${Object.keys(byPerson).length} ${Object.keys(byPerson).length === 1 ? 'person' : 'people'} tracked`],
             ['Working now', `${running.length} of ${memberIds.length}`, 'Live timers'],
             ['Open tasks', String(openCount), 'Assigned and in process'],
             ['Finished today', String(finishedToday)],
