@@ -660,6 +660,9 @@ function FormField({ label, v, onChange, type = 'text', required, placeholder })
         required={required}
         placeholder={placeholder}
         style={fullInput}
+        // Stop the browser pasting HR's own saved login into a NEW member's form.
+        autoComplete={type === 'password' ? 'new-password' : type === 'email' ? 'off' : undefined}
+        data-lpignore="true"
       />
     </label>
   )
