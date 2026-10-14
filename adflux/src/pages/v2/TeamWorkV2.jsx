@@ -3,14 +3,14 @@
 // Hours & cost (cost = admin + accounts only), Approvals (added-later time).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { Plus, Loader2, Check, X, AlertTriangle, Clock } from 'lucide-react'
+import { Plus, Loader2, Check, X, AlertTriangle, Clock, Users, Repeat, Moon } from 'lucide-react'
 import '../../styles/work.css'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { istTodayISO } from '../../utils/istDate'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
-import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, dueState, initialsOf, clientColor } from '../../utils/workUtils'
+import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, dueState, initialsOf, clientColor, istHour } from '../../utils/workUtils'
 import WorkBoard from '../../components/work/WorkBoard'
 import NewTaskModal from '../../components/work/NewTaskModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
@@ -152,6 +152,10 @@ export default function TeamWorkV2() {
   const teamSecs = (report?.by_person || []).reduce((s, p) => s + Number(p.seconds || 0), 0)
   const memberIds = members.map((m) => m.user_id)
   const sharedSet = new Set(shares.map((s) => s.user_id))
+  const needs = [
+    pending.length > 0 && { key: 'pend', icon: Clock, tone: 'warn', pill: 'Waiting', action: 'Review', text: `${pending.length} forgotten-time request${pending.length > 1 ? 's' : ''}`, sub: [...new Set(pending.map((e) => nameOf(e.user_id).split(' ')[0]))].join(', '), go: () => setTab('approvals') },
+    lateParts.length > 0 && { key: 'late', icon: AlertTriangle, tone: 'bad', pill: 'Overdue', action: 'Open', text: `${lateParts.length} task${lateParts.length > 1 ? 's' : ''} past due date`, sub: [...new Set(lateParts.map((p) => p.task?.title).filter(Boolean))].slice(0, 2).join(' · '), go: () => setTab('tasks') },
+  ].filter(Boolean)
   const firedToday = parts.filter((p) => p.task?.template_id && p.task?.created_at >= dayStartISO(today))
 
   return (
@@ -195,51 +199,91 @@ export default function TeamWorkV2() {
             ['Open tasks', String(openCount), 'Assigned and in process'],
             ['Finished today', String(finishedToday)],
           ]} />
-          <div className="wk-card" style={{ marginBottom: 16 }}>
-            <b style={{ fontSize: 18 }}>Needs you</b>
-            {[
-              lateParts.length > 0 && { icon: AlertTriangle, tone: 'bad', text: `${lateParts.length} task part${lateParts.length > 1 ? 's' : ''} late`, go: () => setTab('tasks') },
-              pending.length > 0 && { icon: Clock, tone: 'warn', text: `${pending.length} added-later time${pending.length > 1 ? 's' : ''} waiting for you`, go: () => setTab('approvals') },
-            ].filter(Boolean).map((r, i) => (
-              <div key={i} className="wk-row" style={{ minHeight: 52, borderBottom: '1px solid var(--border)' }}>
-                <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}><r.icon size={18} style={{ color: r.tone === 'bad' ? 'var(--danger)' : 'var(--warning)' }} aria-hidden="true" />{r.text}</span>
-                <button className="wk-btn g sm" onClick={r.go}>Open</button>
-              </div>
-            ))}
-            {lateParts.length === 0 && pending.length === 0 && <div className="wk-sm" style={{ marginTop: 8 }}>All handled. Nothing is stuck.</div>}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-            <div className="wk-card"><b style={{ fontSize: 18 }}>Who is working</b>
-              {memberIds.length === 0 && <div className="wk-sm" style={{ marginTop: 8 }}>No one is on the timeclock yet. Add people in the People tab.</div>}
-              {memberIds.map((id) => {
-                const r = runBy[id]
-                return (
-                  <div key={id} className="wk-row" style={{ minHeight: 44, borderBottom: '1px solid var(--border)' }}>
-                    <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span className="wk-dot" style={{ background: r ? 'var(--success)' : 'var(--border-strong)' }} aria-hidden="true" />
-                      <b>{nameOf(id)}</b>
-                    </span>
-                    <span className="wk-sm">{r ? `${projName(r.project_id) || r.task_label} - ${fmtClock((now - new Date(r.started_at)) / 1000)}` : 'Not running'}</span>
+          <div className="wk-grid" style={{ gap: 24 }}>
+            <div className="wk-c8">
+              <div className="wk-card flush">
+                <div className="wk-ch"><h3><span className="wk-tile" style={{ background: 'rgba(239,68,68,.14)', color: 'var(--danger)' }}><AlertTriangle size={16} aria-hidden="true" /></span>Needs you</h3></div>
+                {needs.length === 0 ? (
+                  <div className="wk-empty"><b>Nothing needs you</b>No approvals waiting, nothing overdue.</div>
+                ) : (
+                  <div className="wk-list">
+                    {needs.map((r) => (
+                      <div key={r.key} className="wk-row wk-hov" style={{ padding: '16px 20px', gap: 16 }} onClick={r.go}>
+                        <span className="wk-tile" style={{ background: r.tone === 'bad' ? 'rgba(239,68,68,.14)' : 'rgba(245,158,11,.14)', color: r.tone === 'bad' ? 'var(--danger)' : 'var(--warning)' }}><r.icon size={16} aria-hidden="true" /></span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 500 }}>{r.text}</div>
+                          <div className="wk-sm" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.sub}</div>
+                        </div>
+                        <span className={`wk-pill ${r.tone}`}>{r.pill}</span>
+                        <button className="wk-btn o sm" onClick={r.go}>{r.action} →</button>
+                      </div>
+                    ))}
                   </div>
-                )
-              })}
+                )}
+              </div>
             </div>
-            <div className="wk-card"><b style={{ fontSize: 18 }}>Fired this morning</b>
-              {firedToday.length === 0 && <div className="wk-sm" style={{ marginTop: 8 }}>No repeating task fired today (none set, or a Sunday / holiday).</div>}
-              {firedToday.map((p) => (
-                <div key={p.id} className="wk-row" style={{ minHeight: 44, borderBottom: '1px solid var(--border)' }}>
-                  <span>{p.task?.title}</span><span className="wk-sm">{nameOf(p.assignee_id)}</span>
-                </div>
-              ))}
+            <div className="wk-c4">
+              <div className="wk-card flush">
+                <div className="wk-ch"><h3><span className="wk-tile" style={{ background: 'rgba(59,130,246,.14)', color: 'var(--info, #60a5fa)' }}><Users size={16} aria-hidden="true" /></span>Who is working</h3></div>
+                {running.length === 0 ? (
+                  <div className="wk-empty"><b>No one is working right now</b>Running timers appear here live.</div>
+                ) : (
+                  <div className="wk-list">
+                    {running.map((r) => (
+                      <div key={r.id} className="wk-row" style={{ padding: '12px 20px' }}>
+                        <span className="wk-grp" style={{ flexWrap: 'nowrap', minWidth: 0 }}>
+                          <span className="wk-av" style={{ width: 36, height: 36 }}>{initialsOf(nameOf(r.user_id))}</span>
+                          <span style={{ minWidth: 0 }}>
+                            <Link to={`/work-profile?user=${r.user_id}`} style={{ color: 'inherit', fontWeight: 500 }}>{nameOf(r.user_id)}</Link>
+                            <div className="wk-sm" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <span className="wk-dot" style={{ background: clientColor(projName(r.project_id)), width: 8, height: 8, marginRight: 6 }} />{projName(r.project_id) || 'No client'} · {r.task_label}
+                            </div>
+                          </span>
+                        </span>
+                        <span className="wk-num">{fmtClock((now - new Date(r.started_at)) / 1000)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {memberIds.filter((id) => !runBy[id]).length > 0 && (
+                  <div className="wk-sm" style={{ padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
+                    Not running: {memberIds.filter((id) => !runBy[id]).map((id) => nameOf(id).split(' ')[0]).join(', ')}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="wk-card"><b style={{ fontSize: 18 }}>Evening report</b>
-              <div className="wk-sm" style={{ marginBottom: 6 }}>Shared today</div>
-              {memberIds.map((id) => (
-                <div key={id} className="wk-row" style={{ minHeight: 40 }}>
-                  <span>{nameOf(id)}</span>
-                  {sharedSet.has(id) ? <span className="wk-pill ok"><Check size={14} aria-hidden="true" /> shared</span> : <span className="wk-pill">not yet</span>}
+            <div className="wk-c6">
+              <div className="wk-card flush">
+                <div className="wk-ch"><div><h3><span className="wk-tile"><Repeat size={16} aria-hidden="true" /></span>Fired this morning</h3><div className="wk-csub">Repeating tasks</div></div></div>
+                {firedToday.length === 0 ? (
+                  <div className="wk-empty"><b>No repeating tasks today</b>None set, or a Sunday / holiday.</div>
+                ) : (
+                  <div className="wk-list">
+                    {firedToday.map((p) => (
+                      <div key={p.id} className="wk-row" style={{ padding: '14px 20px' }}>
+                        <div><div style={{ fontWeight: 500 }}>{p.task?.title}</div><div className="wk-sm">{projName(p.task?.project_id) || 'No client'}</div></div>
+                        <span className="wk-av">{initialsOf(nameOf(p.assignee_id))}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="wk-c6">
+              <div className="wk-card flush">
+                <div className="wk-ch"><div><h3><span className="wk-tile"><Moon size={16} aria-hidden="true" /></span>Evening report</h3><div className="wk-csub">{istHour() >= 19 ? 'After 7 PM' : 'Opens at 7 PM'}</div></div></div>
+                <div style={{ padding: 18, display: 'grid', gap: 16 }}>
+                  {[['Shared', 'ok', memberIds.filter((id) => sharedSet.has(id))], ['Not yet', 'warn', memberIds.filter((id) => !sharedSet.has(id))]].map(([lbl, tone, ids]) => (
+                    <div key={lbl}>
+                      <span className={`wk-pill ${tone}`}>{lbl}</span>
+                      <div className="wk-grp" style={{ marginTop: 8 }}>
+                        {ids.length === 0 && <span className="wk-sm">No one</span>}
+                        {ids.map((id) => <span key={id} className="wk-chip"><span className="wk-av" style={{ width: 22, height: 22, fontSize: 10 }}>{initialsOf(nameOf(id))}</span>{nameOf(id).split(' ')[0]}</span>)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         </>
