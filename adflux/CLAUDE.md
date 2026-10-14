@@ -21251,3 +21251,23 @@ start today, end = the later campaign_end_date of that client's won quotes, assi
 - 19 templates created. Skipped on purpose: 3 campaigns ending 14 / 15 / 16 Oct (no Monday left): rajshakti travels (UA-2026-0427), jay bahucharaji krupa (0429), Ranjit Sir (0443). Anee Marcom has two quotes = one task.
 - NOT automatic: a client whose quote becomes won LATER gets no task. Re-run this file (idempotent) after new wins, or tell Claude. A real "auto-create on Won" trigger is not built.
 - Undo: `UPDATE work_templates SET is_active=false WHERE title LIKE 'Send campaign report - %';`
+
+
+---
+
+## 355 · Phase 367 - the campaign task RULE: every won private LED quote makes 3 tasks (2026-10-14)
+
+SUPERSEDES section 354 (the 19 per-client weekly templates are switched off; this rule replaces them). Owner's rule, built + applied live (dry-run + 3 behaviour tests in a rolled-back run first):
+- **When a private LED quote (segment PRIVATE, media_type LED_OTHER) becomes WON** a trigger creates, for the "campaign tasks" person (`work_rule_settings` key `campaign_tasks_assignee` = Safika), ONE SET PER QUOTE:
+  1. "Approve video from client - <client> (<quote no>)" due the day it is marked Won (only at the Won moment; running campaigns do not get it);
+  2. "Share log report - <client> (<quote no>)": a weekly Monday template from the campaign start to the end date (the 07:00 IST cron `work_run_recurring` makes the task; holidays skipped);
+  3. "End-date report and remove campaign - <client> (<quote no>)" due on the campaign end date.
+  If the campaign dates are edited later, a second trigger shifts the open end report + the weekly template. Idempotent (unique `(source_quote_id, source_kind)` / `source_quote_id`), best-effort: it can never block a quote save.
+- **Won now REQUIRES campaign start + end dates** for private LED (BEFORE UPDATE trigger `trg_quotes_won_needs_dates`, error "Add the campaign start and end dates before marking this quote Won."); the Won modal already collected them.
+  One existing won quote without dates is untouched (the guard fires on the transition only).
+- **Her board shows today + overdue only**; future tasks sit behind a "Show upcoming (N)" button on /my-work (applies to every staff member, nothing is deleted).
+- **Reassign:** the assignee can now give their own task part to ANY active person (`work_reassign_part` accepts the assignee; "Give to someone else..." select in the task detail).
+- **Leave:** when a leave is APPROVED for a work-team member, `trg_work_leave_notify` pushes them the tasks (and Monday repeating tasks) that fall on that leave date so they can hand them over. Nothing moves by itself.
+  Known limits: a push needs quiet hours (09:00-20:59 IST) to be allowed; a Monday report that the cron creates AT 7 AM on the leave day appears after the notice, so it must be given away that morning (or by the head).
+- Backfill: 23 active campaigns got tasks 2 and 3 (task 3 also for the 3 campaigns ending 14-16 Oct). Change the person: `UPDATE work_rule_settings SET user_id = '<user id>' WHERE key = 'campaign_tasks_assignee';`
+- Files: `supabase_phase367_campaign_task_rule.sql` (canonical, UNDO at the bottom), `MyWorkV2.jsx`, `TaskDetailModal.jsx`. `work_reassign_part` was redefined here (its phase 365 copy is superseded).

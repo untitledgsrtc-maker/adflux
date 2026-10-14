@@ -29,6 +29,7 @@ export default function MyWorkV2() {
   const [running, setRunning] = useState(null)
   const [entries, setEntries] = useState([])       // today's entries
   const [parts, setParts] = useState([])
+  const [showUpcoming, setShowUpcoming] = useState(false)   // default: today + overdue only
   const [asked, setAsked] = useState([])
   const [shared, setShared] = useState(null)
   const [now, setNow] = useState(Date.now())
@@ -101,6 +102,10 @@ export default function MyWorkV2() {
     assigneeName: nameOf(p.assignee_id), partsTotal: 1, partsDone: 0, seconds: p.seconds, cost: null,
   })), [parts, projName, nameOf])
 
+  // Today + overdue only: a task due in the future stays out of sight until its day.
+  const upcomingCount = items.filter((i) => i.status !== 'finished' && i.due && i.due > today).length
+  const boardItems = showUpcoming ? items : items.filter((i) => i.status === 'finished' || !i.due || i.due <= today)
+
   const runSecs = running ? (now - new Date(running.started_at).getTime()) / 1000 : 0
   const doneSecs = entries.filter((e) => e.ended_at && e.status === 'approved')
     .reduce((s, e) => s + (new Date(e.ended_at) - new Date(e.started_at)) / 1000, 0)
@@ -159,8 +164,15 @@ export default function MyWorkV2() {
                 <b style={{ fontSize: 18 }}>My tasks</b>
                 <span className="wk-sm">{items.filter((i) => i.status !== 'finished').length} open{lateCount ? ` · ${lateCount} late` : ''}</span>
               </div>
+              {upcomingCount > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <button className="wk-btn g sm" onClick={() => setShowUpcoming((v) => !v)}>
+                    {showUpcoming ? 'Hide upcoming tasks' : `Show upcoming (${upcomingCount})`}
+                  </button>
+                </div>
+              )}
               <div className="wk-sm" style={{ marginTop: 4 }}>Drag your own task forward: Assigned to In process starts the clock, In process to Finished stops it. Or use Start / Finish.</div>
-              <WorkBoard items={items} uid={uid} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} />
+              <WorkBoard items={boardItems} uid={uid} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} />
             </>
           )}
 

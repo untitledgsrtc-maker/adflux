@@ -18,6 +18,7 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
   const [comment, setComment] = useState('')
   const [step, setStep] = useState('')
   const [busy, setBusy] = useState(false)
+  const [people, setPeople] = useState([])
   const latch = useRef(false)
 
   const load = useCallback(async () => {
@@ -34,6 +35,10 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
     setData({ task: t.data, parts: p.data || [], steps: s.data || [], comments: c.data || [], log: l.data || [] })
   }, [taskId])
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    supabase.from('users').select('id,name').eq('is_active', true).neq('role', 'agency').order('name')
+      .then(({ data: u }) => setPeople(u || []))
+  }, [])
 
   const run = async (fn) => {
     if (latch.current) return
@@ -86,6 +91,13 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                     {p.label || 'Their part'}{p.due_date ? ` - due ${fmtDateShort(p.due_date)}` : ''}{p.seconds != null ? ` - ${fmtDur(p.seconds)}` : ''}
                   </div>
                   {p.finish_note && <div className="wk-sm">Note: {p.finish_note}</div>}
+                  {p.status !== 'finished' && (isHead || task.created_by === uid || p.assignee_id === uid) && (
+                    <select className="wk-input" style={{ marginTop: 8, minHeight: 40 }} value="" disabled={busy} aria-label="Give this task to someone else"
+                      onChange={(e) => { const to = e.target.value; if (to) run(() => rpc('work_reassign_part', { p_part: p.id, p_to: to })) }}>
+                      <option value="">Give to someone else…</option>
+                      {people.filter((u) => u.id !== p.assignee_id).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                  )}
                 </div>
               ))}
             </div>
