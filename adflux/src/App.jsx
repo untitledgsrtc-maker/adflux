@@ -310,6 +310,15 @@ function RequireLeadUpload({ children }) {
 // Phase 230 — Operations module route guard. Only the two ops roles
 // (plus admin/co_owner for oversight) may reach /ops; everyone else
 // bounces to their own dashboard. Additive — no existing guard changed.
+// Phase 365 — creative / office staff have no sales work page. Anyone with role 'staff' who
+// reaches a sales-only URL (old bookmark, stale link) is sent to their own Work page instead.
+function StaffToMyWork({ children }) {
+  const { profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (profile?.role === 'staff') return <Navigate to="/my-work" replace />
+  return children
+}
+
 function RequireOps({ children }) {
   const { profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
@@ -483,7 +492,7 @@ export default function App() {
           <Route path="/campaigns"                 element={<RequirePrivileged><CampaignsV2 /></RequirePrivileged>} />
           <Route path="/leads/new"                 element={<RequireNonAgency><LeadFormV2 /></RequireNonAgency>} />
           <Route path="/leads/:id"                 element={<RequireNonAgency><LeadDetailV2 /></RequireNonAgency>} />
-          <Route path="/work"                      element={<WorkV2 />} />
+          <Route path="/work"                      element={<StaffToMyWork><WorkV2 /></StaffToMyWork>} />
           {/* Phase 230 — Operations field app (exec) + Head desk console. */}
           <Route path="/ops"                       element={<RequireOps><OpsWorkV2 /></RequireOps>} />
           <Route path="/ops-command"               element={<RequireOps><OpsCommandV2 /></RequireOps>} />
