@@ -16,18 +16,20 @@ export default function WorkEveningReportCard() {
     ;(async () => {
       try {
         const today = istTodayISO()
-        const [m, s, st] = await Promise.all([
+        const [m, s, st, ws] = await Promise.all([
           supabase.from('work_members').select('user_id'),
           supabase.from('work_report_shares').select('user_id').eq('work_date', today),
-          // everyone active except the two owners (admin + co-owner)
-          supabase.from('users').select('id').not('role', 'in', '(admin,co_owner)').eq('is_active', true).limit(500),
+          // everyone active except the owners (admin, co-owner) and agency partners
+          supabase.from('users').select('id').not('role', 'in', '(admin,co_owner,agency)').eq('is_active', true).limit(500),
+          // sales / telecaller reps share their day summary from /work (stamped on work_sessions)
+          supabase.from('work_sessions').select('user_id').eq('work_date', today).not('evening_summary_sent_at', 'is', null).limit(500),
         ])
         if (m.error || s.error) return
         const ids = [...new Set([...(m.data || []).map((r) => r.user_id), ...((st.data) || []).map((r) => r.id)])]
         if (!ids.length) { if (live) setState({ members: [], shared: new Set() }); return }
-        const u = await supabase.from('users').select('id, name, profile_image_url').in('id', ids).eq('is_active', true).not('role', 'in', '(admin,co_owner)')
+        const u = await supabase.from('users').select('id, name, profile_image_url').in('id', ids).eq('is_active', true).not('role', 'in', '(admin,co_owner,agency)')
         if (!live) return
-        setState({ members: (u.data || []).filter(Boolean), shared: new Set((s.data || []).map((r) => r.user_id)) })
+        setState({ members: (u.data || []).filter(Boolean), shared: new Set([...(s.data || []), ...((ws && ws.data) || [])].map((r) => r.user_id)) })
       } catch { /* card stays hidden */ }
     })()
     return () => { live = false }
