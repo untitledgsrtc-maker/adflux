@@ -57,7 +57,10 @@ export default async function handler(req) {
   const istToday = istNow.toISOString().slice(0, 10)
   const dayAgo   = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
 
-  const reps = await sbRows(`users?whatsapp_number=not.is.null&is_active=eq.true&select=id,name`)
+  let mode = ''
+  try { mode = String((await req.json())?.mode || '') } catch { /* no body = the normal pending-follow-up nudge */ }
+
+  const reps = await sbRows(`users?whatsapp_number=not.is.null&is_active=eq.true&select=id,name,role`)
   let sent = 0, closed = 0, clear = 0
 
   const sendText = async (pnid, to, text) => {
@@ -67,6 +70,27 @@ export default async function handler(req) {
       body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: text } }),
     })
     if (!gr.ok) throw new Error('graph_' + gr.status)
+  }
+
+  // Evening report reminder (Phase 371): only people with an open window who have NOT shared today's report.
+  if (mode === 'evening') {
+    if (istHour < 19 || istHour >= 21) return ok({ skipped: 'not_evening', istHour })
+    for (const r of reps) {
+      if (['admin', 'co_owner', 'agency'].includes(r.role)) continue
+      const uid = r.id
+      const shared = (await sbCount(`work_sessions?user_id=eq.${uid}&work_date=eq.${istToday}&evening_summary_sent_at=not.is.null`))
+        + (await sbCount(`work_report_shares?user_id=eq.${uid}&work_date=eq.${istToday}`))
+      if (shared > 0) { clear++; continue }
+      const worked = (await sbCount(`work_sessions?user_id=eq.${uid}&work_date=eq.${istToday}&check_in_at=not.is.null`)) > 0
+      if (!worked) { clear++; continue }
+      const last = (await sbRows(`team_assistant_requests?user_id=eq.${uid}&created_at=gte.${dayAgo}&select=phone_number_id,wa_from&order=created_at.desc&limit=1`))?.[0]
+      const to = String(last?.wa_from || '').replace(/\D/g, '')
+      const pnid = String(last?.phone_number_id || '')
+      if (to.length < 10 || !/^\d+$/.test(pnid)) { closed++; continue }
+      const first = String(r.name || '').trim().split(/\s+/)[0] || 'there'
+      try { await sendText(pnid, to, `${first}, your evening report is not shared yet. Open the app and tap Share to send it.`); sent++ } catch { /* skip */ }
+    }
+    return ok({ mode, reps: reps.length, sent, window_closed: closed, already_shared_or_off: clear })
   }
 
   for (const r of reps) {
