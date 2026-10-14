@@ -136,7 +136,7 @@ export default function TeamWorkV2() {
     return parts
       .filter((p) => (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient))
       .map((p) => ({
-        id: p.id, taskId: p.task_id, status: p.status, title: p.task?.title || 'Task', label: p.label,
+        id: p.id, taskId: p.task_id, finishedAt: p.finished_at, status: p.status, title: p.task?.title || 'Task', label: p.label,
         client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, assigneeId: p.assignee_id,
         assigneeName: nameOf(p.assignee_id), assigneePhoto: users.find((u) => u.id === p.assignee_id)?.profile_image_url || null, partsTotal: total[p.task_id] || 1, partsDone: done[p.task_id] || 0,
         seconds: taskCostByTask[p.task_id]?.seconds ?? p.seconds, cost: taskCostByTask[p.task_id]?.cost ?? null,

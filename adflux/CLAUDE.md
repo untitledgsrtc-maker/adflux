@@ -21303,3 +21303,4 @@ Owner built his own UI in Claude Design (`Work Module (standalone).html`) and as
 - **356.6** My hours also shows 'Hours per client' bars (same as the head's Hours tab, own data).
 - **356.7** My hours: Today / Yesterday / Past 7 / Past 30 / Pick a date filter (own entries, RLS), per-day grouping, hour strip for a single day.
 - **356.8** Board avatars show the person's photo when set (initials otherwise); My Work evening layout shows the Today hours card under the timer. Day-theme toggle: owner says not needed.
+- **356.9 (2026-10-14)** Board cards now match the design side by side: grip handle, title, client colour dot + name, due pill ('On track, 18 Oct' / 'Due today' / 'Overdue, 12 Oct' / 'Finished 12:40'), avatar left and small Start/Finish button right; on phones the three columns are a segmented switcher (one column at a time, move with Start/Finish).

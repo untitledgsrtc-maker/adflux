@@ -100,7 +100,7 @@ export default function MyWorkV2() {
 
   // board items
   const items = useMemo(() => parts.map((p) => ({
-    id: p.id, taskId: p.task_id, status: p.status, title: p.task?.title || 'Task', label: p.label,
+    id: p.id, taskId: p.task_id, finishedAt: p.finished_at, status: p.status, title: p.task?.title || 'Task', label: p.label,
     client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, assigneeId: p.assignee_id,
     assigneeName: nameOf(p.assignee_id), assigneePhoto: photoOf(p.assignee_id), finishedDay: p.finished_at ? new Date(p.finished_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : null, partsTotal: 1, partsDone: 0, seconds: p.seconds, cost: null,
   })), [parts, projName, nameOf, photoOf])
