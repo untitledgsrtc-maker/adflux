@@ -112,6 +112,25 @@ export default function WorkProfileV2() {
   const taskOnTime = parts.filter((p) => p.status === 'finished' && p.finished_at && istParts(p.finished_at).ymd <= p.due_date).length
   const taskOverdue = parts.filter((p) => (p.status !== 'finished' && p.due_date < today) || (p.status === 'finished' && p.finished_at && istParts(p.finished_at).ymd > p.due_date)).length
   const tasksFinished = parts.filter((p) => p.status === 'finished').length
+  // Work score (display only, no pay effect): 40 tasks on time + 30 on-time clock-in + 30 hours vs 8 h/day.
+  // Days before today only; leave, Sundays and holidays are not counted; a part with no data is left out
+  // and the rest is scaled to 100.
+  const score = (() => {
+    const due = parts.filter((p) => p.due_date && (p.due_date <= today || p.status === 'finished'))
+    const dueOnTime = due.filter((p) => p.status === 'finished' && p.finished_at && istParts(p.finished_at).ymd <= p.due_date).length
+    const work = cells.filter((c) => c && c.ymd < today && ['ok', 'late', 'half', 'absent'].includes(c.kind))
+    const inOnTime = work.filter((c) => c.kind === 'ok').length
+    const hoursPct = work.length ? work.reduce((t, c) => t + Math.min(c.secs, 8 * 3600) / (8 * 3600), 0) / work.length : null
+    const parts3 = [
+      { key: 'tasks', label: 'Tasks on time', max: 40, frac: due.length ? dueOnTime / due.length : null, note: due.length ? `${dueOnTime} of ${due.length} due` : 'No tasks due yet' },
+      { key: 'clock', label: 'On-time clock-in', max: 30, frac: work.length ? inOnTime / work.length : null, note: work.length ? `${inOnTime} of ${work.length} working days` : 'No working days yet' },
+      { key: 'hours', label: 'Hours vs 8 h a day', max: 30, frac: hoursPct, note: hoursPct == null ? 'No working days yet' : `${Math.round(hoursPct * 100)}% of target` },
+    ]
+    const avail = parts3.filter((x) => x.frac != null)
+    const possible = avail.reduce((t, x) => t + x.max, 0)
+    const earned = avail.reduce((t, x) => t + x.max * x.frac, 0)
+    return { parts: parts3, total: possible ? Math.round(earned / possible * 100) : null }
+  })()
   const TONE = { ok: 'var(--success-soft)', late: 'var(--warning-soft)', half: 'var(--warning-soft)', leave: 'var(--danger-soft)', absent: 'var(--danger-soft)', off: 'transparent', future: 'transparent' }
   const COLOR = { ok: 'var(--success)', late: 'var(--warning)', half: 'var(--warning)', leave: 'var(--danger)', absent: 'var(--danger)', off: 'var(--text-muted)', future: 'var(--text-muted)' }
 
@@ -183,6 +202,19 @@ export default function WorkProfileV2() {
                 <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, minWidth: 150, textAlign: 'center' }}>{monthLabel(ym)}</h2>
                 <button className="wk-btn o ic" aria-label="Next month" disabled={ym >= today.slice(0, 7)} onClick={() => setYm(shiftMonth(ym, 1))}><ChevronRight size={16} aria-hidden="true" /></button>
               </div>
+            </div>
+            <div className="wk-card" style={{ marginBottom: 16 }}>
+              <div className="wk-row" style={{ alignItems: 'flex-end', marginBottom: 12 }}>
+                <div><div className="wk-eyb">Work score</div><div className="wk-kpi-n" style={{ color: score.total == null ? undefined : score.total >= 75 ? 'var(--success)' : score.total >= 50 ? 'var(--warning)' : 'var(--danger)' }}>{score.total == null ? '-' : score.total}<span className="wk-sm"> / 100</span></div></div>
+                <div className="wk-sm" style={{ maxWidth: 260, textAlign: 'right' }}>For you to see how the month is going. It does not change salary.</div>
+              </div>
+              {score.parts.map((x) => (
+                <div key={x.key} style={{ marginBottom: 10 }}>
+                  <div className="wk-row" style={{ fontSize: 13, marginBottom: 4 }}><span>{x.label}</span><span className="wk-num">{x.frac == null ? '-' : Math.round(x.max * x.frac)} / {x.max}</span></div>
+                  <div className="wk-bar-h"><i style={{ width: `${x.frac == null ? 0 : x.frac * 100}%` }} /></div>
+                  <div className="wk-sm" style={{ marginTop: 2 }}>{x.note}</div>
+                </div>
+              ))}
             </div>
             <div className="wk-kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
               {kpi('Present days', present.length)}
