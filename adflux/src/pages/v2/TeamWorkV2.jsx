@@ -148,7 +148,11 @@ export default function TeamWorkV2() {
 
   const rangeLabel = from === to ? fmtDateShort(from) : `${fmtDateShort(from)} to ${fmtDateShort(to)}`
   const taskClient = {}
-  parts.forEach((p) => { if (p.task_id && p.task?.project_id) taskClient[p.task_id] = projName(p.task.project_id) })
+  const taskPeople = {}
+  parts.forEach((p) => {
+    if (p.task_id && p.task?.project_id) taskClient[p.task_id] = projName(p.task.project_id)
+    if (p.task_id && p.assignee_id) { const a = (taskPeople[p.task_id] = taskPeople[p.task_id] || []); if (!a.includes(p.assignee_id)) a.push(p.assignee_id) }
+  })
   const openCount = parts.filter((p) => p.status !== 'finished').length
   const lateParts = parts.filter((p) => p.status !== 'finished' && dueState(p.due_date || p.task?.due_date, p.status).cls === 'bad')
   const finishedToday = parts.filter((p) => p.status === 'finished' && p.finished_at && p.finished_at >= dayStartISO(today)).length
@@ -311,7 +315,8 @@ export default function TeamWorkV2() {
             <span className="wk-sm">{canCost ? '₹ Cost shows for admin and accounts only · ' : ''}{items.filter((i) => i.status !== 'finished').length} open · {lateParts.length} overdue</span>
           </div>
           <div className="wk-sm" style={{ marginTop: 8 }}>Drag a card to change its status. A task with several people finishes when every part is finished.</div>
-          <WorkBoard items={items} uid={uid} showCost={canCost} onMove={(id, to2) => rpc('work_move_part', { p_part: id, p_to: to2 })} onOpen={setOpenTask} />
+          <WorkBoard items={items} uid={uid} showCost={canCost} actForAll onMove={(id, to2) => rpc('work_move_part', { p_part: id, p_to: to2 })}
+            onStart={(it) => rpc('work_move_part', { p_part: it.id, p_to: 'in_process' })} onFinish={(it) => rpc('work_move_part', { p_part: it.id, p_to: 'finished' })} onOpen={setOpenTask} />
         </>
       )}
 
@@ -331,7 +336,7 @@ export default function TeamWorkV2() {
       )}
 
       {!loading && !err && tab === 'hours' && (
-        <HoursTab report={report} cost={cost} canCost={canCost} projName={projName} nameOf={nameOf} taskTitles={taskTitles} taskClient={taskClient} rangeLabel={rangeLabel} onOpen={setOpenTask} />
+        <HoursTab report={report} cost={cost} canCost={canCost} projName={projName} nameOf={nameOf} taskTitles={taskTitles} taskClient={taskClient} taskPeople={taskPeople} users={users} rangeLabel={rangeLabel} onOpen={setOpenTask} />
       )}
 
       {!loading && !err && tab === 'approvals' && (() => {
@@ -666,7 +671,7 @@ function TimelineTab({ memberIds, nameOf, byPerson, from, to, projName }) {
   )
 }
 
-function HoursTab({ report, cost, canCost, projName, nameOf, taskTitles, taskClient, rangeLabel, onOpen }) {
+function HoursTab({ report, cost, canCost, projName, nameOf, taskTitles, taskClient, taskPeople, users, rangeLabel, onOpen }) {
   const proj = [...(report?.by_project || [])].sort((a, b) => b.seconds - a.seconds)
   const totalSecs = proj.reduce((t, p) => t + Number(p.seconds || 0), 0) || 1
   const costBy = {}; (cost?.by_project || []).forEach((p) => { costBy[p.project_id] = p })
@@ -713,7 +718,16 @@ function HoursTab({ report, cost, canCost, projName, nameOf, taskTitles, taskCli
                       <b style={{ fontWeight: 500 }}>{taskTitles[t.task_id] || 'Task'}</b>
                       {taskClient[t.task_id] && <div className="wk-sm"><span className="wk-dot" style={{ background: clientColor(taskClient[t.task_id]), width: 8, height: 8, marginRight: 6 }} />{taskClient[t.task_id]}</div>}
                     </td>
-                    <td className="wk-num" style={{ textAlign: 'right' }}>{t.people}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {(taskPeople[t.task_id] || []).length > 0 ? (
+                        <span className="wk-grp" style={{ justifyContent: 'flex-end', flexWrap: 'nowrap', gap: 0 }}>
+                          {(taskPeople[t.task_id] || []).slice(0, 3).map((id, i) => { const u = (users || []).find((x) => x.id === id) || {}; return (
+                            <span key={id} className="wk-av" title={nameOf(id)} style={{ width: 28, height: 28, fontSize: 10, marginLeft: i ? -8 : 0, border: '2px solid var(--surface)' }}>
+                              {u.profile_image_url ? <img src={u.profile_image_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initialsOf(nameOf(id))}
+                            </span>) })}
+                        </span>
+                      ) : <span className="wk-num">{t.people}</span>}
+                    </td>
                     <td className="wk-num" style={{ textAlign: 'right' }}>{fmtDur(t.seconds)}</td>
                     <td className="wk-num" style={{ textAlign: 'right' }}>Rs {Number(t.cost).toLocaleString('en-IN')}</td>
                   </tr>

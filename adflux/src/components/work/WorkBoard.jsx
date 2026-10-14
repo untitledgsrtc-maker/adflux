@@ -24,7 +24,7 @@ function duePill(it) {
   return { cls: 'ok', Icon: Check, text: `On track, ${short}` }
 }
 
-export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, uid, showCost, emptyText = 'Drop a task here' }) {
+export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, uid, showCost, actForAll, emptyText = 'Drop a task here' }) {
   const [drag, setDrag] = useState(null)
   const [over, setOver] = useState('')
   const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches)
@@ -72,7 +72,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, ui
               </div>
               <div className="wk-bar"><i style={{ width: `${Math.round(rows.length / total * 100)}%`, background: c.color }} /></div>
               {rows.map((it) => {
-                const mine = it.assigneeId === uid
+                const mine = !!actForAll || it.assigneeId === uid
                 const dp = duePill(it)
                 const Pi = dp.Icon
                 return (
