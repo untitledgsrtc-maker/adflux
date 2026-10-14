@@ -21271,3 +21271,6 @@ SUPERSEDES section 354 (the 19 per-client weekly templates are switched off; thi
   Known limits: a push needs quiet hours (09:00-20:59 IST) to be allowed; a Monday report that the cron creates AT 7 AM on the leave day appears after the notice, so it must be given away that morning (or by the head).
 - Backfill: 23 active campaigns got tasks 2 and 3 (task 3 also for the 3 campaigns ending 14-16 Oct). Change the person: `UPDATE work_rule_settings SET user_id = '<user id>' WHERE key = 'campaign_tasks_assignee';`
 - Files: `supabase_phase367_campaign_task_rule.sql` (canonical, UNDO at the bottom), `MyWorkV2.jsx`, `TaskDetailModal.jsx`. `work_reassign_part` was redefined here (its phase 365 copy is superseded).
+
+- **355.1 (2026-10-14) - My Work date filter** replaces "Show upcoming": `/my-work` opens on **Today** = tasks due today + everything overdue + the ones finished today; a date picker with < > arrows and a Today button shows only that date's tasks
+  (plus the ones finished on it). The load now keeps finished tasks for 14 days so past days can be looked at. Display only, `MyWorkV2.jsx`.

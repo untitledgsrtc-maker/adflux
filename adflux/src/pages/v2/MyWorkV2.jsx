@@ -29,7 +29,7 @@ export default function MyWorkV2() {
   const [running, setRunning] = useState(null)
   const [entries, setEntries] = useState([])       // today's entries
   const [parts, setParts] = useState([])
-  const [showUpcoming, setShowUpcoming] = useState(false)   // default: today + overdue only
+  const [viewDate, setViewDate] = useState(null)   // null = Today (today's tasks + anything overdue)
   const [asked, setAsked] = useState([])
   const [shared, setShared] = useState(null)
   const [now, setNow] = useState(Date.now())
@@ -55,7 +55,7 @@ export default function MyWorkV2() {
       supabase.from('work_time_entries').select('*').eq('user_id', uid).gte('started_at', t0).order('started_at'),
       supabase.from('work_task_parts')
         .select('id,task_id,assignee_id,label,due_date,status,started_at,finished_at,seconds,task:work_tasks(id,title,project_id,created_by,due_date,status)')
-        .eq('assignee_id', uid).or(`status.neq.finished,finished_at.gte.${t0}`).limit(300),
+        .eq('assignee_id', uid).or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -14))}`).limit(300),
       supabase.from('work_tasks')
         .select('id,title,project_id,due_date,status,created_at,parts:work_task_parts(id,assignee_id,label,status,due_date)')
         .eq('created_by', uid).order('created_at', { ascending: false }).limit(60),
@@ -99,12 +99,19 @@ export default function MyWorkV2() {
   const items = useMemo(() => parts.map((p) => ({
     id: p.id, taskId: p.task_id, status: p.status, title: p.task?.title || 'Task', label: p.label,
     client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, assigneeId: p.assignee_id,
-    assigneeName: nameOf(p.assignee_id), partsTotal: 1, partsDone: 0, seconds: p.seconds, cost: null,
+    assigneeName: nameOf(p.assignee_id), finishedDay: p.finished_at ? new Date(p.finished_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : null, partsTotal: 1, partsDone: 0, seconds: p.seconds, cost: null,
   })), [parts, projName, nameOf])
 
-  // Today + overdue only: a task due in the future stays out of sight until its day.
-  const upcomingCount = items.filter((i) => i.status !== 'finished' && i.due && i.due > today).length
-  const boardItems = showUpcoming ? items : items.filter((i) => i.status === 'finished' || !i.due || i.due <= today)
+  // Date filter. Default = Today: today's tasks + everything overdue. Another date: only that day's tasks.
+  const isToday = !viewDate || viewDate === today
+  const shownDate = isToday ? today : viewDate
+  const boardItems = items.filter((i) => {
+    if (i.status === 'finished') return isToday ? (i.finishedDay === today || i.due === today) : (i.due === shownDate || i.finishedDay === shownDate)
+    if (isToday) return !i.due || i.due <= today
+    return i.due === shownDate
+  })
+  const dayOpen = boardItems.filter((i) => i.status !== 'finished').length
+  const dayLate = boardItems.filter((i) => i.status !== 'finished' && i.due && i.due < today).length
 
   const runSecs = running ? (now - new Date(running.started_at).getTime()) / 1000 : 0
   const doneSecs = entries.filter((e) => e.ended_at && e.status === 'approved')
@@ -162,15 +169,16 @@ export default function MyWorkV2() {
               </div>
               <div className="wk-row" style={{ marginTop: 22 }}>
                 <b style={{ fontSize: 18 }}>My tasks</b>
-                <span className="wk-sm">{items.filter((i) => i.status !== 'finished').length} open{lateCount ? ` · ${lateCount} late` : ''}</span>
+                <span className="wk-sm">{items.filter((i) => i.status !== 'finished').length} open in total{lateCount ? ` · ${lateCount} late` : ''}</span>
               </div>
-              {upcomingCount > 0 && (
-                <div style={{ marginTop: 8 }}>
-                  <button className="wk-btn g sm" onClick={() => setShowUpcoming((v) => !v)}>
-                    {showUpcoming ? 'Hide upcoming tasks' : `Show upcoming (${upcomingCount})`}
-                  </button>
-                </div>
-              )}
+              <div className="wk-row" style={{ marginTop: 10, flexWrap: 'wrap', justifyContent: 'flex-start', gap: 8 }}>
+                <button className="wk-btn o sm" aria-label="Previous day" onClick={() => setViewDate(addDaysISO(shownDate, -1))}>&lt;</button>
+                <input className="wk-input" type="date" style={{ width: 170, minHeight: 40 }} value={shownDate} aria-label="Show tasks for this date"
+                  onChange={(e) => setViewDate(e.target.value || null)} />
+                <button className="wk-btn o sm" aria-label="Next day" onClick={() => setViewDate(addDaysISO(shownDate, 1))}>&gt;</button>
+                <button className={`wk-btn sm ${isToday ? 'y' : 'g'}`} onClick={() => setViewDate(null)}>Today</button>
+                <span className="wk-sm">{isToday ? 'Today' : fmtDateShort(shownDate)} · {dayOpen} open{dayLate ? ` · ${dayLate} overdue` : ''}</span>
+              </div>
               <div className="wk-sm" style={{ marginTop: 4 }}>Drag your own task forward: Assigned to In process starts the clock, In process to Finished stops it. Or use Start / Finish.</div>
               <WorkBoard items={boardItems} uid={uid} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} />
             </>
