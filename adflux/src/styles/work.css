@@ -193,3 +193,6 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 @media (prefers-reduced-motion: reduce) { .wk * { transition: none !important; animation: none !important; } }
 .wk .spin, .wk-modal .spin { animation: wkspin 1s linear infinite; }
 @keyframes wkspin { to { transform: rotate(360deg); } }
+
+/* the hero grows to fill its column so there is no empty hole beside a taller card */
+.wk-c8 > .wk-hero, .wk-c8 > .wk-run { flex: 1 1 auto; }

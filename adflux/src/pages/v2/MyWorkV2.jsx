@@ -177,7 +177,7 @@ export default function MyWorkV2() {
 
           {tab === 'work' && isMember && (
             <div className="wk-grid">
-              <div className="wk-c8">
+              <div className="wk-c8" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 {running
                   ? <RunningCard running={running} secs={runSecs} projName={projName} busy={busy}
                       onPause={() => rpc('work_clock_stop', {})}
@@ -185,7 +185,7 @@ export default function MyWorkV2() {
                   : <StartForm projects={projects} busy={busy} entries={entries}
                       onAddProject={addProject}
                       onStart={(project, label) => rpc('work_clock_start', { p_project: project, p_label: label, p_part: null })} />}
-                {istHour() >= 19 && <div style={{ marginTop: 24 }}><TodayStrip secs={todaySecs} firstIn={firstIn} /></div>}
+                {istHour() >= 19 && <TodayStrip secs={todaySecs} firstIn={firstIn} />}
               </div>
               <div className="wk-c4">
                 <div className="wk-stack">
