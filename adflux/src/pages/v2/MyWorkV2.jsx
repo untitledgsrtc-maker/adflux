@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
-import { Play, Pause, Check, Plus, Send, Clock, Users, User, CalendarX, FileText, Moon } from 'lucide-react'
+import { Play, Pause, Check, Plus, Send, Clock, Users, User, CalendarX, FileText, Moon, ChevronRight } from 'lucide-react'
 import '../../styles/work.css'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -148,9 +148,6 @@ export default function MyWorkV2() {
           <h1 className="wk-title">My Work</h1>
         </div>
         <div className="wk-grp">
-          <Link to="/work-profile" className="wk-btn o"><User size={16} aria-hidden="true" /> My profile</Link>
-          <Link to="/my-offer" className="wk-btn o"><CalendarX size={16} aria-hidden="true" /> Leave request</Link>
-          <Link to="/my-performance" className="wk-btn o"><FileText size={16} aria-hidden="true" /> Salary slips</Link>
           {isHead && <Link to="/team-work" className="wk-btn o"><Users size={16} aria-hidden="true" /> Team view</Link>}
           <button className="wk-btn y" onClick={() => setNewTask(true)}><Plus size={16} aria-hidden="true" /> {isHead ? 'New task' : 'Ask for work'}</button>
         </div>
@@ -193,6 +190,16 @@ export default function MyWorkV2() {
                     ? <EveningCard hour={istHour()} entries={entries} items={items} secs={todaySecs} name={profile?.name}
                         projName={projName} shared={shared} uid={uid} today={today} firstIn={firstIn} onShared={load} />
                     : <TodayStrip secs={todaySecs} firstIn={firstIn} />}
+                  <div className="wk-card flush">
+                    <div className="wk-list">
+                      {[['/work-profile', User, 'My profile'], ['/my-offer', CalendarX, 'Leave request'], ['/my-performance', FileText, 'Salary slips']].map(([to, Ic, label]) => (
+                        <Link key={to} to={to} className="wk-row wk-hov" style={{ padding: '16px 20px', color: 'inherit', textDecoration: 'none' }}>
+                          <span className="wk-grp" style={{ gap: 12 }}><Ic size={16} aria-hidden="true" />{label}</span>
+                          <ChevronRight size={16} aria-hidden="true" />
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="wk-c12">
