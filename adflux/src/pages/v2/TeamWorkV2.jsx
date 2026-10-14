@@ -3,7 +3,7 @@
 // Hours & cost (cost = admin + accounts only), Approvals (added-later time).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { Plus, Loader2, Check, X, AlertTriangle, Clock, Users, Repeat, Moon } from 'lucide-react'
+import { Plus, Loader2, Check, X, AlertTriangle, Clock, Users, Repeat, Moon, Pencil, GitMerge, Archive, ArchiveRestore, Building2 } from 'lucide-react'
 import '../../styles/work.css'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -146,6 +146,9 @@ export default function TeamWorkV2() {
   if (authLoading || !uid) return null
   if (isHead === false) return <Navigate to="/my-work" replace />
 
+  const rangeLabel = from === to ? fmtDateShort(from) : `${fmtDateShort(from)} to ${fmtDateShort(to)}`
+  const taskClient = {}
+  parts.forEach((p) => { if (p.task_id && p.task?.project_id) taskClient[p.task_id] = projName(p.task.project_id) })
   const openCount = parts.filter((p) => p.status !== 'finished').length
   const lateParts = parts.filter((p) => p.status !== 'finished' && dueState(p.due_date || p.task?.due_date, p.status).cls === 'bad')
   const finishedToday = parts.filter((p) => p.status === 'finished' && p.finished_at && p.finished_at >= dayStartISO(today)).length
@@ -171,7 +174,7 @@ export default function TeamWorkV2() {
         </div>
       </div>
 
-      {['overview', 'timeline', 'hours', 'clients'].includes(tab) && (
+      {(
         <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', marginBottom: 14 }}>
           <span className="wk-eyb">Filters</span>
           <div className="wk-tabs" style={{ margin: 0 }}>
@@ -194,7 +197,7 @@ export default function TeamWorkV2() {
 
       {!loading && !err && tab === 'overview' && (
         <>
-          <HeroSegs live eyebrow={`Team · ${range === 'today' ? 'today' : range === 'yesterday' ? 'yesterday' : 'selected dates'}`} segs={[
+          <HeroSegs live eyebrow={`Team · ${rangeLabel}`} segs={[
             ['Team hours', fmtDur(teamSecs), `${Object.keys(byPerson).length} ${Object.keys(byPerson).length === 1 ? 'person' : 'people'} tracked`],
             ['Working now', `${running.length} of ${memberIds.length}`, 'Live timers'],
             ['Open tasks', String(openCount), 'Assigned and in process'],
@@ -317,7 +320,7 @@ export default function TeamWorkV2() {
       )}
 
       {!loading && !err && tab === 'clients' && (
-        <ClientsTab projects={projects} report={report} cost={cost} canCost={canCost}
+        <ClientsTab projects={projects} report={report} cost={cost} canCost={canCost} parts={parts}
           onAdd={async (n) => { try { await addProject(n); toastSuccess('Client added.') } catch (e) { toastError(e, 'Could not add.') } }}
           onUpdate={(id, name, active, merge) => rpc('work_update_project', { p_id: id, p_name: name, p_active: active, p_merge_into: merge || null })} />
       )}
@@ -327,36 +330,41 @@ export default function TeamWorkV2() {
       )}
 
       {!loading && !err && tab === 'hours' && (
-        <HoursTab report={report} cost={cost} canCost={canCost} projName={projName} nameOf={nameOf} taskTitles={taskTitles} onOpen={setOpenTask} />
+        <HoursTab report={report} cost={cost} canCost={canCost} projName={projName} nameOf={nameOf} taskTitles={taskTitles} taskClient={taskClient} rangeLabel={rangeLabel} onOpen={setOpenTask} />
       )}
 
-      {!loading && !err && tab === 'approvals' && (
-        <>
-        <HeroSegs eyebrow="Waiting for you" segs={[['Requests', String(pending.length), 'Forgotten time']]} />
-        <div className="wk-card" style={{ padding: 0, overflowX: 'auto' }}>
-          {pending.length === 0 ? <div className="wk-empty">Nothing waiting. Added-later time shows here for your OK.</div> : (
-            <table className="wk-table" style={{ minWidth: 640 }}>
-              <thead><tr><th>Person</th><th>Client</th><th>What</th><th>When</th><th>Time</th><th /></tr></thead>
-              <tbody>
-                {pending.map((e) => (
-                  <tr key={e.id}>
-                    <td><b>{nameOf(e.user_id)}</b></td>
-                    <td className="wk-sm">{projName(e.project_id) || '-'}</td>
-                    <td>{e.task_label}{e.note && <div className="wk-sm">{e.note}</div>}</td>
-                    <td className="wk-sm">{fmtDateShort(e.started_at.slice(0, 10))} {fmtTimeIST(e.started_at)}</td>
-                    <td className="wk-num">{fmtDur((new Date(e.ended_at) - new Date(e.started_at)) / 1000)}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <button className="wk-btn y sm" disabled={busy} onClick={() => rpc('work_decide_time', { p_entry: e.id, p_approve: true }, 'Approved.')}><Check size={14} aria-hidden="true" /> Approve</button>{' '}
-                      <button className="wk-btn o sm" disabled={busy} onClick={() => rpc('work_decide_time', { p_entry: e.id, p_approve: false }, 'Declined.')}><X size={14} aria-hidden="true" /> Decline</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-        </>
-      )}
+      {!loading && !err && tab === 'approvals' && (() => {
+        const secs = (e) => (new Date(e.ended_at) - new Date(e.started_at)) / 1000
+        const total = pending.reduce((t, e) => t + secs(e), 0)
+        const users_ = (id) => users.find((u) => u.id === id)
+        return (
+          <>
+            <HeroSegs eyebrow="Waiting for you" segs={[['Requests', `${pending.length} ${pending.length === 1 ? 'request' : 'requests'}`, pending.length ? `Forgotten time, ${fmtDur(total)} in total` : 'Forgotten time']]} />
+            <div className="wk-card flush">
+              <div className="wk-ch"><h3><span className="wk-tile" style={{ background: 'rgba(16,185,129,.14)', color: 'var(--success)' }}><Check size={16} aria-hidden="true" /></span>Forgotten-time requests</h3></div>
+              {pending.length === 0 ? <div className="wk-empty"><b>Nothing waiting</b>Added-later time shows here for your OK.</div> : (
+                <div className="wk-list">
+                  {pending.map((e) => (
+                    <div key={e.id} className="wk-row" style={{ padding: '14px 20px', gap: 16, flexWrap: 'wrap' }}>
+                      <span className="wk-grp" style={{ flexWrap: 'nowrap', minWidth: 190, gap: 12 }}>
+                        <span className="wk-av" style={{ width: 36, height: 36 }}>{users_(e.user_id)?.profile_image_url ? <img src={users_(e.user_id).profile_image_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initialsOf(nameOf(e.user_id))}</span>
+                        <span><div style={{ fontWeight: 500 }}>{nameOf(e.user_id)}</div><div className="wk-sm wk-num">{fmtDateShort(e.started_at.slice(0, 10))} · {fmtTimeIST(e.started_at)}-{fmtTimeIST(e.ended_at)}</div></span>
+                      </span>
+                      <span className="wk-sm" style={{ minWidth: 130 }}><span className="wk-dot" style={{ background: clientColor(projName(e.project_id)), width: 8, height: 8, marginRight: 6 }} />{projName(e.project_id) || 'No client'}</span>
+                      <span className="wk-num" style={{ minWidth: 70 }}>{fmtDur(secs(e))}</span>
+                      <span className="wk-sm" style={{ flex: 1, minWidth: 160 }}>{e.note || e.task_label}</span>
+                      <span style={{ whiteSpace: 'nowrap', display: 'flex', gap: 8 }}>
+                        <button className="wk-btn o sm" disabled={busy} onClick={() => rpc('work_decide_time', { p_entry: e.id, p_approve: false }, 'Declined.')}><X size={14} aria-hidden="true" /> Decline</button>
+                        <button className="wk-btn y sm" disabled={busy} onClick={() => rpc('work_decide_time', { p_entry: e.id, p_approve: true }, 'Approved.')}><Check size={14} aria-hidden="true" /> Approve</button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )
+      })()}
 
       {newTask && (
         <NewTaskModal projects={activeProjects} users={users.filter((u) => u.is_active && u.role !== 'agency')} meId={uid} onAddProject={addProject}
@@ -433,14 +441,25 @@ function PeopleTab({ members, users, nameOf, runBy, byPerson, projName, now, isA
   )
 }
 
-function ClientsTab({ projects, report, cost, canCost, onAdd, onUpdate }) {
+function ClientsTab({ projects, report, cost, canCost, parts, onAdd, onUpdate }) {
   const [q, setQ] = useState('')
   const [name, setName] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [showAll, setShowAll] = useState(false)
   const [edit, setEdit] = useState(null)
   const [en, setEn] = useState('')
   const [merge, setMerge] = useState('')
   const hours = useMemo(() => { const m = {}; (report?.by_project || []).forEach((p) => { m[p.project_id] = p }); return m }, [report])
   const costBy = useMemo(() => { const m = {}; (cost?.by_project || []).forEach((p) => { m[p.project_id] = p }); return m }, [cost])
+  const openBy = useMemo(() => {
+    const sets = {}
+    ;(parts || []).forEach((p) => {
+      if (p.status === 'finished') return
+      const pid = p.task?.project_id; if (!pid) return
+      ;(sets[pid] = sets[pid] || new Set()).add(p.task_id)
+    })
+    const m = {}; Object.keys(sets).forEach((k) => { m[k] = sets[k].size }); return m
+  }, [parts])
   const [notSame, setNotSame] = useState([])
   const dup = useMemo(() => {
     const norm = (n) => n.toLowerCase().replace(/\b(pvt|private|ltd|limited|llp|co|company)\b/g, '').replace(/[^a-z0-9]/g, '')
@@ -455,39 +474,65 @@ function ClientsTab({ projects, report, cost, canCost, onAdd, onUpdate }) {
     }
     return null
   }, [projects, notSame])
-  const rows = projects.filter((p) => !q || p.name.toLowerCase().includes(q.toLowerCase()))
+  const worked = (p) => (hours[p.id]?.seconds || 0) > 0 || (openBy[p.id] || 0) > 0
+  const searching = q.trim().length > 0
+  const rows = projects.filter((p) => (searching ? p.name.toLowerCase().includes(q.toLowerCase()) : (showAll || worked(p))))
     .sort((a, b) => (hours[b.id]?.seconds || 0) - (hours[a.id]?.seconds || 0) || a.name.localeCompare(b.name))
+  const workedCount = projects.filter(worked).length
+  const hiddenCount = projects.length - workedCount
+  const doAdd = async () => { if (!name.trim()) return; await onAdd(name.trim()); setName(''); setAdding(false) }
   return (
     <div>
-      <HeroSegs eyebrow="Clients worked on" segs={[['Clients', String(projects.filter((p) => p.is_active).length), `${(report?.by_project || []).length} with time in these dates`]]} />
+      <HeroSegs eyebrow="Clients worked on" segs={[['Clients', String(workedCount), `In the selected dates${dup ? ' · 1 possible duplicate' : ''}`]]} />
       {dup && (
-        <div className="wk-grp" style={{ padding: 16, borderRadius: 14, background: 'rgba(59,130,246,.12)', marginBottom: 14 }}>
-          <div style={{ flex: 1, minWidth: 200 }}><b>Possible duplicate:</b> {dup[0].name} and {dup[1].name}</div>
-          <button className="wk-btn sm" onClick={() => onUpdate(dup[1].id, dup[1].name, true, dup[0].id)}>Merge into {dup[0].name}</button>
+        <div className="wk-grp" style={{ padding: 16, borderRadius: 14, background: 'rgba(59,130,246,.12)', marginBottom: 14, gap: 12 }}>
+          <span className="wk-tile" style={{ background: 'rgba(59,130,246,.18)', color: 'var(--blue, #60a5fa)' }}><GitMerge size={16} aria-hidden="true" /></span>
+          <div style={{ flex: 1, minWidth: 200 }}><b style={{ fontWeight: 500 }}>Possible duplicate:</b> {dup[0].name} and {dup[1].name}</div>
+          <button className="wk-btn sm" onClick={() => onUpdate(dup[1].id, dup[1].name, true, dup[0].id)}><GitMerge size={14} aria-hidden="true" /> Merge</button>
           <button className="wk-btn o sm" onClick={() => setNotSame((x) => [...x, dup.map((d) => d.id).sort().join('|')])}>Not the same</button>
         </div>
       )}
-      <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
-        <input className="wk-input" style={{ width: 240 }} placeholder="Search clients" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search clients" />
-        <input className="wk-input" style={{ width: 240 }} placeholder="New client name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} aria-label="New client name" />
-        <button className="wk-btn y" disabled={!name.trim()} onClick={async () => { await onAdd(name.trim()); setName('') }}><Plus size={16} aria-hidden="true" /> Add client</button>
-      </div>
-      <div className="wk-card" style={{ padding: 0, overflowX: 'auto' }}>
-        <table className="wk-table" style={{ minWidth: 640 }}>
-          <thead><tr><th>Client</th><th>People</th><th>Last day</th><th>Hours</th>{canCost && <th>Cost</th>}<th /></tr></thead>
-          <tbody>
-            {rows.slice(0, 300).map((p) => (
-              <tr key={p.id} style={{ opacity: p.is_active ? 1 : .55 }}>
-                <td><b>{p.name}</b> {!p.is_active && <span className="wk-pill">archived</span>}</td>
-                <td className="wk-num">{hours[p.id]?.people || 0}</td>
-                <td className="wk-sm">{hours[p.id]?.last_day ? fmtDateShort(hours[p.id].last_day) : '-'}</td>
-                <td className="wk-num">{fmtDur(hours[p.id]?.seconds || 0)}</td>
-                {canCost && <td className="wk-num">{costBy[p.id] ? `Rs ${Number(costBy[p.id].cost).toLocaleString('en-IN')}` : '-'}</td>}
-                <td><button className="wk-btn o sm" onClick={() => { setEdit(p); setEn(p.name); setMerge('') }}>Edit</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="wk-card flush">
+        <div className="wk-ch">
+          <h3><span className="wk-tile"><Building2 size={16} aria-hidden="true" /></span>Clients</h3>
+          <div className="wk-grp" style={{ gap: 8 }}>
+            <input className="wk-input" style={{ width: 200 }} placeholder="Search clients" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search clients" />
+            <button className="wk-btn o sm" onClick={() => setAdding((v) => !v)}><Plus size={14} aria-hidden="true" /> Add client</button>
+          </div>
+        </div>
+        {adding && (
+          <div className="wk-row" style={{ padding: '12px 20px', justifyContent: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+            <input className="wk-input" style={{ width: 260 }} placeholder="New client name" value={name} maxLength={80} autoFocus
+              onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') doAdd() }} aria-label="New client name" />
+            <button className="wk-btn y sm" disabled={!name.trim()} onClick={doAdd}>Add</button>
+          </div>
+        )}
+        <div style={{ overflowX: 'auto' }}>
+          <table className="wk-table" style={{ minWidth: 560 }}>
+            <thead><tr><th>Client</th><th style={{ textAlign: 'right' }}>Hours</th>{canCost && <th style={{ textAlign: 'right' }}>Cost</th>}<th style={{ textAlign: 'right' }}>Open tasks</th><th /></tr></thead>
+            <tbody>
+              {rows.slice(0, 300).map((p) => (
+                <tr key={p.id} style={{ opacity: p.is_active ? 1 : .55 }}>
+                  <td><span className="wk-dot" style={{ background: clientColor(p.name), marginRight: 10 }} /><b style={{ fontWeight: 500 }}>{p.name}</b> {!p.is_active && <span className="wk-pill">archived</span>}</td>
+                  <td className="wk-num" style={{ textAlign: 'right' }}>{fmtDur(hours[p.id]?.seconds || 0)}</td>
+                  {canCost && <td className="wk-num" style={{ textAlign: 'right' }}>{costBy[p.id] ? `Rs ${Number(costBy[p.id].cost).toLocaleString('en-IN')}` : '-'}</td>}
+                  <td className="wk-num" style={{ textAlign: 'right' }}>{openBy[p.id] || 0}</td>
+                  <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                    <button className="wk-btn g sm" aria-label={`Edit ${p.name}`} title="Edit" onClick={() => { setEdit(p); setEn(p.name); setMerge('') }}><Pencil size={15} aria-hidden="true" /></button>
+                    <button className="wk-btn g sm" aria-label={`Merge ${p.name}`} title="Merge into another client" onClick={() => { setEdit(p); setEn(p.name); setMerge('') }}><GitMerge size={15} aria-hidden="true" /></button>
+                    <button className="wk-btn g sm" aria-label={p.is_active ? `Archive ${p.name}` : `Bring back ${p.name}`} title={p.is_active ? 'Archive' : 'Bring back'} onClick={() => onUpdate(p.id, p.name, !p.is_active, null)}>{p.is_active ? <Archive size={15} aria-hidden="true" /> : <ArchiveRestore size={15} aria-hidden="true" />}</button>
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && <tr><td colSpan={5} className="wk-empty">No clients with time or open tasks in these dates.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        {!searching && hiddenCount > 0 && (
+          <div className="wk-sm" style={{ padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
+            <button className="wk-btn g sm" onClick={() => setShowAll((v) => !v)}>{showAll ? 'Show only clients with work' : `Show all clients (${projects.length})`}</button>
+          </div>
+        )}
       </div>
       {edit && (
         <div className="wk-modal-back" onClick={() => setEdit(null)}>
@@ -530,11 +575,18 @@ function TimelineTab({ memberIds, nameOf, byPerson, from, to, projName }) {
   const hourOf = (iso) => { const d = new Date(new Date(iso).getTime() + 5.5 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60 }
   const pct = (h) => Math.max(0, Math.min(100, (h - H0) / (H1 - H0) * 100))
   const nowH = hourOf(new Date(nowMs).toISOString())
+  const runningNow = new Set(all.filter((e) => !e.ended_at).map((e) => e.user_id)).size
+  const legend = [...new Set(all.map((e) => projName(e.project_id) || 'Internal'))]
+  const shortName = (n) => { const w = String(n || '').trim().split(/\s+/); const t = (x) => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase(); return w.slice(0, 2).map(t).join(' ') }
   const byUser = {}; all.forEach((e) => { (byUser[e.user_id] = byUser[e.user_id] || []).push(e) })
   return (
+    <div>
+    {single && <HeroSegs live eyebrow={`Now · ${fmtTimeIST(new Date(nowMs).toISOString())}`} segs={[['Running now', `${runningNow} running`, 'Click a person for their day']]} />}
     <div style={{ display: 'grid', gridTemplateColumns: open ? 'minmax(0,1.3fr) minmax(0,1fr)' : '1fr', gap: 16, alignItems: 'start' }}>
       <div className="wk-card flush">
-        <div className="wk-ch"><h3>{single ? 'Today, by person' : 'Hours, by person'}</h3></div>
+        <div className="wk-ch"><h3>{single ? 'Today, by person' : 'Hours, by person'}</h3>
+          {single && legend.length > 0 && <div className="wk-grp" style={{ gap: 12 }}>{legend.map((n) => <span key={n} className="wk-sm"><span className="wk-dot" style={{ background: clientColor(n === 'Internal' ? '' : n), width: 8, height: 8, marginRight: 6 }} />{n}</span>)}</div>}
+        </div>
         {rows.length === 0 && <div className="wk-empty">No one is on the timeclock yet.</div>}
         {single ? (
           <div style={{ padding: 16, overflowX: 'auto' }}>
@@ -549,7 +601,7 @@ function TimelineTab({ memberIds, nameOf, byPerson, from, to, projName }) {
               </div>
               {rows.map((id) => (
                 <div key={id} className="wk-hov" onClick={() => setOpen(id)} style={{ display: 'grid', gridTemplateColumns: '170px 1fr', gap: 12, alignItems: 'center', minHeight: 48, borderRadius: 10 }}>
-                  <span className="wk-grp" style={{ paddingLeft: 8, flexWrap: 'nowrap' }}><span className="wk-av" style={{ width: 28, height: 28 }}>{initialsOf(nameOf(id))}</span><b style={{ fontSize: 13 }}>{nameOf(id)}</b></span>
+                  <span className="wk-grp" style={{ paddingLeft: 8, flexWrap: 'nowrap' }}><span className="wk-av" style={{ width: 28, height: 28 }}>{initialsOf(nameOf(id))}</span><b style={{ fontSize: 13, fontWeight: 500 }}>{shortName(nameOf(id))}</b></span>
                   <div style={{ position: 'relative', height: 26, background: 'var(--w-hov)', borderRadius: 6 }}>
                     {(byUser[id] || []).map((e) => {
                       const s0 = hourOf(e.started_at), e0 = e.ended_at ? hourOf(e.ended_at) : nowH
@@ -590,49 +642,67 @@ function TimelineTab({ memberIds, nameOf, byPerson, from, to, projName }) {
         </div>
       )}
     </div>
+    </div>
   )
 }
 
-function HoursTab({ report, cost, canCost, projName, nameOf, taskTitles, onOpen }) {
+function HoursTab({ report, cost, canCost, projName, nameOf, taskTitles, taskClient, rangeLabel, onOpen }) {
   const proj = [...(report?.by_project || [])].sort((a, b) => b.seconds - a.seconds)
-  const max = proj[0]?.seconds || 1
+  const totalSecs = proj.reduce((t, p) => t + Number(p.seconds || 0), 0) || 1
   const costBy = {}; (cost?.by_project || []).forEach((p) => { costBy[p.project_id] = p })
   return (
     <div>
       {canCost && cost && cost.total_cost != null && (
-        <HeroSegs eyebrow="Cost · selected dates" segs={[
+        <HeroSegs eyebrow={`Cost · ${rangeLabel}`} segs={[
           ['Team cost', `Rs ${Number(cost.total_cost).toLocaleString('en-IN')}`, 'Salary-based'],
           ['Hours tracked', fmtDur(cost.total_seconds)],
           ['Cost per hour', `Rs ${cost.total_seconds ? Math.round(cost.total_cost / (cost.total_seconds / 3600)) : 0}`, 'Average'],
-          ['Not on any task', `${cost.total_seconds ? Math.round(cost.unassigned_seconds / cost.total_seconds * 100) : 0}%`],
+          ['Not on any task', `${cost.total_seconds ? Math.round(cost.unassigned_seconds / cost.total_seconds * 100) : 0}%`, fmtDur(cost.unassigned_seconds || 0)],
         ]} />
       )}
-      <div className="wk-card"><b style={{ fontSize: 18 }}>Hours per client</b>
-        {proj.length === 0 && <div className="wk-sm" style={{ marginTop: 8 }}>No time in this range.</div>}
-        {proj.slice(0, 40).map((p) => (
-          <div key={p.project_id || 'none'} className="wk-hrow">
-            <span className="wk-grp" style={{ flexWrap: 'nowrap' }}><span className="wk-dot" style={{ background: clientColor(projName(p.project_id)) }} />{projName(p.project_id) || 'No client'}</span>
-            <div className="wk-bar-h"><i style={{ width: `${p.seconds / max * 100}%`, background: clientColor(projName(p.project_id)) }} /></div>
-            <span className="wk-num" style={{ textAlign: 'right' }}>{fmtDur(p.seconds)}{canCost && costBy[p.project_id] ? ` · Rs ${Number(costBy[p.project_id].cost).toLocaleString('en-IN')}` : ''}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 24, alignItems: 'start' }}>
+        <div className="wk-card flush">
+          <div className="wk-ch"><div><h3>Share of time by client</h3><div className="wk-csub">Hours are on clients</div></div></div>
+          {proj.length === 0 && <div className="wk-empty">No time in this range.</div>}
+          <div style={{ padding: '4px 20px 16px' }}>
+            {proj.slice(0, 40).map((p) => {
+              const pc = Math.round(p.seconds / totalSecs * 100)
+              const col = clientColor(projName(p.project_id))
+              return (
+                <div key={p.project_id || 'none'} style={{ padding: '10px 0' }}>
+                  <div className="wk-row" style={{ marginBottom: 6 }}>
+                    <span className="wk-grp" style={{ flexWrap: 'nowrap', gap: 10 }}><span className="wk-dot" style={{ background: col }} />{projName(p.project_id) || 'No client'}</span>
+                    <span className="wk-num">{pc}%</span>
+                  </div>
+                  <div className="wk-bar-h"><i style={{ width: `${pc}%`, background: col }} /></div>
+                  <div className="wk-sm" style={{ marginTop: 4 }}>{fmtDur(p.seconds)}{canCost && costBy[p.project_id] ? ` · Rs ${Number(costBy[p.project_id].cost).toLocaleString('en-IN')}` : ''}</div>
+                </div>
+              )
+            })}
           </div>
-        ))}
-      </div>
-      {canCost && cost && (cost.by_task || []).length > 0 && (
-        <div className="wk-card" style={{ marginTop: 16, padding: 0, overflowX: 'auto' }}>
-          <div style={{ padding: '14px 16px 0' }}><b style={{ fontSize: 18 }}>Task cost</b><div className="wk-sm">Admin and accounts only. Click a task for who spent how long.</div></div>
-          <table className="wk-table" style={{ minWidth: 560 }}>
-            <thead><tr><th>Task</th><th>People</th><th>Hours</th><th>Cost</th></tr></thead>
-            <tbody>
-              {[...cost.by_task].sort((a, b) => b.cost - a.cost).slice(0, 80).map((t) => (
-                <tr key={t.task_id} className="click" onClick={() => onOpen(t.task_id)}>
-                  <td><b>{taskTitles[t.task_id] || 'Task'}</b></td><td className="wk-num">{t.people}</td>
-                  <td className="wk-num">{fmtDur(t.seconds)}</td><td className="wk-num">Rs {Number(t.cost).toLocaleString('en-IN')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
-      )}
+        {canCost && cost && (cost.by_task || []).length > 0 && (
+          <div className="wk-card flush" style={{ overflowX: 'auto' }}>
+            <div className="wk-ch"><div><h3>Task cost</h3><div className="wk-csub">Admin and accounts only. Click a task for who spent how long.</div></div></div>
+            <table className="wk-table" style={{ minWidth: 460 }}>
+              <thead><tr><th>Task</th><th style={{ textAlign: 'right' }}>People</th><th style={{ textAlign: 'right' }}>Hours</th><th style={{ textAlign: 'right' }}>Cost</th></tr></thead>
+              <tbody>
+                {[...cost.by_task].sort((a, b) => b.cost - a.cost).slice(0, 80).map((t) => (
+                  <tr key={t.task_id} className="click" onClick={() => onOpen(t.task_id)}>
+                    <td>
+                      <b style={{ fontWeight: 500 }}>{taskTitles[t.task_id] || 'Task'}</b>
+                      {taskClient[t.task_id] && <div className="wk-sm"><span className="wk-dot" style={{ background: clientColor(taskClient[t.task_id]), width: 8, height: 8, marginRight: 6 }} />{taskClient[t.task_id]}</div>}
+                    </td>
+                    <td className="wk-num" style={{ textAlign: 'right' }}>{t.people}</td>
+                    <td className="wk-num" style={{ textAlign: 'right' }}>{fmtDur(t.seconds)}</td>
+                    <td className="wk-num" style={{ textAlign: 'right' }}>Rs {Number(t.cost).toLocaleString('en-IN')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
       {!canCost && <div className="wk-sm" style={{ marginTop: 12 }}>Cost figures are shown to admin and accounts only.</div>}
     </div>
   )
