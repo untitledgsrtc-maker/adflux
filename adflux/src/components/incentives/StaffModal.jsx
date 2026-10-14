@@ -1,4 +1,5 @@
 // src/components/incentives/StaffModal.jsx
+import UserAvatar from '../common/UserAvatar'
 import { useState, useEffect, useRef } from 'react'
 import { X, User, Loader2, AlertTriangle } from 'lucide-react'
 import { useIncentive } from '../../hooks/useIncentive'
@@ -171,7 +172,7 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
       <div className="staff-modal">
         <div className="staff-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="staff-avatar">{initials(member.name)}</div>
+            <div className="staff-avatar"><UserAvatar name={member.name} userId={member.id} style={{ width: '100%', height: '100%' }} /></div>
             <div>
               <h3 style={{ margin: 0 }}>{member.name}</h3>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{member.email}</div>

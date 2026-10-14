@@ -4,6 +4,7 @@
 // (a person only their own part, forward only; a head any).
 import { useEffect, useState } from 'react'
 import { Clock, Play, Check, AlertTriangle, GripVertical } from 'lucide-react'
+import UserAvatar from '../common/UserAvatar'
 import { dueState, initialsOf, fmtDur, clientColor, fmtTimeIST, fmtDateShort, addDaysISO } from '../../utils/workUtils'
 import { istTodayISO } from '../../utils/istDate'
 
@@ -118,7 +119,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, ui
                     <div className="wk-row" style={{ marginTop: 12 }}>
                       {it.assigneePhoto
                         ? <img className="wk-av" src={it.assigneePhoto} alt={it.assigneeName} title={it.assigneeName} style={{ objectFit: 'cover' }} />
-                        : <span className="wk-av" title={it.assigneeName}>{initialsOf(it.assigneeName)}</span>}
+                        : <UserAvatar className="wk-av" name={it.assigneeName} userId={it.assigneeId} />}
                       {mine && it.status === 'assigned' && onStart && (
                         <button className="wk-btn g sm" onClick={(e) => { e.stopPropagation(); onStart(it) }}>
                           <Play size={14} aria-hidden="true" /> Start

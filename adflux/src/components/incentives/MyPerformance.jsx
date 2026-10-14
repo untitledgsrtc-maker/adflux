@@ -1,4 +1,5 @@
 // src/components/incentives/MyPerformance.jsx
+import UserAvatar from '../common/UserAvatar'
 import { useEffect, useState } from 'react'
 import { Flame, Trophy, TrendingUp, ChevronDown, CalendarDays } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -176,7 +177,7 @@ export function MyPerformance() {
     <div className="perf-page">
       {/* Hero */}
       <div className="perf-hero">
-        <div className="perf-hero-avatar">{initials(profile?.name || '?')}</div>
+        <div className="perf-hero-avatar"><UserAvatar name={profile?.name} url={profile?.profile_image_url} style={{ width: '100%', height: '100%' }} /></div>
         <div>
           <p className="perf-hero-name">{profile?.name}</p>
           <p className="perf-hero-sub">

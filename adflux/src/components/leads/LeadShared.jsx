@@ -24,6 +24,7 @@
 // `.display`/`h1-h3`, JetBrains Mono on `.mono`/`.num`), wrap the page
 // content in <div className="lead-root">.
 
+import { useUserPhoto } from '../../hooks/useUserPhotos'
 import { useState } from 'react'
 import { initials as initialsHelper } from '../../utils/formatters'
 // Phase 31R (10 May 2026) — owner audit caught a load-bearing bug:
@@ -171,7 +172,9 @@ export function SegChip({ segment }) {
    Color scheme indexed by `userId.charCodeAt(0) % 6 + 1`, or
    passed in explicitly via `colorIndex` for cases where the design
    pre-assigned a slot. */
-export function LeadAvatar({ name, userId, colorIndex, imageUrl }) {
+export function LeadAvatar({ name, userId, colorIndex, imageUrl: imageUrlProp }) {
+  const cachedPhoto = useUserPhoto(userId)
+  const imageUrl = imageUrlProp || cachedPhoto
   const idx = colorIndex
     ? colorIndex
     : userId

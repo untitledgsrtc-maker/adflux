@@ -129,7 +129,7 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, pr
                 >
                   <td>
                     <div className="staff-name-cell">
-                      <div className="staff-avatar"><UserAvatar name={user.name} url={user.profile_image_url} style={{ width: '100%', height: '100%' }} /></div>
+                      <div className="staff-avatar"><UserAvatar name={user.name} url={user.profile_image_url} userId={user.id} style={{ width: '100%', height: '100%' }} /></div>
                       <div>
                         <div className="staff-name">{user.name || '—'}</div>
                         <div className="staff-email">{user.email || ''}</div>

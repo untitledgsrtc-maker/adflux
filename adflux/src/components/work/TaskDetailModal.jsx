@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Check, Loader2, Send, Play } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toastError } from '../v2/Toast'
+import UserAvatar from '../common/UserAvatar'
 import { fmtDur, fmtDateShort, dueState, STATUS_LABEL, initialsOf } from '../../utils/workUtils'
 
 const EVENT_TEXT = {
@@ -82,7 +83,7 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                 <div key={p.id} className="wk-part">
                   <div className="wk-row">
                     <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span className="wk-av">{initialsOf(nameOf(p.assignee_id))}</span>
+                      <UserAvatar className="wk-av" name={nameOf(p.assignee_id)} userId={p.assignee_id} />
                       <b>{nameOf(p.assignee_id)}</b>
                     </span>
                     <span className={`wk-pill ${p.status === 'finished' ? 'ok' : p.status === 'in_process' ? 'warn' : ''}`}>{STATUS_LABEL[p.status]}</span>
