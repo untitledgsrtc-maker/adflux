@@ -152,7 +152,7 @@ export default function MyWorkV2() {
           <Link to="/my-offer" className="wk-btn o"><CalendarX size={16} aria-hidden="true" /> Leave request</Link>
           <Link to="/my-performance" className="wk-btn o"><FileText size={16} aria-hidden="true" /> Salary slips</Link>
           {isHead && <Link to="/team-work" className="wk-btn o"><Users size={16} aria-hidden="true" /> Team view</Link>}
-          <button className="wk-btn y" onClick={() => setNewTask(true)}><Plus size={16} aria-hidden="true" /> New task</button>
+          <button className="wk-btn y" onClick={() => setNewTask(true)}><Plus size={16} aria-hidden="true" /> {isHead ? 'New task' : 'Ask for work'}</button>
         </div>
       </div>
 

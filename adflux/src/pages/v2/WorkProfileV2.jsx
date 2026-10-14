@@ -200,8 +200,8 @@ export default function WorkProfileV2() {
               <div className="wk-ch">
                 <h3><span className="wk-tile"><Calendar size={16} aria-hidden="true" /></span>Attendance</h3>
                 <div className="wk-grp" style={{ fontSize: 12 }}>
-                  <span className="wk-pill ok">On time</span><span className="wk-pill warn">Late / half day</span>
-                  <span className="wk-pill bad">Leave / no clock-in</span><span className="wk-pill">Sunday / holiday</span>
+                  <span className="wk-pill ok">On time</span><span className="wk-pill warn">Late or half day</span>
+                  <span className="wk-pill bad">No clock-in</span><span className="wk-pill">Sunday or holiday</span>
                 </div>
               </div>
               <div style={{ padding: 18 }}>
