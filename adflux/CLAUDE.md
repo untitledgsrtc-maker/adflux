@@ -21307,3 +21307,5 @@ Owner built his own UI in Claude Design (`Work Module (standalone).html`) and as
 - **356.10** Team Work Overview laid out as the design's Head screen: Needs you rows (icon tile, title, who/what, pill, action) beside Who is working (live timers), then Fired this morning + Evening report (shared / not yet chips).
 - **356.11** Team Work: date filter row sits above the tab strip with a FILTERS label (as in the design).
 - **356.12** My Work: left column is a flex stack and the hero grows to fill it, so no empty gap beside the Evening report.
+
+- **356.13 (2026-10-14)** Team Work matched to the design: Clients (worked-on hero, duplicate banner, one card, open-tasks column, icon actions), Timeline (NOW hero, client legend, short names), Hours & cost (two columns, share %, task client), Approvals (request rows), People (photo + role, Running chip, head switch Yes/No, trash, Add person in header), filters on every tab with a separate Pick a date pill, full-width tab strip, Open timeline button, Overdue label. Not done: stacked avatars in Task cost, Start/Finish on admin board cards. Display only, no SQL.

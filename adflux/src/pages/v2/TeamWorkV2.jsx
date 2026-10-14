@@ -3,7 +3,7 @@
 // Hours & cost (cost = admin + accounts only), Approvals (added-later time).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { Plus, Loader2, Check, X, AlertTriangle, Clock, Users, Repeat, Moon, Pencil, GitMerge, Archive, ArchiveRestore, Building2 } from 'lucide-react'
+import { Plus, Loader2, Check, X, AlertTriangle, Clock, Users, Repeat, Moon, Pencil, GitMerge, Archive, ArchiveRestore, Building2, Calendar, Trash2 } from 'lucide-react'
 import '../../styles/work.css'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -178,13 +178,14 @@ export default function TeamWorkV2() {
         <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', marginBottom: 14 }}>
           <span className="wk-eyb">Filters</span>
           <div className="wk-tabs" style={{ margin: 0 }}>
-            {RANGES.map(([k, l]) => <button key={k} className={`wk-tab${range === k ? ' on' : ''}`} onClick={() => setRange(k)}>{l}</button>)}
+            {RANGES.filter(([k]) => k !== 'custom').map(([k, l]) => <button key={k} className={`wk-tab${range === k ? ' on' : ''}`} onClick={() => setRange(k)}>{l}</button>)}
           </div>
+          <button className={`wk-btn ${range === 'custom' ? 'y' : 'o'}`} onClick={() => setRange('custom')}><Calendar size={16} aria-hidden="true" /> Pick a date</button>
           {range === 'custom' && <input type="date" className="wk-input" style={{ width: 170 }} value={custom} max={today} onChange={(e) => setCustom(e.target.value)} aria-label="Pick a date" />}
         </div>
       )}
 
-      <div className="wk-tabs" role="tablist">
+      <div className="wk-tabs" role="tablist" style={{ width: '100%', display: 'flex', overflowX: 'auto' }}>
         {TABS.map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} className={`wk-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
             {l}{k === 'approvals' && pending.length > 0 && <span className="wk-cnt">{pending.length}</span>}
@@ -197,11 +198,11 @@ export default function TeamWorkV2() {
 
       {!loading && !err && tab === 'overview' && (
         <>
-          <HeroSegs live eyebrow={`Team · ${rangeLabel}`} segs={[
+          <HeroSegs live action={<button className="wk-btn sm" style={{ background: '#fff', color: '#0f172a' }} onClick={() => setTab('timeline')}>Open timeline</button>} eyebrow={`Team · ${rangeLabel}`} segs={[
             ['Team hours', fmtDur(teamSecs), `${Object.keys(byPerson).length} ${Object.keys(byPerson).length === 1 ? 'person' : 'people'} tracked`],
             ['Working now', `${running.length} of ${memberIds.length}`, 'Live timers'],
             ['Open tasks', String(openCount), 'Assigned and in process'],
-            ['Finished today', String(finishedToday)],
+            ['Finished today', String(finishedToday), 'Since 00:00'],
           ]} />
           <div className="wk-grid" style={{ gap: 24 }}>
             <div className="wk-c8">
@@ -298,7 +299,7 @@ export default function TeamWorkV2() {
           <HeroSegs eyebrow="Board · filtered" segs={[
             ['In process', String(items.filter((i) => i.status === 'in_process').length), 'Being worked on'],
             ['Assigned', String(items.filter((i) => i.status === 'assigned').length), 'Not started'],
-            ['Late', String(lateParts.length), lateParts.length ? 'Past due date' : 'None'],
+            ['Overdue', String(lateParts.length), 'Past due date'],
           ]} />
           <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
             <select className="wk-input" style={{ width: 220 }} value={fPerson} onChange={(e) => setFPerson(e.target.value)} aria-label="Filter by person">
@@ -307,7 +308,7 @@ export default function TeamWorkV2() {
             <select className="wk-input" style={{ width: 240 }} value={fClient} onChange={(e) => setFClient(e.target.value)} aria-label="Filter by client">
               <option value="">All clients</option>{activeProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <span className="wk-sm">{items.filter((i) => i.status !== 'finished').length} open · {lateParts.length} late</span>
+            <span className="wk-sm">{canCost ? '₹ Cost shows for admin and accounts only · ' : ''}{items.filter((i) => i.status !== 'finished').length} open · {lateParts.length} overdue</span>
           </div>
           <div className="wk-sm" style={{ marginTop: 8 }}>Drag a card to change its status. A task with several people finishes when every part is finished.</div>
           <WorkBoard items={items} uid={uid} showCost={canCost} onMove={(id, to2) => rpc('work_move_part', { p_part: id, p_to: to2 })} onOpen={setOpenTask} />
@@ -378,10 +379,10 @@ export default function TeamWorkV2() {
   )
 }
 
-function HeroSegs({ eyebrow, segs, live }) {
+function HeroSegs({ eyebrow, segs, live, action }) {
   return (
     <div className="wk-hero" style={{ marginBottom: 16 }}>
-      <span className="wk-grp">{live && <span className="wk-ldot" aria-hidden="true" />}<span className="wk-eyb">{eyebrow}</span></span>
+      <span className="wk-row" style={{ alignItems: 'center' }}><span className="wk-grp">{live && <span className="wk-ldot" aria-hidden="true" />}<span className="wk-eyb">{eyebrow}</span></span>{action}</span>
       <div className="wk-hsegs" style={{ gridTemplateColumns: `repeat(${segs.length}, minmax(0, 1fr))` }}>
         {segs.map(([l, v, sub], i) => (
           <div key={l} className="wk-hseg">
@@ -397,45 +398,64 @@ function HeroSegs({ eyebrow, segs, live }) {
 
 function PeopleTab({ members, users, nameOf, runBy, byPerson, projName, now, isAdmin, busy, onSet }) {
   const [add, setAdd] = useState('')
+  const [adding, setAdding] = useState(false)
   const ids = new Set(members.map((m) => m.user_id))
   const candidates = users.filter((u) => u.is_active && !ids.has(u.id) && u.role !== 'agency')
+  const userOf = (id) => users.find((u) => u.id === id) || {}
+  const heads = members.filter((m) => m.is_head).length
   return (
     <div>
-      <HeroSegs eyebrow="Work team" segs={[['People', String(members.length), `${members.filter((m) => m.is_head).length} head`], ['Working now', String(Object.keys(runBy).length), 'Live timers']]} />
-      {isAdmin && (
-        <div className="wk-card" style={{ marginBottom: 14 }}>
-          <b>Put someone on the timeclock</b>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+      <HeroSegs eyebrow="Work team" segs={[['People', `${members.length} ${members.length === 1 ? 'person' : 'people'}`, `${heads} head`], ['Working now', String(Object.keys(runBy).length), 'Live timers']]} />
+      <div className="wk-card flush">
+        <div className="wk-ch">
+          <h3><span className="wk-tile" style={{ background: 'rgba(59,130,246,.14)', color: 'var(--info, #60a5fa)' }}><Users size={16} aria-hidden="true" /></span>Work team</h3>
+          {isAdmin && <button className="wk-btn o sm" onClick={() => setAdding((v) => !v)}><Plus size={14} aria-hidden="true" /> Add person</button>}
+        </div>
+        {isAdmin && adding && (
+          <div className="wk-row" style={{ padding: '12px 20px', justifyContent: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
             <select className="wk-input" style={{ flex: 1, minWidth: 220 }} value={add} onChange={(e) => setAdd(e.target.value)} aria-label="Person">
               <option value="">Pick a person</option>
               {candidates.map((u) => <option key={u.id} value={u.id}>{u.name}{u.designation ? ` - ${u.designation}` : ''}</option>)}
             </select>
-            <button className="wk-btn y" disabled={!add || busy} onClick={async () => { if (await onSet(add, true, false)) setAdd('') }}>Add</button>
+            <button className="wk-btn y sm" disabled={!add || busy} onClick={async () => { if (await onSet(add, true, false)) { setAdd(''); setAdding(false) } }}>Add</button>
           </div>
+        )}
+        <div style={{ overflowX: 'auto' }}>
+          <table className="wk-table" style={{ minWidth: 640 }}>
+            <thead><tr><th>Person</th><th>Running now</th><th style={{ textAlign: 'right' }}>Hours</th><th>Head</th>{isAdmin && <th />}</tr></thead>
+            <tbody>
+              {members.map((m) => {
+                const r = runBy[m.user_id]
+                const u = userOf(m.user_id)
+                const nm = nameOf(m.user_id)
+                const pretty = nm === nm.toUpperCase() ? nm.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : nm
+                return (
+                  <tr key={m.user_id}>
+                    <td>
+                      <span className="wk-grp" style={{ flexWrap: 'nowrap', gap: 12 }}>
+                        <span className="wk-av" style={{ width: 36, height: 36 }}>{u.profile_image_url ? <img src={u.profile_image_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initialsOf(nm)}</span>
+                        <span><Link to={`/work-profile?user=${m.user_id}`} style={{ color: 'inherit', fontWeight: 500 }}>{pretty}</Link>{u.designation && <div className="wk-sm">{u.designation}</div>}</span>
+                      </span>
+                    </td>
+                    <td className="wk-sm">{r
+                      ? <><span className="wk-pill ok" style={{ marginRight: 8 }}>Running</span><span className="wk-dot" style={{ background: clientColor(projName(r.project_id)), width: 8, height: 8, marginRight: 6 }} />{projName(r.project_id) || 'No client'} · {r.task_label} · <span className="wk-num">{fmtClock((now - new Date(r.started_at)) / 1000)}</span></>
+                      : 'Not clocked in'}</td>
+                    <td className="wk-num" style={{ textAlign: 'right' }}>{fmtDur(byPerson[m.user_id]?.seconds || 0)}</td>
+                    <td>{isAdmin ? (
+                      <span className="wk-grp" style={{ flexWrap: 'nowrap', gap: 8 }}>
+                        <button type="button" role="switch" aria-checked={m.is_head} aria-label={`Head: ${nm}`} disabled={busy}
+                          className={`wk-sw${m.is_head ? ' on' : ''}`} onClick={() => onSet(m.user_id, true, !m.is_head)}><i /></button>
+                        <span className="wk-sm">{m.is_head ? 'Yes' : 'No'}</span>
+                      </span>
+                    ) : (m.is_head ? 'Yes' : 'No')}</td>
+                    {isAdmin && <td style={{ textAlign: 'right' }}><button className="wk-btn g sm" aria-label={`Remove ${nm}`} title="Remove from timeclock" disabled={busy} onClick={() => onSet(m.user_id, false, false)}><Trash2 size={15} aria-hidden="true" /></button></td>}
+                  </tr>
+                )
+              })}
+              {members.length === 0 && <tr><td colSpan={5} className="wk-empty">No one yet. People get on the timeclock when they are given a task, or add them above.</td></tr>}
+            </tbody>
+          </table>
         </div>
-      )}
-      <div className="wk-card" style={{ padding: 0, overflowX: 'auto' }}>
-        <table className="wk-table" style={{ minWidth: 640 }}>
-          <thead><tr><th>Person</th><th>Now</th><th>Hours in range</th><th>Head</th>{isAdmin && <th />}</tr></thead>
-          <tbody>
-            {members.map((m) => {
-              const r = runBy[m.user_id]
-              return (
-                <tr key={m.user_id}>
-                  <td><Link to={`/work-profile?user=${m.user_id}`} style={{ color: 'inherit', fontWeight: 700 }}>{nameOf(m.user_id)}</Link></td>
-                  <td className="wk-sm">{r ? <><span className="wk-dot" style={{ background: 'var(--success)', marginRight: 6 }} />{projName(r.project_id) || r.task_label} · {fmtClock((now - new Date(r.started_at)) / 1000)}</> : 'Not running'}</td>
-                  <td className="wk-num">{fmtDur(byPerson[m.user_id]?.seconds || 0)}</td>
-                  <td>{isAdmin ? (
-                    <button type="button" role="switch" aria-checked={m.is_head} aria-label={`Head: ${nameOf(m.user_id)}`} disabled={busy}
-                      className={`wk-sw${m.is_head ? ' on' : ''}`} onClick={() => onSet(m.user_id, true, !m.is_head)}><i /></button>
-                  ) : (m.is_head ? 'Yes' : '')}</td>
-                  {isAdmin && <td><button className="wk-btn o sm" disabled={busy} onClick={() => onSet(m.user_id, false, false)}>Remove</button></td>}
-                </tr>
-              )
-            })}
-            {members.length === 0 && <tr><td colSpan={5} className="wk-empty">No one yet. People get on the timeclock when they are given a task, or add them above.</td></tr>}
-          </tbody>
-        </table>
       </div>
     </div>
   )
