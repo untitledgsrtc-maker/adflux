@@ -12,6 +12,7 @@ import { istTodayISO } from '../../utils/istDate'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, dueState, initialsOf, clientColor, istHour } from '../../utils/workUtils'
 import WorkBoard from '../../components/work/WorkBoard'
+import UserAvatar from '../../components/common/UserAvatar'
 import NewTaskModal from '../../components/work/NewTaskModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
 
@@ -107,6 +108,7 @@ export default function TeamWorkV2() {
   }, [cost]) // eslint-disable-line
 
   const nameOf = useMemo(() => { const m = new Map(users.map((u) => [u.id, u.name])); return (id) => m.get(id) || 'Someone' }, [users])
+  const photoOf = (id) => users.find((u) => u.id === id)?.profile_image_url || null
   const projName = useMemo(() => { const m = new Map(projects.map((p) => [p.id, p.name])); return (id) => m.get(id) || '' }, [projects])
   const activeProjects = useMemo(() => projects.filter((p) => p.is_active), [projects])
 
@@ -241,7 +243,7 @@ export default function TeamWorkV2() {
                     {running.map((r) => (
                       <div key={r.id} className="wk-row" style={{ padding: '12px 20px' }}>
                         <span className="wk-grp" style={{ flexWrap: 'nowrap', minWidth: 0 }}>
-                          <span className="wk-av" style={{ width: 36, height: 36 }}>{initialsOf(nameOf(r.user_id))}</span>
+                          <UserAvatar className="wk-av" name={nameOf(r.user_id)} url={photoOf(r.user_id)} size={36} />
                           <span style={{ minWidth: 0 }}>
                             <Link to={`/work-profile?user=${r.user_id}`} style={{ color: 'inherit', fontWeight: 500 }}>{nameOf(r.user_id)}</Link>
                             <div className="wk-sm" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -271,7 +273,7 @@ export default function TeamWorkV2() {
                     {firedToday.map((p) => (
                       <div key={p.id} className="wk-row" style={{ padding: '14px 20px' }}>
                         <div><div style={{ fontWeight: 500 }}>{p.task?.title}</div><div className="wk-sm">{projName(p.task?.project_id) || 'No client'}</div></div>
-                        <span className="wk-av">{initialsOf(nameOf(p.assignee_id))}</span>
+                        <UserAvatar className="wk-av" name={nameOf(p.assignee_id)} url={photoOf(p.assignee_id)} />
                       </div>
                     ))}
                   </div>
@@ -287,7 +289,7 @@ export default function TeamWorkV2() {
                       <span className={`wk-pill ${tone}`}>{lbl}</span>
                       <div className="wk-grp" style={{ marginTop: 8 }}>
                         {ids.length === 0 && <span className="wk-sm">No one</span>}
-                        {ids.map((id) => <span key={id} className="wk-chip"><span className="wk-av" style={{ width: 22, height: 22, fontSize: 10 }}>{initialsOf(nameOf(id))}</span>{nameOf(id).split(' ')[0]}</span>)}
+                        {ids.map((id) => <span key={id} className="wk-chip"><UserAvatar className="wk-av" name={nameOf(id)} url={photoOf(id)} size={22} />{nameOf(id).split(' ')[0]}</span>)}
                       </div>
                     </div>
                   ))}
@@ -332,7 +334,7 @@ export default function TeamWorkV2() {
       )}
 
       {!loading && !err && tab === 'timeline' && (
-        <TimelineTab memberIds={memberIds} nameOf={nameOf} byPerson={byPerson} from={from} to={to} projName={projName} />
+        <TimelineTab photoOf={photoOf} memberIds={memberIds} nameOf={nameOf} byPerson={byPerson} from={from} to={to} projName={projName} />
       )}
 
       {!loading && !err && tab === 'hours' && (
@@ -579,7 +581,7 @@ function ClientsTab({ projects, report, cost, canCost, parts, onAdd, onUpdate })
   )
 }
 
-function TimelineTab({ memberIds, nameOf, byPerson, from, to, projName }) {
+function TimelineTab({ photoOf, memberIds, nameOf, byPerson, from, to, projName }) {
   const days = Math.max(1, Math.round((new Date(to) - new Date(from)) / 86400000) + 1)
   const cap = 8.5 * 3600 * days
   const rows = [...memberIds].sort((a, b) => (byPerson[b]?.seconds || 0) - (byPerson[a]?.seconds || 0))
@@ -626,7 +628,7 @@ function TimelineTab({ memberIds, nameOf, byPerson, from, to, projName }) {
               </div>
               {rows.map((id) => (
                 <div key={id} className="wk-hov" onClick={() => setOpen(id)} style={{ display: 'grid', gridTemplateColumns: '170px 1fr', gap: 12, alignItems: 'center', minHeight: 48, borderRadius: 10 }}>
-                  <span className="wk-grp" style={{ paddingLeft: 8, flexWrap: 'nowrap' }}><span className="wk-av" style={{ width: 28, height: 28 }}>{initialsOf(nameOf(id))}</span><b style={{ fontSize: 13, fontWeight: 500 }}>{shortName(nameOf(id))}</b></span>
+                  <span className="wk-grp" style={{ paddingLeft: 8, flexWrap: 'nowrap' }}><UserAvatar className="wk-av" name={nameOf(id)} url={photoOf(id)} size={28} /><b style={{ fontSize: 13, fontWeight: 500 }}>{shortName(nameOf(id))}</b></span>
                   <div style={{ position: 'relative', height: 26, background: 'var(--w-hov)', borderRadius: 6 }}>
                     {(byUser[id] || []).map((e) => {
                       const s0 = hourOf(e.started_at), e0 = e.ended_at ? hourOf(e.ended_at) : nowH

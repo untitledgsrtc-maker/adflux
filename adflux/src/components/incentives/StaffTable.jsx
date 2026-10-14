@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Pencil, Flame, Trophy, AlertCircle, IndianRupee } from 'lucide-react'
 import { calculateIncentive, calculateStreak, isIncrementEligible } from '../../utils/incentiveCalc'
 import { formatCurrency, initials, formatMonthYear } from '../../utils/formatters'
+import UserAvatar from '../common/UserAvatar'
 
 function SlabBar({ pct, slabReached, targetExceeded }) {
   // Phase 21a — pct is earned/target. When target is 0 (not configured)
@@ -128,7 +129,7 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, pr
                 >
                   <td>
                     <div className="staff-name-cell">
-                      <div className="staff-avatar">{initials(user.name || '?')}</div>
+                      <div className="staff-avatar"><UserAvatar name={user.name} url={user.profile_image_url} style={{ width: '100%', height: '100%' }} /></div>
                       <div>
                         <div className="staff-name">{user.name || '—'}</div>
                         <div className="staff-email">{user.email || ''}</div>

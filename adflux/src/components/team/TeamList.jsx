@@ -5,6 +5,7 @@ import {
   Edit2, UserX, UserCheck, Mail, Trash2, UserCircle,
 } from 'lucide-react'
 import { initials } from '../../utils/formatters'
+import UserAvatar from '../common/UserAvatar'
 import { MemberStatsCard } from './MemberStatsCard'
 import { TeamMemberModal } from './TeamMemberModal'
 import { useTeam } from '../../hooks/useTeam'
@@ -75,7 +76,7 @@ function MemberCard({ member, settings, onDeactivate, onReactivate, onEdit }) {
       <div className={`member-card ${!member.is_active ? 'member-card--inactive' : ''}`}>
         {/* Avatar */}
         <div className={`member-avatar ${isAdmin ? 'member-avatar--admin' : ''}`}>
-          {initials(member.name)}
+          <UserAvatar name={member.name} url={member.profile_image_url} style={{ width: '100%', height: '100%' }} />
         </div>
 
         {/* Info */}
