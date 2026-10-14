@@ -4,7 +4,7 @@
 // (a person only their own part, forward only; a head any).
 import { useState } from 'react'
 import { Clock, Play, Check } from 'lucide-react'
-import { dueState, initialsOf, fmtDur } from '../../utils/workUtils'
+import { dueState, initialsOf, fmtDur, clientColor } from '../../utils/workUtils'
 
 const COLS = [
   { key: 'assigned',   title: 'Assigned',   color: 'var(--text-muted)' },
@@ -62,7 +62,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, ui
                   onClick={() => onOpen(it.taskId)}
                 >
                   <div className="wk-row" style={{ justifyContent: 'flex-start' }}>
-                    <span className="wk-ctile" aria-hidden="true">{(it.client || '?')[0]}</span>
+                    <span className="wk-ctile" aria-hidden="true" style={{ background: `${clientColor(it.client)}33`, color: clientColor(it.client) }}>{(it.client || '?')[0].toUpperCase()}</span>
                     <div style={{ minWidth: 0 }}>
                       <div className="wk-sm">{it.client || 'No client'}</div>
                       <b>{it.title}</b>

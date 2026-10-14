@@ -10,7 +10,7 @@ import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { istTodayISO } from '../../utils/istDate'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
-import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, dueState, initialsOf } from '../../utils/workUtils'
+import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, dueState, initialsOf, clientColor } from '../../utils/workUtils'
 import WorkBoard from '../../components/work/WorkBoard'
 import NewTaskModal from '../../components/work/NewTaskModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
@@ -446,28 +446,66 @@ function TimelineTab({ memberIds, nameOf, byPerson, from, to, projName }) {
   const cap = 8.5 * 3600 * days
   const rows = [...memberIds].sort((a, b) => (byPerson[b]?.seconds || 0) - (byPerson[a]?.seconds || 0))
   const [open, setOpen] = useState(null)
-  const [detail, setDetail] = useState([])
+  const [all, setAll] = useState([])
+  const [nowMs, setNowMs] = useState(Date.now())
   useEffect(() => {
-    if (!open) return
-    supabase.from('work_time_entries').select('*').eq('user_id', open).eq('status', 'approved')
-      .gte('started_at', dayStartISO(from)).lt('started_at', dayStartISO(addDaysISO(to, 1))).order('started_at')
-      .then(({ data }) => setDetail(data || []))
-  }, [open, from, to])
+    let live = true
+    supabase.from('work_time_entries').select('*').eq('status', 'approved')
+      .gte('started_at', dayStartISO(from)).lt('started_at', dayStartISO(addDaysISO(to, 1))).order('started_at').limit(2000)
+      .then(({ data }) => { if (live) setAll(data || []) })
+    const i = setInterval(() => setNowMs(Date.now()), 60000)
+    return () => { live = false; clearInterval(i) }
+  }, [from, to])
+  const detail = open ? all.filter((e) => e.user_id === open) : []
+  const single = from === to
+  const H0 = 8, H1 = 21
+  const hourOf = (iso) => { const d = new Date(new Date(iso).getTime() + 5.5 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60 }
+  const pct = (h) => Math.max(0, Math.min(100, (h - H0) / (H1 - H0) * 100))
+  const nowH = hourOf(new Date(nowMs).toISOString())
+  const byUser = {}; all.forEach((e) => { (byUser[e.user_id] = byUser[e.user_id] || []).push(e) })
   return (
     <div style={{ display: 'grid', gridTemplateColumns: open ? 'minmax(0,1.3fr) minmax(0,1fr)' : '1fr', gap: 16, alignItems: 'start' }}>
-      <div className="wk-card" style={{ padding: 0 }}>
+      <div className="wk-card flush">
+        <div className="wk-ch"><h3>{single ? 'Today, by person' : 'Hours, by person'}</h3></div>
         {rows.length === 0 && <div className="wk-empty">No one is on the timeclock yet.</div>}
-        {rows.map((id) => {
+        {single ? (
+          <div style={{ padding: 16, overflowX: 'auto' }}>
+            <div style={{ minWidth: 640 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr', gap: 12, marginBottom: 6 }}>
+                <span />
+                <div style={{ position: 'relative', height: 18 }}>
+                  {Array.from({ length: H1 - H0 + 1 }, (_, i) => i).filter((i) => i % 1 === 0).map((i) => (
+                    <span key={i} className="wk-num wk-mu" style={{ position: 'absolute', left: `${pct(H0 + i)}%`, fontSize: 11, transform: 'translateX(-50%)' }}>{String(H0 + i).padStart(2, '0')}</span>
+                  ))}
+                </div>
+              </div>
+              {rows.map((id) => (
+                <div key={id} className="wk-hov" onClick={() => setOpen(id)} style={{ display: 'grid', gridTemplateColumns: '170px 1fr', gap: 12, alignItems: 'center', minHeight: 48, borderRadius: 10 }}>
+                  <span className="wk-grp" style={{ paddingLeft: 8, flexWrap: 'nowrap' }}><span className="wk-av" style={{ width: 28, height: 28 }}>{initialsOf(nameOf(id))}</span><b style={{ fontSize: 13 }}>{nameOf(id)}</b></span>
+                  <div style={{ position: 'relative', height: 26, background: 'var(--w-hov)', borderRadius: 6 }}>
+                    {(byUser[id] || []).map((e) => {
+                      const s0 = hourOf(e.started_at), e0 = e.ended_at ? hourOf(e.ended_at) : nowH
+                      return <span key={e.id} title={`${projName(e.project_id) || '-'} · ${e.task_label}`}
+                        style={{ position: 'absolute', left: `${pct(s0)}%`, width: `${Math.max(0.6, pct(e0) - pct(s0))}%`, top: 3, bottom: 3, borderRadius: 6, background: clientColor(projName(e.project_id)), boxShadow: e.ended_at ? 'none' : '0 0 0 2px var(--accent)' }} />
+                    })}
+                    <span style={{ position: 'absolute', left: `${pct(nowH)}%`, top: -4, bottom: -4, width: 2, background: 'var(--accent)' }} />
+                  </div>
+                </div>
+              ))}
+              <div className="wk-sm" style={{ marginTop: 10, paddingLeft: 182 }}>Yellow line is now. Outlined blocks are running. Colour = client.</div>
+            </div>
+          </div>
+        ) : rows.map((id) => {
           const s = byPerson[id]?.seconds || 0
           return (
-            <div key={id} className="wk-hrow" style={{ padding: '6px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }} onClick={() => setOpen(id)}>
+            <div key={id} className="wk-hrow wk-hov" style={{ padding: '6px 16px', borderBottom: '1px solid var(--border)' }} onClick={() => setOpen(id)}>
               <span><b>{nameOf(id)}</b>{s === 0 && <span className="wk-pill" style={{ marginLeft: 8 }}>no clock-in</span>}</span>
               <div className="wk-bar-h"><i style={{ width: `${Math.min(100, s / cap * 100)}%` }} /></div>
               <span className="wk-num" style={{ textAlign: 'right' }}>{fmtDur(s)}</span>
             </div>
           )
         })}
-        <div className="wk-sm" style={{ padding: 12 }}>Bar is full at 8h 30m per day. Tap a person for their day. No screenshots, no activity score.</div>
+        <div className="wk-sm" style={{ padding: 12 }}>Tap a person for their day. No screenshots, no activity score.</div>
       </div>
       {open && (
         <div className="wk-card">
@@ -476,6 +514,7 @@ function TimelineTab({ memberIds, nameOf, byPerson, from, to, projName }) {
           {detail.length === 0 && <div className="wk-sm" style={{ marginTop: 10 }}>No time recorded.</div>}
           {detail.map((e) => (
             <div key={e.id} className="wk-log">
+              <span className="wk-dot" style={{ background: clientColor(projName(e.project_id)), marginTop: 5 }} />
               <div style={{ flex: 1 }}><b>{projName(e.project_id) || '-'}</b><div className="wk-sm">{e.task_label}</div></div>
               <div className="wk-sm" style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{fmtTimeIST(e.started_at)} - {e.ended_at ? fmtTimeIST(e.ended_at) : 'running'}<br />{fmtDur(((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000)}</div>
             </div>
@@ -504,8 +543,8 @@ function HoursTab({ report, cost, canCost, projName, nameOf, taskTitles, onOpen 
         {proj.length === 0 && <div className="wk-sm" style={{ marginTop: 8 }}>No time in this range.</div>}
         {proj.slice(0, 40).map((p) => (
           <div key={p.project_id || 'none'} className="wk-hrow">
-            <span>{projName(p.project_id) || 'No client'}</span>
-            <div className="wk-bar-h"><i style={{ width: `${p.seconds / max * 100}%` }} /></div>
+            <span className="wk-grp" style={{ flexWrap: 'nowrap' }}><span className="wk-dot" style={{ background: clientColor(projName(p.project_id)) }} />{projName(p.project_id) || 'No client'}</span>
+            <div className="wk-bar-h"><i style={{ width: `${p.seconds / max * 100}%`, background: clientColor(projName(p.project_id)) }} /></div>
             <span className="wk-num" style={{ textAlign: 'right' }}>{fmtDur(p.seconds)}{canCost && costBy[p.project_id] ? ` · Rs ${Number(costBy[p.project_id].cost).toLocaleString('en-IN')}` : ''}</span>
           </div>
         ))}

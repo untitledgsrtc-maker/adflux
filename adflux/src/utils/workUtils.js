@@ -39,3 +39,13 @@ export const dueState = (due, status) => {
   if (due === addDaysISO(t, 1)) return { cls: 'warn', label: 'Tomorrow' }
   return { cls: '', label: fmtDateShort(due) }
 }
+
+// Stable colour per client name (the design's client tags). Same name = same colour everywhere.
+const CLIENT_COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#fb923c', '#34d399', '#facc15', '#60a5fa', '#f87171', '#2dd4bf', '#c084fc']
+export const clientColor = (name) => {
+  const t = String(name || '').trim().toLowerCase()
+  if (!t) return '#64748b'
+  let h = 0
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0
+  return CLIENT_COLORS[h % CLIENT_COLORS.length]
+}

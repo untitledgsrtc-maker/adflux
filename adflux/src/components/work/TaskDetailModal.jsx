@@ -1,7 +1,7 @@
 // Phase 365 - one task: parts, checklist, comments, task log, due date. Opens from the board
 // and from "Asked by me". Everything it writes goes through the work_* functions.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Check, Loader2, Send } from 'lucide-react'
+import { X, Check, Loader2, Send, Play } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toastError } from '../v2/Toast'
 import { fmtDur, fmtDateShort, dueState, STATUS_LABEL, initialsOf } from '../../utils/workUtils'
@@ -148,6 +148,17 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                 </div>
               ))}
             </div>
+            {(() => {
+              const mine = data.parts.find((p) => p.assignee_id === uid && p.status !== 'finished')
+              if (!mine) return null
+              return (
+                <div style={{ position: 'sticky', bottom: -20, margin: '20px -20px -20px', padding: 16, background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+                  {mine.status === 'assigned'
+                    ? <button className="wk-btn y lg" disabled={busy} onClick={() => run(() => rpc('work_clock_start', { p_project: null, p_label: null, p_part: mine.id }))}><Play size={16} aria-hidden="true" /> Start my part</button>
+                    : <button className="wk-btn y lg" disabled={busy} onClick={() => run(() => rpc('work_finish_part', { p_part: mine.id, p_note: null }))}><Check size={16} aria-hidden="true" /> Finish my part</button>}
+                </div>
+              )
+            })()}
           </>
         )}
       </div>

@@ -121,9 +121,9 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
           <textarea id="nt-steps" className="wk-input" value={steps} onChange={(e) => setSteps(e.target.value)} placeholder={'Get logo\nRough cut\nAdd subtitles'} /></div>
 
         <div className="wk-field"><label>Repeat</label>
-          <div className="wk-chips" style={{ marginTop: 0 }}>
-            {[['once', 'Just once'], ['daily', 'Every day'], ['weekly', 'Every week'], ['monthly', 'Every month']].map(([k, l]) => (
-              <button key={k} className={`wk-chip${repeat === k ? ' on' : ''}`} onClick={() => setRepeat(k)}>{l}</button>
+          <div className="wk-seg" style={{ display: 'flex' }}>
+            {[['once', 'None'], ['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly']].map(([k, l]) => (
+              <button key={k} style={{ flex: 1 }} className={repeat === k ? 'on' : ''} onClick={() => setRepeat(k)}>{l}</button>
             ))}
           </div>
           {repeat === 'weekly' && (
