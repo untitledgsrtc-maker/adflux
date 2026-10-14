@@ -372,8 +372,10 @@ function PeopleTab({ members, users, nameOf, runBy, byPerson, projName, now, isA
                   <td><Link to={`/work-profile?user=${m.user_id}`} style={{ color: 'inherit', fontWeight: 700 }}>{nameOf(m.user_id)}</Link></td>
                   <td className="wk-sm">{r ? <><span className="wk-dot" style={{ background: 'var(--success)', marginRight: 6 }} />{projName(r.project_id) || r.task_label} · {fmtClock((now - new Date(r.started_at)) / 1000)}</> : 'Not running'}</td>
                   <td className="wk-num">{fmtDur(byPerson[m.user_id]?.seconds || 0)}</td>
-                  <td>{isAdmin ? <input type="checkbox" checked={m.is_head} disabled={busy} style={{ width: 20, height: 20 }} aria-label="Head"
-                    onChange={(e) => onSet(m.user_id, true, e.target.checked)} /> : (m.is_head ? 'Yes' : '')}</td>
+                  <td>{isAdmin ? (
+                    <button type="button" role="switch" aria-checked={m.is_head} aria-label={`Head: ${nameOf(m.user_id)}`} disabled={busy}
+                      className={`wk-sw${m.is_head ? ' on' : ''}`} onClick={() => onSet(m.user_id, true, !m.is_head)}><i /></button>
+                  ) : (m.is_head ? 'Yes' : '')}</td>
                   {isAdmin && <td><button className="wk-btn o sm" disabled={busy} onClick={() => onSet(m.user_id, false, false)}>Remove</button></td>}
                 </tr>
               )
@@ -394,11 +396,32 @@ function ClientsTab({ projects, report, cost, canCost, onAdd, onUpdate }) {
   const [merge, setMerge] = useState('')
   const hours = useMemo(() => { const m = {}; (report?.by_project || []).forEach((p) => { m[p.project_id] = p }); return m }, [report])
   const costBy = useMemo(() => { const m = {}; (cost?.by_project || []).forEach((p) => { m[p.project_id] = p }); return m }, [cost])
+  const [notSame, setNotSame] = useState([])
+  const dup = useMemo(() => {
+    const norm = (n) => n.toLowerCase().replace(/\b(pvt|private|ltd|limited|llp|co|company)\b/g, '').replace(/[^a-z0-9]/g, '')
+    const seen = new Map()
+    for (const p of projects.filter((x) => x.is_active)) {
+      const k = norm(p.name); if (!k) continue
+      if (seen.has(k)) {
+        const a = seen.get(k)
+        const key = [a.id, p.id].sort().join('|')
+        if (!notSame.includes(key)) return [a, p]
+      } else seen.set(k, p)
+    }
+    return null
+  }, [projects, notSame])
   const rows = projects.filter((p) => !q || p.name.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) => (hours[b.id]?.seconds || 0) - (hours[a.id]?.seconds || 0) || a.name.localeCompare(b.name))
   return (
     <div>
       <HeroSegs eyebrow="Clients worked on" segs={[['Clients', String(projects.filter((p) => p.is_active).length), `${(report?.by_project || []).length} with time in these dates`]]} />
+      {dup && (
+        <div className="wk-grp" style={{ padding: 16, borderRadius: 14, background: 'rgba(59,130,246,.12)', marginBottom: 14 }}>
+          <div style={{ flex: 1, minWidth: 200 }}><b>Possible duplicate:</b> {dup[0].name} and {dup[1].name}</div>
+          <button className="wk-btn sm" onClick={() => onUpdate(dup[1].id, dup[1].name, true, dup[0].id)}>Merge into {dup[0].name}</button>
+          <button className="wk-btn o sm" onClick={() => setNotSame((x) => [...x, dup.map((d) => d.id).sort().join('|')])}>Not the same</button>
+        </div>
+      )}
       <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
         <input className="wk-input" style={{ width: 240 }} placeholder="Search clients" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search clients" />
         <input className="wk-input" style={{ width: 240 }} placeholder="New client name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} aria-label="New client name" />

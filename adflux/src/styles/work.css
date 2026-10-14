@@ -166,6 +166,13 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 .wk-log:last-child { border: 0; }
 .wk-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: min(92vw, 620px); padding: 14px 18px; background: var(--w-card); border: 1px solid var(--accent); border-radius: 16px; z-index: 9999; box-shadow: 0 14px 28px rgba(0, 0, 0, .5); }
 
+/* on/off switch (Head toggle) */
+.wk-sw { width: 38px; height: 22px; border-radius: 999px; background: var(--w-raised); border: 1px solid var(--w-bd2); position: relative; cursor: pointer; padding: 0; transition: .15s; }
+.wk-sw i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 999px; background: var(--text-muted); transition: .15s; }
+.wk-sw.on { background: var(--accent); border-color: var(--accent); }
+.wk-sw.on i { left: 18px; background: #0f172a; }
+.wk-sw:disabled { opacity: .5; cursor: default; }
+
 /* legacy: running card (kept so nothing breaks) */
 .wk-run { background: var(--w-card); border: 2px solid var(--accent); border-radius: 16px; padding: 18px; }
 
