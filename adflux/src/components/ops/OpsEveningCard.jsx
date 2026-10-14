@@ -17,6 +17,8 @@
 // States: loading skeleton, error + Retry (last data kept on a failed refresh),
 // denied/empty (the RPC answered without ok:true). Gujarati-first (opsStrings).
 
+import { stampEveningShared } from '../../utils/eveningStamp'
+import { useAuthStore } from '../../store/authStore'
 import { Activity, AlertTriangle, CheckCircle2, Phone, Route } from 'lucide-react'
 import useOpsDayReport from '../../hooks/useOpsDayReport'
 import { t, getOpsLang } from '../../utils/opsStrings'
@@ -114,7 +116,7 @@ export function OpsEveningView({ data, loading, error, denied, refetch, lang, ca
           </div>
         ) : null}
         {!closed ? <StationList list={stations} lang={lang} /> : null}
-        <ShareButton lang={lang} onShare={() => shareOpsEvening(d, 'exec', lang)} />
+        <ShareButton lang={lang} onShare={() => { shareOpsEvening(d, 'exec', lang); stampEveningShared(useAuthStore.getState().profile?.id) }} />
         {error ? <StaleNote lang={lang} onRetry={refetch} /> : null}
         {canHide ? <HideButton lang={lang} onClick={onHide} /> : null}
       </>

@@ -18,6 +18,8 @@
 // the screens are off by timer, so the live network numbers are replaced by
 // "Day closed" (the RPC also nulls the per-tech live counts then).
 
+import { stampEveningShared } from '../../utils/eveningStamp'
+import { useAuthStore } from '../../store/authStore'
 import { useNavigate } from 'react-router-dom'
 import {
   Wifi, WifiOff, VideoOff, Activity, Clock, ChevronRight, AlertCircle, CheckCircle2,
@@ -212,7 +214,7 @@ export function OpsHeadEveningView({ data, loading, error, denied, refetch, lang
         <NeedsList needs={d.needs} lang={lang} />
         {!closed ? <StationList list={arr(d.worst_stations)} lang={lang} /> : null}
         {/* head text is English unless a caller passes shareLang */}
-        <ShareButton lang={lang} onShare={() => shareOpsEvening(d, 'head', shareLang)} />
+        <ShareButton lang={lang} onShare={() => { shareOpsEvening(d, 'head', shareLang); stampEveningShared(useAuthStore.getState().profile?.id) }} />
         {error ? <StaleNote lang={lang} onRetry={refetch} /> : null}
         {canHide ? <HideButton lang={lang} onClick={onHide} /> : null}
       </>
