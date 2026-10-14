@@ -21238,3 +21238,16 @@ Replaces Trackdek (subscription ends 30 Nov 2026). Plan + approved design: `docs
 HR creates the 8 people (Add Member, role staff, real mobile, typed salary); seed `work_projects` from Trackdek's client list (merge duplicates, last 90 days only) before cutover; run both systems about one week before
 30 Nov; an in-app notifications list (pushes exist from the DB, the NotificationPanel is still sales-derived); optional "still working?" prompt after 4 h; owner decision pending: whether unfinished checklist steps
 should block finishing a task (recommended: no - today they do not).
+
+
+---
+
+## 354 · Phase 366 - weekly "Send campaign report" tasks for Safika (2026-10-14)
+
+Owner: for every ACTIVE won PRIVATE client create a task "send report" every Monday until the campaign ends, assigned to Safika (graphic designer, role staff).
+`supabase_phase366_weekly_report_tasks.sql` (APPLIED LIVE, dry-run first, re-run adds nothing): one Work-module repeating template per CLIENT (not per quote): title "Send campaign report - <client>", weekly, Monday,
+start today, end = the later campaign_end_date of that client's won quotes, assignee Safika, created by admin; a work_projects client row is created if missing. The 07:00 IST cron `work_run_recurring` makes the task each Monday
+(skips holidays) and the template stops by itself after its end date.
+- 19 templates created. Skipped on purpose: 3 campaigns ending 14 / 15 / 16 Oct (no Monday left): rajshakti travels (UA-2026-0427), jay bahucharaji krupa (0429), Ranjit Sir (0443). Anee Marcom has two quotes = one task.
+- NOT automatic: a client whose quote becomes won LATER gets no task. Re-run this file (idempotent) after new wins, or tell Claude. A real "auto-create on Won" trigger is not built.
+- Undo: `UPDATE work_templates SET is_active=false WHERE title LIKE 'Send campaign report - %';`
