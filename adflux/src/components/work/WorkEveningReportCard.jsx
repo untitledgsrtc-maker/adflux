@@ -19,13 +19,13 @@ export default function WorkEveningReportCard() {
         const [m, s, st] = await Promise.all([
           supabase.from('work_members').select('user_id'),
           supabase.from('work_report_shares').select('user_id').eq('work_date', today),
-          // everyone on the Work team: anyone on the timeclock + every active staff login
-          supabase.from('users').select('id').eq('role', 'staff').eq('is_active', true),
+          // everyone active except the two owners (admin + co-owner)
+          supabase.from('users').select('id').not('role', 'in', '(admin,co_owner)').eq('is_active', true).limit(500),
         ])
         if (m.error || s.error) return
         const ids = [...new Set([...(m.data || []).map((r) => r.user_id), ...((st.data) || []).map((r) => r.id)])]
         if (!ids.length) { if (live) setState({ members: [], shared: new Set() }); return }
-        const u = await supabase.from('users').select('id, name, profile_image_url').in('id', ids).eq('is_active', true)
+        const u = await supabase.from('users').select('id, name, profile_image_url').in('id', ids).eq('is_active', true).not('role', 'in', '(admin,co_owner)')
         if (!live) return
         setState({ members: (u.data || []).filter(Boolean), shared: new Set((s.data || []).map((r) => r.user_id)) })
       } catch { /* card stays hidden */ }
