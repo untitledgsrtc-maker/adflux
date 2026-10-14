@@ -44,6 +44,8 @@ import { useAuthStore } from '../../store/authStore'
 import { pushToast, toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { TeamMemberModal } from '../../components/team/TeamMemberModal'
+import PerformanceScoreCard from '../../components/incentives/PerformanceScoreCard'
+import DailyScoresCard from '../../components/incentives/DailyScoresCard'
 import { SalaryPayoutModal } from '../../components/incentives/SalaryPayoutModal'
 // HR D1 (§290): IncentivePayoutModal retired — incentive is earned inside net (Sept+).
 import { istCurrentMonthYM, istCurrentMonthLabel, istTodayISO } from '../../utils/istDate'
@@ -349,6 +351,36 @@ function EditTargetsModal({ userId, current, onClose, onSaved }) {
 }
 
 // ─── Main page ──────────────────────────────────────────────────────
+// Offer & appointment: what the person signed for (same data as their /my-offer page).
+function OfferSection({ userId }) {
+  const [offer, setOffer] = useState(undefined)
+  useEffect(() => {
+    let live = true
+    supabase.from('hr_offers')
+      .select('position, territory, place, joining_date, fixed_salary_monthly, incentive_sales_multiplier, incentive_new_client_rate, incentive_renewal_rate, incentive_flat_bonus, status')
+      .eq('converted_user_id', userId).order('created_at', { ascending: false }).limit(1)
+      .then(({ data }) => { if (live) setOffer((data && data[0]) || null) })
+    return () => { live = false }
+  }, [userId])
+  if (offer === undefined) return null
+  if (offer === null) return <SectionCard title="Offer & appointment" sub="No offer letter on file for this person." />
+  const money = (n) => (n == null ? '-' : fmtINR(n))
+  return (
+    <SectionCard title="Offer & appointment" sub={`${offer.position || '-'} · ${offer.status || ''}`}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+        <Tile label="Fixed salary / month" value={money(offer.fixed_salary_monthly)} />
+        <Tile label="Joining date" value={offer.joining_date || '-'} />
+        <Tile label="Territory" value={offer.territory || '-'} />
+        <Tile label="Place" value={offer.place || '-'} />
+        <Tile label="New client rate" value={offer.incentive_new_client_rate != null ? `${offer.incentive_new_client_rate}%` : '-'} />
+        <Tile label="Renewal rate" value={offer.incentive_renewal_rate != null ? `${offer.incentive_renewal_rate}%` : '-'} />
+        <Tile label="Flat bonus above target" value={money(offer.incentive_flat_bonus)} />
+        <Tile label="Target multiplier" value={offer.incentive_sales_multiplier != null ? `${offer.incentive_sales_multiplier}x` : '-'} />
+      </div>
+    </SectionCard>
+  )
+}
+
 export default function RepProfileV2() {
   const { userId } = useParams()
   const navigate = useNavigate()
@@ -777,6 +809,14 @@ export default function RepProfileV2() {
       {/* Agency = commission-only partner; the score/salary math does
           not apply, so the card is skipped for them. */}
       {user.role !== 'agency' && <RepPerformanceCard userId={user.id} />}
+      {user.role !== 'agency' && (
+        <>
+          {/* Same score view the person sees on /my-performance */}
+          <PerformanceScoreCard userId={user.id} role={user.role} />
+          <DailyScoresCard userId={user.id} role={user.role} />
+        </>
+      )}
+      <OfferSection userId={user.id} />
 
       {/* ─── 1b. HR Acceptance (Phase 87.5b) ──────────────────────── */}
       <SectionCard

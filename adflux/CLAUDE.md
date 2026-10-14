@@ -21309,3 +21309,5 @@ Owner built his own UI in Claude Design (`Work Module (standalone).html`) and as
 - **356.12** My Work: left column is a flex stack and the hero grows to fill it, so no empty gap beside the Evening report.
 
 - **356.13 (2026-10-14)** Team Work matched to the design: Clients (worked-on hero, duplicate banner, one card, open-tasks column, icon actions), Timeline (NOW hero, client legend, short names), Hours & cost (two columns, share %, task client), Approvals (request rows), People (photo + role, Running chip, head switch Yes/No, trash, Add person in header), filters on every tab with a separate Pick a date pill, full-width tab strip, Open timeline button, Overdue label. Not done: stacked avatars in Task cost, Start/Finish on admin board cards. Display only, no SQL.
+
+- **369.1 (2026-10-14)** /people/:userId (RepProfileV2) now carries the same score ring + daily scores the person sees on /my-performance (PerformanceScoreCard + DailyScoresCard take optional userId/role; own-page behaviour unchanged) and an Offer & appointment section from hr_offers (converted_user_id). Admin sees one page per person. Display only, no SQL.

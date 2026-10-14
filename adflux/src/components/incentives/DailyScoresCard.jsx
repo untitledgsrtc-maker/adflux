@@ -23,8 +23,10 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function pad2(n) { return String(n).padStart(2, '0') }
 
-export default function DailyScoresCard() {
-  const profile = useAuthStore((s) => s.profile)
+export default function DailyScoresCard({ userId: propUserId, role: propRole } = {}) {
+  const me = useAuthStore((s) => s.profile)
+  // Admin person page passes the viewed person; own page passes nothing (unchanged).
+  const profile = propUserId ? { id: propUserId, role: propRole } : me
   const isTC = profile?.role === 'telecaller'
 
   // Current IST month = the max month the rep can view (no future).

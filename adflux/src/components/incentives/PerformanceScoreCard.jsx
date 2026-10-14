@@ -101,8 +101,10 @@ function monthStart() {
   return `${istCurrentMonthYM()}-01`
 }
 
-export default function PerformanceScoreCard({ userId: propUserId, hideHeader }) {
-  const { profile } = useAuth()
+export default function PerformanceScoreCard({ userId: propUserId, hideHeader, role: propRole }) {
+  const { profile: me } = useAuth()
+  // Admin person page passes the viewed person's role; own page passes nothing (unchanged).
+  const profile = propUserId && propRole ? { ...me, role: propRole } : me
   const userId = propUserId || profile?.id
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
