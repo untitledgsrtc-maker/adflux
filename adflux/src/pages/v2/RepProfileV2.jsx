@@ -381,6 +381,42 @@ function OfferSection({ userId }) {
   )
 }
 
+// Claims list: every travel / expense claim the person raised (read-only; approvals stay in People -> TA Claims).
+function ClaimsSection({ userId }) {
+  const [rows, setRows] = useState(undefined)
+  useEffect(() => {
+    let live = true
+    supabase.from('ta_da_requests')
+      .select('id, claim_date, kind, claim_km, claim_amount, city, reason, status, admin_note')
+      .eq('user_id', userId).order('claim_date', { ascending: false }).limit(30)
+      .then(({ data, error }) => { if (live) setRows(error ? [] : (data || [])) })
+    return () => { live = false }
+  }, [userId])
+  if (rows === undefined) return null
+  const tone = (st) => (st === 'approved' ? 'var(--success)' : st === 'rejected' ? 'var(--danger)' : 'var(--warning)')
+  const kindLabel = { ta_override: 'Travel', da_night: 'Daily allowance', hotel: 'Hotel', other: 'Other' }
+  return (
+    <SectionCard title="Claims" sub={rows.length ? `Last ${rows.length} travel and expense claims` : 'No claims raised yet.'}>
+      {rows.length > 0 && (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {rows.map((r) => (
+            <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600 }}>{kindLabel[r.kind] || r.kind} · {r.claim_date}{r.city ? ` · ${r.city}` : ''}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.reason || ''}{r.admin_note ? ` — ${r.admin_note}` : ''}</div>
+              </div>
+              <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <div className="tabular-nums" style={{ fontWeight: 600 }}>{r.claim_amount != null ? fmtINR(r.claim_amount) : r.claim_km != null ? `${r.claim_km} km` : '-'}</div>
+                <div style={{ fontSize: 12, color: tone(r.status), textTransform: 'capitalize' }}>{r.status}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
 export default function RepProfileV2() {
   const { userId } = useParams()
   const navigate = useNavigate()
@@ -817,6 +853,7 @@ export default function RepProfileV2() {
         </>
       )}
       <OfferSection userId={user.id} />
+      <ClaimsSection userId={user.id} />
 
       {/* ─── 1b. HR Acceptance (Phase 87.5b) ──────────────────────── */}
       <SectionCard
