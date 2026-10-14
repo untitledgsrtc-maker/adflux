@@ -220,7 +220,7 @@ export default function MyWorkV2() {
           )}
 
           {tab === 'asked' && <AskedTab asked={asked} nameOf={nameOf} projName={projName} onOpen={setOpenTask} onNew={() => setNewTask(true)} />}
-          {tab === 'hours' && isMember && <HoursTab entries={entries} projects={projects} projName={projName} secs={todaySecs} onAddManual={(a) => rpc('work_add_manual_time', a, 'Sent for approval.')} onAddProject={addProject} />}
+          {tab === 'hours' && isMember && <HoursTab uid={uid} entries={entries} projects={projects} projName={projName} onAddManual={(a) => rpc('work_add_manual_time', a, 'Sent for approval.')} onAddProject={addProject} />}
           {!isMember && tab !== 'asked' && <div className="wk-empty">You can ask for work and follow it here.</div>}
         </>
       )}
@@ -472,14 +472,42 @@ function AskedTab({ asked, nameOf, projName, onOpen, onNew }) {
   )
 }
 
-function HoursTab({ entries, projects, projName, secs, onAddManual, onAddProject }) {
+const HRANGES = [['today', 'Today'], ['yesterday', 'Yesterday'], ['7', 'Past 7 days'], ['30', 'Past 30 days'], ['custom', 'Pick a date']]
+
+function HoursTab({ uid, entries: todayEntries, projects, projName, onAddManual, onAddProject }) {
   const today = istTodayISO()
+  const [range, setRange] = useState('today')
+  const [custom, setCustom] = useState(today)
+  const [rows, setRows] = useState(null)
   const [project, setProject] = useState('')
   const [label, setLabel] = useState('')
   const [from, setFrom] = useState('10:00')
   const [to, setTo] = useState('11:00')
   const [day, setDay] = useState(today)
   const [note, setNote] = useState('')
+  const [rf, rt] = useMemo(() => {
+    if (range === 'today') return [today, today]
+    if (range === 'yesterday') return [addDaysISO(today, -1), addDaysISO(today, -1)]
+    if (range === '7') return [addDaysISO(today, -6), today]
+    if (range === '30') return [addDaysISO(today, -29), today]
+    return [custom, custom]
+  }, [range, custom, today])
+  useEffect(() => {
+    let live = true
+    setRows(null)
+    supabase.from('work_time_entries').select('*').eq('user_id', uid)
+      .gte('started_at', dayStartISO(rf)).lt('started_at', dayStartISO(addDaysISO(rt, 1))).order('started_at').limit(1500)
+      .then(({ data }) => { if (live) setRows(data || []) })
+    return () => { live = false }
+  }, [uid, rf, rt, todayEntries.length])
+  const all = rows || []
+  const approved = all.filter((e) => e.status === 'approved')
+  const asks = todayEntries.filter((e) => e.status !== 'approved')
+  const dur = (e) => ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000
+  const total = approved.reduce((n, e) => n + dur(e), 0)
+  const byClient = Object.entries(approved.reduce((m, e) => { m[e.project_id || ''] = (m[e.project_id || ''] || 0) + dur(e); return m }, {})).sort((a, b) => b[1] - a[1])
+  const dayKey = (e) => new Date(new Date(e.started_at).getTime() + 5.5 * 3600e3).toISOString().slice(0, 10)
+  const byDay = Object.entries(approved.reduce((m, e) => { (m[dayKey(e)] = m[dayKey(e)] || []).push(e); return m }, {})).sort((a, b) => b[0].localeCompare(a[0]))
   const submit = async () => {
     if (!project || !label.trim()) return toastError('', 'Pick a client and say what you did.')
     await onAddManual({
@@ -488,30 +516,32 @@ function HoursTab({ entries, projects, projName, secs, onAddManual, onAddProject
     })
     setLabel(''); setNote('')
   }
-  const approved = entries.filter((e) => e.status === 'approved')
-  const asks = entries.filter((e) => e.status !== 'approved')
-  const byClient = Object.entries(approved.reduce((m, e) => {
-    const sec = ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000
-    m[e.project_id || ''] = (m[e.project_id || ''] || 0) + sec; return m
-  }, {})).sort((a, b) => b[1] - a[1])
-  const longDay = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short' })
+  const rangeText = rf === rt ? fmtDateShort(rf) : `${fmtDateShort(rf)} to ${fmtDateShort(rt)}`
   return (
     <div className="wk-grid">
       <div className="wk-c12">
+        <div className="wk-grp" style={{ marginBottom: 14 }}>
+          <div className="wk-tabs" style={{ margin: 0 }}>
+            {HRANGES.map(([k, l]) => <button key={k} className={`wk-tab${range === k ? ' on' : ''}`} onClick={() => setRange(k)}>{l}</button>)}
+          </div>
+          {range === 'custom' && <input type="date" className="wk-input" style={{ width: 170 }} value={custom} max={today} onChange={(e) => setCustom(e.target.value)} aria-label="Pick a date" />}
+        </div>
         <div className="wk-hero">
-          <span className="wk-eyb">Tracked today</span>
-          <div className="wk-num" style={{ fontSize: 40, fontWeight: 600, marginTop: 4 }}>{fmtDur(secs)}</div>
-          <div className="wk-hs">Across {new Set(approved.map((e) => e.project_id)).size || 0} clients</div>
+          <span className="wk-eyb">Tracked · {rangeText}</span>
+          <div className="wk-num" style={{ fontSize: 40, fontWeight: 600, marginTop: 4 }}>{rows === null ? '...' : fmtDur(total)}</div>
+          <div className="wk-hs">Across {byClient.length} {byClient.length === 1 ? 'client' : 'clients'}</div>
         </div>
       </div>
       <div className="wk-c8">
-        <div className="wk-card flush" style={{ marginBottom: 24 }}>
-          <div className="wk-ch"><h3><span className="wk-tile"><Clock size={16} aria-hidden="true" /></span>Today, by hour</h3></div>
-          <DayStrip entries={approved} projName={projName} />
-        </div>
+        {rf === rt && (
+          <div className="wk-card flush" style={{ marginBottom: 24 }}>
+            <div className="wk-ch"><h3><span className="wk-tile"><Clock size={16} aria-hidden="true" /></span>{rf === today ? 'Today' : 'The day'}, by hour</h3></div>
+            <DayStrip entries={approved} projName={projName} showNow={rf === today} />
+          </div>
+        )}
         <div className="wk-card" style={{ marginBottom: 24 }}>
           <b style={{ fontSize: 18 }}>Hours per client</b>
-          {byClient.length === 0 && <div className="wk-sm" style={{ marginTop: 8 }}>No time today.</div>}
+          {byClient.length === 0 && <div className="wk-sm" style={{ marginTop: 8 }}>No time in these dates.</div>}
           {byClient.map(([pid, sec]) => (
             <div key={pid || 'none'} className="wk-hrow">
               <span className="wk-grp" style={{ flexWrap: 'nowrap' }}><span className="wk-dot" style={{ background: clientColor(projName(pid)) }} />{projName(pid) || 'No client'}</span>
@@ -522,29 +552,25 @@ function HoursTab({ entries, projects, projName, secs, onAddManual, onAddProject
         </div>
         <div className="wk-card flush">
           <div className="wk-ch"><h3><span className="wk-tile"><Clock size={16} aria-hidden="true" /></span>Days</h3></div>
-          {approved.length === 0 ? (
-            <div className="wk-empty"><b>No time tracked today</b>Start a timer on My work, or add time you forgot to track.</div>
-          ) : (
-            <div>
-              <div className="wk-row" style={{ padding: '14px 20px', background: 'var(--w-hov, rgba(51,65,85,.45))' }}>
-                <b>{longDay}</b><b className="wk-num">{fmtDur(secs)}</b>
+          {byDay.length === 0 ? (
+            <div className="wk-empty"><b>No time tracked in these dates</b>Start a timer on My work, or add time you forgot to track.</div>
+          ) : byDay.map(([d, list]) => (
+            <div key={d}>
+              <div className="wk-row" style={{ padding: '14px 20px', background: 'var(--w-hov)' }}>
+                <b>{fmtDateShort(d)}</b><b className="wk-num">{fmtDur(list.reduce((n, e) => n + dur(e), 0))}</b>
               </div>
-              {approved.map((e) => {
-                const s = ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000
-                return (
-                  <div key={e.id} className="wk-row" style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div>{projName(e.project_id) || '-'}</div>
-                      <div className="wk-sm">{e.task_label} · {fmtTimeIST(e.started_at)} to {e.ended_at ? fmtTimeIST(e.ended_at) : 'running'}
-                        {e.auto_stopped && ' · auto-stopped'}</div>
-                    </div>
-                    {!e.ended_at && <span className="wk-pill y"><span className="wk-ldot" style={{ width: 6, height: 6, boxShadow: 'none' }} aria-hidden="true" />Running</span>}
-                    <span className="wk-num">{fmtDur(s)}</span>
+              {list.map((e) => (
+                <div key={e.id} className="wk-row" style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="wk-grp" style={{ flexWrap: 'nowrap' }}><span className="wk-dot" style={{ background: clientColor(projName(e.project_id)) }} />{projName(e.project_id) || '-'}</div>
+                    <div className="wk-sm">{e.task_label} · {fmtTimeIST(e.started_at)} to {e.ended_at ? fmtTimeIST(e.ended_at) : 'running'}{e.auto_stopped && ' · auto-stopped'}</div>
                   </div>
-                )
-              })}
+                  {!e.ended_at && <span className="wk-pill y">Running</span>}
+                  <span className="wk-num">{fmtDur(dur(e))}</span>
+                </div>
+              ))}
             </div>
-          )}
+          ))}
         </div>
       </div>
       <div className="wk-c4">
@@ -590,7 +616,7 @@ function HoursTab({ entries, projects, projName, secs, onAddManual, onAddProject
 
 // One-person version of the head's Timeline: 08-21 strip, blocks coloured by client,
 // running block outlined, yellow line = now.
-function DayStrip({ entries, projName }) {
+function DayStrip({ entries, projName, showNow = true }) {
   const H0 = 8, H1 = 21
   const hourOf = (iso) => { const d = new Date(new Date(iso).getTime() + 5.5 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60 }
   const pct = (h) => Math.max(0, Math.min(100, (h - H0) / (H1 - H0) * 100))
@@ -609,7 +635,7 @@ function DayStrip({ entries, projName }) {
             return <span key={e.id} title={`${projName(e.project_id) || '-'} - ${e.task_label}`}
               style={{ position: 'absolute', left: `${pct(s0)}%`, width: `${Math.max(0.6, pct(e0) - pct(s0))}%`, top: 3, bottom: 3, borderRadius: 6, background: clientColor(projName(e.project_id)), boxShadow: e.ended_at ? 'none' : '0 0 0 2px var(--accent)' }} />
           })}
-          <span style={{ position: 'absolute', left: `${pct(nowH)}%`, top: -4, bottom: -4, width: 2, background: 'var(--accent)' }} />
+          {showNow && <span style={{ position: 'absolute', left: `${pct(nowH)}%`, top: -4, bottom: -4, width: 2, background: 'var(--accent)' }} />}
         </div>
         <div className="wk-sm" style={{ marginTop: 10 }}>Yellow line is now. Outlined block is running. Colour = client.</div>
       </div>
