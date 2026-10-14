@@ -52,7 +52,7 @@ export default function MyWorkV2() {
     const [m, pr, us, run, en, pa, ak, sh] = await Promise.all([
       supabase.from('work_members').select('user_id,is_head').eq('user_id', uid).maybeSingle(),
       supabase.from('work_projects').select('id,name,kind').eq('is_active', true).order('name'),
-      supabase.from('users').select('id,name,designation,role').eq('is_active', true).neq('role', 'agency').order('name'),
+      supabase.from('users').select('id,name,designation,role,profile_image_url').eq('is_active', true).neq('role', 'agency').order('name'),
       supabase.from('work_time_entries').select('*').eq('user_id', uid).is('ended_at', null).maybeSingle(),
       supabase.from('work_time_entries').select('*').eq('user_id', uid).gte('started_at', t0).order('started_at'),
       supabase.from('work_task_parts')
@@ -76,6 +76,7 @@ export default function MyWorkV2() {
   useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i) }, [])
 
   const projName = useMemo(() => { const m = new Map(projects.map((p) => [p.id, p.name])); return (id) => m.get(id) || '' }, [projects])
+  const photoOf = useMemo(() => { const m = new Map(users.map((u) => [u.id, u.profile_image_url])); return (id) => m.get(id) || null }, [users])
   const nameOf = useMemo(() => { const m = new Map(users.map((u) => [u.id, u.name])); return (id) => m.get(id) || 'Someone' }, [users])
 
   const rpc = async (name, args, okMsg) => {
@@ -101,8 +102,8 @@ export default function MyWorkV2() {
   const items = useMemo(() => parts.map((p) => ({
     id: p.id, taskId: p.task_id, status: p.status, title: p.task?.title || 'Task', label: p.label,
     client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, assigneeId: p.assignee_id,
-    assigneeName: nameOf(p.assignee_id), finishedDay: p.finished_at ? new Date(p.finished_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : null, partsTotal: 1, partsDone: 0, seconds: p.seconds, cost: null,
-  })), [parts, projName, nameOf])
+    assigneeName: nameOf(p.assignee_id), assigneePhoto: photoOf(p.assignee_id), finishedDay: p.finished_at ? new Date(p.finished_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : null, partsTotal: 1, partsDone: 0, seconds: p.seconds, cost: null,
+  })), [parts, projName, nameOf, photoOf])
 
   // Date filter. Default = Today: today's tasks + everything overdue + what was finished TODAY (yesterday's
   // finished ones drop off). A From - To range shows the tasks due in the range and the ones finished in it.
@@ -184,6 +185,7 @@ export default function MyWorkV2() {
                   : <StartForm projects={projects} busy={busy} entries={entries}
                       onAddProject={addProject}
                       onStart={(project, label) => rpc('work_clock_start', { p_project: project, p_label: label, p_part: null })} />}
+                {istHour() >= 19 && <div style={{ marginTop: 24 }}><TodayStrip secs={todaySecs} firstIn={firstIn} /></div>}
               </div>
               <div className="wk-c4">
                 <div className="wk-stack">

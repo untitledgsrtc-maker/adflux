@@ -80,7 +80,9 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, ui
                       {it.status === 'finished' ? <Check size={14} aria-hidden="true" /> : <Clock size={14} aria-hidden="true" />}
                       {it.status === 'finished' ? 'Finished' : ds.label}
                     </span>
-                    <span className="wk-av" title={it.assigneeName}>{initialsOf(it.assigneeName)}</span>
+                    {it.assigneePhoto
+                      ? <img className="wk-av" src={it.assigneePhoto} alt={it.assigneeName} title={it.assigneeName} style={{ objectFit: 'cover' }} />
+                      : <span className="wk-av" title={it.assigneeName}>{initialsOf(it.assigneeName)}</span>}
                   </div>
                   {showCost && it.status === 'finished' && it.cost != null && (
                     <div className="wk-row" style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'var(--surface-2)' }}>

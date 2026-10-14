@@ -67,7 +67,7 @@ export default function TeamWorkV2() {
     const t0 = dayStartISO(today)
     const q = await Promise.all([
       supabase.from('work_members').select('user_id,is_head'),
-      supabase.from('users').select('id,name,designation,role,is_active').order('name'),
+      supabase.from('users').select('id,name,designation,role,is_active,profile_image_url').order('name'),
       supabase.from('work_projects').select('id,name,kind,is_active').order('name'),
       supabase.from('work_time_entries').select('*').is('ended_at', null),
       supabase.from('work_time_entries').select('*').eq('status', 'pending').order('started_at', { ascending: false }).limit(100),
@@ -138,10 +138,10 @@ export default function TeamWorkV2() {
       .map((p) => ({
         id: p.id, taskId: p.task_id, status: p.status, title: p.task?.title || 'Task', label: p.label,
         client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, assigneeId: p.assignee_id,
-        assigneeName: nameOf(p.assignee_id), partsTotal: total[p.task_id] || 1, partsDone: done[p.task_id] || 0,
+        assigneeName: nameOf(p.assignee_id), assigneePhoto: users.find((u) => u.id === p.assignee_id)?.profile_image_url || null, partsTotal: total[p.task_id] || 1, partsDone: done[p.task_id] || 0,
         seconds: taskCostByTask[p.task_id]?.seconds ?? p.seconds, cost: taskCostByTask[p.task_id]?.cost ?? null,
       }))
-  }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask])
+  }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask, users])
 
   if (authLoading || !uid) return null
   if (isHead === false) return <Navigate to="/my-work" replace />
