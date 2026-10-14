@@ -171,6 +171,16 @@ export default function TeamWorkV2() {
         </div>
       </div>
 
+      {['overview', 'timeline', 'hours', 'clients'].includes(tab) && (
+        <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', marginBottom: 14 }}>
+          <span className="wk-eyb">Filters</span>
+          <div className="wk-tabs" style={{ margin: 0 }}>
+            {RANGES.map(([k, l]) => <button key={k} className={`wk-tab${range === k ? ' on' : ''}`} onClick={() => setRange(k)}>{l}</button>)}
+          </div>
+          {range === 'custom' && <input type="date" className="wk-input" style={{ width: 170 }} value={custom} max={today} onChange={(e) => setCustom(e.target.value)} aria-label="Pick a date" />}
+        </div>
+      )}
+
       <div className="wk-tabs" role="tablist">
         {TABS.map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} className={`wk-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
@@ -178,15 +188,6 @@ export default function TeamWorkV2() {
           </button>
         ))}
       </div>
-
-      {['overview', 'timeline', 'hours', 'clients'].includes(tab) && (
-        <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', marginBottom: 14 }}>
-          <div className="wk-tabs" style={{ margin: 0 }}>
-            {RANGES.map(([k, l]) => <button key={k} className={`wk-tab${range === k ? ' on' : ''}`} onClick={() => setRange(k)}>{l}</button>)}
-          </div>
-          {range === 'custom' && <input type="date" className="wk-input" style={{ width: 170 }} value={custom} max={today} onChange={(e) => setCustom(e.target.value)} aria-label="Pick a date" />}
-        </div>
-      )}
 
       {err && <div className="wk-err" role="alert"><span>{err}</span><button className="wk-btn g sm" onClick={load}>Retry</button></div>}
       {loading && !err && <div className="wk-empty"><Loader2 className="spin" size={26} aria-hidden="true" /></div>}

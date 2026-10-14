@@ -21305,3 +21305,4 @@ Owner built his own UI in Claude Design (`Work Module (standalone).html`) and as
 - **356.8** Board avatars show the person's photo when set (initials otherwise); My Work evening layout shows the Today hours card under the timer. Day-theme toggle: owner says not needed.
 - **356.9 (2026-10-14)** Board cards now match the design side by side: grip handle, title, client colour dot + name, due pill ('On track, 18 Oct' / 'Due today' / 'Overdue, 12 Oct' / 'Finished 12:40'), avatar left and small Start/Finish button right; on phones the three columns are a segmented switcher (one column at a time, move with Start/Finish).
 - **356.10** Team Work Overview laid out as the design's Head screen: Needs you rows (icon tile, title, who/what, pill, action) beside Who is working (live timers), then Fired this morning + Evening report (shared / not yet chips).
+- **356.11** Team Work: date filter row sits above the tab strip with a FILTERS label (as in the design).
