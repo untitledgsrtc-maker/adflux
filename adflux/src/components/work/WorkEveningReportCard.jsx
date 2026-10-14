@@ -16,14 +16,16 @@ export default function WorkEveningReportCard() {
     ;(async () => {
       try {
         const today = istTodayISO()
-        const [m, s] = await Promise.all([
+        const [m, s, st] = await Promise.all([
           supabase.from('work_members').select('user_id'),
           supabase.from('work_report_shares').select('user_id').eq('work_date', today),
+          // everyone on the Work team: anyone on the timeclock + every active staff login
+          supabase.from('users').select('id').eq('role', 'staff').eq('is_active', true),
         ])
         if (m.error || s.error) return
-        const ids = (m.data || []).map((r) => r.user_id)
+        const ids = [...new Set([...(m.data || []).map((r) => r.user_id), ...((st.data) || []).map((r) => r.id)])]
         if (!ids.length) { if (live) setState({ members: [], shared: new Set() }); return }
-        const u = await supabase.from('users').select('id, name, profile_image_url').in('id', ids)
+        const u = await supabase.from('users').select('id, name, profile_image_url').in('id', ids).eq('is_active', true)
         if (!live) return
         setState({ members: (u.data || []).filter(Boolean), shared: new Set((s.data || []).map((r) => r.user_id)) })
       } catch { /* card stays hidden */ }
