@@ -5,7 +5,7 @@
 // Attendance here does NOT change pay: leave deduction still comes from the leave requests.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
 import '../../styles/work.css'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -116,6 +116,14 @@ export default function WorkProfileV2() {
   const COLOR = { ok: 'var(--success)', late: 'var(--warning)', half: 'var(--warning)', leave: 'var(--danger)', absent: 'var(--danger)', off: 'var(--text-muted)', future: 'var(--text-muted)' }
 
   if (!uid) return null
+  const joined = person?.created_at ? new Date(person.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
+  const kpi = (label, value, sub, tone) => (
+    <div className="wk-card" key={label}>
+      <div className="wk-eyb">{label}</div>
+      <div className="wk-kpi-n" style={{ color: tone || undefined }}>{value}</div>
+      {sub && <div className="wk-sm">{sub}</div>}
+    </div>
+  )
   return (
     <div className="wk">
       <div className="wk-head">
@@ -126,72 +134,92 @@ export default function WorkProfileV2() {
         <Link to={own ? '/my-work' : '/team-work'} className="wk-btn o">Back</Link>
       </div>
       {err && <div className="wk-err" role="alert"><span>{err}</span><button className="wk-btn g sm" onClick={load}>Retry</button></div>}
-      {loading && !person && !err && <div className="wk-empty"><Loader2 className="spin" size={26} aria-hidden="true" /></div>}
-      {!loading && !person && !err && <div className="wk-empty">This profile could not be found.</div>}
+      {loading && !person && !err && (
+        <div className="wk-grid">
+          <div className="wk-c12"><div className="wk-skel" style={{ height: 110, borderRadius: 16 }} /></div>
+          <div className="wk-c4"><div className="wk-skel" style={{ height: 320, borderRadius: 16 }} /></div>
+          <div className="wk-c8"><div className="wk-skel" style={{ height: 320, borderRadius: 16 }} /></div>
+        </div>
+      )}
+      {!loading && !person && !err && <div className="wk-empty"><b>Profile not found</b>This profile could not be found.</div>}
       {person && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, alignItems: 'start' }}>
-          <div className="wk-card" style={{ textAlign: 'center' }}>
-            {own ? <ProfilePicUploader /> : (
-              person.profile_image_url
-                ? <img src={person.profile_image_url} alt="" style={{ width: 96, height: 96, borderRadius: '50%', objectFit: 'cover' }} />
-                : <div className="wk-av" style={{ width: 96, height: 96, fontSize: 32, margin: '0 auto' }}>{initialsOf(person.name)}</div>
-            )}
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, marginTop: 10 }}>{person.name}</div>
-            <div className="wk-sm">{person.designation || 'Team member'}</div>
-            <table className="wk-table" style={{ marginTop: 12, textAlign: 'left' }}><tbody>
-              <tr><td className="wk-sm">Reports to</td><td>{manager || '-'}</td></tr>
-              <tr><td className="wk-sm">City</td><td>{person.city || '-'}</td></tr>
-              <tr><td className="wk-sm">Joined</td><td>{person.created_at ? new Date(person.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td></tr>
-              <tr><td className="wk-sm">Email</td><td style={{ wordBreak: 'break-all' }}>{person.email || '-'}</td></tr>
-            </tbody></table>
-            {own && (
-              <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
-                <Link to="/my-offer" className="wk-btn o sm">My Offer - leave request</Link>
-                <Link to="/my-performance" className="wk-btn o sm">Salary slips</Link>
-              </div>
-            )}
+        <div className="wk-grid">
+          <div className="wk-c12">
+            <div className="wk-hero">
+              <span className="wk-eyb">{monthLabel(ym)} · hours tracked</span>
+              <div className="wk-num" style={{ fontSize: 40, fontWeight: 600, marginTop: 4 }}>{fmtDur(monthSecs)}</div>
+              <div className="wk-hs">{present.length} {present.length === 1 ? 'day' : 'days'} present · {tasksFinished} of {taskTotal} tasks finished</div>
+            </div>
           </div>
 
-          <div>
-            <div className="wk-kpis" style={{ marginTop: 0 }}>
-              <div className="wk-card"><div className="wk-sm">Present</div><div className="wk-kpi-n">{present.length}</div></div>
-              <div className="wk-card"><div className="wk-sm">On time</div><div className="wk-kpi-n" style={{ color: 'var(--success)' }}>{onTime}</div></div>
-              <div className="wk-card"><div className="wk-sm">Late</div><div className="wk-kpi-n" style={{ color: 'var(--warning)' }}>{late}</div></div>
-              <div className="wk-card"><div className="wk-sm">Tasks this month</div><div className="wk-kpi-n">{taskTotal}</div></div>
-              <div className="wk-card"><div className="wk-sm">Done on time</div><div className="wk-kpi-n" style={{ color: 'var(--success)' }}>{taskOnTime}</div></div>
-              <div className="wk-card"><div className="wk-sm">Overdue</div><div className="wk-kpi-n" style={{ color: taskOverdue ? 'var(--danger)' : 'var(--text)' }}>{taskOverdue}</div></div>
-              <div className="wk-card"><div className="wk-sm">Avg check-in</div><div className="wk-kpi-n">{avgIn == null ? '-' : `${String(Math.floor(avgIn / 60)).padStart(2, '0')}:${String(avgIn % 60).padStart(2, '0')}`}</div></div>
+          <div className="wk-c4">
+            <div className="wk-card" style={{ textAlign: 'center' }}>
+              {own ? <ProfilePicUploader /> : (
+                person.profile_image_url
+                  ? <img src={person.profile_image_url} alt="" style={{ width: 96, height: 96, borderRadius: '50%', objectFit: 'cover' }} />
+                  : <div className="wk-av" style={{ width: 96, height: 96, fontSize: 32, margin: '0 auto' }}>{initialsOf(person.name)}</div>
+              )}
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, marginTop: 12 }}>{person.name}</div>
+              <div className="wk-mu">{person.designation || 'Team member'}</div>
+              <dl className="wk-dl" style={{ textAlign: 'left' }}>
+                <dt>Reports to</dt><dd>{manager || '-'}</dd>
+                <dt>City</dt><dd>{person.city || '-'}</dd>
+                <dt>Joined</dt><dd className="wk-mono">{joined}</dd>
+                <dt>Email</dt><dd style={{ wordBreak: 'break-all' }}>{person.email || '-'}</dd>
+              </dl>
+              {own && (
+                <div style={{ display: 'grid', gap: 8, marginTop: 16 }}>
+                  <Link to="/my-offer" className="wk-btn o sm">Leave request</Link>
+                  <Link to="/my-performance" className="wk-btn o sm">Salary slips</Link>
+                </div>
+              )}
             </div>
-            <div className="wk-card" style={{ marginTop: 14 }}>
-              <div className="wk-row" style={{ flexWrap: 'wrap', marginBottom: 12 }}>
-                <b style={{ fontSize: 18 }}>Check-in attendance - {monthLabel(ym)}</b>
-                <span style={{ display: 'flex', gap: 6 }}>
-                  <button className="wk-btn o sm" aria-label="Previous month" onClick={() => setYm(shiftMonth(ym, -1))}><ChevronLeft size={16} aria-hidden="true" /></button>
-                  <button className="wk-btn o sm" aria-label="Next month" disabled={ym >= today.slice(0, 7)} onClick={() => setYm(shiftMonth(ym, 1))}><ChevronRight size={16} aria-hidden="true" /></button>
-                </span>
+          </div>
+
+          <div className="wk-c8">
+            <div className="wk-row" style={{ marginBottom: 16 }}>
+              <div className="wk-grp">
+                <button className="wk-btn o ic" aria-label="Previous month" onClick={() => setYm(shiftMonth(ym, -1))}><ChevronLeft size={16} aria-hidden="true" /></button>
+                <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600, minWidth: 150, textAlign: 'center' }}>{monthLabel(ym)}</h2>
+                <button className="wk-btn o ic" aria-label="Next month" disabled={ym >= today.slice(0, 7)} onClick={() => setYm(shiftMonth(ym, 1))}><ChevronRight size={16} aria-hidden="true" /></button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 6 }}>
-                {WD.map((w) => <div key={w} className="wk-sm" style={{ textAlign: 'center' }}>{w}</div>)}
-                {cells.map((c, i) => c ? (
-                  <div key={c.ymd} title={c.label ? `${c.d}: ${c.label}` : undefined}
-                    style={{ minHeight: 64, borderRadius: 10, padding: '6px 8px', background: TONE[c.kind], color: COLOR[c.kind], border: `1px solid ${c.ymd === today ? 'var(--accent)' : 'var(--border)'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <b className="wk-num" style={{ fontSize: 15 }}>{c.d}</b>
-                    <span style={{ fontSize: 11 }}>{c.kind === 'absent' ? 'No clock-in' : c.label}</span>
-                    {c.secs > 0 && <span className="wk-num" style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{fmtDur(c.secs)}</span>}
-                  </div>
-                ) : <div key={`e${i}`} />)}
-              </div>
-              <div className="wk-chips">
-                <span className="wk-pill ok">On time - by 9:30</span><span className="wk-pill warn">Late / half day</span>
-                <span className="wk-pill bad">Leave / no clock-in</span><span className="wk-pill">Sunday / holiday</span>
-              </div>
-              <div className="wk-sm" style={{ marginTop: 10 }}>First timer start of the day is the check-in: by 9:30 on time, to 11:30 late, after that a half day. Attendance does not change pay by itself.</div>
             </div>
-            <div className="wk-card" style={{ marginTop: 14 }}>
-              <b style={{ fontSize: 18 }}>This month at work</b>
-              <div className="wk-row" style={{ marginTop: 10 }}><span className="wk-sm">Hours tracked</span><b className="wk-num">{fmtDur(monthSecs)}</b></div>
-              <div className="wk-row" style={{ marginTop: 8 }}><span className="wk-sm">Tasks finished</span><b className="wk-num">{tasksFinished} of {taskTotal}</b></div>
-              <div className="wk-row" style={{ marginTop: 8 }}><span className="wk-sm">Overdue or finished late</span><b className="wk-num" style={{ color: taskOverdue ? 'var(--warning)' : 'var(--text)' }}>{taskOverdue}</b></div>
+            <div className="wk-kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+              {kpi('Present days', present.length)}
+              {kpi('On time', onTime, 'By 09:30', 'var(--success)')}
+              {kpi('Late', late, 'Incl. half days', 'var(--warning)')}
+              {kpi('Average check-in', avgIn == null ? '-' : `${String(Math.floor(avgIn / 60)).padStart(2, '0')}:${String(avgIn % 60).padStart(2, '0')}`)}
+              {kpi('Tasks this month', taskTotal, `${tasksFinished} finished`)}
+              {kpi('Done on time', taskOnTime, null, 'var(--success)')}
+              {kpi('Overdue', taskOverdue, taskOverdue ? 'Needs attention' : null, taskOverdue ? 'var(--danger)' : undefined)}
+            </div>
+          </div>
+
+          <div className="wk-c12">
+            <div className="wk-card flush">
+              <div className="wk-ch">
+                <h3><span className="wk-tile"><Calendar size={16} aria-hidden="true" /></span>Attendance</h3>
+                <div className="wk-grp" style={{ fontSize: 12 }}>
+                  <span className="wk-pill ok">On time</span><span className="wk-pill warn">Late / half day</span>
+                  <span className="wk-pill bad">Leave / no clock-in</span><span className="wk-pill">Sunday / holiday</span>
+                </div>
+              </div>
+              <div style={{ padding: 18 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8 }}>
+                  {WD.map((w) => <div key={w} className="wk-sm" style={{ textAlign: 'center', paddingBottom: 4 }}>{w}</div>)}
+                  {cells.map((c, i) => c ? (
+                    <div key={c.ymd} className="wk-cal" title={c.label ? `${c.d}: ${c.label}` : undefined}
+                      style={{ background: TONE[c.kind], color: COLOR[c.kind], borderColor: c.ymd === today ? 'var(--accent)' : c.kind === 'future' ? 'var(--border)' : 'transparent' }}>
+                      <span className="wk-num" style={{ fontSize: 12, color: c.kind === 'future' ? 'var(--text-muted)' : 'var(--text)' }}>{c.d}</span>
+                      {c.label && c.kind !== 'future' && <span className={c.kind === 'ok' || c.kind === 'late' || c.kind === 'half' ? 'wk-mono' : ''} style={{ fontWeight: 500, fontSize: 14 }}>{c.label}</span>}
+                      {c.kind === 'absent' && <span style={{ fontSize: 13 }}>No clock-in</span>}
+                      {c.kind === 'half' && <span style={{ fontSize: 12 }}>Half day</span>}
+                      {c.secs > 0 && <span className="wk-num" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtDur(c.secs)}</span>}
+                    </div>
+                  ) : <div key={`e${i}`} />)}
+                </div>
+                <div className="wk-sm" style={{ marginTop: 14 }}>First timer start of the day is the check-in: by 9:30 on time, to 11:30 late, after that a half day. Attendance does not change pay by itself.</div>
+              </div>
             </div>
           </div>
         </div>

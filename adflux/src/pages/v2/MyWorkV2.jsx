@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
-import { Play, Pause, Check, Plus, Loader2, Send, Clock, Users } from 'lucide-react'
+import { Play, Pause, Check, Plus, Send, Clock, Users, User, CalendarX, FileText, ChevronRight, Moon } from 'lucide-react'
 import '../../styles/work.css'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -131,37 +131,49 @@ export default function MyWorkV2() {
 
   if (!uid) return null
 
+  const dateLine = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: '2-digit', month: 'short' })
+  const openAll = items.filter((i) => i.status !== 'finished').length
+  const showTabs = [
+    isMember && ['work', 'My work'],
+    ['asked', 'Asked by me', asked.length],
+    isMember && ['hours', 'My hours'],
+  ].filter(Boolean)
+
   return (
     <div className="wk">
       <div className="wk-head">
         <div>
-          <div className="wk-eyebrow">{new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: '2-digit', month: 'short' })}</div>
+          <div className="wk-eyebrow">{dateLine}</div>
           <h1 className="wk-title">My Work</h1>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          {isMember && <div className="wk-card" style={{ padding: '8px 14px' }}><span className="wk-sm">Today </span><b className="wk-num" style={{ fontSize: 20 }}>{fmtDur(todaySecs)}</b>{firstIn && <span className="wk-sm"> · in {fmtTimeIST(firstIn)}</span>}</div>}
+        <div className="wk-grp">
           {isHead && <Link to="/team-work" className="wk-btn o"><Users size={16} aria-hidden="true" /> Team view</Link>}
           <button className="wk-btn y" onClick={() => setNewTask(true)}><Plus size={16} aria-hidden="true" /> New task</button>
         </div>
       </div>
 
       {err && <div className="wk-err" role="alert"><span>{err}</span><button className="wk-btn g sm" onClick={load}>Retry</button></div>}
-      {loading && !err && <div className="wk-empty"><Loader2 className="spin" size={26} aria-hidden="true" /></div>}
+      {loading && !err && (
+        <div className="wk-grid">
+          <div className="wk-c8"><div className="wk-skel" style={{ height: 190, borderRadius: 16 }} /></div>
+          <div className="wk-c4"><div className="wk-skel" style={{ height: 190, borderRadius: 16 }} /></div>
+          <div className="wk-c12"><div className="wk-skel" style={{ height: 260, borderRadius: 16 }} /></div>
+        </div>
+      )}
 
       {!loading && !err && (
         <>
           <div className="wk-tabs" role="tablist">
-            {isMember && <button role="tab" aria-selected={tab === 'work'} className={`wk-tab${tab === 'work' ? ' on' : ''}`} onClick={() => setTab('work')}>My work</button>}
-            <button role="tab" aria-selected={tab === 'asked'} className={`wk-tab${tab === 'asked' ? ' on' : ''}`} onClick={() => setTab('asked')}>Asked by me <span className="wk-cnt">{asked.length}</span></button>
-            {isMember && <button role="tab" aria-selected={tab === 'hours'} className={`wk-tab${tab === 'hours' ? ' on' : ''}`} onClick={() => setTab('hours')}>My hours</button>}
-            <Link to="/work-profile" className="wk-tab">My profile</Link>
-            <Link to="/my-offer" className="wk-tab">Leave request</Link>
-            <Link to="/my-performance" className="wk-tab">Salary slips</Link>
+            {showTabs.map(([k, l, n]) => (
+              <button key={k} role="tab" aria-selected={tab === k} className={`wk-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
+                {l}{n > 0 && <span className="wk-cnt">{n}</span>}
+              </button>
+            ))}
           </div>
 
           {tab === 'work' && isMember && (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, alignItems: 'start' }}>
+            <div className="wk-grid">
+              <div className="wk-c8">
                 {running
                   ? <RunningCard running={running} secs={runSecs} projName={projName} busy={busy}
                       onPause={() => rpc('work_clock_stop', {})}
@@ -169,30 +181,53 @@ export default function MyWorkV2() {
                   : <StartForm projects={projects} busy={busy} entries={entries}
                       onAddProject={addProject}
                       onStart={(project, label) => rpc('work_clock_start', { p_project: project, p_label: label, p_part: null })} />}
-                <EveningCard hour={istHour()} entries={entries} items={items} secs={todaySecs} name={profile?.name}
-                  projName={projName} shared={shared} uid={uid} today={today} firstIn={firstIn} onShared={load} />
               </div>
-              <div className="wk-row" style={{ marginTop: 22 }}>
-                <b style={{ fontSize: 18 }}>My tasks</b>
-                <span className="wk-sm">{items.filter((i) => i.status !== 'finished').length} open in total{lateCount ? ` · ${lateCount} late` : ''}</span>
+              <div className="wk-c4">
+                <div className="wk-stack">
+                  {istHour() >= 19
+                    ? <EveningCard hour={istHour()} entries={entries} items={items} secs={todaySecs} name={profile?.name}
+                        projName={projName} shared={shared} uid={uid} today={today} firstIn={firstIn} onShared={load} />
+                    : <TodayStrip secs={todaySecs} firstIn={firstIn} />}
+                  <Shortcuts />
+                </div>
               </div>
-              <div className="wk-row" style={{ marginTop: 10, flexWrap: 'wrap', justifyContent: 'flex-start', gap: 8, alignItems: 'center' }}>
-                <span className="wk-sm">From</span>
-                <input className="wk-input" type="date" style={{ width: 160, minHeight: 40 }} value={rFrom} aria-label="From date"
-                  onChange={(e) => { const v = e.target.value; if (!v) { setViewFrom(null); setViewTo(null) } else { setViewFrom(v); if (!viewTo || viewTo < v) setViewTo(v) } }} />
-                <span className="wk-sm">To</span>
-                <input className="wk-input" type="date" style={{ width: 160, minHeight: 40 }} value={rTo} min={rFrom} aria-label="To date"
-                  onChange={(e) => { const v = e.target.value; if (v) { setViewFrom(viewFrom || rFrom); setViewTo(v) } }} />
-                <button className={`wk-btn sm ${isToday ? 'y' : 'g'}`} onClick={() => { setViewFrom(null); setViewTo(null) }}>Today</button>
-                <span className="wk-sm">{rangeLabel} · {dayOpen} open{dayLate ? ` · ${dayLate} overdue` : ''}</span>
+              <div className="wk-c12">
+                <div className="wk-row" style={{ flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+                  <div className="wk-grp" style={{ gap: 12 }}>
+                    <h2 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Tasks</h2>
+                    <span className="wk-mu">
+                      {rangeLabel} · <span className="wk-num">{dayOpen}</span> open
+                      {dayLate > 0 && <> · <span className="wk-num" style={{ color: 'var(--danger)' }}>{dayLate}</span> overdue</>}
+                      {openAll > dayOpen && <> · <span className="wk-num">{openAll}</span> open in total</>}
+                    </span>
+                  </div>
+                  <div className="wk-grp">
+                    <span className="wk-sm">From</span>
+                    <input className="wk-input" type="date" style={{ width: 150 }} value={rFrom} aria-label="From date"
+                      onChange={(e) => { const v = e.target.value; if (!v) { setViewFrom(null); setViewTo(null) } else { setViewFrom(v); if (!viewTo || viewTo < v) setViewTo(v) } }} />
+                    <span className="wk-sm">To</span>
+                    <input className="wk-input" type="date" style={{ width: 150 }} value={rTo} min={rFrom} aria-label="To date"
+                      onChange={(e) => { const v = e.target.value; if (v) { setViewFrom(viewFrom || rFrom); setViewTo(v) } }} />
+                    <button className={`wk-btn ${isToday ? 'y' : 'o'}`} onClick={() => { setViewFrom(null); setViewTo(null) }}>Today</button>
+                  </div>
+                </div>
+                {boardItems.length === 0 ? (
+                  <div className="wk-card">
+                    <div className="wk-empty"><b>Nothing for {isToday ? 'today' : 'these dates'}</b>
+                      No tasks due {isToday ? 'today and nothing overdue' : 'in this range'}. Ask your head for work or pick other dates.
+                      <div style={{ marginTop: 12 }}><button className="wk-btn" onClick={() => setNewTask(true)}><Plus size={16} aria-hidden="true" /> Ask for work</button></div>
+                    </div>
+                  </div>
+                ) : (
+                  <WorkBoard items={boardItems} uid={uid} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} />
+                )}
+                <div className="wk-sm" style={{ marginTop: 10 }}>Drag your own task forward: Assigned to In process starts the clock, In process to Finished stops it. Or use Start / Finish.</div>
               </div>
-              <div className="wk-sm" style={{ marginTop: 4 }}>Drag your own task forward: Assigned to In process starts the clock, In process to Finished stops it. Or use Start / Finish.</div>
-              <WorkBoard items={boardItems} uid={uid} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} />
-            </>
+            </div>
           )}
 
-          {tab === 'asked' && <AskedTab asked={asked} nameOf={nameOf} projName={projName} onOpen={setOpenTask} />}
-          {tab === 'hours' && isMember && <HoursTab entries={entries} projects={projects} projName={projName} onAddManual={(a) => rpc('work_add_manual_time', a, 'Sent for approval.')} onAddProject={addProject} />}
+          {tab === 'asked' && <AskedTab asked={asked} nameOf={nameOf} projName={projName} onOpen={setOpenTask} onNew={() => setNewTask(true)} />}
+          {tab === 'hours' && isMember && <HoursTab entries={entries} projects={projects} projName={projName} secs={todaySecs} onAddManual={(a) => rpc('work_add_manual_time', a, 'Sent for approval.')} onAddProject={addProject} />}
           {!isMember && tab !== 'asked' && <div className="wk-empty">You can ask for work and follow it here.</div>}
         </>
       )}
@@ -209,16 +244,59 @@ export default function MyWorkV2() {
   )
 }
 
+function Shortcuts() {
+  const rows = [[User, 'My profile', '/work-profile'], [CalendarX, 'Leave request', '/my-offer'], [FileText, 'Salary slips', '/my-performance']]
+  return (
+    <div className="wk-card flush">
+      <div className="wk-list">
+        {rows.map(([Icon, label, to]) => (
+          <Link key={label} to={to} className="wk-lrow">
+            <Icon size={18} aria-hidden="true" /><span style={{ flex: 1 }}>{label}</span>
+            <ChevronRight size={16} aria-hidden="true" className="wk-mu" />
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TodayStrip({ secs, firstIn }) {
+  return (
+    <div className="wk-card flush">
+      <div className="wk-ch"><h3><span className="wk-tile"><Clock size={16} aria-hidden="true" /></span>Today</h3></div>
+      <div style={{ padding: 18, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {firstIn || secs > 0 ? (
+          <>
+            <div><div className="wk-eyb">Hours today</div><div className="wk-num" style={{ fontSize: 24, fontWeight: 600 }}>{fmtDur(secs)}</div></div>
+            <div><div className="wk-eyb">First clock-in</div><div className="wk-mono" style={{ fontSize: 22, fontWeight: 500 }}>{firstIn ? fmtTimeIST(firstIn) : '-'}</div></div>
+          </>
+        ) : (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ fontWeight: 600 }}>Not clocked in yet</div>
+            <div className="wk-sm">Your day starts when you start your first timer.</div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function RunningCard({ running, secs, projName, busy, onPause, onFinish }) {
   return (
-    <div className="wk-run">
-      <div className="wk-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Play size={14} aria-hidden="true" /> Running now</div>
-      <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>{running.task_label}</div>
-      <div className="wk-sm">{projName(running.project_id)}</div>
-      <div className="wk-timer" aria-live="off">{fmtClock(secs)}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: onFinish ? '1fr 1fr' : '1fr', gap: 10 }}>
-        <button className="wk-btn g lg" disabled={busy} onClick={onPause}><Pause size={18} aria-hidden="true" /> Pause</button>
-        {onFinish && <button className="wk-btn y lg" disabled={busy} onClick={onFinish}><Check size={18} aria-hidden="true" /> Finish</button>}
+    <div className="wk-hero">
+      <div className="wk-row">
+        <span className="wk-grp"><span className="wk-ldot" aria-hidden="true" /><span className="wk-eyb">Running · {projName(running.project_id) || 'No client'}</span></span>
+        <span className="wk-mono wk-hs">Started {fmtTimeIST(running.started_at)}</span>
+      </div>
+      <div className="wk-row" style={{ flexWrap: 'wrap', alignItems: 'flex-end', gap: 20 }}>
+        <div>
+          <div className="wk-timer" aria-live="off">{fmtClock(secs)}</div>
+          <div className="wk-hs">{running.task_label}</div>
+        </div>
+        <div className="wk-grp" style={{ flexWrap: 'nowrap' }}>
+          <button className="wk-btn glass" disabled={busy} onClick={onPause}><Pause size={16} aria-hidden="true" /> Pause</button>
+          {onFinish && <button className="wk-btn y" disabled={busy} onClick={onFinish}><Check size={16} aria-hidden="true" /> Finish</button>}
+        </div>
       </div>
     </div>
   )
@@ -260,28 +338,33 @@ function StartForm({ projects, busy, entries, onAddProject, onStart }) {
   }
 
   return (
-    <div className="wk-card">
-      <div style={{ fontSize: 18, fontWeight: 700 }}>Start the clock</div>
-      <div className="wk-field"><label htmlFor="sf-client">Client</label>
-        {!adding ? (
-          <select id="sf-client" className="wk-input" value={project} onChange={(e) => setProject(e.target.value)}>
-            <option value="">Pick a client</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        ) : (
-          <input id="sf-client" className="wk-input" value={newClient} onChange={(e) => setNewClient(e.target.value)} placeholder="New client name" maxLength={80} autoFocus />
-        )}
-        <button className="wk-chip" style={{ marginTop: 8 }} onClick={() => { setAdding((a) => !a); setNewClient('') }}>
-          {adding ? 'Pick from list' : '+ New client'}
-        </button>
+    <div className="wk-hero">
+      <span className="wk-eyb">Not running · start work</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, alignItems: 'end', marginTop: 14 }}>
+        <div className="wk-field" style={{ margin: 0 }}>
+          <label htmlFor="sf-client">Client</label>
+          {!adding ? (
+            <select id="sf-client" className="wk-input" value={project} onChange={(e) => setProject(e.target.value)}>
+              <option value="">Pick a client</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          ) : (
+            <input id="sf-client" className="wk-input" value={newClient} onChange={(e) => setNewClient(e.target.value)} placeholder="New client name" maxLength={80} autoFocus />
+          )}
+        </div>
+        <div className="wk-field" style={{ margin: 0 }}>
+          <label htmlFor="sf-label">What are you doing</label>
+          <input id="sf-label" className="wk-input" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder="For example: LED loop, 15 sec cut"
+            onKeyDown={(e) => { if (e.key === 'Enter') go() }} />
+        </div>
+        <button className="wk-btn y" disabled={busy} onClick={go}><Play size={16} aria-hidden="true" /> Start</button>
       </div>
-      <div className="wk-field"><label htmlFor="sf-label">What are you doing</label>
-        <input id="sf-label" className="wk-input" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder="Type, or tap one below"
-          onKeyDown={(e) => { if (e.key === 'Enter') go() }} />
-        {sugg.length > 0 && <div className="wk-chips">{sugg.map((s) => <button key={s} className="wk-chip" onClick={() => setLabel(s)}>{s}</button>)}</div>}
+      <div className="wk-grp" style={{ marginTop: 14 }}>
+        <button className="wk-chip" onClick={() => { setAdding((a) => !a); setNewClient('') }}>{adding ? 'Pick from list' : '+ New client'}</button>
+        {sugg.length > 0 && <span className="wk-eyb">Recent</span>}
+        {sugg.map((s) => <button key={s} className="wk-chip" onClick={() => setLabel(s)}>{s}</button>)}
       </div>
-      <button className="wk-btn y lg" style={{ marginTop: 18 }} disabled={busy} onClick={go}><Play size={18} aria-hidden="true" /> Start</button>
-      <div className="wk-sm" style={{ marginTop: 10, textAlign: 'center' }}>First start of the day is your clock-in. Last stop is your clock-out.</div>
+      <div className="wk-hs" style={{ marginTop: 12 }}>First start of the day is your clock-in. Last stop is your clock-out.</div>
     </div>
   )
 }
@@ -322,50 +405,84 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
     } catch (e) { toastError(e, 'Could not open WhatsApp.') } finally { setTimeout(() => setBusy(false), 1500) }
   }
   return (
-    <div className="wk-card" style={{ borderColor: 'var(--accent)' }}>
-      <div className="wk-row"><b style={{ fontSize: 18 }}>Your day report</b><span className="wk-pill warn"><Clock size={14} aria-hidden="true" /> after 7 PM</span></div>
-      <div className="wk-sm" style={{ margin: '4px 0 10px' }}>{fmtDateShort(today)}</div>
-      <div className="wk-row"><span className="wk-sm">Hours tracked</span><b className="wk-num">{fmtDur(secs)}</b></div>
-      <div className="wk-row" style={{ marginTop: 6 }}><span className="wk-sm">Clock in</span><b className="wk-num">{firstIn ? fmtTimeIST(firstIn) : '-'}</b></div>
-      <div className="wk-row" style={{ marginTop: 6 }}><span className="wk-sm">Finished / in process / late</span><b className="wk-num">{finished} / {proc} / {late}</b></div>
-      <div className="wk-field"><label htmlFor="ev-note">Note for the team (optional)</label>
-        <input id="ev-note" className="wk-input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} /></div>
-      <button className="wk-btn y lg" style={{ marginTop: 14 }} disabled={busy} onClick={share}><Send size={18} aria-hidden="true" /> Share to your team group</button>
-      {shared && <div className="wk-sm" style={{ marginTop: 8, textAlign: 'center' }}>Last shared {fmtTimeIST(shared.shared_at)}</div>}
+    <div className="wk-card flush">
+      <div className="wk-ch">
+        <div><h3><span className="wk-tile"><Moon size={16} aria-hidden="true" /></span>Evening report</h3><div className="wk-csub">{fmtDateShort(today)} · ready to share</div></div>
+      </div>
+      <div style={{ padding: 18, display: 'grid', gap: 12 }}>
+        <div className="wk-rep">
+          <div className="wk-row"><span className="wk-mu">Hours</span><span className="wk-num">{fmtDur(secs)}</span></div>
+          <div className="wk-row"><span className="wk-mu">Clock-in</span><span className="wk-num">{firstIn ? fmtTimeIST(firstIn) : '-'}</span></div>
+          <div className="wk-row"><span className="wk-mu">Finished</span><span className="wk-num">{finished}</span></div>
+          <div className="wk-row"><span className="wk-mu">In process</span><span className="wk-num">{proc}</span></div>
+          <div className="wk-row"><span className="wk-mu">Late</span><span className="wk-num" style={{ color: late ? 'var(--danger)' : undefined }}>{late}</span></div>
+        </div>
+        <div className="wk-field" style={{ margin: 0 }}><label htmlFor="ev-note">Note (optional)</label>
+          <textarea id="ev-note" className="wk-input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="Anything the team should know" /></div>
+        <button className="wk-btn y lg" disabled={busy} onClick={share}><Send size={16} aria-hidden="true" /> Share to your team group</button>
+        <div className="wk-sm">{shared ? `Last shared ${fmtTimeIST(shared.shared_at)}. ` : ''}Opens WhatsApp with this report filled in.</div>
+      </div>
     </div>
   )
 }
 
-function AskedTab({ asked, nameOf, projName, onOpen }) {
-  if (!asked.length) return <div className="wk-empty">Tasks you ask for show here, with who is on them and how far they are.</div>
+const PART_PILL = { assigned: ['', 'Assigned'], in_process: ['in', 'In process'], finished: ['ok', 'Finished'] }
+
+function AskedTab({ asked, nameOf, projName, onOpen, onNew }) {
+  const waiting = asked.reduce((n, t) => n + t.parts.filter((p) => p.status !== 'finished').length, 0)
   return (
-    <div className="wk-card" style={{ padding: 0, overflowX: 'auto' }}>
-      <table className="wk-table" style={{ minWidth: 640 }}>
-        <thead><tr><th>Task</th><th>Client</th><th>Who</th><th>Due</th><th>Status</th></tr></thead>
-        <tbody>
-          {asked.map((t) => {
-            const done = t.parts.filter((p) => p.status === 'finished').length
-            const ds = dueState(t.due_date, t.status)
-            return (
-              <tr key={t.id} className="click" onClick={() => onOpen(t.id)}>
-                <td><b>{t.title}</b></td>
-                <td className="wk-sm">{projName(t.project_id) || '-'}</td>
-                <td>{t.parts.map((p) => nameOf(p.assignee_id).split(' ')[0]).join(', ')}</td>
-                <td><span className={`wk-pill ${ds.cls}`}>{ds.label}</span></td>
-                <td><span className={`wk-pill ${t.status === 'finished' ? 'ok' : t.status === 'in_process' ? 'warn' : ''}`}>
-                  {t.status === 'finished' ? 'Finished' : t.parts.length > 1 ? `${done} of ${t.parts.length} done` : t.status === 'in_process' ? 'In process' : 'Assigned'}</span></td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+    <div style={{ display: 'grid', gap: 20 }}>
+      <div className="wk-hero">
+        <span className="wk-eyb">Waiting on others</span>
+        <div className="wk-num" style={{ fontSize: 40, fontWeight: 600, marginTop: 4 }}>{waiting} {waiting === 1 ? 'part' : 'parts'}</div>
+        <div className="wk-hs">Still with other people across your open requests</div>
+      </div>
+      <div className="wk-card flush">
+        <div className="wk-ch">
+          <h3><span className="wk-tile"><Send size={16} aria-hidden="true" /></span>Tasks I created for others</h3>
+          <button className="wk-btn o sm" onClick={onNew}><Plus size={14} aria-hidden="true" /> New task</button>
+        </div>
+        {asked.length === 0 ? (
+          <div className="wk-empty"><b>You have not asked anyone for work</b>Tasks you create for other people show here with their progress.</div>
+        ) : (
+          <div className="wk-list">
+            {asked.map((t) => {
+              const done = t.parts.filter((p) => p.status === 'finished').length
+              const ds = dueState(t.due_date, t.status)
+              return (
+                <div key={t.id} className="wk-hov" tabIndex={0} role="button" onClick={() => onOpen(t.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') onOpen(t.id) }}
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, padding: '16px 20px', alignItems: 'center' }}>
+                  <div><b>{t.title}</b><div className="wk-sm">{projName(t.project_id) || 'No client'}</div></div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {t.parts.map((p) => {
+                      const [tone, lbl] = PART_PILL[p.status] || ['', p.status]
+                      return (
+                        <div key={p.id} className="wk-grp" style={{ flexWrap: 'nowrap' }}>
+                          <span className="wk-av" style={{ width: 26, height: 26, fontSize: 11 }}>{nameOf(p.assignee_id).slice(0, 2).toUpperCase()}</span>
+                          <span style={{ flex: 1 }}>{nameOf(p.assignee_id).split(' ')[0]}{p.label && <span className="wk-mu"> · {p.label}</span>}</span>
+                          <span className={`wk-pill ${tone}`}>{lbl}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div>
+                    <div className="wk-row" style={{ fontSize: 12, marginBottom: 6 }}><span className="wk-mu">Parts done</span><span className="wk-num">{done} of {t.parts.length}</span></div>
+                    <div className="wk-bar" style={{ margin: 0 }}><i style={{ width: `${t.parts.length ? Math.round(done / t.parts.length * 100) : 0}%`, background: done === t.parts.length ? 'var(--success)' : undefined }} /></div>
+                    <div style={{ marginTop: 8 }}><span className={`wk-pill ${t.status === 'finished' ? 'ok' : ds.cls}`}>{t.status === 'finished' ? 'Finished' : ds.label}</span></div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function HoursTab({ entries, projects, projName, onAddManual, onAddProject }) {
+function HoursTab({ entries, projects, projName, secs, onAddManual, onAddProject }) {
   const today = istTodayISO()
-  const [show, setShow] = useState(false)
   const [project, setProject] = useState('')
   const [label, setLabel] = useState('')
   const [from, setFrom] = useState('10:00')
@@ -378,54 +495,85 @@ function HoursTab({ entries, projects, projName, onAddManual, onAddProject }) {
       p_project: project, p_label: label.trim(),
       p_start: `${day}T${from}:00+05:30`, p_end: `${day}T${to}:00+05:30`, p_note: note.trim() || null,
     })
-    setShow(false); setLabel(''); setNote('')
+    setLabel(''); setNote('')
   }
+  const approved = entries.filter((e) => e.status === 'approved')
+  const asks = entries.filter((e) => e.status !== 'approved')
+  const longDay = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short' })
   return (
-    <div>
-      <div className="wk-row" style={{ marginBottom: 12 }}>
-        <b style={{ fontSize: 18 }}>Today</b>
-        <button className="wk-btn o sm" onClick={() => setShow((s) => !s)}><Plus size={16} aria-hidden="true" /> Add forgotten time</button>
-      </div>
-      {show && (
-        <div className="wk-card" style={{ marginBottom: 14 }}>
-          <div className="wk-sm">Needs your head's approval before it counts. Up to 12 hours, last 7 days.</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
-            <div className="wk-field"><label>Day</label><input className="wk-input" type="date" value={day} max={today} min={addDaysISO(today, -7)} onChange={(e) => setDay(e.target.value)} /></div>
-            <div className="wk-field"><label>From</label><input className="wk-input" type="time" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-            <div className="wk-field"><label>To</label><input className="wk-input" type="time" value={to} onChange={(e) => setTo(e.target.value)} /></div>
-          </div>
-          <div className="wk-field"><label>Client</label>
-            <select className="wk-input" value={project} onChange={(e) => setProject(e.target.value)}>
-              <option value="">Pick a client</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select></div>
-          <div className="wk-field"><label>What did you do</label><input className="wk-input" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} /></div>
-          <div className="wk-field"><label>Why (optional)</label><input className="wk-input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} /></div>
-          <button className="wk-btn y" style={{ marginTop: 14 }} onClick={submit}>Send for approval</button>
+    <div className="wk-grid">
+      <div className="wk-c12">
+        <div className="wk-hero">
+          <span className="wk-eyb">Tracked today</span>
+          <div className="wk-num" style={{ fontSize: 40, fontWeight: 600, marginTop: 4 }}>{fmtDur(secs)}</div>
+          <div className="wk-hs">Across {new Set(approved.map((e) => e.project_id)).size || 0} clients</div>
         </div>
-      )}
-      {entries.length === 0 ? <div className="wk-empty">No time recorded today. Start the clock from My work.</div> : (
-        <div className="wk-card" style={{ padding: 0 }}>
-          <table className="wk-table">
-            <thead><tr><th>Client</th><th>What</th><th>From</th><th>To</th><th>Time</th></tr></thead>
-            <tbody>
-              {entries.map((e) => {
+      </div>
+      <div className="wk-c8">
+        <div className="wk-card flush">
+          <div className="wk-ch"><h3><span className="wk-tile"><Clock size={16} aria-hidden="true" /></span>Days</h3></div>
+          {approved.length === 0 ? (
+            <div className="wk-empty"><b>No time tracked today</b>Start a timer on My work, or add time you forgot to track.</div>
+          ) : (
+            <div>
+              <div className="wk-row" style={{ padding: '14px 20px', background: 'var(--w-hov, rgba(51,65,85,.45))' }}>
+                <b>{longDay}</b><b className="wk-num">{fmtDur(secs)}</b>
+              </div>
+              {approved.map((e) => {
                 const s = ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000
                 return (
-                  <tr key={e.id}>
-                    <td>{projName(e.project_id) || '-'}</td>
-                    <td>{e.task_label}{e.status === 'pending' && <span className="wk-pill warn" style={{ marginLeft: 8 }}>waiting approval</span>}
-                      {e.status === 'declined' && <span className="wk-pill bad" style={{ marginLeft: 8 }}>declined</span>}
-                      {e.auto_stopped && <span className="wk-pill" style={{ marginLeft: 8 }}>auto-stopped</span>}</td>
-                    <td className="wk-sm">{fmtTimeIST(e.started_at)}</td>
-                    <td className="wk-sm">{e.ended_at ? fmtTimeIST(e.ended_at) : 'running'}</td>
-                    <td className="wk-num">{fmtDur(s)}</td>
-                  </tr>
+                  <div key={e.id} className="wk-row" style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div>{projName(e.project_id) || '-'}</div>
+                      <div className="wk-sm">{e.task_label} · {fmtTimeIST(e.started_at)} to {e.ended_at ? fmtTimeIST(e.ended_at) : 'running'}
+                        {e.auto_stopped && ' · auto-stopped'}</div>
+                    </div>
+                    {!e.ended_at && <span className="wk-pill y"><span className="wk-ldot" style={{ width: 6, height: 6, boxShadow: 'none' }} aria-hidden="true" />Running</span>}
+                    <span className="wk-num">{fmtDur(s)}</span>
+                  </div>
                 )
               })}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+      <div className="wk-c4">
+        <div className="wk-stack">
+          <div className="wk-card flush">
+            <div className="wk-ch"><h3><span className="wk-tile"><Plus size={16} aria-hidden="true" /></span>Add forgotten time</h3></div>
+            <div style={{ padding: 18, display: 'grid', gap: 14 }}>
+              <div className="wk-field" style={{ margin: 0 }}><label>Client</label>
+                <select className="wk-input" value={project} onChange={(e) => setProject(e.target.value)}>
+                  <option value="">Pick a client</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select></div>
+              <div className="wk-field" style={{ margin: 0 }}><label>What</label>
+                <input className="wk-input" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder="What you worked on" /></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr', gap: 8 }}>
+                <div className="wk-field" style={{ margin: 0 }}><label>Day</label><input className="wk-input" type="date" value={day} max={today} min={addDaysISO(today, -7)} onChange={(e) => setDay(e.target.value)} /></div>
+                <div className="wk-field" style={{ margin: 0 }}><label>Start</label><input className="wk-input" type="time" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+                <div className="wk-field" style={{ margin: 0 }}><label>End</label><input className="wk-input" type="time" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+              </div>
+              <div className="wk-field" style={{ margin: 0 }}><label>Note</label>
+                <input className="wk-input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="Why the timer was off" /></div>
+              <button className="wk-btn y" onClick={submit}><Send size={16} aria-hidden="true" /> Send for approval</button>
+              <div className="wk-sm">Your head approves it before it counts. Up to 12 hours, last 7 days.</div>
+            </div>
+          </div>
+          {asks.length > 0 && (
+            <div className="wk-card flush">
+              <div className="wk-ch"><h3><span className="wk-tile"><Check size={16} aria-hidden="true" /></span>My requests</h3></div>
+              <div className="wk-list">
+                {asks.map((e) => (
+                  <div key={e.id} className="wk-row" style={{ padding: '12px 20px' }}>
+                    <div style={{ flex: 1 }}><div>{projName(e.project_id) || '-'}</div><div className="wk-sm wk-mono">{e.task_label}</div></div>
+                    <span className={`wk-pill ${e.status === 'declined' ? 'bad' : 'warn'}`}>{e.status === 'declined' ? 'Declined' : 'Waiting'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

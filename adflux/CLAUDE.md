@@ -21282,3 +21282,15 @@ SUPERSEDES section 354 (the 19 per-client weekly templates are switched off; thi
 - **355.3 (2026-10-14) - day report would not open WhatsApp on iPhone.** `EveningCard.share` awaited a database read BEFORE opening WhatsApp, and iOS blocks a link opened after an await (only "Last shared" updated).
   It now builds the text from the entries already on the page and opens `https://wa.me/?text=` straight from the tap (native app: the existing openWhatsAppShare), then saves the "shared" mark.
   RULE: anything that must open an app / link from a tap (WhatsApp, tel:, mailto:) must be the first thing in the click handler - never after an await. Same class as the section 345 salary slip.
+
+
+---
+
+## 356 · Phase 368 - Work module re-skinned to the owner's own Claude Design (2026-10-14)
+
+Owner built his own UI in Claude Design (`Work Module (standalone).html`) and asked for the live pages to match it, wired to the real data. Display only: no SQL, no APK, no RPC or data change; every handler (timer, finish, move, reassign, manual time, share) is byte-identical. (Phase-number note, section 52: 368 = this batch; disambiguate by SHA.)
+- `src/styles/work.css` rewritten: same `wk-*` class names, new look = pill buttons (40px, 44 on touch), 16px cards with header + icon tile, teal gradient `.wk-hero` (yellow glow, big 72px timer), pill tab strip, 12-column `.wk-grid` (8/4, one column on phones), status pills, right side panel for the task / new-task modals, skeleton + empty + error states. Colours come from the global tokens so it follows the app theme; a `data-theme="day"` block mirrors the design's day palette.
+- `MyWorkV2.jsx`: Hero timer (start form or running), "Today" card (evening report after 19:00), shortcut list (My profile / Leave request / Salary slips), Tasks header with the From-To range + Today button, board with an empty state, Asked by me = Hero + list with per-person progress, My hours = Hero + days list + "Add forgotten time" + "My requests" (today only, same data as before).
+- `WorkProfileV2.jsx`: hero month total, profile card, month nav + 7 KPI cards, attendance calendar (`.wk-cal`) with hours per day. `TeamWorkV2.jsx`: team-hours hero on the Overview; tables and boards pick up the new look from the stylesheet.
+- Checked: esbuild parse, `npm run build` (incl. SW-denylist tripwire), brand check, and a rendered preview of the hero / board in the browser pane. NOT checked live (needs a staff login): owner to open /my-work on phone and desktop.
+- Not ported (kept simple, owner's call): the design's per-client colour tags, per-day hours history on My hours beyond today, and the day theme toggle (the app has none).

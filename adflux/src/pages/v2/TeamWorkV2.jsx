@@ -189,7 +189,14 @@ export default function TeamWorkV2() {
 
       {!loading && !err && tab === 'overview' && (
         <>
-          <div className="wk-card">
+          <div className="wk-hero" style={{ marginBottom: 16 }}>
+            <span className="wk-eyb">Team hours · {range === 'today' ? 'today' : range === 'yesterday' ? 'yesterday' : 'selected dates'}</span>
+            <div className="wk-row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div className="wk-num" style={{ fontSize: 48, fontWeight: 600, lineHeight: 1.1 }}>{fmtDur(teamSecs)}</div>
+              <div className="wk-hs">{running.length} of {memberIds.length} working now · {openCount} open tasks · {finishedToday} finished today</div>
+            </div>
+          </div>
+          <div className="wk-card" style={{ marginBottom: 16 }}>
             <b style={{ fontSize: 18 }}>Needs you</b>
             {[
               lateParts.length > 0 && { icon: AlertTriangle, tone: 'bad', text: `${lateParts.length} task part${lateParts.length > 1 ? 's' : ''} late`, go: () => setTab('tasks') },
