@@ -129,3 +129,12 @@ Owner: "not happy with UI/UX - add skill ui ux pro max". Skill installed locally
 Findings against its rules: text 11-13 px (min 16 px body on mobile), buttons about 28 px high (min 44 px), gaps under 8 px, colour-only status, too many small boxes per screen.
 Applied: 16 px body / 14 px meta, 48-56 px primary buttons, 8-16 px gaps, status = icon + word + colour, one focus per screen (big running card; "Needs you" first on admin), 44 px tabs, Lucide / Tabler icons (no emoji). Brand LOCKED (navy + #FFE600, DM Sans / Space Grotesk): the skill's generic red / gold palette was NOT used.
 Mockups re-shown: person phone (My Work + Start the clock) and admin dashboard (Needs you, 4 numbers, 3-column tasks, who is working, fired this morning).
+
+## 13. UI design decisions (locked 13 Oct 2026)
+- Language: English only (no Gujarati toggle in v1).
+- PC is the main design; phone is the secondary layout for field people.
+- Task board (admin and person): 3 columns, drag and drop + Start/Finish buttons + keyboard arrows. A person moves only their own parts, forward only.
+- Admin gets a Timeline tab (per-person hours bar, Today / Yesterday / 7 / 30 days, date picker, person filter, no screenshots).
+- Task has a due-date picker; each person's part can have its own date.
+- Salary, 70/30 variable, salary slips and leave request are NOT rebuilt: the sidebar links to My Offer and Salary slips.
+- Design file: _design_reference/work_module_ui_design.html

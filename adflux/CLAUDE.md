@@ -21205,3 +21205,36 @@ Owner: "clear filter too needed." A yellow **Clear filters** button appears in t
 ## 352 - Trackdek read end to end + creative "My Work" PLAN written (2026-10-13)
 Owner: "first make plan and structure design, then UI/UX, then build." Read the live Trackdek account fully (Dashboard, Timesheets, Screenshots, Projects, Task Progress, Overview, Members, Manual Time, Leave, Holiday, Attendance, Task logs): it is a timeclock + screenshot monitor; 142 projects (= clients + internal streams), 757 tasks (typed on the fly, all status New), 23,708 time slices, 16 members of whom 8 use it daily; leave and holiday unused; manual time has an approve / decline step; subscription ends 30 Nov 2026.
 Plan + data structure + phases: `docs/PLAN_creative_timeclock_structure.md` (decisions 1-5 locked 13 Oct: Trackdek replaced by 30 Nov, first start = clock in, no screenshots/scoring, checker chosen per job later, free-typed tasks with suggestions; sections 6-8 hold the full structure). NOTHING built. Order agreed: plan -> UI/UX -> build. Phase 1 = timeclock, needed live by about 15 Nov. Screenshots / keyboard / mouse scoring deliberately dropped (recommended).
+
+
+---
+
+## 353 · Phase 365 - Work module (timeclock + tasks) for the creative team, built + live (2026-10-14)
+
+Replaces Trackdek (subscription ends 30 Nov 2026). Plan + approved design: `docs/PLAN_creative_timeclock_structure.md` (section 13), `_design_reference/work_module_ui_design.html`.
+(Phase-number note, section 52: 365 = this batch; disambiguate by SHA.) Rule 93: this section ships in the same commit as the code.
+
+### What shipped
+- **DB** `supabase_phase365_work_timeclock.sql` (APPLIED LIVE, 31 `work_*` functions present): tables work_members, work_projects (clients, unique on lower(btrim(name))), work_templates, work_tasks, work_task_parts,
+  work_task_steps, work_task_comments, work_task_log, work_time_entries (one running timer per person, partial unique index), work_report_shares. Clients have SELECT only; every write is a SECURITY DEFINER `work_*`
+  function (start / stop timer, create task, finish / move part, comments, steps, due dates, reassign, manual time + approve, projects, members, templates, hours + cost reports). Cron `work-autostop` (21:30 IST) and
+  `work-recurring` (07:00 IST, skips Sundays + holidays). Column-level GRANT hides `cost_amount` on tasks / parts; cost comes only from `work_cost_report` (admin + accounts) = hours x (monthly salary / 26 / 8).
+- **Pages** `/my-work` (MyWorkV2: running timer, start form, evening report after 19:00 with WhatsApp share, my board, asked-by-me, my hours + add forgotten time), `/team-work` (TeamWorkV2: overview, tasks board,
+  people, clients, timeline, hours + cost, approvals; non-heads bounce to /my-work), `/work-profile` (WorkProfileV2: photo, details, monthly check-in calendar, hours + tasks; `?user=<id>` for a head).
+  Shared: `components/work/{WorkBoard,NewTaskModal,TaskDetailModal}.jsx`, `styles/work.css` (`.wk-*`), `utils/workUtils.js`.
+- **Frozen files touched, additive only (sales-module-guardian: FLAG, no P0, both findings closed):** `App.jsx` (3 lazy routes + RootRedirect `role==='staff'` -> /my-work), `DashboardV2.jsx` (staff -> /my-work),
+  `V2AppShell.jsx` (STAFF_NAV, isStaff in baseNav / mobile nav, staff added to the background-GPS skip list, "Team Work" in ADMIN_NAV, no incentive card for staff).
+  Guardian P2: `.wk-toast` z-index 9100 invented a new tier -> now 9999 (section 29 scale). Guardian P1: confirmed `staff` IS in the live `users_role_check` (checked via the CLI).
+- `supabase_phase211_anon_execute_sweep.sql`: the internal work_* helpers (work_user_rate, work_log, work_push, work_refresh_task, work__stop_running, work_autostop_all, work_run_recurring) are in both re-lock lists.
+
+### Contracts (do not regress)
+- Hours do NOT affect pay (reporting only). No screenshots, keystroke or mouse counts, no productivity percentage - decided and locked; do not add them.
+- Cost (salary-derived) is visible to admin + accounts only, through `work_cost_report`; never add cost_amount back to a client SELECT.
+- A person moves only their own part forward; a head moves any. One running timer per person; midnight IST split; forgotten timer auto-stops 21:30 IST.
+- Check-in on the profile calendar = the first timer start of the IST day (by 9:30 on time, to 11:30 late, after that half day). It does not change pay (leave deductions still come from `leaves`).
+- Salary / 70-30 / salary slips / leave request are NOT rebuilt - the pages link to My Offer and My Performance.
+
+### Still to do
+HR creates the 8 people (Add Member, role staff, real mobile, typed salary); seed `work_projects` from Trackdek's client list (merge duplicates, last 90 days only) before cutover; run both systems about one week before
+30 Nov; an in-app notifications list (pushes exist from the DB, the NotificationPanel is still sales-derived); optional "still working?" prompt after 4 h; owner decision pending: whether unfinished checklist steps
+should block finishing a task (recommended: no - today they do not).

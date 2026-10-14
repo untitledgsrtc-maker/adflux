@@ -64,7 +64,7 @@ import {
   Repeat, Gift, LogOut, Search, Bell, Plus, Menu, X,
   TrendingUp, UserCircle2, UserPlus, Contact2, MapPin, Tv, FileBox,
   Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet, Megaphone, MessageCircle,
-  IndianRupee, GraduationCap, Activity, Gauge,
+  IndianRupee, GraduationCap, Activity, Gauge, Briefcase,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -114,6 +114,8 @@ const ADMIN_NAV = [
   // cockpit (/ops-admin: trends · money · leaderboard · ticket-flow); a
   // "Live console" link there jumps to the Head's /ops-dashboard.
   { to: '/ops-admin',         label: 'Operations',     icon: Tv },
+  // Phase 365 — creative team timeclock + tasks (head view).
+  { to: '/team-work',         label: 'Team Work',      icon: Briefcase },
 ]
 
 const SALES_NAV = [
@@ -294,6 +296,14 @@ const MOBILE_NAV_OPS_HEAD = [
   { to: '/ops-log',           label: 'Log',            icon: FileText },
 ]
 
+// Phase 365 — Work module. Creative / office staff (role 'staff') get their Work page,
+// and the existing pages for pay + leave. Same list in sidebar and bottom bar.
+const STAFF_NAV = [
+  { to: '/my-work',           label: 'My Work',        icon: Briefcase },
+  { to: '/my-performance',    label: 'Salary slips',   icon: TrendingUp },
+  { to: '/my-offer',          label: 'My Offer',       icon: FileText },
+]
+
 const MOBILE_NAV_ADMIN = [
   { to: '/dashboard',         label: 'Home',           icon: LayoutDashboard },
   { to: '/pending-approvals', label: 'Approve',        icon: CheckSquare },
@@ -446,7 +456,7 @@ export function V2AppShell() {
     // Phase 230 — operation_head is a desk role; skip it too. The roving
     // operation_executive is NOT skipped → it's tracked like a field rep.
     if (role === 'telecaller' || role === 'agency' || role === 'accounts'
-        || role === 'operation_head') return
+        || role === 'operation_head' || role === 'staff') return
     startBackgroundGps(profile.id).catch((e) =>
       console.warn('[v2-shell] bg-gps start failed:', e?.message || e)
     )
@@ -582,12 +592,14 @@ export function V2AppShell() {
   const isHR         = profile?.role === 'hr'   // Phase 109 — HR login
   const isAccounts   = profile?.role === 'accounts'   // Phase 182 — Accounts login
   const isOps        = profile?.role === 'operation_head' || profile?.role === 'operation_executive'  // Phase 230
+  const isStaff      = profile?.role === 'staff'   // Phase 365 — creative / office staff
   const baseNav =
     isPrivileged   ? ADMIN_NAV :
     isManager      ? MANAGER_NAV :
     isHR           ? HR_NAV :
     isAccounts     ? ACCOUNTS_NAV :
     isOps          ? (profile?.role === 'operation_head' ? OPS_HEAD_NAV : OPS_EXEC_NAV) :
+    isStaff        ? STAFF_NAV :
     isTelecaller   ? TELECALLER_NAV :
     isAgency       ? AGENCY_NAV :
                      SALES_NAV
@@ -601,6 +613,7 @@ export function V2AppShell() {
     isHR           ? HR_NAV :
     isAccounts     ? ACCOUNTS_NAV :
     isOps          ? (profile?.role === 'operation_head' ? MOBILE_NAV_OPS_HEAD : MOBILE_NAV_OPS_EXEC) :
+    isStaff        ? STAFF_NAV :
     isTelecaller   ? MOBILE_NAV_TELECALLER :
     isAgency       ? AGENCY_NAV :
                      MOBILE_NAV_SALES
@@ -690,6 +703,7 @@ export function V2AppShell() {
               : isTelecaller ? 'Telecaller'
               : isAgency ? 'Agency'
               : isOps ? (profile?.role === 'operation_head' ? 'Operation Head' : 'Field Tech')
+              : isStaff ? 'Team'
               : 'Sales'
             }</div>
           </div>
@@ -881,6 +895,7 @@ export function V2AppShell() {
                 : isTelecaller ? 'Telecaller'
                 : isAgency ? 'Agency'
                 : isOps ? (profile?.role === 'operation_head' ? 'Operation Head' : 'Field Tech')
+                : isStaff ? 'Team'
                 : 'Sales'
               }</div>
             </div>
@@ -897,17 +912,17 @@ export function V2AppShell() {
                   no Clients, no Score. Agency uses Home + Quotes +
                   Earnings + Offer (sidebar / bottom-nav already cover).
                   Other roles unchanged. */}
-              {!isAgency && !isOps && (
+              {!isAgency && !isOps && !isStaff && (
                 <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/follow-ups') }}>
                   <ClockIcon size={18} /> <span>Follow-ups</span>
                 </button>
               )}
-              {!isOps && (
+              {!isOps && !isStaff && (
                 <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/quotes') }}>
                   <FileText size={18} /> <span>Quotes</span>
                 </button>
               )}
-              {!isAgency && !isOps && (
+              {!isAgency && !isOps && !isStaff && (
                 <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/clients') }}>
                   <Users size={18} /> <span>Clients</span>
                 </button>
@@ -978,6 +993,7 @@ export function V2AppShell() {
           {!isPrivileged
             && !isAccounts /* Phase 182 — no rep incentive card for the finance role */
             && !isOps /* Ops redesign 2026-08-27 — no sales incentive card on ops pages */
+            && !isStaff /* Phase 365 — no sales incentive card for creative / office staff */
             && !location.pathname.startsWith('/quotes/')
             && location.pathname !== '/quotes/new' && (
             <div style={{ marginBottom: 0 }}>
@@ -1009,6 +1025,7 @@ export function V2AppShell() {
               : isTelecaller ? 'Telecaller'
               : isAgency ? 'Agency'
               : isOps ? (profile?.role === 'operation_head' ? 'Operation Head' : 'Field Tech')
+              : isStaff ? 'Team'
               : 'Sales'
             }</div>
                 </div>

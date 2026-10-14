@@ -89,6 +89,10 @@ const OpsDownV2 = lazyWithRetry(() => import('./pages/v2/OpsDownV2'))
 const OpsTicketsV2 = lazyWithRetry(() => import('./pages/v2/OpsTicketsV2'))
 const OpsMyPerformanceV2 = lazyWithRetry(() => import('./pages/v2/OpsMyPerformanceV2'))
 const OpsHomeV2 = lazyWithRetry(() => import('./pages/v2/OpsHomeV2'))
+// Phase 365 — Work module (timeclock + tasks) for the creative team.
+const MyWorkV2 = lazyWithRetry(() => import('./pages/v2/MyWorkV2'))
+const TeamWorkV2 = lazyWithRetry(() => import('./pages/v2/TeamWorkV2'))
+const WorkProfileV2 = lazyWithRetry(() => import('./pages/v2/WorkProfileV2'))
 // Ops redesign (2026-08-28) — simple per-station fix screen (contacts + call).
 const OpsFixV2 = lazyWithRetry(() => import('./pages/v2/OpsFixV2'))
 const MessagesV2 = lazyWithRetry(() => import('./pages/v2/MessagesV2'))
@@ -372,6 +376,8 @@ function RootRedirect() {
   if (role === 'hr')                              return <Navigate to="/hr" replace />
   // Phase 182 — Accounts login lands on the payroll shell.
   if (role === 'accounts')                        return <Navigate to="/people" replace />
+  // Phase 365 — creative / office staff land on their Work page (was the sales dashboard).
+  if (role === 'staff')                           return <Navigate to="/my-work" replace />
   return <Navigate to="/dashboard" replace />
 }
 
@@ -490,6 +496,11 @@ export default function App() {
           <Route path="/ops-tickets"               element={<RequireOps><OpsTicketsV2 /></RequireOps>} />
           <Route path="/ops-performance"           element={<RequireOps><OpsMyPerformanceV2 /></RequireOps>} />
           <Route path="/ops-home"                  element={<RequireOps><OpsHomeV2 /></RequireOps>} />
+          {/* Phase 365 — Work module. /my-work is open to every signed-in user (non-members only ask + follow);
+              /team-work checks head access itself and bounces everyone else to /my-work. */}
+          <Route path="/my-work"                   element={<MyWorkV2 />} />
+          <Route path="/team-work"                 element={<TeamWorkV2 />} />
+          <Route path="/work-profile"              element={<WorkProfileV2 />} />
           <Route path="/ops-fix/:depotId"          element={<RequireOps><OpsFixV2 /></RequireOps>} />
           <Route path="/ops-admin"                 element={<RequirePrivileged><OpsAdminV2 /></RequirePrivileged>} />
           {/* Phase 61 — Manager dashboard. Shows the team-lead's

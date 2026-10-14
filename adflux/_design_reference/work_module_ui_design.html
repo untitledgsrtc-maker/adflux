@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Work module - UI design (design only, not built)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f172a; --surface:#1e293b; --surface-2:#334155; --border:#334155; --border-strong:#475569;
+  --text:#f1f5f9; --muted:#a8b3c5; --accent:#FFE600; --accent-fg:#0f172a; --accent-soft:rgba(255,230,0,.14);
+  --ok:#6ee7b7; --ok-soft:rgba(16,185,129,.16); --warn:#fcd34d; --warn-soft:rgba(245,158,11,.16);
+  --bad:#fca5a5; --bad-soft:rgba(239,68,68,.16);
+  --r:14px; --r-lg:20px; --font:'DM Sans',system-ui,sans-serif; --num:'Space Grotesk','DM Sans',sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:#0b1220;color:var(--text);font-family:var(--font);font-size:16px;line-height:1.55}
+a{color:inherit}
+.wrap{max-width:1240px;margin:0 auto;padding:24px 20px 80px}
+h1{font-family:var(--num);font-size:30px;margin:0 0 6px}
+h2{font-family:var(--num);font-size:22px;margin:48px 0 6px}
+.lead{color:var(--muted);max-width:70ch;margin:0 0 18px}
+.jump{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 8px}
+.jump a{min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:12px;background:var(--surface);border:1px solid var(--border);text-decoration:none}
+.jump a:hover,.jump a:focus-visible{border-color:var(--accent);outline:none}
+.note{background:var(--accent-soft);border:1px solid var(--accent);border-radius:var(--r);padding:12px 16px;color:var(--text)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:28px;margin-top:20px}
+figure{margin:0}
+figcaption{color:var(--muted);font-size:14px;margin-top:10px;max-width:42ch}
+figcaption b{color:var(--text);font-weight:500;display:block;font-size:15px}
+.phone{width:100%;max-width:390px;background:var(--bg);border:1px solid var(--border-strong);border-radius:34px;padding:18px 16px 12px;min-height:640px;display:flex;flex-direction:column}
+.desk{background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--r-lg);padding:24px;margin-top:20px}
+svg.i{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sm{color:var(--muted);font-size:14px}
+.h{font-family:var(--num);font-size:26px;font-weight:700;line-height:1.15}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:16px}
+.lang{display:inline-flex;border:1px solid var(--border-strong);border-radius:999px;overflow:hidden}
+.lang span{min-height:36px;padding:0 12px;display:flex;align-items:center;font-size:13px;color:var(--muted)}
+.lang span.on{background:var(--accent);color:var(--accent-fg);font-weight:700}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px}
+.run{background:var(--surface);border:2px solid var(--accent);border-radius:var(--r-lg);padding:18px}
+.timer{font-family:var(--num);font-size:46px;font-weight:700;color:var(--accent);line-height:1.1;margin:8px 0 14px;letter-spacing:.02em}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 20px;border-radius:14px;font-size:16px;font-weight:700;border:1px solid transparent;cursor:pointer;font-family:var(--font);transition:background-color .18s,border-color .18s}
+.btn.y{background:var(--accent);color:var(--accent-fg)}.btn.y:hover{background:#f0d800}
+.btn.g{background:var(--surface-2);color:var(--text)}.btn.g:hover{background:var(--border-strong)}
+.btn.o{background:transparent;border-color:var(--border-strong);color:var(--text)}
+.btn.lg{min-height:56px;font-size:18px;width:100%}
+.btn.sm{min-height:44px;padding:0 14px;font-size:14px}
+.btn:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0 4px}
+.seg>div{min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:14px;background:var(--surface);border:1px solid var(--border);font-size:13px;color:var(--muted);cursor:pointer}
+.seg>div b{font-family:var(--num);font-size:20px;color:var(--text)}
+.seg>div.on{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}.seg>div.on b{color:var(--accent)}
+.task{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;margin-top:12px}
+.task .t{font-size:18px;font-weight:700}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 11px;font-size:13px;font-weight:500}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.warn{background:var(--warn-soft);color:var(--warn)}.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.n{background:var(--surface-2);color:#cbd5e1}
+.navb{display:grid;grid-template-columns:repeat(3,1fr);margin-top:auto;border-top:1px solid var(--border);padding-top:10px}
+.navb div{min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;color:var(--muted);gap:2px}
+.navb div.on{color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:999px;background:var(--surface-2);font-size:15px;border:1px solid transparent;cursor:pointer}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.field{display:block;margin-top:16px}
+.field label{display:block;color:var(--muted);font-size:14px;margin-bottom:6px}
+.inp{min-height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;background:var(--surface);border:1px solid var(--border-strong);border-radius:14px;color:var(--muted);font-size:16px}
+.inp.v{color:var(--text)}
+.part{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-top:10px}
+.bar{height:10px;border-radius:5px;background:var(--surface-2);overflow:hidden;margin:10px 0}.bar i{display:block;height:100%;background:var(--accent)}
+.empty{text-align:center;padding:36px 12px;color:var(--muted)}
+.empty svg{width:44px;height:44px;stroke-width:1.4;color:var(--border-strong);margin-bottom:8px}
+.skel{border-radius:12px;background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 50%,var(--surface) 75%);background-size:200% 100%;animation:sh 1.4s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}
+.err{display:flex;gap:12px;align-items:center;background:var(--bad-soft);border:1px solid #7f1d1d;border-radius:14px;padding:12px 14px;color:var(--bad)}
+/* admin */
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tab{min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:#cbd5e1;cursor:pointer}
+.tab.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:700}
+.num{font-family:var(--num);font-size:32px;font-weight:700;line-height:1.1;margin-top:4px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-top:16px}
+.need{display:flex;align-items:center;gap:12px;min-height:56px;border-bottom:1px solid var(--border)}.need:last-child{border:0}
+.need .t{flex:1}
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:12px}
+.col{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px}
+.tk{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:10px;cursor:grab;transition:border-color .18s,opacity .18s}
+.tk:hover{border-color:var(--border-strong)}
+.tk.drag{opacity:.35}
+.col{transition:border-color .18s,background-color .18s;min-height:160px}
+.col.over{border-color:var(--accent);background:var(--accent-soft)}
+.ctile{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:10px;background:var(--surface-2);font-family:var(--num);font-weight:700}
+.cdot{width:10px;height:10px;border-radius:50%}
+.cnt{min-width:28px;text-align:center;padding:2px 8px;border-radius:999px;background:var(--surface-2);font-size:13px}
+.av{width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700}
+.dz{margin-top:12px;min-height:56px;display:grid;place-items:center;border:1px dashed var(--border-strong);border-radius:14px;color:var(--muted);font-size:14px}
+.col.over .dz{border-color:var(--accent);color:var(--accent)}
+.tk.lifted{border-color:var(--accent);box-shadow:0 14px 28px rgba(0,0,0,.45)}
+.tk.done{border-color:var(--ok);background:linear-gradient(0deg,rgba(16,185,129,.10),rgba(16,185,129,.10)),var(--bg)}
+.tk.done .bar i{background:#10B981}
+.tk.done .tick{display:inline-flex}
+.tick{display:none;align-items:center;gap:6px;margin-top:10px;color:var(--ok);font-weight:700;font-size:14px}
+.col.over.fin{border-color:#10B981;background:rgba(16,185,129,.14)}
+.col.over.fin .dz{border-color:#10B981;color:var(--ok)}
+kbd{border:1px solid var(--border-strong);border-radius:6px;padding:1px 7px;font:13px var(--num);background:var(--surface-2)}
+.costline{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--surface-2);font-size:14px;color:var(--muted)}
+.costline b{font-family:var(--num);color:var(--text);font-size:16px}
+.finish-toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);max-width:min(92vw,620px);padding:14px 18px;background:var(--surface);border:1px solid var(--accent);border-radius:14px;box-shadow:0 14px 28px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50}
+.finish-toast.show{opacity:1;transform:translate(-50%,0)}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.calh{text-align:center;padding:4px 0}
+.cal{min-height:58px;border-radius:12px;padding:6px 8px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid var(--border);cursor:pointer}
+.cal.e{border:0;cursor:default}
+.cal b{font-family:var(--num);font-size:15px}.cal span{font-size:12px}
+@media(max-width:760px){.cal span{display:none}.cal{min-height:44px}}
+.nrow{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--border);min-height:64px}
+.nrow:last-child{border:0}
+.ni{width:36px;height:36px;display:grid;place-items:center;border-radius:12px;background:var(--surface-2);flex:none}
+.moveto{display:inline-flex;align-items:center;gap:6px;min-height:36px;margin-top:8px;padding:0 10px;border-radius:10px;background:var(--surface-2);font-size:13px;color:var(--muted)}
+.who{display:flex;align-items:center;gap:8px;min-height:36px;font-size:15px}
+.dot{width:10px;height:10px;border-radius:50%;background:#10B981;flex:none}.dot.o{background:var(--border-strong)}
+table{width:100%;border-collapse:collapse}
+th{color:var(--muted);font-weight:500;font-size:13px;text-align:left;padding:12px 10px;border-bottom:1px solid var(--border-strong)}
+td{padding:14px 10px;border-bottom:1px solid var(--border);font-size:15px}
+.mono{font-family:var(--num)}
+.hrow{display:grid;grid-template-columns:200px 1fr 90px;gap:12px;align-items:center;min-height:48px}
+.hrow .bar{margin:0}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+<symbol id="pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></symbol>
+<symbol id="check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+<symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+<symbol id="user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+<symbol id="alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+<symbol id="repeat" viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+<symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+<symbol id="brief" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
+<symbol id="inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+<symbol id="refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+<symbol id="file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+<symbol id="hour" viewBox="0 0 24 24"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></symbol>
+<symbol id="chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+</defs>
+</svg>
+
+<div class="wrap">
+<h1>Work module - UI design</h1>
+<p class="lead">Design only. Nothing is built. Timeclock + tasks (one-time and repeating, one or many people) + admin dashboard. Built with the ui-ux-pro-max rules on the app's own brand (navy and brand yellow, DM Sans and Space Grotesk, Lucide icons at stroke 1.6).</p>
+<div class="note"><b>Rules applied:</b> 16 px body text, 44 px or larger tap targets, 8 px or larger gaps, status = icon + word + colour, a visible focus ring, empty / loading / error states drawn, no emoji, motion off when the phone asks for less motion.</div>
+<nav class="jump" aria-label="Jump to">
+<a href="#pc">Person - PC</a><a href="#person">Person - phone</a><a href="#profile">Profile</a><a href="#evening">Evening report</a><a href="#notif">Notifications</a><a href="#clients">Clients</a><a href="#tasklog">Task log</a><a href="#states">Empty, loading, error</a><a href="#admin">Admin - desktop</a>
+</nav>
+
+<h2 id="pc">Person - PC (main design)</h2>
+<p class="lead">Most of the team works on a PC, so the PC screen is the main design. Same three places as phone, laid out wide: the clock and the task list sit side by side, and New task opens as a side panel so nobody leaves the page.</p>
+
+<div class="desk" style="padding:0;overflow-x:auto">
+<div style="display:grid;grid-template-columns:220px 1fr;min-height:700px;min-width:1120px">
+<aside style="background:var(--surface);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:6px">
+<div style="font-family:var(--num);font-weight:700;font-size:18px;padding:0 10px 14px">Untitled OS</div>
+<div class="who" style="min-height:44px;padding:0 12px;border-radius:12px;background:var(--accent-soft);color:var(--accent);font-weight:700"><svg class="i"><use href="#brief"/></svg>My Work</div>
+<div class="who" style="min-height:44px;padding:0 12px;border-radius:12px;color:var(--muted)"><svg class="i"><use href="#send"/></svg>Asked by me <span class="pill n" style="margin-left:auto">2</span></div>
+<div class="who" style="min-height:44px;padding:0 12px;border-radius:12px;color:var(--muted)"><svg class="i"><use href="#hour"/></svg>My hours</div>
+<div class="sm" style="padding:14px 12px 4px;border-top:1px solid var(--border);margin-top:10px">Already built - opens existing pages</div>
+<div class="who" style="min-height:44px;padding:0 12px;border-radius:12px;color:var(--muted)"><svg class="i"><use href="#file"/></svg>My Offer - leave request</div>
+<div class="who" style="min-height:44px;padding:0 12px;border-radius:12px;color:var(--muted)"><svg class="i"><use href="#file"/></svg>Salary slips</div>
+<div style="margin-top:auto;padding:12px;border-top:1px solid var(--border)"><div class="sm">Signed in</div><div style="font-weight:700">Safika Bansiwala</div><div class="sm">Clocked in 10:08 AM</div></div>
+</aside>
+<main style="padding:24px;position:relative">
+<div class="row" style="flex-wrap:wrap;margin-bottom:18px">
+<div><div class="sm">Tuesday 13 Oct</div><div class="h">My Work</div></div>
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="lang" role="group" aria-label="Language"><span class="on">EN</span><span>ગુ</span></div><div class="card" style="padding:8px 16px"><span class="sm">Today</span> <b class="mono" style="font-size:20px">6h 31m</b></div><button class="btn y"><svg class="i"><use href="#plus"/></svg>New task</button></div>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:24px;align-items:start">
+<div>
+<div class="run">
+<div class="sm" style="display:flex;align-items:center;gap:6px"><svg class="i"><use href="#play"/></svg>Running now</div>
+<div style="font-size:20px;font-weight:700;margin-top:4px">Reel 2 - product story</div>
+<div class="sm">Finesse Ribbons</div>
+<div class="timer">00:38:12</div>
+<div class="two"><button class="btn g"><svg class="i"><use href="#pause"/></svg>Pause</button><button class="btn y"><svg class="i"><use href="#check"/></svg>Finish</button></div>
+</div>
+<div class="card" style="margin-top:16px">
+<div style="font-size:18px;font-weight:700">Start without a task</div>
+<div class="field"><label>Client</label><div class="inp"><svg class="i"><use href="#search"/></svg>Search or type a client</div></div>
+<div class="chips"><span class="chip">Swachh Bharat Mission</span><span class="chip">IDP Education</span><span class="chip">GSRTC Work</span></div>
+<div class="field"><label>What are you doing</label><div class="inp">Type, or tap one below</div></div>
+<div class="chips"><span class="chip">CHECKING</span><span class="chip">REEL MAKING</span></div>
+<button class="btn y lg" style="margin-top:16px"><svg class="i"><use href="#play"/></svg>Start</button>
+<div class="sm" style="margin-top:10px">First Start of the day = clock-in. Last Stop = clock-out.</div>
+</div>
+</div>
+
+<div>
+<div class="row" style="flex-wrap:wrap;gap:8px"><div class="tabs"><span class="tab on">All</span><span class="tab">Due today</span><span class="tab">Late</span></div><div class="sm">9 tasks · <span style="color:var(--bad)">1 late</span></div></div><div class="sm" style="margin:8px 0">Drag your own task forward: To do → In process starts the clock, In process → Done stops it. Or press <kbd>←</kbd> <kbd>→</kbd> on a focused card.</div><div class="board" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="col"><div class="row"><span style="display:flex;align-items:center;gap:8px"><span class="cdot" style="background:#94a3b8"></span><b>To do</b></span><span class="cnt">3</span></div><div class="bar" style="height:4px;margin:10px 0 4px"><i style="width:33%;background:#94a3b8"></i></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">F</span><div style="min-width:0"><div class="sm">Finesse Ribbons</div><b>Post design</b></div></div><div class="row" style="margin-top:10px"><span class="pill warn"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Tomorrow</span><span class="av">SB</span></div><button class="btn y sm" style="width:100%;margin-top:10px"><svg class="i"><use href="#play"/></svg>Start</button></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">G</span><div style="min-width:0"><div class="sm">GSRTC Work</div><b>GSRTC brochure - part 2 of 3</b></div></div><div class="row" style="margin-top:10px"><span class="pill bad"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Late 1 day</span><span class="av">SB</span></div><button class="btn y sm" style="width:100%;margin-top:10px"><svg class="i"><use href="#play"/></svg>Start</button></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">F</span><div style="min-width:0"><div class="sm">Finesse Ribbons</div><b>Daily update to client group</b></div></div><div class="row" style="margin-top:10px"><span class="pill n"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>No due time</span><span class="av">SB</span></div><button class="btn y sm" style="width:100%;margin-top:10px"><svg class="i"><use href="#play"/></svg>Start</button></div><div class="dz">Drop a task here</div></div><div class="col"><div class="row"><span style="display:flex;align-items:center;gap:8px"><span class="cdot" style="background:#FFE600"></span><b>In process</b></span><span class="cnt">1</span></div><div class="bar" style="height:4px;margin:10px 0 4px"><i style="width:50%;background:#FFE600"></i></div><div class="tk lifted"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">F</span><div style="min-width:0"><div class="sm">Finesse Ribbons</div><b>Reel 2 - product story</b></div></div><div class="bar" style="margin:10px 0 6px"><i style="width:50%"></i></div><div class="sm">1 of 2 people done</div><div class="row" style="margin-top:10px"><span class="pill warn"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Thu 15 Oct</span><span class="av">SB</span></div><button class="btn g sm" style="width:100%;margin-top:10px"><svg class="i"><use href="#check"/></svg>Finish</button></div><div class="dz">Drop a task here</div></div><div class="col"><div class="row"><span style="display:flex;align-items:center;gap:8px"><span class="cdot" style="background:#10B981"></span><b>Done</b></span><span class="cnt">5</span></div><div class="bar" style="height:4px;margin:10px 0 4px"><i style="width:100%;background:#10B981"></i></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">A</span><div style="min-width:0"><div class="sm">Anand Mall</div><b>Brochure PDF</b></div></div><div class="row" style="margin-top:10px"><span class="pill ok"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Done yesterday</span><span class="av">SB</span></div></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">I</span><div style="min-width:0"><div class="sm">IDP Education</div><b>Photoshop work</b></div></div><div class="row" style="margin-top:10px"><span class="pill ok"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Done 11:20 AM</span><span class="av">SB</span></div></div><div class="dz">Drop a task here</div></div></div>
+</div>
+</div>
+
+<div style="position:absolute;right:0;top:0;bottom:0;width:340px;background:var(--surface);border-left:1px solid var(--border-strong);padding:22px;box-shadow:-12px 0 24px rgba(0,0,0,.35)">
+<div class="row"><div class="h" style="font-size:22px">New task</div><button class="btn o sm" aria-label="Close panel">Close</button></div>
+<div class="field"><label>What</label><div class="inp v">Make 2 reels</div></div>
+<div class="field"><label>Client (optional)</label><div class="inp v">Finesse Ribbons</div></div>
+<div class="field"><label>People and their part</label>
+<div class="part"><div class="row"><b>Piyush Kumawat</b><span class="pill warn">Thu</span></div><div class="sm">Reel 1 - festival offer</div></div>
+<div class="part"><div class="row"><b>Akshar Gohil</b><span class="pill warn">Thu</span></div><div class="sm">Reel 2 - product story</div></div>
+<button class="btn o sm" style="width:100%;margin-top:10px;border-style:dashed;color:var(--accent)"><svg class="i"><use href="#plus"/></svg>Add another person</button></div>
+<div class="field"><label for="dd1">Due date (date picker)</label>
+<input id="dd1" type="date" value="2026-10-15" style="width:100%;min-height:52px;padding:0 14px;background:var(--bg);color:var(--text);border:1px solid var(--border-strong);border-radius:14px;font:16px var(--font);color-scheme:dark">
+<div class="chips"><span class="chip">Today</span><span class="chip">Tomorrow</span><span class="chip on">Thu 15 Oct</span><span class="chip">Next week</span></div>
+<div class="sm" style="margin-top:6px">One date for the task. Each person's part can have its own date when you add people.</div></div>
+<div class="field"><label>Repeat</label><div class="chips" style="margin-top:0"><span class="chip on">Just once</span><span class="chip">Daily</span><span class="chip">Weekly</span><span class="chip">Monthly</span></div></div>
+<button class="btn y lg" style="margin-top:20px">Assign</button>
+</div>
+</main>
+</div>
+</div>
+<p class="sm" style="margin-top:12px">Shown with the New task panel open. Closed, the task table uses the full width. Keyboard: N = new task, Space = start / pause.</p>
+
+<div class="desk">
+<div class="row" style="flex-wrap:wrap;margin-bottom:12px"><div><div class="sm">I asked for</div><div class="h">Asked by me</div></div><button class="btn y"><svg class="i"><use href="#plus"/></svg>New task</button></div>
+<table>
+<thead><tr><th>Task</th><th>Client</th><th>Who</th><th>Due</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><b>Photos of Anand stand</b></td><td class="sm">Anand Mall</td><td>Gohil</td><td class="sm">Tomorrow</td><td><span class="pill n">Assigned</span></td></tr>
+<tr><td><b>Make 2 reels</b></td><td class="sm">Finesse Ribbons</td><td>Piyush, Akshar</td><td class="sm">Thursday</td><td><span class="pill warn">1 of 2 done</span></td></tr>
+<tr><td><b>Brochure PDF</b></td><td class="sm">GSRTC Work</td><td>Safika</td><td class="sm">Yesterday</td><td><span class="pill ok"><svg class="i" style="width:16px;height:16px"><use href="#check"/></svg>Finished</span></td></tr>
+</tbody></table>
+</div>
+
+<h2 id="person">Person - phone screens</h2>
+<p class="lead">Same three places on a phone, for people in the field. Each person has: My Work, Asked by me, New task. The clock lives at the top of My Work.</p>
+<div class="grid">
+
+<figure><div class="phone">
+<div class="top"><div><div class="sm">Tuesday 13 Oct</div><div class="h">My Work</div></div><div style="text-align:right"><div class="lang" role="group" aria-label="Language"><span class="on">EN</span><span>ગુ</span></div><div class="sm" style="margin-top:8px">In 10:08 AM - Today 6h 31m</div></div></div>
+<div class="run">
+<div class="sm" style="display:flex;align-items:center;gap:6px"><svg class="i"><use href="#play"/></svg>Running now</div>
+<div style="font-size:20px;font-weight:700;margin-top:4px">Reel 2 - product story</div>
+<div class="sm">Finesse Ribbons</div>
+<div class="timer" aria-live="off">00:38:12</div>
+<div class="two"><button class="btn g"><svg class="i"><use href="#pause"/></svg>Pause</button><button class="btn y"><svg class="i"><use href="#check"/></svg>Finish</button></div>
+</div>
+<div class="seg" role="tablist"><div class="on" role="tab"><b>3</b>To do</div><div role="tab"><b>1</b>In process</div><div role="tab"><b>5</b>Done</div></div>
+<div class="task"><div class="t">Post design</div><div class="sm">Finesse Ribbons - from Admin</div>
+<div class="row" style="margin-top:12px"><span class="pill warn"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Due tomorrow</span><button class="btn y sm">Start</button></div></div>
+<div class="task" style="border-color:#7f1d1d"><div class="t">GSRTC brochure</div><div class="sm">GSRTC Work - part 2 of 3, with Safika</div>
+<div class="row" style="margin-top:12px"><span class="pill bad"><svg class="i" style="width:16px;height:16px"><use href="#alert"/></svg>Late 1 day</span><button class="btn y sm">Start</button></div></div>
+<div class="task"><div class="row"><div class="t">Daily update to client group</div><span class="pill n"><svg class="i" style="width:16px;height:16px"><use href="#repeat"/></svg>Daily</span></div><div class="sm">Fired this morning - Finesse Ribbons</div>
+<div class="row" style="margin-top:12px"><span class="sm">No due time</span><button class="btn y sm">Start</button></div></div>
+<div class="navb" style="margin-top:20px"><div class="on"><svg class="i"><use href="#brief"/></svg>My Work</div><div><svg class="i"><use href="#send"/></svg>Asked by me</div><div><svg class="i"><use href="#plus"/></svg>New task</div></div>
+</div><figcaption><b>My Work - something running</b>One big card, one big timer, two buttons. Below it, the tasks, each with one Start button. A repeating task shows a Daily badge.</figcaption></figure>
+
+<figure><div class="phone">
+<div class="top"><div><div class="sm">Start without a task</div><div class="h">Start the clock</div></div></div>
+<div class="field" style="margin-top:0"><label>Client</label><div class="inp"><svg class="i"><use href="#search"/></svg>Search or type a client</div></div>
+<div class="chips"><span class="chip on">Swachh Bharat Mission</span><span class="chip">IDP Education</span><span class="chip">GSRTC Work</span><span class="chip">Finesse Ribbons</span></div>
+<div class="field"><label>What are you doing</label><div class="inp">Type, or tap one below</div></div>
+<div class="chips"><span class="chip">CHECKING</span><span class="chip">WORKING ON CAMPAIGN</span><span class="chip">REEL MAKING</span></div>
+<div style="margin-top:28px"><button class="btn y lg"><svg class="i"><use href="#play"/></svg>Start</button></div>
+<div class="sm" style="text-align:center;margin-top:12px">The first Start of the day is your clock-in.<br>The last Stop is your clock-out.</div>
+<div class="row" style="margin-top:auto;padding-top:20px"><button class="btn o sm"><svg class="i"><use href="#clock"/></svg>Add forgotten time</button><span class="sm">Waits for admin</span></div>
+</div><figcaption><b>Start the clock</b>Recent clients and past task names are chips, so the usual case is two taps. Free typing always works.</figcaption></figure>
+
+<figure><div class="phone">
+<div class="top"><div><div class="sm">Asked by Safika</div><div class="h">Make 2 reels</div></div><span class="pill warn">1 of 2 done</span></div>
+<div class="sm">Finesse Ribbons - due Thursday</div>
+<div class="bar" role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"><i style="width:50%"></i></div>
+<div class="part"><div class="row"><b>Piyush - Reel 1</b><span class="pill ok"><svg class="i" style="width:16px;height:16px"><use href="#check"/></svg>Finished</span></div><div class="sm">Festival offer - 1h 15m</div></div>
+<div class="part" style="border-color:var(--accent)"><div class="row"><b>Akshar - Reel 2</b><span class="pill warn"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>In process</span></div><div class="sm">Product story - 38m so far</div></div>
+<div class="card" style="margin-top:16px"><div class="sm">Note from Safika</div><div>Use the new logo. Keep it under 20 seconds.</div></div>
+<div class="sm" style="margin-top:16px">When both parts are finished the task is Finished and Safika is told.</div>
+<div class="navb"><div><svg class="i"><use href="#brief"/></svg>My Work</div><div class="on"><svg class="i"><use href="#send"/></svg>Asked by me</div><div><svg class="i"><use href="#plus"/></svg>New task</div></div>
+</div><figcaption><b>Task detail - several people</b>Each person's part has its own status. A progress bar shows how far the whole task is.</figcaption></figure>
+
+<figure><div class="phone">
+<div class="top"><div><div class="h">New task</div></div><button class="btn o sm" aria-label="Close">Cancel</button></div>
+<div class="field" style="margin-top:0"><label>What</label><div class="inp v">Make 2 reels</div></div>
+<div class="field"><label>Client (optional)</label><div class="inp v">Finesse Ribbons</div></div>
+<div class="field"><label>People and their part</label>
+<div class="part"><div class="row"><b>Piyush Kumawat</b><span class="pill warn">Thu</span></div><div class="sm">Reel 1 - festival offer</div></div>
+<div class="part"><div class="row"><b>Akshar Gohil</b><span class="pill warn">Thu</span></div><div class="sm">Reel 2 - product story</div></div>
+<button class="btn o" style="width:100%;margin-top:10px;border-style:dashed;color:var(--accent)"><svg class="i"><use href="#plus"/></svg>Add another person</button></div>
+<div class="field"><label>Repeat</label><div class="chips" style="margin-top:0"><span class="chip on">Just once</span><span class="chip">Every day</span><span class="chip">Every week</span><span class="chip">Every month</span></div></div>
+<div style="margin-top:auto;padding-top:20px"><button class="btn y lg">Assign</button></div>
+</div><figcaption><b>New task</b>Anyone can ask anyone. One person or many; each gets their own part and due date. Repeat fires every morning (not Sundays or holidays).</figcaption></figure>
+
+<figure><div class="phone">
+<div class="top"><div><div class="sm">I asked for</div><div class="h">Asked by me</div></div></div>
+<div class="task" style="margin-top:0"><div class="row"><div class="t">Photos of Anand stand</div><span class="pill n">Assigned</span></div><div class="sm">Gohil - due tomorrow</div></div>
+<div class="task"><div class="row"><div class="t">Make 2 reels</div><span class="pill warn">1 of 2 done</span></div><div class="sm">Piyush done - Akshar working</div></div>
+<div class="task"><div class="row"><div class="t">Brochure PDF</div><span class="pill ok"><svg class="i" style="width:16px;height:16px"><use href="#check"/></svg>Finished</span></div><div class="sm">Safika - yesterday</div></div>
+<div class="sm" style="margin-top:16px">You get a notification when a task you asked for is finished.</div>
+<div class="navb"><div><svg class="i"><use href="#brief"/></svg>My Work</div><div class="on"><svg class="i"><use href="#send"/></svg>Asked by me</div><div><svg class="i"><use href="#plus"/></svg>New task</div></div>
+</div><figcaption><b>Asked by me</b>The sales rep who asked Operations for photos sees it here, with no timer needed.</figcaption></figure>
+
+</div>
+
+<h2 id="states">Empty, loading and error states</h2>
+<p class="lead">Every list has all three, so nothing is ever a blank box.</p>
+<div class="grid">
+<figure><div class="phone" style="min-height:420px">
+<div class="top"><div class="h">My Work</div></div>
+<div class="empty"><svg class="i"><use href="#inbox"/></svg><div style="font-size:18px;color:var(--text);font-weight:700">Nothing to do right now</div><div>New tasks appear here. You can also start the clock on any client.</div><div style="margin-top:16px"><button class="btn y">Start the clock</button></div></div>
+</div><figcaption><b>Empty</b>Says what to do next.</figcaption></figure>
+<figure><div class="phone" style="min-height:420px">
+<div class="top"><div class="h">My Work</div></div>
+<div class="skel" style="height:150px"></div><div class="skel" style="height:96px;margin-top:12px"></div><div class="skel" style="height:96px;margin-top:12px"></div>
+</div><figcaption><b>Loading</b>Shapes the same size as the real cards, so nothing jumps when data arrives.</figcaption></figure>
+<figure><div class="phone" style="min-height:420px">
+<div class="top"><div class="h">My Work</div></div>
+<div class="err" role="alert"><svg class="i"><use href="#alert"/></svg><div style="flex:1">Could not load your tasks. Check the internet.</div><button class="btn sm" style="background:var(--bad);color:#0f172a">Retry</button></div>
+<div class="sm" style="margin-top:16px">If the timer is running it keeps counting. Nothing is lost.</div>
+</div><figcaption><b>Error</b>Red banner with Retry. The clock never stops because of a network problem.</figcaption></figure>
+</div>
+
+<h2 id="admin">Admin - desktop</h2>
+<p class="lead">One page to see what is stuck, who is working and where time goes. Tabs: Overview, Tasks, People, Campaigns, Hours.</p>
+
+<div class="desk">
+<div class="row" style="flex-wrap:wrap;margin-bottom:16px">
+<div><div class="sm">Tuesday 13 Oct</div><div class="h">Team work</div></div>
+<div style="display:flex;gap:10px;flex-wrap:wrap"><div class="lang"><span class="on">Today</span><span>Week</span><span>Dates</span></div><button class="btn y"><svg class="i"><use href="#plus"/></svg>New task</button></div>
+</div>
+<div class="tabs"><span class="tab on">Overview</span><span class="tab">Tasks</span><span class="tab">People</span><span class="tab">Campaigns</span><span class="tab">Hours</span><span class="tab">Timeline</span></div>
+
+<div class="card" style="margin-top:18px">
+<div style="font-size:18px;font-weight:700">Needs you</div>
+<div class="need"><svg class="i" style="color:var(--bad)"><use href="#alert"/></svg><span class="t">GSRTC brochure is late by 1 day</span><span class="pill bad">Late</span><button class="btn g sm">Open</button></div>
+<div class="need"><svg class="i" style="color:var(--warn)"><use href="#hour"/></svg><span class="t">3 added-later times wait for you</span><span class="pill warn">Approve</span><button class="btn g sm">Review</button></div>
+<div class="need"><svg class="i" style="color:var(--warn)"><use href="#file"/></svg><span class="t">2 invoices waiting for Accounts</span><span class="pill warn">Waiting</span><button class="btn g sm">Open</button></div>
+</div>
+
+<div class="kpis">
+<div class="card"><div class="sm">Team hours today</div><div class="num">54h 45m</div></div>
+<div class="card"><div class="sm">Working now</div><div class="num">9 <span class="sm">of 16</span></div></div>
+<div class="card"><div class="sm">Open tasks</div><div class="num">17</div></div>
+<div class="card"><div class="sm">Finished today</div><div class="num" style="color:var(--ok)">8</div></div>
+</div>
+
+<div class="row" style="flex-wrap:wrap;gap:12px;margin-top:24px"><div style="font-size:18px;font-weight:700">Tasks</div><div class="sm">17 open · <span style="color:var(--bad)">3 late</span> · 8 finished today</div></div>
+<div class="tabs" style="margin-top:12px"><span class="tab on">All tasks</span><span class="tab">My tasks</span><span class="tab">Due today</span><span class="tab">Late</span></div>
+<div class="sm" style="margin-top:10px">Drag a task to move it - or press <kbd>←</kbd> <kbd>→</kbd> on a focused card. Dropping on Finished tells whoever asked for it. Try it: it works in this mockup.</div>
+<div class="board">
+<div class="col"><div class="row"><span style="display:flex;align-items:center;gap:8px"><span class="cdot" style="background:#94a3b8"></span><b>Assigned</b></span><span class="cnt">5</span></div><div class="bar" style="height:4px;margin:10px 0 4px"><i style="width:30%;background:#94a3b8"></i></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">F</span><div style="min-width:0"><div class="sm">Finesse Ribbons</div><b>Make 2 reels</b></div></div><div class="bar" style="margin:10px 0 6px"><i style="width:0%"></i></div><div class="sm">0 of 2 people done</div><div class="row" style="margin-top:10px"><span class="pill warn"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Thu 15 Oct</span><span class="av" title="Piyush + Akshar">PA</span></div></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">A</span><div style="min-width:0"><div class="sm">Anand Mall</div><b>Photos of Anand stand</b></div></div><div class="row" style="margin-top:10px"><span class="pill warn"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Tomorrow</span><span class="av" title="Gohil">GO</span></div></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">G</span><div style="min-width:0"><div class="sm">GSRTC Work</div><b>GSRTC brochure</b></div></div><div class="row" style="margin-top:10px"><span class="pill bad"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Late 1 day</span><span class="av" title="Safika">SB</span></div></div><div class="dz">Drop a task here</div></div>
+<div class="col"><div class="row"><span style="display:flex;align-items:center;gap:8px"><span class="cdot" style="background:#FFE600"></span><b>In process</b></span><span class="cnt">4</span></div><div class="bar" style="height:4px;margin:10px 0 4px"><i style="width:55%;background:#FFE600"></i></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">S</span><div style="min-width:0"><div class="sm">Swachh Bharat Mission</div><b>Campaign working</b></div></div><div class="row" style="margin-top:10px"><span class="pill warn"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Today</span><span class="av" title="Dixita R.">DR</span></div></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">I</span><div style="min-width:0"><div class="sm">IDP Education</div><b>Photoshop work</b></div></div><div class="row" style="margin-top:10px"><span class="pill warn"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Today</span><span class="av" title="Safika">SB</span></div></div><div class="tk lifted"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">U</span><div style="min-width:0"><div class="sm">Untitled Advertising</div><b>Reel editing</b></div></div><div class="bar" style="margin:10px 0 6px"><i style="width:50%"></i></div><div class="sm">1 of 2 people done</div><div class="row" style="margin-top:10px"><span class="pill n"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Fri 16 Oct</span><span class="av" title="Piyush">PK</span></div></div><div class="dz">Drop a task here</div></div>
+<div class="col"><div class="row"><span style="display:flex;align-items:center;gap:8px"><span class="cdot" style="background:#10B981"></span><b>Finished</b></span><span class="cnt">8</span></div><div class="bar" style="height:4px;margin:10px 0 4px"><i style="width:100%;background:#10B981"></i></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">S</span><div style="min-width:0"><div class="sm">Swachh Bharat Mission</div><b>Checking</b></div></div><div class="row" style="margin-top:10px"><span class="pill ok"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Done 4:20 PM</span><span class="av" title="Damini">DR</span></div></div><div class="tk"><div class="row" style="justify-content:flex-start;gap:10px"><span class="ctile">H</span><div style="min-width:0"><div class="sm">HR</div><b>Sales head questions</b></div></div><div class="row" style="margin-top:10px"><span class="pill ok"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>Done 3:55 PM</span><span class="av" title="Riya">RJ</span></div></div><div class="dz">Drop a task here</div></div>
+</div>
+
+<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:24px">
+<div class="card"><div style="font-size:18px;font-weight:700;margin-bottom:6px">Who is working</div>
+<table><tbody>
+<tr><td><span class="dot" style="display:inline-block;margin-right:8px"></span>Dixita Rana</td><td class="sm">Swachh Bharat</td><td class="mono">8h 16m</td></tr>
+<tr><td><span class="dot" style="display:inline-block;margin-right:8px"></span>Renuka Vasava</td><td class="sm">Checking</td><td class="mono">7h 51m</td></tr>
+<tr><td><span class="dot" style="display:inline-block;margin-right:8px"></span>Riya Jangid</td><td class="sm">HR hiring</td><td class="mono">7h 56m</td></tr>
+<tr><td><span class="dot o" style="display:inline-block;margin-right:8px"></span>Piyush Kumawat</td><td class="sm">Stopped 7:01 PM</td><td class="mono">3h 42m</td></tr>
+</tbody></table></div>
+<div class="card"><div style="font-size:18px;font-weight:700;margin-bottom:6px">Fired this morning</div>
+<div class="who"><svg class="i"><use href="#repeat"/></svg><span style="flex:1">Daily update - Finesse</span><span class="sm">Akshar</span></div>
+<div class="who"><svg class="i"><use href="#repeat"/></svg><span style="flex:1">Check LED report</span><span class="sm">Piyush</span></div>
+<div class="who"><svg class="i"><use href="#repeat"/></svg><span style="flex:1">Monthly report - Anee</span><span class="sm">Riya</span></div>
+<div class="sm" style="margin-top:10px">Skipped on Sundays and holidays.</div></div>
+<div class="card"><div style="font-size:18px;font-weight:700;margin-bottom:6px">Hours per client</div>
+<div class="hrow"><span>Swachh Bharat Mission</span><div class="bar"><i style="width:100%"></i></div><span class="mono">31h 32m</span></div>
+<div class="hrow"><span>HR</span><div class="bar"><i style="width:25%"></i></div><span class="mono">7h 56m</span></div>
+<div class="hrow"><span>IDP Education</span><div class="bar"><i style="width:7%"></i></div><span class="mono">2h 15m</span></div></div>
+</div>
+</div>
+
+<h2 id="timeline">Admin - Timeline tab (same idea as Trackdek, in our brand)</h2>
+<p class="lead">One row per person, hours worked and a bar. Today / Yesterday / Past 7 days / Past 30 days, a date picker and a person filter. Click a row to see that person's day: which client, which task, start and stop. No screenshots.</p>
+<div class="desk">
+<div class="row" style="flex-wrap:wrap;gap:12px;margin-bottom:16px">
+<div class="lang" role="group" aria-label="Range"><span class="on">Today</span><span>Yesterday</span><span>Past 7 days</span><span>Past 30 days</span></div>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<input type="date" aria-label="Pick a date" value="2026-10-13" style="min-height:44px;padding:0 12px;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:12px;font:15px var(--font);color-scheme:dark">
+<div class="inp" style="min-height:44px;min-width:200px;justify-content:space-between">All people <svg class="i"><use href="#chev"/></svg></div>
+</div></div>
+<div class="card" style="padding:0">
+<div class="hrow" style="grid-template-columns:240px 1fr 110px;padding:10px 16px;border-bottom:1px solid var(--border)"><span><b>Dixita Rana</b></span><div class="bar"><i style="width:97%"></i></div><span class="mono" style="text-align:right">8h 16m</span></div>
+<div class="hrow" style="grid-template-columns:240px 1fr 110px;padding:10px 16px;border-bottom:1px solid var(--border)"><span><b>Renuka Vasava</b></span><div class="bar"><i style="width:92%"></i></div><span class="mono" style="text-align:right">7h 51m</span></div>
+<div class="hrow" style="grid-template-columns:240px 1fr 110px;padding:10px 16px;border-bottom:1px solid var(--border)"><span><b>Dixita Gohel</b></span><div class="bar"><i style="width:80%"></i></div><span class="mono" style="text-align:right">6h 50m</span></div>
+<div class="hrow" style="grid-template-columns:240px 1fr 110px;padding:10px 16px;border-bottom:1px solid var(--border)"><span><b>Safika Bansiwala</b></span><div class="bar"><i style="width:88%"></i></div><span class="mono" style="text-align:right">7h 30m</span></div>
+<div class="hrow" style="grid-template-columns:240px 1fr 110px;padding:10px 16px;border-bottom:1px solid var(--border)"><span><b>Damini Rane</b></span><div class="bar"><i style="width:76%"></i></div><span class="mono" style="text-align:right">6h 31m</span></div>
+<div class="hrow" style="grid-template-columns:240px 1fr 110px;padding:10px 16px;border-bottom:1px solid var(--border)"><span><b>Piyush Kumawat</b></span><div class="bar"><i style="width:44%"></i></div><span class="mono" style="text-align:right">3h 42m</span></div>
+<div class="hrow" style="grid-template-columns:240px 1fr 110px;padding:10px 16px"><span><b>Shreya Panchal</b> <span class="pill n">no clock-in</span></span><div class="bar"><i style="width:0"></i></div><span class="mono" style="text-align:right">0h 00m</span></div>
+</div>
+<div class="sm" style="margin-top:12px">Bar is full at 8h 30m. Click a person: day detail opens beside the list. A person with no clock-in shows a grey tag, not a red alarm.</div>
+</div>
+
+<h2 id="profile">Profile - with monthly check-in attendance</h2>
+<p class="lead">Shown to the person (their own) and to admin (everyone). Photo and details reuse what already exists. Pay and leave open the existing pages.</p>
+<div class="desk"><div style="display:grid;grid-template-columns:minmax(260px,320px) 1fr;gap:24px">
+<div class="card" style="text-align:center">
+<div style="width:96px;height:96px;margin:0 auto 12px;border-radius:50%;background:var(--accent-soft);border:2px solid var(--accent);display:grid;place-items:center;font-family:var(--num);font-size:34px;font-weight:700;color:var(--accent)">SB</div>
+<div class="h" style="font-size:22px">Safika Bansiwala</div>
+<div class="sm">Graphic Designer</div>
+<div class="chips" style="justify-content:center"><span class="chip">Change photo</span></div>
+<table style="margin-top:14px;text-align:left"><tbody>
+<tr><td class="sm">Reports to</td><td>Dixita (Ops head)</td></tr>
+<tr><td class="sm">City</td><td>Vadodara</td></tr>
+<tr><td class="sm">Joined</td><td>01 Jun 2026</td></tr>
+<tr><td class="sm">Email</td><td>safika@untitledad.in</td></tr>
+</tbody></table>
+<div style="display:grid;gap:8px;margin-top:14px"><span class="btn o sm">My Offer - leave request</span><span class="btn o sm">Salary slips</span></div>
+</div>
+<div>
+<div class="kpis" style="margin-top:0">
+<div class="card"><div class="sm">Present</div><div class="num">9<span class="sm"> of 10 days</span></div></div>
+<div class="card"><div class="sm">On time</div><div class="num" style="color:var(--ok)">7</div></div>
+<div class="card"><div class="sm">Late</div><div class="num" style="color:var(--warn)">2</div></div>
+<div class="card"><div class="sm">Avg check-in</div><div class="num">09:27</div></div>
+</div>
+<div class="card" style="margin-top:16px">
+<div class="row" style="flex-wrap:wrap;gap:10px;margin-bottom:12px"><div style="font-size:18px;font-weight:700">Check-in attendance - October 2026</div>
+<div class="lang"><span>&lt; Sep</span><span class="on">Oct</span><span>Nov &gt;</span></div></div>
+<div class="calgrid">
+<div class="sm calh">Mon</div><div class="sm calh">Tue</div><div class="sm calh">Wed</div><div class="sm calh">Thu</div><div class="sm calh">Fri</div><div class="sm calh">Sat</div><div class="sm calh">Sun</div>
+<div class="cal e"></div><div class="cal e"></div><div class="cal e"></div><div class="cal" style="background:var(--ok-soft);color:var(--ok)" title="On time 09:21"><b>1</b><span>09:21</span></div><div class="cal" style="background:var(--ok-soft);color:var(--ok)" title="On time 09:18"><b>2</b><span>09:18</span></div><div class="cal" style="background:var(--ok-soft);color:var(--ok)" title="On time 09:25"><b>3</b><span>09:25</span></div><div class="cal" style="background:transparent;color:var(--muted)" title="Sunday "><b>4</b><span>Sunday</span></div><div class="cal" style="background:var(--ok-soft);color:var(--ok)" title="On time 09:10"><b>5</b><span>09:10</span></div><div class="cal" style="background:var(--ok-soft);color:var(--ok)" title="On time 09:27"><b>6</b><span>09:27</span></div><div class="cal" style="background:var(--warn-soft);color:var(--warn)" title="Late 10:12"><b>7</b><span>10:12</span></div><div class="cal" style="background:var(--ok-soft);color:var(--ok)" title="On time 09:05"><b>8</b><span>09:05</span></div><div class="cal" style="background:var(--warn-soft);color:var(--warn)" title="Late 09:48"><b>9</b><span>09:48</span></div><div class="cal" style="background:var(--warn-soft);color:var(--warn)" title="Half day 11:42"><b>10</b><span>11:42</span></div><div class="cal" style="background:transparent;color:var(--muted)" title="Sunday "><b>11</b><span>Sunday</span></div><div class="cal" style="background:var(--ok-soft);color:var(--ok)" title="On time 09:14"><b>12</b><span>09:14</span></div><div class="cal" style="background:var(--ok-soft);color:var(--ok)" style="outline:2px solid var(--accent)" title="On time 09:22"><b>13</b><span>09:22</span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>14</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>15</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>16</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>17</b><span></span></div><div class="cal" style="background:transparent;color:var(--muted)" title="Sunday "><b>18</b><span>Sunday</span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>19</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>20</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>21</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>22</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>23</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>24</b><span></span></div><div class="cal" style="background:transparent;color:var(--muted)" title="Sunday "><b>25</b><span>Sunday</span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>26</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>27</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>28</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>29</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>30</b><span></span></div><div class="cal" style="background:transparent;color:#64748b" title=" "><b>31</b><span></span></div>
+</div>
+<div class="chips" style="margin-top:12px"><span class="pill ok">On time - by 9:30</span><span class="pill warn">Late / half day</span><span class="pill bad">Leave</span><span class="pill n">Sunday / holiday</span></div>
+<div class="sm" style="margin-top:10px">Tap a day for the check-in time and any late reason. Same rules as sales: by 9:30 on time, 9:30-11:30 late, after 11:30 half day. First timer start of the day = check-in. Attendance does not change pay by itself - leave is deducted from the leave you request.</div>
+</div>
+<div class="card" style="margin-top:16px"><div style="font-size:18px;font-weight:700;margin-bottom:6px">This month at work</div>
+<div class="hrow" style="grid-template-columns:200px 1fr 90px"><span>Hours tracked</span><div class="bar"><i style="width:78%"></i></div><span class="mono">96h 20m</span></div>
+<div class="hrow" style="grid-template-columns:200px 1fr 90px"><span>Tasks finished</span><div class="bar"><i style="width:66%"></i></div><span class="mono">23</span></div>
+<div class="hrow" style="grid-template-columns:200px 1fr 90px"><span>Finished late</span><div class="bar"><i style="width:9%;background:#F59E0B"></i></div><span class="mono">2</span></div></div>
+</div></div></div>
+
+<h2 id="evening">Evening report - appears after 7 PM, shared to the team group</h2>
+<p class="lead">Same idea as the sales day summary. From 7:00 PM IST a card appears at the top of My Work. One tap opens WhatsApp with the report written, the person picks the team group and sends. The numbers are read fresh at the moment of sharing.</p>
+<div class="desk"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;align-items:start">
+<div class="card" style="border-color:var(--accent)">
+<div class="row"><div style="font-size:18px;font-weight:700">Your day report</div><span class="pill warn"><svg class="i" style="width:16px;height:16px"><use href="#clock"/></svg>7:12 PM</span></div>
+<div class="sm" style="margin:4px 0 12px">Tuesday 13 Oct - Safika Bansiwala</div>
+<div class="hrow" style="grid-template-columns:150px 1fr"><span class="sm">Clock in - out</span><b class="mono">09:22 - 18:48</b></div>
+<div class="hrow" style="grid-template-columns:150px 1fr"><span class="sm">Hours tracked</span><b class="mono">7h 31m</b></div>
+<div class="hrow" style="grid-template-columns:150px 1fr"><span class="sm">Tasks finished</span><b class="mono">4</b></div>
+<div class="hrow" style="grid-template-columns:150px 1fr"><span class="sm">Still in process</span><b class="mono">1</b></div>
+<div class="hrow" style="grid-template-columns:150px 1fr"><span class="sm">Late tasks</span><b class="mono" style="color:var(--bad)">1</b></div>
+<div class="sm" style="margin:10px 0 4px">Clients worked on</div>
+<div class="chips" style="margin-top:0"><span class="chip">Finesse Ribbons 3h 10m</span><span class="chip">GSRTC Work 2h 40m</span><span class="chip">IDP Education 1h 41m</span></div>
+<div class="field"><label>Note for the team (optional)</label><div class="inp">Waiting for client feedback on reel 2</div></div>
+<button class="btn y lg" style="margin-top:14px"><svg class="i"><use href="#send"/></svg>Share to your team group</button>
+<div class="sm" style="margin-top:8px;text-align:center">Last shared 7:15 PM</div>
+</div>
+<div>
+<div class="sm" style="margin-bottom:8px">What lands in WhatsApp (the person picks the group once, then it is one tap)</div>
+<div style="background:#0b2a22;border:1px solid #14532d;border-radius:16px;padding:16px;font-size:15px;line-height:1.6;white-space:pre-line">Safika Bansiwala - Day report
+Tue 13 Oct 2026
+
+In 09:22 | Out 18:48 (7h 31m)
+Finished: 4 | In process: 1 | Late: 1
+
+Finesse Ribbons - 3h 10m
+GSRTC Work - 2h 40m
+IDP Education - 1h 41m
+
+Note: Waiting for client feedback on reel 2</div>
+<div class="note" style="margin-top:14px;font-size:15px"><b>Rules:</b> shows from 7 PM, stays available after the clock is stopped. Reads fresh numbers on tap. No salary or cost in the text. A forgotten timer is auto-stopped at 21:30 and the report says so.</div>
+<div class="card" style="margin-top:14px"><div style="font-size:16px;font-weight:700;margin-bottom:6px">Admin sees who has shared</div>
+<div class="who"><svg class="i" style="color:var(--ok)"><use href="#check"/></svg>Dixita Rana, Renuka Vasava, Safika Bansiwala, Damini Rane - shared</div>
+<div class="who"><svg class="i" style="color:var(--warn)"><use href="#clock"/></svg>Piyush Kumawat, Dixita Gohel - not yet (a gentle push at 7:30 PM)</div></div>
+</div></div></div>
+
+<h2 id="notif">Notifications - in the app and as a push</h2>
+<p class="lead">One bell at the top and one page, like the Trackdek list but useful. The same item also arrives as a phone push (quiet hours respected). Tap an item to jump to the task.</p>
+<div class="desk">
+<div class="row" style="flex-wrap:wrap;gap:12px;margin-bottom:14px"><div class="tabs"><span class="tab on">All</span><span class="tab">Tasks</span><span class="tab">Approvals</span><span class="tab">Birthdays</span></div>
+<div style="display:flex;gap:8px;align-items:center"><span class="btn o sm">Mark all read</span><span class="pill n">3 new</span></div></div>
+<div class="card" style="padding:0"><div class="nrow"><span class="cdot" style="background:var(--accent);margin-top:8px"></span><span class="ni" style="color:var(--accent)"><svg class="i"><use href="#user"/></svg></span><div style="flex:1;min-width:0"><div><b>Safika asked you: Make 2 reels</b></div><div class="sm">Finesse Ribbons - due Thu 15 Oct - your part: Reel 1</div><div style="display:flex;gap:8px;margin-top:8px"><span class="btn y sm">Start</span><span class="btn o sm">Open</span></div></div><div class="sm" style="white-space:nowrap">5 min ago</div></div><div class="nrow"><span class="cdot" style="background:var(--accent);margin-top:8px"></span><span class="ni" style="color:var(--bad)"><svg class="i"><use href="#alert"/></svg></span><div style="flex:1;min-width:0"><div><b>GSRTC brochure is late by 1 day</b></div><div class="sm">You are on part 2 of 3 - Mayur is waiting</div></div><div class="sm" style="white-space:nowrap">1 h ago</div></div><div class="nrow"><span class="cdot" style="background:var(--accent);margin-top:8px"></span><span class="ni" style="color:var(--ok)"><svg class="i"><use href="#check"/></svg></span><div style="flex:1;min-width:0"><div><b>Your task was finished: Photos of Anand stand</b></div><div class="sm">Done by Gohil at 3:55 PM</div></div><div class="sm" style="white-space:nowrap">2 h ago</div></div><div class="nrow"><span style="width:10px"></span><span class="ni" style="color:var(--muted)"><svg class="i"><use href="#repeat"/></svg></span><div style="flex:1;min-width:0"><div><b>Daily update to client group fired</b></div><div class="sm">Repeating task - Finesse Ribbons</div></div><div class="sm" style="white-space:nowrap">9:00 AM</div></div><div class="nrow"><span style="width:10px"></span><span class="ni" style="color:var(--warn)"><svg class="i"><use href="#clock"/></svg></span><div style="flex:1;min-width:0"><div><b>Your added-later time was approved</b></div><div class="sm">Tuesday 13 Oct - 1h 30m on Swachh Bharat Mission</div></div><div class="sm" style="white-space:nowrap">Yesterday</div></div><div class="nrow"><span style="width:10px"></span><span class="ni" style="color:var(--warn)"><svg class="i"><use href="#file"/></svg></span><div style="flex:1;min-width:0"><div><b>Leave approved</b></div><div class="sm">15 Oct - Casual leave - approved by Riya</div></div><div class="sm" style="white-space:nowrap">Yesterday</div></div><div class="nrow"><span style="width:10px"></span><span class="ni" style="color:var(--accent)"><svg class="i"><use href="#users"/></svg></span><div style="flex:1;min-width:0"><div><b>Damini Rane's birthday is on 06/11/2026</b></div><div class="sm">Do not forget to wish them</div></div><div class="sm" style="white-space:nowrap">In 23 days</div></div><div class="nrow"><span style="width:10px"></span><span class="ni" style="color:var(--muted)"><svg class="i"><use href="#send"/></svg></span><div style="flex:1;min-width:0"><div><b>Evening report ready</b></div><div class="sm">Share your day report to the team group</div></div><div class="sm" style="white-space:nowrap">7:00 PM</div></div></div>
+<div class="note" style="margin-top:14px"><b>What notifies who:</b> a task or a part is assigned to you · a task you asked for is finished · your task is late or due today · a repeating task fired · your added-later time or leave is approved or rejected · the evening report is ready · a team birthday is coming (admin sees all, others see their team). Admin also gets: late task nobody started, someone has not clocked in by 10:30, time waiting for approval.</div>
+</div>
+
+<h2 id="clients">Admin - Clients (the project list)</h2>
+<p class="lead">One row per client or internal stream. Members, open tasks, last activity, hours worked. Anyone on the timeclock can add a client; the head merges duplicates or archives. Click a row for that client's tasks, people and hours.</p>
+<div class="desk">
+<div class="row" style="flex-wrap:wrap;gap:12px;margin-bottom:14px">
+<div class="tabs"><span class="tab">Today</span><span class="tab">Yesterday</span><span class="tab on">Past 7 days</span><span class="tab">Past 30 days</span><span class="tab">Custom</span></div>
+<div style="display:flex;gap:8px"><div class="inp" style="min-height:44px;min-width:220px"><svg class="i"><use href="#search"/></svg>Search clients</div><span class="btn y sm"><svg class="i"><use href="#plus"/></svg>Add client</span></div></div>
+<div class="card" style="padding:0;overflow-x:auto"><table style="min-width:780px"><thead><tr><th>Client</th><th>Members</th><th>Open tasks</th><th>Last activity</th><th>Hours</th><th></th></tr></thead><tbody><tr><td><b>Untitled Advertising</b></td><td><span style="display:inline-flex;align-items:center;padding-left:6px"><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">BS</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">DS</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">SB</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">PK</span><span class="sm" style="margin-left:6px">+9</span></span></td><td class="mono">175</td><td class="sm">14/10/2026</td><td class="mono">17h 00m</td><td style="text-align:right"><span class="btn o sm">Open</span></td></tr><tr><td><b>Untitled Advertising (HR)</b></td><td><span style="display:inline-flex;align-items:center;padding-left:6px"><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">RJ</span></span></td><td class="mono">64</td><td class="sm">14/10/2026</td><td class="mono">18h 17m</td><td style="text-align:right"><span class="btn o sm">Open</span></td></tr><tr><td><b>Swachh Bharat Mission</b></td><td><span style="display:inline-flex;align-items:center;padding-left:6px"><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">SB</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">RV</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">DR</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">SB</span><span class="sm" style="margin-left:6px">+2</span></span></td><td class="mono">15</td><td class="sm">14/10/2026</td><td class="mono">61h 08m</td><td style="text-align:right"><span class="btn o sm">Open</span></td></tr><tr><td><b>Untitled GSRTC Work</b></td><td><span style="display:inline-flex;align-items:center;padding-left:6px"><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">BS</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">DS</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">SB</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">PK</span><span class="sm" style="margin-left:6px">+7</span></span></td><td class="mono">20</td><td class="sm">14/10/2026</td><td class="mono">03h 36m</td><td style="text-align:right"><span class="btn o sm">Open</span></td></tr><tr><td><b>IDP Education India Pvt Ltd.</b></td><td><span style="display:inline-flex;align-items:center;padding-left:6px"><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">SB</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">RV</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">DR</span><span class="sm" style="margin-left:6px">+1</span></span></td><td class="mono">6</td><td class="sm">13/10/2026</td><td class="mono">02h 15m</td><td style="text-align:right"><span class="btn o sm">Open</span></td></tr><tr><td><b>Anee Marcom Pvt Ltd</b></td><td><span style="display:inline-flex;align-items:center;padding-left:6px"><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">SB</span><span class="av" style="width:30px;height:30px;font-size:11px;margin-left:-6px;border:2px solid var(--surface)">DR</span></span></td><td class="mono">1</td><td class="sm">12/10/2026</td><td class="mono">00h 39m</td><td style="text-align:right"><span class="btn o sm">Open</span></td></tr></tbody></table></div>
+<div class="sm" style="margin-top:12px">Hours here follow the date range above. A client with the same name typed twice is flagged "possible duplicate - merge?" for the head.</div>
+</div>
+
+<h2 id="tasklog">Task log - who did what, and when</h2>
+<p class="lead">Opens from any task. A time-ordered history that nobody can edit. Admin sees every task; a person sees the tasks they are on. The cost number comes from the hours in this log.</p>
+<div class="desk"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;align-items:start">
+<div class="card"><div class="row"><div><div class="sm">Finesse Ribbons</div><div class="h" style="font-size:22px">Make 2 reels</div></div><span class="pill warn">1 of 2 done</span></div>
+<div class="kpis" style="grid-template-columns:repeat(3,1fr);margin-top:12px">
+<div class="card"><div class="sm">Hours</div><div class="num" style="font-size:22px">5h 40m</div></div>
+<div class="card"><div class="sm">Due</div><div class="num" style="font-size:22px">Thu 15</div></div>
+<div class="card"><div class="sm">Cost (admin)</div><div class="num" style="font-size:22px">Rs 1,190</div></div></div>
+<div style="margin-top:16px"><div class="row"><b>Checklist</b><span class="sm">2 of 4 done</span></div>
+<div class="bar" style="margin:8px 0"><i style="width:50%"></i></div>
+<div class="who"><svg class="i" style="color:var(--ok)"><use href="#check"/></svg>Get logo and fonts from client</div>
+<div class="who"><svg class="i" style="color:var(--ok)"><use href="#check"/></svg>Rough cut</div>
+<div class="who"><span style="width:20px;height:20px;border:1.6px solid var(--border-strong);border-radius:6px;display:inline-block"></span>Add subtitles</div>
+<div class="who"><span style="width:20px;height:20px;border:1.6px solid var(--border-strong);border-radius:6px;display:inline-block"></span>Export 9:16 and 1:1</div>
+<div class="inp" style="min-height:44px;margin-top:8px"><svg class="i"><use href="#plus"/></svg>Add a step</div>
+<div class="sm" style="margin-top:6px">A step is a tick-box for the person doing the task. It has no owner, date or timer of its own. For different people use "add another person" instead.</div></div>
+<div style="margin-top:18px"><div class="row"><b>Comments</b><span class="sm">3</span></div>
+<div class="part"><div class="row"><b>Mayur</b><span class="sm">Mon 4:12 PM</span></div><div>Please use the new logo, keep it under 20 seconds.</div></div>
+<div class="part"><div class="row"><b>Akshar</b><span class="sm">Tue 5:12 PM</span></div><div>Client has not sent the logo yet. Waiting.</div></div>
+<div class="part"><div class="row"><b>Mayur</b><span class="sm">Tue 5:40 PM</span></div><div>Got it. Sent to him again on WhatsApp.</div></div>
+<div class="inp" style="min-height:52px;margin-top:10px">Write a comment</div>
+<div class="sm" style="margin-top:6px">Everyone on the task is notified. Comments also appear in the task log.</div></div>
+<div class="part"><div class="row"><b>Piyush - Reel 1</b><span class="pill ok">Finished</span></div><div class="sm">2h 10m</div></div>
+<div class="part"><div class="row"><b>Akshar - Reel 2</b><span class="pill warn">In process</span></div><div class="sm">3h 30m so far</div></div></div>
+<div class="card"><div style="font-size:18px;font-weight:700;margin-bottom:4px">Log</div><div class="nrow" style="min-height:0;padding:10px 0"><span class="ni" style="color:var(--accent);width:32px;height:32px"><svg class="i"><use href="#plus"/></svg></span><div style="flex:1"><div><b>Safika</b> created the task and assigned 2 people</div><div class="sm" style="margin-top:2px">Reel 1 - Piyush, Reel 2 - Akshar. Due Thu 15 Oct.</div></div><div class="sm" style="white-space:nowrap">Mon 12 Oct, 4:10 PM</div></div><div class="nrow" style="min-height:0;padding:10px 0"><span class="ni" style="color:var(--ok);width:32px;height:32px"><svg class="i"><use href="#play"/></svg></span><div style="flex:1"><div><b>Piyush</b> started Reel 1</div></div><div class="sm" style="white-space:nowrap">Mon 12 Oct, 4:30 PM</div></div><div class="nrow" style="min-height:0;padding:10px 0"><span class="ni" style="color:var(--muted);width:32px;height:32px"><svg class="i"><use href="#hour"/></svg></span><div style="flex:1"><div><b>Piyush</b> worked 1h 15m, then paused</div></div><div class="sm" style="white-space:nowrap">Mon 12 Oct, 5:45 PM</div></div><div class="nrow" style="min-height:0;padding:10px 0"><span class="ni" style="color:var(--ok);width:32px;height:32px"><svg class="i"><use href="#check"/></svg></span><div style="flex:1"><div><b>Piyush</b> finished Reel 1</div><div class="sm" style="margin-top:2px">Total on this part: 2h 10m</div></div><div class="sm" style="white-space:nowrap">Tue 13 Oct, 11:20 AM</div></div><div class="nrow" style="min-height:0;padding:10px 0"><span class="ni" style="color:var(--warn);width:32px;height:32px"><svg class="i"><use href="#clock"/></svg></span><div style="flex:1"><div><b>Dixita (admin)</b> changed due date for Reel 2: Wed 14 Oct to Thu 15 Oct</div></div><div class="sm" style="white-space:nowrap">Tue 13 Oct, 2:05 PM</div></div><div class="nrow" style="min-height:0;padding:10px 0"><span class="ni" style="color:var(--ok);width:32px;height:32px"><svg class="i"><use href="#play"/></svg></span><div style="flex:1"><div><b>Akshar</b> started Reel 2</div></div><div class="sm" style="white-space:nowrap">Tue 13 Oct, 3:00 PM</div></div><div class="nrow" style="min-height:0;padding:10px 0"><span class="ni" style="color:var(--muted);width:32px;height:32px"><svg class="i"><use href="#file"/></svg></span><div style="flex:1"><div><b>Akshar</b> added a note: waiting for client logo</div></div><div class="sm" style="white-space:nowrap">Tue 13 Oct, 5:12 PM</div></div></div>
+</div></div>
+
+<h2 id="cost">Admin - Task cost (admin and accounts only)</h2>
+<p class="lead">Hours on a task x that person's hourly rate. Hourly rate = monthly salary / 26 days / 8 hours. Shows what each task, client and person really cost. Not shown to the person or to other staff.</p>
+<div class="desk">
+<div class="row" style="flex-wrap:wrap;gap:12px;margin-bottom:14px">
+<div class="lang"><span class="on">This month</span><span>Last month</span><span>All time</span></div>
+<div class="sm">Rates come from the salary on file. Hours do not change anyone's pay.</div></div>
+<div class="kpis">
+<div class="card"><div class="sm">Team cost this month</div><div class="num">Rs 2,41,600</div></div>
+<div class="card"><div class="sm">Hours tracked</div><div class="num">1,142h</div></div>
+<div class="card"><div class="sm">Avg cost / hour</div><div class="num">Rs 212</div></div>
+<div class="card"><div class="sm">Not on any client</div><div class="num" style="color:var(--warn)">14%</div></div>
+</div>
+<div class="card" style="margin-top:16px;padding:0;overflow-x:auto">
+<table style="min-width:760px"><thead><tr><th>Task</th><th>Client</th><th>People</th><th>Hours</th><th>Cost</th><th>Income from client</th></tr></thead><tbody>
+<tr><td><b>Make 2 reels</b></td><td class="sm">Finesse Ribbons</td><td class="sm">Piyush, Akshar</td><td class="mono">5h 40m</td><td class="mono">Rs 1,190</td><td class="sm">-</td></tr>
+<tr><td><b>Campaign working</b></td><td class="sm">Swachh Bharat Mission</td><td class="sm">Dixita R.</td><td class="mono">31h 32m</td><td class="mono">Rs 8,900</td><td class="mono">Rs 1,65,000</td></tr>
+<tr><td><b>GSRTC brochure</b></td><td class="sm">GSRTC Work</td><td class="sm">Safika, Renuka</td><td class="mono">12h 10m</td><td class="mono">Rs 3,050</td><td class="mono">Rs 40,000</td></tr>
+<tr><td><b>Photoshop work</b></td><td class="sm">IDP Education</td><td class="sm">Safika</td><td class="mono">2h 15m</td><td class="mono">Rs 560</td><td class="sm">-</td></tr>
+</tbody></table></div>
+<div class="sm" style="margin-top:12px">Click a task to see who spent how many hours and each person's rate. Also available per client and per person. Example numbers only.</div>
+</div>
+
+<h2>What the design deliberately does not have</h2>
+<p class="lead">No screenshots. No keyboard or mouse counts. No productivity percentage. No status the person has to remember to change. Hours do not affect salary, score or attendance.</p>
+</div>
+<script>
+(function(){
+  var dragged=null, cols=document.querySelectorAll('.board .col');
+  var boards=document.querySelectorAll('.board');
+  document.querySelectorAll('.board .tk').forEach(function(c){
+    c.draggable=true; c.setAttribute('tabindex','0');
+    var b=document.createElement('div'); b.className='moveto';
+    b.textContent='Move to: Assigned / In process / Finished'; c.appendChild(b);
+    c.addEventListener('dragstart',function(e){dragged=c;c.classList.add('drag');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','x');});
+    c.addEventListener('dragend',function(){c.classList.remove('drag');cols.forEach(function(x){x.classList.remove('over','fin')});});
+    c.addEventListener('keydown',function(e){
+      if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;
+      var arr=Array.prototype.slice.call(c.parentNode.parentNode.querySelectorAll('.col')), i=arr.indexOf(c.parentNode), n=i+(e.key==='ArrowRight'?1:-1);
+      if(n>=0&&n<arr.length){var z=arr[n].querySelector('.dz');arr[n].insertBefore(c,z);syncDone();c.focus();}
+    });
+  });
+  /* admin board only: per-task cost (hours x salary rate) shown on every card and on drop into Finished */
+  var COST={'Make 2 reels':['5h 40m','Rs 1,190'],'Photos of Anand stand':['1h 05m','Rs 270'],'GSRTC brochure':['12h 10m','Rs 3,050'],
+    'Campaign working':['31h 32m','Rs 8,900'],'Photoshop work':['2h 15m','Rs 560'],'Reel editing':['3h 20m','Rs 700'],
+    'Checking':['4h 20m','Rs 920'],'Sales head questions':['1h 40m','Rs 410']};
+  function syncDone(){boards.forEach(function(b){var cs=b.querySelectorAll('.col');cs.forEach(function(col,i){col.querySelectorAll('.tk').forEach(function(c){
+      var fin=(i===2); c.classList.toggle('done',fin); if(fin)c.classList.remove('lifted');
+      if(!c.querySelector('.tick')){var t=document.createElement('div');t.className='tick';t.textContent='\u2713 Finished';c.insertBefore(t,c.querySelector('.moveto'));}
+    });});});}
+  var adminBoard=boards[boards.length-1];
+  adminBoard.querySelectorAll('.tk').forEach(function(c){
+    var t=c.querySelector('b').textContent, v=COST[t]; if(!v)return;
+    c.dataset.hours=v[0]; c.dataset.cost=v[1];
+    var l=document.createElement('div'); l.className='costline';
+    l.innerHTML='<span>'+v[0]+' tracked</span><b>'+v[1]+'</b>';
+    c.insertBefore(l,c.querySelector('.moveto'));
+  });
+  var toastEl=document.createElement('div'); toastEl.className='finish-toast'; toastEl.setAttribute('role','status');
+  document.body.appendChild(toastEl);
+  function finishedToast(c){
+    if(!c.dataset.cost)return;
+    toastEl.innerHTML='<b>Finished:</b> '+c.querySelector('b').textContent+' &middot; '+c.dataset.hours+' &middot; task cost <b style="color:var(--accent)">'+c.dataset.cost+'</b><span class="sm"> (hours x salary rate) &middot; asker notified</span>';
+    toastEl.classList.add('show'); clearTimeout(toastEl._t); toastEl._t=setTimeout(function(){toastEl.classList.remove('show')},4500);
+  }
+  adminBoard.addEventListener('drop',function(e){
+    var col=e.target.closest('.col'); if(!col||!dragged)return;
+    var all=adminBoard.querySelectorAll('.col'); if(col===all[2]&&dragged.parentNode===col) finishedToast(dragged);
+  });
+  cols.forEach(function(col){
+    col.addEventListener('dragover',function(e){e.preventDefault();col.classList.add('over');var all=col.parentNode.querySelectorAll('.col');col.classList.toggle('fin',col===all[2]);});
+    col.addEventListener('dragleave',function(){col.classList.remove('over','fin');});
+    col.addEventListener('drop',function(e){e.preventDefault();col.classList.remove('over','fin');if(dragged&&dragged.parentNode.parentNode===col.parentNode){col.insertBefore(dragged,col.querySelector('.dz'));syncDone();}});
+  });
+syncDone();
+})();
+</script>
+</body>
+</html>

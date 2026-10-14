@@ -96,6 +96,9 @@ BEGIN
                         -- Only the service-role Edge sync, pg_cron and the ticket triggers reach them.
                         -- ops_ticket_resolved_push is the 5th: the resolved-ticket trigger function.
                         'ops_notify_outages', 'ops_morning_digest', 'ops_head_evening_push',
+                        -- Phase 365 work module internals (supabase_phase365_work_timeclock.sql)
+                        'work_user_rate', 'work_log', 'work_push', 'work_refresh_task', 'work__stop_running',
+                        'work_autostop_all', 'work_run_recurring',
                         'ops_ticket_assignment_push', 'ops_ticket_resolved_push',
                         'ops_tech_day_block',
                         -- Already REVOKEd on live by their own files (a 2026-10-08 rolled-back dry-run of
@@ -188,6 +191,7 @@ WHERE n.nspname = 'public'
                     'wa_ai_recovery_dispatch',
                     '_client_owner_for_key','_client_fold_row','_client_fold',
                     'ops_notify_outages','ops_morning_digest','ops_head_evening_push',
+                    'work_user_rate','work_log','work_push','work_refresh_task','work__stop_running','work_autostop_all','work_run_recurring',
                     'ops_ticket_assignment_push','ops_ticket_resolved_push','ops_tech_day_block',
                     'ops_aiadflux_sync_dispatch','ops_ticket_wa_dispatch',
                     'earned_incentive_for','recompute_daily_new_leads',

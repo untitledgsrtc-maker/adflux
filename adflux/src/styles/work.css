@@ -1,0 +1,80 @@
+/* Work module (timeclock + tasks) - Phase 365. Global tokens only (section 5). */
+.wk { max-width: 1280px; margin: 0 auto; padding: 4px 0 40px; color: var(--text); }
+.wk-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.wk-eyebrow { font-size: 14px; color: var(--text-muted); }
+.wk-title { font-family: var(--font-display); font-size: 28px; font-weight: 700; margin: 2px 0 0; }
+.wk-sm { font-size: 14px; color: var(--text-muted); }
+.wk-num { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+.wk-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; }
+.wk-run { background: var(--surface); border: 2px solid var(--accent); border-radius: var(--radius-lg); padding: 18px; }
+.wk-timer { font-family: var(--font-display); font-variant-numeric: tabular-nums; font-size: 46px; font-weight: 700; color: var(--accent); line-height: 1.1; margin: 8px 0 14px; letter-spacing: .02em; }
+.wk-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.wk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: var(--radius-lg); font-size: 15px; font-weight: 700; border: 1px solid transparent; cursor: pointer; font-family: inherit; transition: background-color .18s, border-color .18s; }
+.wk-btn:focus-visible, .wk-chip:focus-visible, .wk-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wk-btn:disabled { opacity: .55; cursor: not-allowed; }
+.wk-btn.y { background: var(--accent); color: var(--accent-fg); }
+.wk-btn.y:hover:not(:disabled) { background: var(--accent-hover); }
+.wk-btn.g { background: var(--surface-2); color: var(--text); }
+.wk-btn.g:hover:not(:disabled) { background: var(--surface-3); }
+.wk-btn.o { background: transparent; border-color: var(--border-strong); color: var(--text); }
+.wk-btn.lg { min-height: 52px; font-size: 16px; width: 100%; }
+.wk-btn.sm { min-height: 40px; padding: 0 14px; font-size: 14px; }
+.wk-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.wk-tab { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 16px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); cursor: pointer; font-size: 15px; font-family: inherit; }
+.wk-tab.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 700; }
+.wk-chip { min-height: 40px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 999px; background: var(--surface-2); border: 1px solid transparent; color: var(--text); font-size: 14px; cursor: pointer; font-family: inherit; }
+.wk-chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.wk-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.wk-field { display: block; margin-top: 14px; }
+.wk-field > label { display: block; font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
+.wk-input { width: 100%; box-sizing: border-box; min-height: 48px; padding: 0 14px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius); font-size: 16px; font-family: inherit; }
+textarea.wk-input { padding: 12px 14px; min-height: 84px; resize: vertical; }
+.wk-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wk-pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 11px; font-size: 13px; font-weight: 500; background: var(--surface-3); color: var(--text); }
+.wk-pill.ok { background: var(--success-soft); color: var(--success); }
+.wk-pill.warn { background: var(--warning-soft); color: var(--warning); }
+.wk-pill.bad { background: var(--danger-soft); color: var(--danger); }
+.wk-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 12px; align-items: start; }
+.wk-col { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; min-height: 160px; transition: border-color .18s, background-color .18s; }
+.wk-col.over { border-color: var(--accent); background: var(--accent-soft); }
+.wk-col.over.fin { border-color: var(--success); background: var(--success-soft); }
+.wk-cnt { min-width: 28px; text-align: center; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); font-size: 13px; }
+.wk-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.wk-bar { height: 4px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin: 10px 0 4px; }
+.wk-bar > i { display: block; height: 100%; background: var(--accent); }
+.wk-tk { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; margin-top: 10px; cursor: grab; transition: border-color .18s, opacity .18s; }
+.wk-tk:hover { border-color: var(--border-strong); }
+.wk-tk.drag { opacity: .35; }
+.wk-tk.done { border-color: var(--success); background: var(--success-soft); }
+.wk-tk.late { border-color: var(--danger); }
+.wk-ctile { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: var(--radius); background: var(--surface-2); font-family: var(--font-display); font-weight: 700; }
+.wk-av { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 700; flex: none; }
+.wk-dz { margin-top: 12px; min-height: 52px; display: grid; place-items: center; border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); color: var(--text-muted); font-size: 14px; }
+.wk-empty { text-align: center; padding: 28px 12px; color: var(--text-muted); }
+.wk-err { background: var(--danger-soft); border: 1px solid var(--danger); color: var(--danger); border-radius: var(--radius); padding: 12px 14px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.wk-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin: 14px 0; }
+.wk-kpi-n { font-family: var(--font-display); font-variant-numeric: tabular-nums; font-size: 30px; font-weight: 700; margin-top: 2px; }
+.wk-table { width: 100%; border-collapse: collapse; }
+.wk-table th { color: var(--text-muted); font-weight: 500; font-size: 13px; text-align: left; padding: 10px; border-bottom: 1px solid var(--border-strong); }
+.wk-table td { padding: 12px 10px; border-bottom: 1px solid var(--border); font-size: 15px; }
+.wk-table tr.click { cursor: pointer; }
+.wk-table tr.click:hover td { background: var(--surface-2); }
+.wk-modal-back { position: fixed; inset: 0; background: rgba(2, 6, 23, .7); z-index: 9000; display: flex; justify-content: flex-end; }
+.wk-modal { width: min(560px, 100%); height: 100%; overflow-y: auto; background: var(--surface); border-left: 1px solid var(--border-strong); padding: 20px; box-sizing: border-box; }
+.wk-part { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-top: 10px; }
+.wk-log { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.wk-log:last-child { border: 0; }
+.wk-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: min(92vw, 620px); padding: 14px 18px; background: var(--surface); border: 1px solid var(--accent); border-radius: var(--radius-lg); z-index: 9999; box-shadow: 0 14px 28px rgba(0,0,0,.5); }
+.wk-bar-h { height: 10px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+.wk-bar-h > i { display: block; height: 100%; background: var(--accent); }
+.wk-hrow { display: grid; grid-template-columns: minmax(120px, 220px) 1fr 90px; gap: 12px; align-items: center; min-height: 44px; }
+@media (max-width: 860px) {
+  .wk-board { grid-template-columns: 1fr; }
+  .wk-timer { font-size: 40px; }
+  .wk-title { font-size: 24px; }
+  .wk-hrow { grid-template-columns: 1fr 70px; }
+  .wk-hrow .wk-bar-h { grid-column: 1 / -1; order: 3; }
+}
+@media (prefers-reduced-motion: reduce) { .wk * { transition: none !important; } }
+.wk .spin, .wk-modal .spin { animation: wkspin 1s linear infinite; }
+@keyframes wkspin { to { transform: rotate(360deg); } }
