@@ -211,16 +211,7 @@ export default function MyWorkV2() {
                     <button className={`wk-btn ${isToday ? 'y' : 'o'}`} onClick={() => { setViewFrom(null); setViewTo(null) }}>Today</button>
                   </div>
                 </div>
-                {boardItems.length === 0 ? (
-                  <div className="wk-card">
-                    <div className="wk-empty"><b>Nothing for {isToday ? 'today' : 'these dates'}</b>
-                      No tasks due {isToday ? 'today and nothing overdue' : 'in this range'}. Ask your head for work or pick other dates.
-                      <div style={{ marginTop: 12 }}><button className="wk-btn" onClick={() => setNewTask(true)}><Plus size={16} aria-hidden="true" /> Ask for work</button></div>
-                    </div>
-                  </div>
-                ) : (
-                  <WorkBoard items={boardItems} uid={uid} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} />
-                )}
+                <WorkBoard items={boardItems} uid={uid} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} />
                 <div className="wk-sm" style={{ marginTop: 10 }}>Drag your own task forward: Assigned to In process starts the clock, In process to Finished stops it. Or use Start / Finish.</div>
               </div>
             </div>
@@ -390,11 +381,25 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         total += s; byProj.set(e.project_id, (byProj.get(e.project_id) || 0) + s)
       })
       const last = rows.filter((e) => e.ended_at).slice(-1)[0]
+      const dateLbl = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+      const proj = [...byProj.entries()].sort((x, y) => y[1] - x[1])
       const lines = [
-        `${name || 'Team member'} - Day report`, fmtDateShort(today), '',
-        `In ${fmtTimeIST(rows[0]?.started_at)} | Out ${last ? fmtTimeIST(last.ended_at) : '-'} (${fmtDur(total)})`,
-        `Finished: ${finished} | In process: ${proc} | Late: ${late}`, '',
-        ...[...byProj.entries()].sort((a, b) => b[1] - a[1]).map(([p, s]) => `${projName(p) || 'Other'} - ${fmtDur(s)}`),
+        '🟡 UNTITLED · DAY SUMMARY',
+        `📅 ${dateLbl}`,
+        `👤 ${name || 'Team member'} · Work team`,
+        '',
+        '📋 *TASKS*',
+        `• Finished:   ${finished}`,
+        `• In process: ${proc}${proc ? ' 🟡' : ''}`,
+        `• Late:       ${late}${late ? ' 🔴' : ''}`,
+        '',
+        '⏱ *TIME*',
+        `• Clock in:  ${rows[0] ? fmtTimeIST(rows[0].started_at) : '-'}`,
+        `• Clock out: ${last ? fmtTimeIST(last.ended_at) : '-'}`,
+        `• Hours:     ${fmtDur(total)}`,
+        '',
+        '📊 *BY CLIENT*',
+        ...(proj.length ? proj.map(([pid, sec]) => `• ${projName(pid) || 'Other'}: ${fmtDur(sec)}`) : ['• -']),
       ]
       if (note.trim()) lines.push('', `Note: ${note.trim()}`)
       const text = lines.join('\n')
