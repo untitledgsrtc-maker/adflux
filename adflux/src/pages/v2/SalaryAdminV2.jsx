@@ -24,7 +24,6 @@ import { useNavigate } from 'react-router-dom'
 import { Download, Loader2, AlertTriangle, Wallet, IndianRupee } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
-import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { SalaryPayoutModal } from '../../components/incentives/SalaryPayoutModal'
 
 function fmtINR(n) {
@@ -102,8 +101,11 @@ export default function SalaryAdminV2({ embedded = false }) {
   const [roleFilter, setRoleFilter] = useState('all')
   const [searchQ, setSearchQ]       = useState('')
 
-  async function load() {
-    setLoading(true); setErr('')
+  async function load(opts) {
+    // A silent reload (tab came back) keeps the table on screen instead of flashing the spinner.
+    const silent = opts === true
+    if (!silent) setLoading(true)
+    setErr('')
     const [y, m] = month.split('-').map(n => parseInt(n, 10))
     if (!y || !m) { setErr('Pick a month.'); setLoading(false); return }
 
@@ -196,7 +198,21 @@ export default function SalaryAdminV2({ embedded = false }) {
   }
 
   useEffect(() => { if (isAdmin) load() }, [isAdmin, month]) // eslint-disable-line
-  useAutoRefresh(load, { enabled: isAdmin })
+  // Payroll does not need the all-reps live feed (every call / follow-up by any rep re-ran
+  // this whole batch and flashed the table about once a second). Refresh quietly when the
+  // admin returns to the tab, and otherwise only on a month change or a button press.
+  useEffect(() => {
+    if (!isAdmin) return undefined
+    let last = 0
+    const onShow = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - last < 60000) return
+      last = Date.now()
+      load(true)
+    }
+    document.addEventListener('visibilitychange', onShow)
+    return () => document.removeEventListener('visibilitychange', onShow)
+  }, [isAdmin, month]) // eslint-disable-line
 
   // Phase 38.2 — apply role + search filters before render. Filters
   // only have visible controls in embedded mode but logic is shared.

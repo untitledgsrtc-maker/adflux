@@ -179,9 +179,12 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
 
   // Load TA rows whenever rep or month changes.
   // Phase 87.1 — fUser='ALL' loads rows across every active rep.
-  async function loadRows() {
+  async function loadRows(silent) {
     if (!fUser || !fMonth) { setRows([]); return }
-    setLoading(true); setErr('')
+    // A silent reload (auto-refresh / after an action) keeps the table on screen; a filter
+    // change always shows the spinner so old rows never sit under a new filter.
+    if (silent !== true) setLoading(true)
+    setErr('')
     const monthEnd = (() => {
       const d = new Date(fMonth)
       d.setMonth(d.getMonth() + 1)
@@ -244,7 +247,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
   // Phase 34Z.88 — dropped enabled gate. loadRows itself returns early
   // when fUser / fMonth missing (line 134), so unconditional mount
   // covers the case where admin clears filters then returns to tab.
-  useAutoRefresh(loadRows)
+  useAutoRefresh(() => loadRows(true))
 
   // Load city ceilings the first time the admin expands the editor.
   async function loadCeilings() {
@@ -334,7 +337,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     setBulkBusy(false)
     if (error) { toastError(error, 'Bulk approve failed: ' + error.message); return }
     toastSuccess('Pending rows approved.')
-    loadRows()
+    loadRows(true)
   }
 
   // Aggregate footer.
@@ -409,7 +412,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     })
     setRecomputing(false)
     if (error) { setErr(error.message); return }
-    loadRows()
+    loadRows(true)
   }
 
   // Inline status flip — admin tags a row approved / rejected / paid.
@@ -422,7 +425,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     const { error } = await supabase.from('daily_ta')
       .update(patch).eq('id', row.id)
     if (error) { toastError(error, 'Status update failed: ' + error.message); return }
-    loadRows()
+    loadRows(true)
   }
 
   // Inline hotel edit. Saves on blur.
@@ -436,7 +439,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       .update({ hotel_amount: hotelValue, total_amount: newTotal })
       .eq('id', row.id)
     if (error) { toastError(error, 'Hotel save failed: ' + error.message); return }
-    loadRows()
+    loadRows(true)
   }
 
   // CSV export — what finance opens in Excel.
