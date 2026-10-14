@@ -300,6 +300,7 @@ const MOBILE_NAV_OPS_HEAD = [
 // and the existing pages for pay + leave. Same list in sidebar and bottom bar.
 const STAFF_NAV = [
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },
+  { to: '/work-profile',      label: 'My profile',     icon: UserCircle2 },
   { to: '/my-performance',    label: 'Salary slips',   icon: TrendingUp },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
 ]
@@ -868,9 +869,9 @@ export function V2AppShell() {
 
           <div
             className="v2d-me"
-            onClick={() => setMoreOpen(true)}
+            onClick={() => (isStaff ? navigate('/work-profile') : setMoreOpen(true))}
             style={{ cursor: 'pointer' }}
-            title="More options"
+            title={isStaff ? 'My profile' : 'More options'}
           >
             {/* Phase 101.B.3 — uploaded profile pic in topbar avatar.
                 Phase 87.5 ProfilePicUploader writes users.profile_image_url
