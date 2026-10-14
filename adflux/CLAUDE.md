@@ -21278,3 +21278,7 @@ SUPERSEDES section 354 (the 19 per-client weekly templates are switched off; thi
 - **355.2 (2026-10-14) - My Work range filter + profile task numbers.** `/my-work`: From - To date range (Today = today's + overdue + finished TODAY; yesterday's finished tasks drop off; the evening report counts only tasks
   finished today). `/work-profile`: monthly cards Tasks this month / Done on time / Overdue (tasks DUE in the month; overdue = not done and past due, or finished after the due date) and every calendar day shows the hours worked.
   Display only (`MyWorkV2.jsx`, `WorkProfileV2.jsx`).
+
+- **355.3 (2026-10-14) - day report would not open WhatsApp on iPhone.** `EveningCard.share` awaited a database read BEFORE opening WhatsApp, and iOS blocks a link opened after an await (only "Last shared" updated).
+  It now builds the text from the entries already on the page and opens `https://wa.me/?text=` straight from the tap (native app: the existing openWhatsAppShare), then saves the "shared" mark.
+  RULE: anything that must open an app / link from a tap (WhatsApp, tel:, mailto:) must be the first thing in the click handler - never after an await. Same class as the section 345 salary slip.

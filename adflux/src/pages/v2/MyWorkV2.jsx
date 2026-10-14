@@ -4,6 +4,7 @@
 // the work_* database functions. Hours have NO pay effect.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import { Play, Pause, Check, Plus, Loader2, Send, Clock, Users } from 'lucide-react'
 import '../../styles/work.css'
 import { supabase } from '../../lib/supabase'
@@ -292,13 +293,14 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
   const finished = items.filter((i) => i.status === 'finished' && i.finishedDay === today).length   // finished TODAY only
   const proc = items.filter((i) => i.status === 'in_process').length
   const late = items.filter((i) => i.status !== 'finished' && dueState(i.due, i.status).cls === 'bad').length
-  const share = async () => {
+  // The WhatsApp window MUST open straight from the tap: iPhone blocks a link opened after an
+  // await (that is why the share did nothing and only "Last shared" updated). So the text is built
+  // from the entries already on the page, opened first, and the "shared" mark is saved afterwards.
+  const share = () => {
     if (busy) return
     setBusy(true)
     try {
-      // re-read at the moment of sharing so the numbers are current (not page-load numbers)
-      const { data } = await supabase.from('work_time_entries').select('*').eq('user_id', uid).gte('started_at', dayStartISO(today)).order('started_at')
-      const rows = (data || []).filter((e) => e.status === 'approved')
+      const rows = (entries || []).filter((e) => e.status === 'approved')
       const byProj = new Map(); let total = 0
       rows.forEach((e) => {
         const s = ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000
@@ -312,10 +314,12 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         ...[...byProj.entries()].sort((a, b) => b[1] - a[1]).map(([p, s]) => `${projName(p) || 'Other'} - ${fmtDur(s)}`),
       ]
       if (note.trim()) lines.push('', `Note: ${note.trim()}`)
-      openWhatsAppShare(lines.join('\n'))
-      await supabase.rpc('work_mark_report_shared', { p_date: today, p_note: note.trim() || null })
-      onShared()
-    } catch (e) { toastError(e, 'Could not open WhatsApp.') } finally { setBusy(false) }
+      const text = lines.join('\n')
+      if (Capacitor.isNativePlatform()) openWhatsAppShare(text)
+      else window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`   // works on iPhone, Android and desktop
+      supabase.rpc('work_mark_report_shared', { p_date: today, p_note: note.trim() || null })
+        .then(({ error }) => { if (error) console.warn('report mark failed', error.message); onShared() })
+    } catch (e) { toastError(e, 'Could not open WhatsApp.') } finally { setTimeout(() => setBusy(false), 1500) }
   }
   return (
     <div className="wk-card" style={{ borderColor: 'var(--accent)' }}>
