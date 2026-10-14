@@ -14,11 +14,11 @@ import { TeamMemberModal } from '../../components/team/TeamMemberModal'
 import '../../styles/team.css'
 
 const FILTERS = [
-  { key: 'all',      label: 'All' },
-  { key: 'active',   label: 'Active' },
+  { key: 'all',      label: 'All people' },
+  { key: 'active',   label: 'Active people' },
+  { key: 'inactive', label: 'Deactivated people' },
   { key: 'sales',    label: 'Sales' },
   { key: 'admin',    label: 'Admin' },
-  { key: 'inactive', label: 'Inactive' },
 ]
 
 // Phase 38 — `embedded` prop suppresses own page-head when mounted
@@ -95,17 +95,14 @@ export default function TeamV2({ embedded = false }) {
       </div>
 
       <div className="v2d-hr-toolbar">
-        <div className="v2d-tab-row">
-          {FILTERS.map(f => (
-            <button
-              key={f.key}
-              className={`v2d-tab-pill${filter === f.key ? ' is-active' : ''}`}
-              onClick={() => setFilter(f.key)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <select
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          aria-label="Show people"
+          style={{ minHeight: 44, padding: '0 14px', borderRadius: 999, background: 'var(--surface-2, #334155)', color: 'var(--text, #f1f5f9)', border: '1px solid var(--border-strong, #475569)', fontSize: 15, fontFamily: 'inherit', cursor: 'pointer' }}
+        >
+          {FILTERS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+        </select>
         <div className="v2d-search v2d-search--inline">
           <Search size={14} />
           <input
