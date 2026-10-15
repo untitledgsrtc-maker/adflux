@@ -140,8 +140,10 @@ export default function TeamWorkV2() {
     // in process; finished work only if it finished inside the range. Later-dated open work is opt-in.
     const f0 = Date.parse(dayStartISO(from)), f1 = Date.parse(dayStartISO(addDaysISO(to, 1)))
     const inRange = (p) => {
-      if (p.status === 'finished') const ft = p.finished_at ? Date.parse(p.finished_at) : NaN
-      return ft >= f0 && ft < f1
+      if (p.status === 'finished') {
+        const ft = p.finished_at ? Date.parse(p.finished_at) : NaN
+        return ft >= f0 && ft < f1
+      }
       const d = p.due_date || p.task?.due_date
       return showLater || p.status === 'in_process' || !d || d <= to
     }
