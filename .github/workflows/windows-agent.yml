@@ -1,0 +1,34 @@
+# Builds the Untitled Work Windows installer (unsigned, per owner decision 15 Oct 2026).
+# Run: GitHub -> Actions -> "Windows agent" -> Run workflow. The .exe is attached as an artifact.
+name: Windows agent
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'adflux/windows-agent/**'
+      - '.github/workflows/windows-agent.yml'
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: adflux/windows-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: adflux/windows-agent/src-tauri
+      - name: Install web dependencies
+        run: npm install
+      - name: Generate icons from the app icon
+        run: npx tauri icon app-icon.png
+      - name: Build installer
+        run: npx tauri build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UntitledWork-Setup
+          path: adflux/windows-agent/src-tauri/target/release/bundle/nsis/*.exe
