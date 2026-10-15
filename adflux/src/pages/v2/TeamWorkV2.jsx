@@ -621,6 +621,12 @@ function TimelineTab({ photoOf, memberIds, nameOf, byPerson, from, to, projName 
   }, [from, to])
   const detail = open ? all.filter((e) => e.user_id === open) : []
   const single = from === to
+  const isToday = single && from === istTodayISO()
+  const dayList = Array.from({ length: days }, (_, k) => addDaysISO(from, k))
+  const istDay = (iso) => new Date(new Date(iso).getTime() + 5.5 * 3600e3).toISOString().slice(0, 10)
+  const secsOf = (e) => Math.max(0, ((e.ended_at ? new Date(e.ended_at) : new Date(nowMs)) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0))
+  const totalSecs = all.reduce((n, e) => n + secsOf(e), 0)
+  const peopleWorked = new Set(all.map((e) => e.user_id)).size
   const H0 = 8, H1 = 21
   const hourOf = (iso) => { const d = new Date(new Date(iso).getTime() + 5.5 * 3600e3); return d.getUTCHours() + d.getUTCMinutes() / 60 }
   const pct = (h) => Math.max(0, Math.min(100, (h - H0) / (H1 - H0) * 100))
@@ -631,10 +637,15 @@ function TimelineTab({ photoOf, memberIds, nameOf, byPerson, from, to, projName 
   const byUser = {}; all.forEach((e) => { (byUser[e.user_id] = byUser[e.user_id] || []).push(e) })
   return (
     <div>
-    {single && <HeroSegs live eyebrow={`Now · ${fmtTimeIST(new Date(nowMs).toISOString())}`} segs={[['Running now', `${runningNow} running`, 'Click a person for their day']]} />}
+    {isToday
+      ? <HeroSegs live eyebrow={`Now · ${fmtTimeIST(new Date(nowMs).toISOString())}`} segs={[['Running now', `${runningNow} running`, 'Click a person for their day']]} />
+      : <HeroSegs eyebrow={`Timeline · ${single ? fmtDateShort(from) : `${fmtDateShort(from)} to ${fmtDateShort(to)}`}`} segs={[
+          ['Tracked', fmtDur(totalSecs), `${peopleWorked} ${peopleWorked === 1 ? 'person' : 'people'} worked`],
+          ['Days', String(days), single ? 'One day' : 'In this range'],
+        ]} />}
     <div style={{ display: 'grid', gridTemplateColumns: open ? 'minmax(0,1.3fr) minmax(0,1fr)' : '1fr', gap: 16, alignItems: 'start' }}>
       <div className="wk-card flush">
-        <div className="wk-ch"><h3>{single ? 'Today, by person' : 'Hours, by person'}</h3>
+        <div className="wk-ch"><h3>{single ? (isToday ? 'Today, by person' : `${fmtDateShort(from)}, by person`) : 'Days, by person'}</h3>
           {single && legend.length > 0 && <div className="wk-grp" style={{ gap: 12 }}>{legend.map((n) => <span key={n} className="wk-sm"><span className="wk-dot" style={{ background: clientColor(n === 'Internal' ? '' : n), width: 8, height: 8, marginRight: 6 }} />{n}</span>)}</div>}
         </div>
         {rows.length === 0 && <div className="wk-empty">No one is on the timeclock yet.</div>}
@@ -658,23 +669,44 @@ function TimelineTab({ photoOf, memberIds, nameOf, byPerson, from, to, projName 
                       return <span key={e.id} title={`${projName(e.project_id) || '-'} · ${e.task_label}`}
                         style={{ position: 'absolute', left: `${pct(s0)}%`, width: `${Math.max(0.6, pct(e0) - pct(s0))}%`, top: 3, bottom: 3, borderRadius: 6, background: clientColor(projName(e.project_id)), boxShadow: e.ended_at ? 'none' : '0 0 0 2px var(--accent)' }} />
                     })}
-                    <span style={{ position: 'absolute', left: `${pct(nowH)}%`, top: -4, bottom: -4, width: 2, background: 'var(--accent)' }} />
+                    {isToday && <span style={{ position: 'absolute', left: `${pct(nowH)}%`, top: -4, bottom: -4, width: 2, background: 'var(--accent)' }} />}
                   </div>
                 </div>
               ))}
-              <div className="wk-sm" style={{ marginTop: 10, paddingLeft: 182 }}>Yellow line is now. Outlined blocks are running. Colour = client.</div>
+              <div className="wk-sm" style={{ marginTop: 10, paddingLeft: 182 }}>{isToday ? 'Yellow line is now. Outlined blocks are running. Colour = client.' : 'Colour = client.'}</div>
             </div>
           </div>
-        ) : rows.map((id) => {
-          const s = byPerson[id]?.seconds || 0
-          return (
-            <div key={id} className="wk-hrow wk-hov" style={{ padding: '6px 16px', borderBottom: '1px solid var(--border)' }} onClick={() => setOpen(id)}>
-              <span><b>{nameOf(id)}</b>{s === 0 && <span className="wk-pill" style={{ marginLeft: 8 }}>no clock-in</span>}</span>
-              <div className="wk-bar-h"><i style={{ width: `${Math.min(100, s / cap * 100)}%` }} /></div>
-              <span className="wk-num" style={{ textAlign: 'right' }}>{fmtDur(s)}</span>
+        ) : (
+          <div style={{ padding: 16, overflowX: 'auto' }}>
+            <div style={{ minWidth: Math.max(640, 170 + days * 22 + 90) }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr 70px', gap: 12, marginBottom: 6 }}>
+                <span />
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${days}, 1fr)`, gap: 2 }}>
+                  {dayList.map((d) => <span key={d} className="wk-num wk-mu" style={{ fontSize: 10, textAlign: 'center' }}>{String(Number(d.slice(8))).padStart(2, '0')}</span>)}
+                </div>
+                <span className="wk-sm" style={{ textAlign: 'right' }}>Total</span>
+              </div>
+              {rows.map((id) => {
+                const per = {}; (byUser[id] || []).forEach((e) => { const k = istDay(e.started_at); per[k] = (per[k] || 0) + secsOf(e) })
+                const tot = Object.values(per).reduce((n, v) => n + v, 0)
+                return (
+                  <div key={id} className="wk-hov" onClick={() => setOpen(id)} style={{ display: 'grid', gridTemplateColumns: '170px 1fr 70px', gap: 12, alignItems: 'center', minHeight: 48, borderRadius: 10 }}>
+                    <span className="wk-grp" style={{ paddingLeft: 8, flexWrap: 'nowrap' }}><UserAvatar className="wk-av" name={nameOf(id)} url={photoOf(id)} size={28} /><b style={{ fontSize: 13, fontWeight: 500 }}>{shortName(nameOf(id))}</b></span>
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${days}, 1fr)`, gap: 2, height: 26, background: 'var(--w-hov)', borderRadius: 6, padding: '0 2px', alignItems: 'end' }}>
+                      {dayList.map((d) => {
+                        const v = per[d] || 0
+                        return <span key={d} title={`${fmtDateShort(d)} - ${v ? fmtDur(v) : 'no time'}`}
+                          style={{ height: v ? `${Math.max(12, Math.min(100, v / (9 * 3600) * 100))}%` : 2, background: v ? 'var(--accent)' : 'var(--border)', borderRadius: 3, opacity: v ? 1 : .6 }} />
+                      })}
+                    </div>
+                    <span className="wk-num" style={{ textAlign: 'right' }}>{tot ? fmtDur(tot) : '-'}</span>
+                  </div>
+                )
+              })}
+              <div className="wk-sm" style={{ marginTop: 10, paddingLeft: 182 }}>Each bar is one day (full height = 9 hours).</div>
             </div>
-          )
-        })}
+          </div>
+        )}
         <div className="wk-sm" style={{ padding: 12 }}>Tap a person for their day. No screenshots, no activity score.</div>
       </div>
       {open && (
