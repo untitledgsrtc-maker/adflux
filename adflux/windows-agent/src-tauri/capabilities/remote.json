@@ -12,6 +12,15 @@
   },
   "permissions": [
     "core:default",
-    "core:event:default"
+    "core:event:default",
+    "allow-idle-seconds",
+    "allow-active-window",
+    "allow-take-screenshot",
+    "allow-device-name",
+    "allow-show-window",
+    "allow-hide-window",
+    "allow-set-tray-tooltip",
+    "allow-autostart-enabled",
+    "allow-set-autostart"
   ]
 }

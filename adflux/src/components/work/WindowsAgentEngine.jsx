@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { istTodayISO } from '../../utils/istDate'
 
-const VERSION = '0.2.0'
+const VERSION = '0.2.1'
 const QKEY = 'agent_slice_queue'
 const T = () => window.__TAURI_INTERNALS__
 const invoke = (cmd, args) => T().invoke(cmd, args)
@@ -31,7 +31,7 @@ export default function WindowsAgentEngine() {
   const [interval, setIntervalMin] = useState(10)
   const S = useRef({
     device: 'Windows PC', config: null, running: null, projects: {}, buckets: new Map(),
-    lastShot: 0, asking: null, askTimer: null, suppress: false, runId: null, ticking: false,
+    lastShot: 0, asking: null, askTimer: null, suppress: false, runId: null, ticking: false, lastTickAt: 0, lastSampleAt: 0, lastErr: '',
   })
 
   useEffect(() => {
@@ -68,7 +68,10 @@ export default function WindowsAgentEngine() {
       const minute = Math.floor(Date.now() / 60000) * 60000
       const k = `${minute}|${win.program}|${win.title}`
       const b = s.buckets.get(k) || { minute, entry: s.running.id, program: win.program, title: win.title, active: 0, idle: 0 }
-      if (idle >= 30) b.idle = Math.min(60, b.idle + 5); else b.active = Math.min(60, b.active + 5)
+      // real elapsed time since the last sample (a hidden / busy window can tick late), not a fixed 5 s
+      const now = Date.now()
+      const dt = s.lastTickAt ? Math.min(65, Math.max(1, Math.round((now - s.lastTickAt) / 1000))) : 5
+      if (idle >= 30) b.idle = Math.min(60, b.idle + dt); else b.active = Math.min(60, b.active + dt)
       s.buckets.set(k, b)
     }
     async function uploadQueue() {
@@ -131,18 +134,20 @@ export default function WindowsAgentEngine() {
       s.ticking = true
       try {
         const [idle, win] = await Promise.all([invoke('idle_seconds'), invoke('active_window')])
+        s.lastSampleAt = Date.now(); s.lastErr = ''
         if (recordOk()) {
           sample(win, idle)
           await flushBuckets(false)
           await maybeScreenshot()
           await maybeAskIdle(idle)
         }
-      } catch { /* one bad sample */ } finally { s.ticking = false }
+        s.lastTickAt = Date.now()
+      } catch (e) { s.lastErr = String(e?.message || e) } finally { s.ticking = false }
     }
     function pushState() {
       if (!s.running) { emit('agent:state', { running: false }); invoke('set_tray_tooltip', { text: 'Untitled Work - not running' }).catch(() => {}); return }
       const secs = (Date.now() - new Date(s.running.started_at).getTime()) / 1000 - (s.running.break_seconds || 0)
-      emit('agent:state', { running: true, secs, client: clientName(s.running.project_id), label: s.running.task_label, recording: recordOk() })
+      emit('agent:state', { running: true, secs, client: clientName(s.running.project_id), label: s.running.task_label, recording: recordOk() && Date.now() - s.lastSampleAt < 30000, err: s.lastErr })
     }
 
     listen('agent:cmd', async (p) => {

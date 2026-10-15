@@ -28,7 +28,7 @@ function runWidget() {
     } else {
       w.innerHTML = `<div class="wk-row"><span class="wk-grp" style="min-width:0"><span class="wk-ldot"></span><span class="wk-eyb" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px">${esc(s.client || 'No client')}</span></span><button class="wk-btn y sm" id="stop">Stop</button></div>
         <div class="wk-timer" style="font-size:34px;margin:6px 0 2px">${clock(s.secs)}</div>
-        <div class="wk-hs" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.label || '')}${s.recording ? ' · recording' : ''}</div>`
+        <div class="wk-hs" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.label || '')}${s.recording ? ' · recording' : (s.err ? ' · cannot record' : '')}</div>`
     }
     document.getElementById('stop')?.addEventListener('click', () => emit('agent:cmd', { type: 'stop' }))
     document.getElementById('open')?.addEventListener('click', () => emit('agent:cmd', { type: 'open' }))
