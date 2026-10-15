@@ -29,9 +29,11 @@ export default function WindowsAgentEngine() {
   const [needConsent, setNeedConsent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [interval, setIntervalMin] = useState(10)
+  const [ask, setAsk] = useState(null)          // idle question also shown inside this page (backup for the small window)
+  const [diag, setDiag] = useState(null)        // tiny status pill: idle seconds, recording, last error
   const S = useRef({
     device: 'Windows PC', config: null, running: null, projects: {}, buckets: new Map(),
-    lastShot: 0, asking: null, askTimer: null, suppress: false, runId: null, ticking: false, lastTickAt: 0, lastSampleAt: 0, lastErr: '',
+    lastShot: 0, asking: null, askTimer: null, suppress: false, runId: null, ticking: false, lastTickAt: 0, lastSampleAt: 0, lastErr: '', idleNow: 0, answer: null,
   })
 
   useEffect(() => {
@@ -98,7 +100,7 @@ export default function WindowsAgentEngine() {
       if (!every || !s.running || Date.now() - s.lastShot < every * 60000) return
       s.lastShot = Date.now()
       try {
-        const b64 = await invoke('take_screenshot')
+        const b64 = await Promise.race([invoke('take_screenshot'), new Promise((_, rej) => setTimeout(() => rej(new Error('screenshot timed out')), 20000))])
         const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
         const takenAt = new Date().toISOString()
         const { data: path, error } = await supabase.rpc('work_agent_register_screenshot', { p_entry: s.running.id, p_taken_at: takenAt, p_bytes: bin.length })
@@ -110,7 +112,7 @@ export default function WindowsAgentEngine() {
     async function answerIdle(decision) {
       const a = s.asking
       if (!a) return
-      clearTimeout(s.askTimer); s.asking = null
+      clearTimeout(s.askTimer); s.asking = null; setAsk(null)
       invoke('hide_window', { label: 'idle' }).catch(() => {})
       const idleSecs = Math.round((Date.now() - new Date(a.began).getTime()) / 1000)
       if (decision === 'still_working') s.suppress = true
@@ -125,16 +127,21 @@ export default function WindowsAgentEngine() {
       if (s.asking || s.suppress || idle < mins * 60) return
       const began = new Date(Date.now() - idle * 1000)
       s.asking = { began: began.toISOString(), entry: s.running.id }
-      await emit('agent:idle-ask', { minutes: mins, waitMin: 5, client: clientName(s.running.project_id) || s.running.task_label, stopAt: timeIST(began.toISOString()) })
+      const info = { minutes: mins, waitMin: 5, client: clientName(s.running.project_id) || s.running.task_label, stopAt: timeIST(began.toISOString()) }
+      setAsk(info)
+      await emit('agent:idle-ask', info)
       invoke('show_window', { label: 'idle' }).catch(() => {})
+      invoke('show_window', { label: 'main' }).catch(() => {})
       s.askTimer = setTimeout(() => answerIdle('auto_stopped'), 5 * 60000)
     }
     async function tick() {
+      // a call that never returned must not freeze recording for good
+      if (s.ticking && Date.now() - (s.tickStart || 0) > 30000) s.ticking = false
       if (s.ticking || !s.running) return
-      s.ticking = true
+      s.ticking = true; s.tickStart = Date.now()
       try {
         const [idle, win] = await Promise.all([invoke('idle_seconds'), invoke('active_window')])
-        s.lastSampleAt = Date.now(); s.lastErr = ''
+        s.lastSampleAt = Date.now(); s.lastErr = ''; s.idleNow = idle
         if (recordOk()) {
           sample(win, idle)
           await flushBuckets(false)
@@ -150,6 +157,7 @@ export default function WindowsAgentEngine() {
       emit('agent:state', { running: true, secs, client: clientName(s.running.project_id), label: s.running.task_label, recording: recordOk() && Date.now() - s.lastSampleAt < 30000, err: s.lastErr })
     }
 
+    s.answer = answerIdle
     listen('agent:cmd', async (p) => {
       if (p?.type === 'stop') { await supabase.rpc('work_clock_stop', {}); await loadAll(); window.dispatchEvent(new Event('focus')) }
       if (p?.type === 'open') invoke('show_window', { label: 'main' }).catch(() => {})
@@ -172,7 +180,10 @@ export default function WindowsAgentEngine() {
       await loadAll()
     })()
 
-    const timers = [setInterval(tick, 5000), setInterval(pushState, 1000), setInterval(loadAll, 15000), setInterval(() => uploadQueue().catch(() => {}), 30000)]
+    const diagTimer = setInterval(() => {
+      setDiag({ run: !!s.running, rec: recordOk() && Date.now() - s.lastSampleAt < 30000, idle: s.idleNow || 0, err: s.lastErr, asking: !!s.asking })
+    }, 2000)
+    const timers = [diagTimer, setInterval(tick, 5000), setInterval(pushState, 1000), setInterval(loadAll, 15000), setInterval(() => uploadQueue().catch(() => {}), 30000)]
     return () => { alive = false; timers.forEach(clearInterval) }
   }, [uid])
 
@@ -186,7 +197,29 @@ export default function WindowsAgentEngine() {
     }
   }
 
-  if (!needConsent) return null
+  const pill = diag && diag.run ? (
+    <div className="wk" style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 8999, pointerEvents: 'none' }}>
+      <span className={`wk-pill ${diag.rec ? 'ok' : 'warn'}`} style={{ opacity: .9 }}>
+        {diag.rec ? 'Recording' : (diag.err ? 'Cannot record' : 'Not recording')} · idle {Math.floor(diag.idle / 60)}:{String(diag.idle % 60).padStart(2, '0')}
+      </span>
+    </div>
+  ) : null
+  const question = ask ? (
+    <div className="wk" style={{ position: 'fixed', inset: 0, zIndex: 9001, background: 'rgba(7,11,22,.75)', display: 'grid', placeItems: 'center', padding: 16 }}>
+      <div className="wk-card" style={{ maxWidth: 440, width: '100%', borderColor: 'var(--w-wat, #FBBF24)' }} role="dialog" aria-label="Still working?">
+        <div className="wk-eyb">No activity for {ask.minutes} min</div>
+        <div style={{ fontSize: 18, margin: '6px 0 12px' }}>Still working on {ask.client || 'your task'}?</div>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <button className="wk-btn y" onClick={() => S.current.answer?.('still_working')}>Yes, still working</button>
+          <button className="wk-btn o" onClick={() => S.current.answer?.('break')}>It was a break</button>
+          <button className="wk-btn o" onClick={() => S.current.answer?.('stop')}>Stop timer</button>
+        </div>
+        <div className="wk-sm" style={{ marginTop: 10 }}>No answer in {ask.waitMin} min: the timer stops at {ask.stopAt}.</div>
+      </div>
+    </div>
+  ) : null
+
+  if (!needConsent) return <>{pill}{question}</>
   return (
     <div className="wk" style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(7,11,22,.7)', display: 'grid', placeItems: 'center', padding: 16 }}>
       <div className="wk-card" style={{ maxWidth: 520, width: '100%' }} role="dialog" aria-label="Before you start">
