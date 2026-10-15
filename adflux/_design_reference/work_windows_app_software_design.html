@@ -1,0 +1,109 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Untitled Work for Windows - software design</title>
+<style>
+:root{--bg:#0f172a;--s:#1e293b;--s2:#334155;--bd:#334155;--tx:#f1f5f9;--mu:#94a3b8;--ac:#FFE600;--ok:#10B981;--wa:#F59E0B;--dn:#EF4444;--bl:#3B82F6}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 "DM Sans",Inter,system-ui,sans-serif;padding:24px 16px 80px}
+h1,h2,.n{font-family:"Space Grotesk",system-ui,sans-serif}.w{max-width:1100px;margin:0 auto}
+h1{font-size:26px;margin:0 0 4px}.sub{color:var(--mu);margin:0 0 24px}h2{font-size:18px;margin:36px 0 4px}.lab{color:var(--mu);font-size:14px;margin:0 0 14px}
+.card{background:var(--s);border:1px solid var(--bd);border-radius:14px;padding:18px}
+.g{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.win{border:1px solid var(--s2);border-radius:10px;background:#0b1222;overflow:hidden}
+.tb{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#0a0f1d;border-bottom:1px solid var(--bd);font-size:12px;color:var(--mu)}
+.bd{padding:16px}.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.btn{display:inline-block;border:1px solid var(--bd);border-radius:8px;padding:8px 16px;font-size:14px}.y{background:var(--ac);color:#0f172a;border-color:var(--ac);font-weight:600}
+.mu{color:var(--mu)}.sm{font-size:13px}.n{font-size:34px;font-weight:600}
+.app{display:grid;grid-template-columns:150px 1fr;min-height:360px}.rail{border-right:1px solid var(--bd);padding:12px 8px;font-size:14px}
+.rail div{padding:8px 10px;border-radius:8px;color:var(--mu)}.rail .on{background:rgba(255,230,0,.14);color:var(--ac)}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--bd)}th{color:var(--mu);font-weight:500;font-size:12px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+ul{margin:6px 0 0;padding-left:20px}code{background:var(--s2);padding:1px 6px;border-radius:6px;font-size:13px}
+</style></head><body><div class="w">
+<h1>Untitled Work for Windows</h1>
+<p class="sub">Software design: how the program itself is built and behaves, not a page list. For approval; nothing built. Unsigned installer accepted by owner (15 Oct 2026). First tracked person: Safika; more added later.</p>
+
+<h2>1. What the program is</h2>
+<div class="card"><table>
+<tr><th>Item</th><th>Decision</th></tr>
+<tr><td>Name</td><td>Untitled Work</td></tr>
+<tr><td>Runs on</td><td>Windows 10 and 11 (64-bit)</td></tr>
+<tr><td>Built with</td><td>Tauri (small, about 10 MB, low memory). Same login as the web app.</td></tr>
+<tr><td>Installer</td><td>One <code>UntitledWork-Setup.exe</code>, not signed. Windows shows "Windows protected your PC": click More info, then Run anyway (one time per PC).</td></tr>
+<tr><td>Start</td><td>Starts with Windows, lives in the system tray (bottom right), main window opens on click.</td></tr>
+<tr><td>Updates</td><td>Checks for a new version at start and once a day, installs on next launch. Updates are verified with our own key even though the installer is unsigned.</td></tr>
+<tr><td>Offline</td><td>Keeps recording while offline, uploads when the internet is back (up to 48 hours stored).</td></tr>
+<tr><td>Data it sends</td><td>Timer start / stop, active program name, window title, idle seconds, screenshots (every 10 min, only while a timer runs). Nothing else. No keystrokes, no mouse positions, no file contents.</td></tr>
+</table></div>
+
+<h2>2. The four parts of the program</h2>
+<p class="lab">Tray icon, widget, main window, popups. Each has a fixed size and job.</p>
+<div class="g">
+<div class="win"><div class="tb"><span>1. Tray icon and menu</span></div><div class="bd">
+<div class="sm mu">Icon states</div>
+<ul class="sm"><li><span class="dot" style="background:var(--mu)"></span>grey: signed in, no timer</li><li><span class="dot" style="background:var(--ok)"></span>green: timer running</li><li><span class="dot" style="background:var(--wa)"></span>amber: idle question waiting</li><li><span class="dot" style="background:var(--dn)"></span>red: signed out or offline over 1 h</li></ul>
+<div class="sm mu" style="margin-top:12px">Right-click menu</div>
+<div class="card" style="padding:10px;margin-top:6px"><div class="sm">Start work</div><div class="sm">Stop timer</div><div class="sm">Open Untitled Work</div><div class="sm">Open in browser</div><div class="sm">Sign out</div><div class="sm">Quit</div></div></div></div>
+
+<div class="win"><div class="tb"><span>2. Widget (300 x 110, always on top)</span><span>_ x</span></div><div class="bd">
+<div class="row"><div><div class="sm mu">Running</div><div class="n" style="font-size:28px">02:14:36</div></div><span class="btn y">Stop</span></div>
+<div class="sm" style="margin-top:6px">SIRACHCHA BHARAT MISSION</div>
+<div class="sm mu">Reel 1 edit</div>
+<div class="sm mu" style="margin-top:8px"><span class="dot" style="background:var(--dn)"></span>Recording. Next screenshot in 6 min.</div></div></div>
+</div>
+
+<h2>3. Main window (900 x 600)</h2>
+<p class="lab">Left rail with four items. Same data as the website My Work.</p>
+<div class="win"><div class="tb"><span>Untitled Work</span><span>_ &#9633; x</span></div>
+<div class="app"><div class="rail"><div class="on">Today</div><div>My tasks</div><div>History</div><div>Settings</div></div>
+<div class="bd">
+<div class="row"><div><div class="sm mu">Thursday, 15 Oct</div><div class="n">02:14:36</div></div><div style="text-align:right"><div class="sm mu">Day total</div><b>4h 02m</b><div class="sm mu">Check-in 09:18</div></div></div>
+<div class="row" style="margin-top:14px"><div class="btn" style="flex:1">SIRACHCHA BHARAT MISSION</div><div class="btn" style="flex:1">Reel 1 edit</div><span class="btn y">Stop</span></div>
+<table style="margin-top:16px"><tr><th>From</th><th>To</th><th>Client</th><th>Task</th><th>Time</th></tr>
+<tr><td>09:18</td><td>11:40</td><td>Anee Marcom</td><td>Post banner</td><td>2h 22m</td></tr>
+<tr><td>11:52</td><td>now</td><td>SIRACHCHA</td><td>Reel 1 edit</td><td>2h 14m</td></tr></table>
+<div class="sm mu" style="margin-top:12px">Today view = timer + slices. My tasks = the same board as the website. History = past days. Settings = start with Windows, sign out, version, check for update.</div>
+</div></div></div>
+
+<h2>4. Popups and notices</h2>
+<div class="g">
+<div class="win"><div class="tb"><span>Idle question (center of screen, 380 x 220)</span></div><div class="bd">
+<b>No activity for 5 min</b><div class="sm mu">Still working on SIRACHCHA BHARAT MISSION?</div>
+<div style="display:grid;gap:8px;margin-top:12px"><span class="btn y" style="text-align:center">Yes, still working</span><span class="btn" style="text-align:center">It was a break</span><span class="btn" style="text-align:center">Stop timer</span></div>
+<div class="sm mu" style="margin-top:8px">No answer in 5 min: stops at 10:42, note "auto-stopped, idle".</div></div></div>
+<div class="win"><div class="tb"><span>First run: consent (once)</span></div><div class="bd">
+<b>Before you start</b><div class="sm mu">While your timer runs this app records the program and window title you are in, when you are idle, and a screenshot every 10 minutes. Nothing is recorded when the timer is stopped. Admin and your team head can see it. Screenshots are deleted after 30 days.</div>
+<div class="row" style="margin-top:12px"><span class="btn">Not now</span><span class="btn y">I understand, continue</span></div></div></div>
+<div class="win"><div class="tb"><span>Windows toast (corner, 4 seconds)</span></div><div class="bd">
+<div class="sm">Untitled Work</div><div class="sm mu">Screenshot saved 10:30. Next in 10 min.</div></div></div>
+<div class="win"><div class="tb"><span>Other notices</span></div><div class="bd"><ul class="sm">
+<li>"Update ready, restarts when you next open it"</li><li>"No internet. Still recording, will upload later"</li><li>"No timer started yet. It is 09:45" (once a day)</li><li>"Timer stopped automatically at 21:30" (same as the web rule)</li></ul></div></div>
+</div>
+
+<h2>5. Behaviour rules (state table)</h2>
+<div class="card"><table>
+<tr><th>State</th><th>Records</th><th>Shows</th></tr>
+<tr><td>Signed out</td><td>nothing</td><td>sign-in window (same phone and password as the app)</td></tr>
+<tr><td>Signed in, no timer</td><td>nothing</td><td>grey tray, Start button</td></tr>
+<tr><td>Timer running</td><td>program, title, idle, screenshot every 10 min</td><td>green tray, widget with the red dot</td></tr>
+<tr><td>Idle 5 min</td><td>idle seconds</td><td>idle question; no answer 5 min = auto stop at idle start</td></tr>
+<tr><td>Screen locked or asleep</td><td>counted as idle, no screenshot</td><td>question on return</td></tr>
+<tr><td>Offline</td><td>keeps local copy (up to 48 h)</td><td>amber note, uploads when back</td></tr>
+<tr><td>21:30 IST</td><td>stops</td><td>"Timer stopped automatically"</td></tr></table></div>
+
+<h2>6. How it connects to the system</h2>
+<div class="card"><table>
+<tr><th>Piece</th><th>How</th></tr>
+<tr><td>Timer</td><td>Same <code>work_*</code> functions the website uses, so web, app and Team Work always agree.</td></tr>
+<tr><td>Activity and idle</td><td>Batched every minute to <code>work_activity_slices</code> and <code>work_idle_events</code>.</td></tr>
+<tr><td>Screenshots</td><td>Private storage bucket, uploaded with a short-lived link. Row in <code>work_screenshots</code>.</td></tr>
+<tr><td>Who is tracked</td><td>Per-person on / off in <code>work_tracking_settings</code>. First: Safika. The program only records when its person is switched on.</td></tr>
+<tr><td>Who sees it</td><td>Admin and team head, in Team Work, new Activity tab.</td></tr>
+<tr><td>Consent record</td><td>Accept stored with time and PC name in <code>work_agent_devices</code>.</td></tr></table></div>
+
+<h2>7. Owner decisions recorded (15 Oct 2026)</h2>
+<div class="card"><ul class="sm">
+<li>Minimum 8 hours a day mandatory: a later rule, not part of this build.</li>
+<li>Unsigned installer accepted.</li>
+<li>First tracked person: Safika; others added later from Settings.</li>
+<li>Notice to staff: written into the offer letter and accepted with it, not a separate letter. The in-app consent screen still shows once as the technical record.</li>
+<li>One-week pilot on one PC, then all PCs. Run beside Trackdek about a week, cut over before 30 November.</li></ul></div>
+</div></body></html>
