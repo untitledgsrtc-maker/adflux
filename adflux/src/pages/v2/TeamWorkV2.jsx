@@ -51,6 +51,7 @@ export default function TeamWorkV2() {
   const [openTask, setOpenTask] = useState(null)
   const [fPerson, setFPerson] = useState('')
   const [fClient, setFClient] = useState('')
+  const [showLater, setShowLater] = useState(false)   // Tasks board: also show open tasks due after the chosen range
   const [busy, setBusy] = useState(false)
   const latch = useRef(false)
 
@@ -135,15 +136,25 @@ export default function TeamWorkV2() {
   const items = useMemo(() => {
     const total = {}, done = {}
     parts.forEach((p) => { total[p.task_id] = (total[p.task_id] || 0) + 1; if (p.status === 'finished') done[p.task_id] = (done[p.task_id] || 0) + 1 })
+    // Board follows the date filter: open work due on/before the range end (overdue included) or already
+    // in process; finished work only if it finished inside the range. Later-dated open work is opt-in.
+    const f0 = Date.parse(dayStartISO(from)), f1 = Date.parse(dayStartISO(addDaysISO(to, 1)))
+    const inRange = (p) => {
+      if (p.status === 'finished') const ft = p.finished_at ? Date.parse(p.finished_at) : NaN
+      return ft >= f0 && ft < f1
+      const d = p.due_date || p.task?.due_date
+      return showLater || p.status === 'in_process' || !d || d <= to
+    }
     return parts
-      .filter((p) => (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient))
+      .filter((p) => inRange(p) && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient))
       .map((p) => ({
         id: p.id, taskId: p.task_id, finishedAt: p.finished_at, status: p.status, title: p.task?.title || 'Task', label: p.label,
         client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, assigneeId: p.assignee_id,
         assigneeName: nameOf(p.assignee_id), assigneePhoto: users.find((u) => u.id === p.assignee_id)?.profile_image_url || null, partsTotal: total[p.task_id] || 1, partsDone: done[p.task_id] || 0,
         seconds: taskCostByTask[p.task_id]?.seconds ?? p.seconds, cost: taskCostByTask[p.task_id]?.cost ?? null,
       }))
-  }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask, users])
+  }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask, users, from, to, showLater])
+  const laterCount = useMemo(() => showLater ? 0 : parts.filter((p) => p.status !== 'finished' && p.status !== 'in_process' && (p.due_date || p.task?.due_date) > to && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient)).length, [parts, to, showLater, fPerson, fClient])
 
   if (authLoading || !uid) return null
   if (isHead === false) return <Navigate to="/my-work" replace />
@@ -315,6 +326,11 @@ export default function TeamWorkV2() {
               <option value="">All clients</option>{activeProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <span className="wk-sm">{canCost ? '₹ Cost shows for admin and accounts only · ' : ''}{items.filter((i) => i.status !== 'finished').length} open · {lateParts.length} overdue</span>
+            {(laterCount > 0 || showLater) && (
+              <button className="wk-btn o sm" onClick={() => setShowLater((v) => !v)}>
+                {showLater ? 'Hide later tasks' : `Show ${laterCount} later task${laterCount === 1 ? '' : 's'}`}
+              </button>
+            )}
           </div>
           <div className="wk-sm" style={{ marginTop: 8 }}>Drag a card to change its status. A task with several people finishes when every part is finished.</div>
           <WorkBoard items={items} uid={uid} showCost={canCost} actForAll onMove={(id, to2) => rpc('work_move_part', { p_part: id, p_to: to2 })}

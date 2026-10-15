@@ -21334,3 +21334,6 @@ Push at 19:30 IST (Mon-Sat) to everyone who worked today and has not shared the 
 - **Morning hi dashboard card:** `src/components/work/WorkMorningHiCard.jsx`, mounted above the Evening report card in `AdminDashboardDesktop.jsx`. "Said hi" = a `team_assistant_requests` row since IST midnight (admin/co_owner read via tar_admin_read). Excludes admin/co_owner/agency. Read only.
 - **New task suggestions:** `NewTaskModal.jsx` chips under "What", from past work (last 600 tasks + 1800 parts; +4 same person, +3 same client). No AI, no cost, no SQL.
 - **Open:** morning follow-up nudge (~10:30) for people who have not said hi; single payout flow decision; leaderboard photo avatars.
+
+## Team Work Tasks board follows the date filter (15-10-2026)
+`TeamWorkV2.jsx` `items`: open parts show only if in process, undated, or due on/before the range end (overdue included); finished parts only if finished inside the range. Later-dated open work is hidden behind a "Show N later tasks" toggle. Before this, "Today" listed every open task (24 incl. due Nov).
