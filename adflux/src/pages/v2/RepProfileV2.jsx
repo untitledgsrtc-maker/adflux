@@ -48,7 +48,11 @@ import PerformanceScoreCard from '../../components/incentives/PerformanceScoreCa
 import DailyScoresCard from '../../components/incentives/DailyScoresCard'
 import { SalaryPayoutModal } from '../../components/incentives/SalaryPayoutModal'
 // HR D1 (§290): IncentivePayoutModal retired — incentive is earned inside net (Sept+).
+import WorkProfileV2 from './WorkProfileV2'
 import { istCurrentMonthYM, istCurrentMonthLabel, istTodayISO } from '../../utils/istDate'
+
+// Roles whose pages are Work/ops/HR/accounts, not sales: sales KPI + incentive sections are hidden for them.
+const WORK_ONLY_ROLES = ['staff', 'operation_executive', 'operation_head', 'hr', 'accounts']
 
 // ─── Helpers ────────────────────────────────────────────────────────
 function fmtINR(n) {
@@ -844,14 +848,16 @@ export default function RepProfileV2() {
       {/* ─── 1a. Performance & pay (Phase 163, Issue 5) ───────────── */}
       {/* Agency = commission-only partner; the score/salary math does
           not apply, so the card is skipped for them. */}
-      {user.role !== 'agency' && <RepPerformanceCard userId={user.id} />}
-      {user.role !== 'agency' && (
+      {user.role !== 'agency' && !WORK_ONLY_ROLES.includes(user.role) && <RepPerformanceCard userId={user.id} />}
+      {user.role !== 'agency' && !WORK_ONLY_ROLES.includes(user.role) && (
         <>
           {/* Same score view the person sees on /my-performance */}
           <PerformanceScoreCard userId={user.id} role={user.role} />
           <DailyScoresCard userId={user.id} role={user.role} />
         </>
       )}
+      {/* Work staff: Work score + check-in attendance + tasks, same as Team Work -> member page */}
+      {user.role === 'staff' && <WorkProfileV2 embedded userId={user.id} />}
       <OfferSection userId={user.id} />
       <ClaimsSection userId={user.id} />
 
@@ -938,6 +944,8 @@ export default function RepProfileV2() {
         )}
       </SectionCard>
 
+      {/* Sales KPI sections do not apply to Work staff / ops / HR / accounts */}
+      {!WORK_ONLY_ROLES.includes(user.role) && (<>
       {/* ─── 2. KPI targets ────────────────────────────────────────── */}
       <SectionCard
         title="KPI targets"
@@ -1023,6 +1031,8 @@ export default function RepProfileV2() {
         </div>
       </SectionCard>
 
+      </>)}
+
       {/* ─── 4. Salary ────────────────────────────────────────────── */}
       <SectionCard
         title={`Salary · ${monthLabel}`}
@@ -1078,6 +1088,7 @@ export default function RepProfileV2() {
         )}
       </SectionCard>
 
+      {!WORK_ONLY_ROLES.includes(user.role) && (<>
       {/* ─── 5. Incentive ─────────────────────────────────────────── */}
       {/* HR D1 (§290): "Pay incentive" button removed — incentive is now EARNED
           inside net_payable (Sept 2026+), paid via the Salary payout. This section
@@ -1107,6 +1118,8 @@ export default function RepProfileV2() {
           </div>
         )}
       </SectionCard>
+
+      </>)}
 
       {/* ─── 6. TA / DA ───────────────────────────────────────────── */}
       <SectionCard

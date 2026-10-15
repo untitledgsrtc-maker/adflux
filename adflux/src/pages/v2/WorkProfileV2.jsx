@@ -22,11 +22,11 @@ const istParts = (iso) => {
 const monthLabel = (ym) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString('en-IN', { timeZone: 'UTC', month: 'long', year: 'numeric' })
 const shiftMonth = (ym, n) => { const d = new Date(`${ym}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7) }
 
-export default function WorkProfileV2() {
+export default function WorkProfileV2({ embedded = false, userId = null }) {
   const { profile } = useAuth()
   const [params] = useSearchParams()
   const uid = profile?.id
-  const targetId = params.get('user') || uid
+  const targetId = userId || params.get('user') || uid
   const own = targetId === uid
   const today = istTodayISO()
   const [ym, setYm] = useState(today.slice(0, 7))
@@ -144,14 +144,16 @@ export default function WorkProfileV2() {
     </div>
   )
   return (
-    <div className="wk">
-      <div className="wk-head">
-        <div>
-          <div className="wk-eyebrow">{own ? 'My profile' : 'Team member'}</div>
-          <h1 className="wk-title">{person?.name || 'Profile'}</h1>
+    <div className="wk" style={embedded ? { padding: 0 } : undefined}>
+      {!embedded && (
+        <div className="wk-head">
+          <div>
+            <div className="wk-eyebrow">{own ? 'My profile' : 'Team member'}</div>
+            <h1 className="wk-title">{person?.name || 'Profile'}</h1>
+          </div>
+          <Link to={own ? '/my-work' : '/team-work'} className="wk-btn o">Back</Link>
         </div>
-        <Link to={own ? '/my-work' : '/team-work'} className="wk-btn o">Back</Link>
-      </div>
+      )}
       {err && <div className="wk-err" role="alert"><span>{err}</span><button className="wk-btn g sm" onClick={load}>Retry</button></div>}
       {loading && !person && !err && (
         <div className="wk-grid">

@@ -21337,3 +21337,6 @@ Push at 19:30 IST (Mon-Sat) to everyone who worked today and has not shared the 
 
 ## Team Work Tasks board follows the date filter (15-10-2026)
 `TeamWorkV2.jsx` `items`: open parts show only if in process, undated, or due on/before the range end (overdue included); finished parts only if finished inside the range. Later-dated open work is hidden behind a "Show N later tasks" toggle. Before this, "Today" listed every open task (24 incl. due Nov).
+
+## /people/:id for Work staff shows Work profile, not sales KPIs (15-10-2026)
+`RepProfileV2.jsx`: `WORK_ONLY_ROLES = staff, operation_executive, operation_head, hr, accounts` hide the sales sections (Performance & pay card, PerformanceScoreCard, DailyScoresCard, KPI targets, Today/week/month, Incentive). Role `staff` instead mounts `<WorkProfileV2 embedded userId>` (Work score 40/30/30, check-in calendar, tasks). `WorkProfileV2` gained `embedded` + `userId` props (no page header when embedded). Offer, Claims, HR acceptance, Salary, TA/DA, Leaves stay for everyone. Sales/telecaller pages unchanged.
