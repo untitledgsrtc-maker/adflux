@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Untitled Work",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "in.untitledad.work",
   "build": {
     "frontendDist": "../dist",
@@ -12,16 +12,61 @@
   "app": {
     "withGlobalTauri": false,
     "windows": [
-      { "label": "main", "title": "Untitled Work", "url": "index.html?view=main", "width": 960, "height": 680, "minWidth": 720, "minHeight": 520, "visible": true },
-      { "label": "widget", "title": "Untitled Work timer", "url": "index.html?view=widget", "width": 320, "height": 150, "resizable": false, "alwaysOnTop": true, "visible": false, "skipTaskbar": true, "maximizable": false },
-      { "label": "idle", "title": "Still working?", "url": "index.html?view=idle", "width": 420, "height": 350, "resizable": false, "alwaysOnTop": true, "visible": false, "center": true, "maximizable": false, "minimizable": false }
+      {
+        "label": "main",
+        "title": "Untitled Work",
+        "url": "https://app.untitledad.in",
+        "width": 960,
+        "height": 680,
+        "minWidth": 720,
+        "minHeight": 520,
+        "visible": true
+      },
+      {
+        "label": "widget",
+        "title": "Untitled Work timer",
+        "url": "index.html?view=widget",
+        "width": 320,
+        "height": 150,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "visible": false,
+        "skipTaskbar": true,
+        "maximizable": false
+      },
+      {
+        "label": "idle",
+        "title": "Still working?",
+        "url": "index.html?view=idle",
+        "width": 420,
+        "height": 350,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "visible": false,
+        "center": true,
+        "maximizable": false,
+        "minimizable": false
+      }
     ],
-    "security": { "csp": null }
+    "security": {
+      "csp": null
+    }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
-    "windows": { "nsis": { "installMode": "currentUser" } }
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
   }
 }

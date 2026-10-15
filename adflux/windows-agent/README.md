@@ -3,6 +3,9 @@
 Tauri v2 program for the Work team's Windows PCs. Design: `_design_reference/work_windows_app_software_design.html`.
 Plan + decisions: `docs/PLAN_creative_timeclock_structure.md` section 14. Database: `supabase_phase381_work_activity.sql`, `supabase_phase382_work_break_hours.sql`.
 
+## What it is (v0.2.0)
+The main window shows the real website (app.untitledad.in). The recording engine lives in the website (`src/components/work/WindowsAgentEngine.jsx`), only active inside this app and only for role `staff`. This folder holds the shell: tray, autostart, window show/hide, idle time, foreground program, screenshot, plus the local timer widget and idle-question windows.
+
 ## What it does
 - Sign in with the website email + password. Same timer as the website (`work_clock_start / stop`, `work_finish_part`).
 - Records ONLY while a timer runs, the person is switched on in Team Work -> Activity, and consent is accepted:
