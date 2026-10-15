@@ -21323,3 +21323,6 @@ Push at 19:30 IST (Mon-Sat) to everyone who worked today and has not shared the 
 
 ## Morning "hi" dashboard card (15-10-2026)
 `WorkMorningHiCard.jsx` mounted above the Evening report card on the admin dashboard. Same chip layout; "Said hi" = a `team_assistant_requests` row since IST midnight (admin/co_owner read it directly via tar_admin_read). Excludes admin/co_owner/agency. Read only, no SQL.
+
+## New task: past-work suggestions (15-10-2026)
+`NewTaskModal.jsx` shows up to 6 title chips under "What": last 600 `work_tasks` + 1800 `work_task_parts`, scored (+4 picked person did it, +3 same client), deduped by title, filtered by what is typed. Read only, no SQL, best-effort (modal works if the reads fail).

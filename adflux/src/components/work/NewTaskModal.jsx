@@ -1,7 +1,7 @@
 // Phase 365 - New task side panel: what, client, note, due date, people + their part,
 // checklist steps, repeat. Anyone signed in can ask anyone (owner decision).
-import { useRef, useState } from 'react'
-import { X, Plus, Trash2, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { X, Plus, Trash2, Loader2, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toastError, toastSuccess } from '../v2/Toast'
 import { istTodayISO } from '../../utils/istDate'
@@ -21,6 +21,42 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
   const [monthDay, setMonthDay] = useState(1)
   const [busy, setBusy] = useState(false)
   const latch = useRef(false)
+
+  // Task suggestions from past work: recent tasks + who did them. Best-effort - modal works without it.
+  const [past, setPast] = useState([]) // [{ title, project_id, assignees:Set }]
+  useEffect(() => {
+    let live = true
+    ;(async () => {
+      try {
+        const [t, pt] = await Promise.all([
+          supabase.from('work_tasks').select('id, title, project_id').order('created_at', { ascending: false }).limit(600),
+          supabase.from('work_task_parts').select('task_id, assignee_id').order('created_at', { ascending: false }).limit(1800),
+        ])
+        if (t.error || pt.error || !live) return
+        const who = new Map()
+        for (const r of pt.data || []) { if (!who.has(r.task_id)) who.set(r.task_id, new Set()); who.get(r.task_id).add(r.assignee_id) }
+        setPast((t.data || []).map((r) => ({ title: String(r.title || '').trim(), project_id: r.project_id, assignees: who.get(r.id) || new Set() })).filter((r) => r.title))
+      } catch { /* no suggestions */ }
+    })()
+    return () => { live = false }
+  }, [])
+
+  const picked = parts.map((p) => p.assignee).filter(Boolean)
+  const suggestions = useMemo(() => {
+    const q = title.trim().toLowerCase()
+    const by = new Map()
+    for (const r of past) {
+      const key = r.title.toLowerCase()
+      if (q && (!key.includes(q) || key === q)) continue
+      let score = 1
+      if (picked.some((id) => r.assignees.has(id))) score += 4
+      if (project && r.project_id === project) score += 3
+      const cur = by.get(key)
+      if (cur) cur.score += score
+      else by.set(key, { title: r.title, score })
+    }
+    return [...by.values()].sort((a, b) => b.score - a.score).slice(0, 6)
+  }, [past, title, project, picked.join(',')])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const setPart = (i, k, v) => setParts((p) => p.map((x, j) => (j === i ? { ...x, [k]: v } : x)))
 
@@ -69,7 +105,18 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
         </div>
 
         <div className="wk-field"><label htmlFor="nt-title">What</label>
-          <input id="nt-title" className="wk-input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="e.g. Make 2 reels" /></div>
+          <input id="nt-title" className="wk-input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="e.g. Make 2 reels" />
+          {suggestions.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div className="wk-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={14} aria-hidden="true" />
+                {picked.length || project ? 'Suggested from past work' : 'Common tasks'}
+              </div>
+              <div className="wk-chips">
+                {suggestions.map((sg) => <button key={sg.title} type="button" className="wk-chip" onClick={() => setTitle(sg.title.slice(0, 120))}>{sg.title}</button>)}
+              </div>
+            </div>
+          )}</div>
 
         <div className="wk-field"><label htmlFor="nt-client">Client (optional)</label>
           <select id="nt-client" className="wk-input" value={project} onChange={(e) => setProject(e.target.value)}>
