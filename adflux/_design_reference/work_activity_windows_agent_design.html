@@ -1,0 +1,91 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Work activity - Windows agent design</title>
+<style>
+:root{--bg:#0f172a;--s:#1e293b;--s2:#334155;--bd:#334155;--tx:#f1f5f9;--mu:#94a3b8;--ac:#FFE600;--ok:#10B981;--wa:#F59E0B;--dn:#EF4444;--bl:#3B82F6;--r:14px}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 "DM Sans",Inter,system-ui,sans-serif;padding:24px 16px 80px}
+h1,h2,h3,.n{font-family:"Space Grotesk",system-ui,sans-serif}
+.w{max-width:1100px;margin:0 auto}h1{font-size:26px;margin:0 0 4px}.sub{color:var(--mu);margin:0 0 28px}
+h2{font-size:18px;margin:40px 0 4px}.lab{color:var(--mu);font-size:14px;margin:0 0 14px}
+.grid{display:grid;gap:16px}.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.card{background:var(--s);border:1px solid var(--bd);border-radius:var(--r);padding:18px}
+.btn{display:inline-block;border:1px solid var(--bd);border-radius:999px;padding:8px 16px;font-size:14px;color:var(--tx);background:transparent}
+.y{background:var(--ac);color:#0f172a;border-color:var(--ac);font-weight:600}
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px}
+.ok{background:rgba(16,185,129,.12);color:var(--ok)}.wa{background:rgba(245,158,11,.12);color:var(--wa)}.dn{background:rgba(239,68,68,.12);color:var(--dn)}
+.mu{color:var(--mu)}.sm{font-size:13px}.n{font-size:34px;font-weight:600}
+.win{border:1px solid var(--s2);border-radius:12px;background:#0b1222;max-width:340px;margin:0 auto}
+.wt{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--bd);font-size:12px;color:var(--mu)}
+.wb{padding:16px}.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.bar{height:14px;border-radius:7px;background:var(--s2);display:flex;overflow:hidden}.bar i{display:block;height:100%}
+.sh{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.shot{aspect-ratio:16/10;border-radius:8px;border:1px solid var(--bd);background:linear-gradient(135deg,#1e293b,#334155);position:relative;font-size:11px;color:var(--mu);padding:6px}
+.shot b{position:absolute;bottom:6px;left:8px;color:var(--tx)}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--bd)}th{color:var(--mu);font-weight:500;font-size:12px}
+ul{margin:8px 0 0;padding-left:20px}.chip{display:inline-block;border:1px solid var(--bd);border-radius:999px;padding:2px 10px;font-size:13px;margin:2px}
+</style></head><body><div class="w">
+<h1>Work activity: Windows agent and Activity tab</h1>
+<p class="sub">Design for approval, nothing built yet. Level A (app name, window title, idle time) plus level B (screenshots every 10 minutes). Tracks only while a timer is running.</p>
+
+<h2>1. First run on the designer's PC (consent)</h2><p class="lab">Shown once after install. Cannot be skipped. The agent does nothing until they accept.</p>
+<div class="win"><div class="wt"><span>Untitled Work</span><span>x</span></div><div class="wb">
+<div class="n" style="font-size:22px">Before you start</div>
+<p class="mu sm">While your timer is running, this app records:</p>
+<ul class="sm"><li>which program and window title you are in</li><li>when you are idle</li><li>a screenshot every 10 minutes</li></ul>
+<p class="mu sm" style="margin-top:12px">Nothing is recorded when the timer is stopped. Admin and your team head can see this. Screenshots are deleted after 30 days.</p>
+<div class="row" style="margin-top:14px"><span class="btn">Not now</span><span class="btn y">I understand, continue</span></div></div></div>
+
+<h2>2. The small timer window (always on top)</h2><p class="lab">Same start, stop and switch as My Work. The red dot and the line at the bottom make recording obvious to the person.</p>
+<div class="grid g2">
+<div class="win"><div class="wt"><span>Untitled Work</span><span>_ x</span></div><div class="wb">
+<div class="mu sm">Running</div><div class="n">02:14:36</div>
+<div class="sm">SIRACHCHA BHARAT MISSION</div><div class="mu sm">Reel 1 edit</div>
+<div class="row" style="margin-top:12px"><span class="btn">Switch</span><span class="btn y">Stop</span></div>
+<div class="sm mu" style="margin-top:12px"><span style="color:var(--dn)">&#9679;</span> Recording app and screen. Next screenshot in 6 min.</div></div></div>
+<div class="win"><div class="wt"><span>Untitled Work</span><span>_ x</span></div><div class="wb">
+<div class="mu sm">No timer running</div><div class="n">00:00:00</div>
+<div class="row" style="margin-top:12px"><span class="btn y">Start work</span></div>
+<div class="sm mu" style="margin-top:12px">Not recording. 9:30 check-in is the first start of the day.</div></div></div></div>
+
+<h2>3. Team Work, new tab: Activity</h2><p class="lab">Admin and team head only. One person per day: what they used, how long, idle time, and the screenshots.</p>
+<div class="card">
+<div class="row" style="flex-wrap:wrap"><div><div class="mu sm">Person</div><b>Safika Bansiwala</b> <span class="mu">Today</span></div>
+<div><span class="btn">Yesterday</span> <span class="btn">Pick a date</span></div></div>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:16px">
+<div><div class="mu sm">Tracked</div><div class="n">6h 12m</div></div>
+<div><div class="mu sm">Active</div><div class="n" style="color:var(--ok)">5h 20m</div></div>
+<div><div class="mu sm">Idle</div><div class="n" style="color:var(--wa)">52m</div></div>
+<div><div class="mu sm">Screenshots</div><div class="n">37</div></div></div>
+<div style="margin-top:16px"><div class="mu sm" style="margin-bottom:6px">Day timeline, 09:00 to 19:00</div>
+<div class="bar"><i style="width:22%;background:var(--bl)"></i><i style="width:8%;background:var(--s2)"></i><i style="width:30%;background:#a78bfa"></i><i style="width:6%;background:var(--wa)"></i><i style="width:24%;background:var(--bl)"></i><i style="width:10%;background:var(--ok)"></i></div>
+<div class="sm" style="margin-top:8px"><span class="chip">Photoshop</span><span class="chip">Premiere Pro</span><span class="chip">Chrome</span><span class="chip">WhatsApp</span><span class="chip">Idle</span></div></div>
+<table style="margin-top:16px"><tr><th>Program</th><th>Window</th><th>Time</th><th>Client</th></tr>
+<tr><td>Photoshop</td><td>PostBanner.psd</td><td>1h 48m</td><td>SIRACHCHA BHARAT MISSION</td></tr>
+<tr><td>Premiere Pro</td><td>Reel1_final.prproj</td><td>2h 05m</td><td>Anee Marcom</td></tr>
+<tr><td>Chrome</td><td>Canva - Design</td><td>58m</td><td>Anee Marcom</td></tr>
+<tr><td>WhatsApp</td><td>Chats</td><td>29m</td><td>-</td></tr></table>
+</div>
+
+<h2>4. Screenshots strip</h2><p class="lab">Click one to open full size. Each shows the time and the task running at that moment. Blur toggle hides content for quick scanning.</p>
+<div class="card"><div class="row" style="margin-bottom:12px"><b>Screenshots, 10:00 to 12:00</b><span class="btn">Blur on</span></div>
+<div class="sh"><div class="shot">Photoshop<b>10:00</b></div><div class="shot">Photoshop<b>10:10</b></div><div class="shot">Photoshop<b>10:20</b></div><div class="shot">Idle<b>10:30</b></div><div class="shot">Premiere<b>10:40</b></div><div class="shot">Premiere<b>10:50</b></div><div class="shot">Premiere<b>11:00</b></div><div class="shot">Chrome<b>11:10</b></div></div></div>
+
+<h2>5. Settings (admin only)</h2><p class="lab">One place to change how much is recorded.</p>
+<div class="card"><table>
+<tr><td>Screenshot every</td><td><span class="chip">5 min</span><span class="chip" style="border-color:var(--ac);color:var(--ac)">10 min</span><span class="chip">15 min</span><span class="chip">Off</span></td></tr>
+<tr><td>Keep screenshots for</td><td><span class="chip">7 days</span><span class="chip" style="border-color:var(--ac);color:var(--ac)">30 days</span><span class="chip">60 days</span></td></tr>
+<tr><td>Who can see</td><td>Admin and team head</td></tr>
+<tr><td>Tracked people</td><td>Pick from Work members (per person on / off)</td></tr>
+<tr><td>Records only while timer runs</td><td><span class="pill ok">Always on, cannot be changed</span></td></tr></table></div>
+
+<h2>6. Data structure</h2><p class="lab">All new tables are written by the agent through database functions only. Clients read nothing directly.</p>
+<div class="card"><table>
+<tr><th>Table</th><th>Holds</th></tr>
+<tr><td>work_agent_devices</td><td>person, PC name, agent version, last seen, consent accepted at</td></tr>
+<tr><td>work_activity_slices</td><td>person, time entry, start, program, window title, active seconds, idle seconds (one row per minute of work)</td></tr>
+<tr><td>work_screenshots</td><td>person, time entry, taken at, storage path (private bucket), size</td></tr>
+<tr><td>work_tracking_settings</td><td>interval, retention days, per-person on / off</td></tr></table>
+<p class="sm mu">Access: admin and heads read; a person reads only their own. Cron deletes screenshots after the retention period. Screenshots live in a private storage bucket, opened through short-lived links.</p></div>
+
+<h2>7. Build order</h2>
+<div class="card"><ol class="sm"><li>Tables, storage bucket, functions, retention cron (SQL).</li><li>Activity tab and Settings in Team Work (works with test data).</li><li>Windows agent: consent, timer, program and window capture, idle, screenshots, upload. Signed installer.</li><li>Pilot on one PC for a week, then roll out to all PCs before 30 Nov.</li></ol></div>
+</div></body></html>

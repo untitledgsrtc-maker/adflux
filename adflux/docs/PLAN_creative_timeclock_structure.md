@@ -138,3 +138,6 @@ Mockups re-shown: person phone (My Work + Start the clock) and admin dashboard (
 - Task has a due-date picker; each person's part can have its own date.
 - Salary, 70/30 variable, salary slips and leave request are NOT rebuilt: the sidebar links to My Offer and Salary slips.
 - Design file: _design_reference/work_module_ui_design.html
+
+## 14. Windows activity agent (DESIGN, 2026-10-15)
+Owner reversed the 13 Oct "no screenshots / no activity" rule for a Windows agent: level A (program, window title, idle) + level B (screenshot every N min, default 10). Records ONLY while a timer runs; consent screen on first run; admin + head see it; 30-day retention; no keystroke/mouse counts, no productivity %. Mockup: `_design_reference/work_activity_windows_agent_design.html`. Tables: work_agent_devices, work_activity_slices, work_screenshots, work_tracking_settings. NOTHING built; build order in the mockup section 7. Needs owner approval of the design first.

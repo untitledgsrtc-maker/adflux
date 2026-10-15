@@ -21340,3 +21340,6 @@ Push at 19:30 IST (Mon-Sat) to everyone who worked today and has not shared the 
 
 ## /people/:id for Work staff shows Work profile, not sales KPIs (15-10-2026)
 `RepProfileV2.jsx`: `WORK_ONLY_ROLES = staff, operation_executive, operation_head, hr, accounts` hide the sales sections (Performance & pay card, PerformanceScoreCard, DailyScoresCard, KPI targets, Today/week/month, Incentive). Role `staff` instead mounts `<WorkProfileV2 embedded userId>` (Work score 40/30/30, check-in calendar, tasks). `WorkProfileV2` gained `embedded` + `userId` props (no page header when embedded). Offer, Claims, HR acceptance, Salary, TA/DA, Leaves stay for everyone. Sales/telecaller pages unchanged.
+
+## 361 · Windows activity agent - DESIGN only (15-10-2026)
+Owner chose level A + B (app/window title/idle + screenshot every 10 min) and asked for structure and design first. This REVERSES the 13 Oct lock in section 353 ("no screenshots, no activity") for the Windows agent only; browser My Work stays timer-only. Mockup `_design_reference/work_activity_windows_agent_design.html`, plan section 14 in `docs/PLAN_creative_timeclock_structure.md`. Rules: record only while a timer runs, consent screen first, admin + head only, 30-day retention, no keystroke/mouse counts, no productivity %. Nothing built. DPDP Act notice to staff needed before rollout.
