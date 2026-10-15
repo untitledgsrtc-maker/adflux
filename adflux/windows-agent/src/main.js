@@ -67,7 +67,7 @@ function runMain() {
   const st = {
     user: null, profile: null, device: 'Windows PC', config: null, running: null, parts: [], projects: [], entries: [],
     tab: 'work', busy: false, msg: '', offline: false, member: true, loaded: false, autostart: false,
-    project: localStorage.getItem('agent_last_project') || '', label: '',
+    project: localStorage.getItem('agent_last_project') || '', label: '', email: '',
   }
   const eng = { buckets: new Map(), lastShot: 0, asking: null, askTimer: null, suppress: false, runId: null, lastShotFor: null }
   const QKEY = 'agent_slice_queue'
@@ -230,6 +230,7 @@ function runMain() {
   // ---- UI
   function render() {
     if (!st.user) return renderLogin()
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return   // do not wipe what is being typed
     const dayTotal = st.entries.reduce((n, e) => n + Math.max(0, ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0)), 0)
     const first = st.entries[0]?.started_at
     const needConsent = st.config?.tracked && !st.config?.consent_at
@@ -308,16 +309,21 @@ function runMain() {
   function renderLogin() {
     root.innerHTML = `<div class="wk ag-center"><div class="wk-card ag-narrow">
       <div class="wk-eyebrow">Untitled Work</div><h1 class="wk-title" style="font-size:26px">Sign in</h1>
-      <div class="wk-field"><label>Email</label><input class="wk-input" id="l-email" type="email" autocomplete="username"></div>
+      <div class="wk-field"><label>Email</label><input class="wk-input" id="l-email" type="email" autocomplete="username" value="${esc(st.email || '')}"></div>
       <div class="wk-field"><label>Password</label><input class="wk-input" id="l-pass" type="password" autocomplete="current-password"></div>
       ${st.msg ? `<div class="wk-err" role="alert"><span>${esc(st.msg)}</span></div>` : ''}
       <button class="wk-btn y ag-btn-full" id="l-go"${st.busy ? ' disabled' : ''}>Sign in</button>
       <div class="ag-small" style="margin-top:10px">Same email and password as the Untitled OS website.</div></div></div>`
     const go = async () => {
-      st.busy = true; st.msg = ''; renderLogin()
-      const r = await sb.auth.signInWithPassword({ email: document.getElementById('l-email')?.value.trim(), password: document.getElementById('l-pass')?.value })
+      // read the fields BEFORE re-rendering (a re-render empties them)
+      const email = (document.getElementById('l-email')?.value || '').trim()
+      const password = document.getElementById('l-pass')?.value || ''
+      if (!email || !password) { st.msg = 'Type your email and password.'; st.email = email; return renderLogin() }
+      st.busy = true; st.msg = ''; st.email = email; renderLogin()
+      const r = await sb.auth.signInWithPassword({ email, password })
       st.busy = false
-      if (r.error) { st.msg = r.error.message; return renderLogin() }
+      if (r.error) { st.msg = r.error.message === 'Invalid login credentials' ? 'Wrong email or password.' : r.error.message; return renderLogin() }
+      st.email = ''
       await afterLogin(r.data.user)
     }
     document.getElementById('l-go')?.addEventListener('click', go)
