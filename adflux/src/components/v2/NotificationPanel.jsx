@@ -22,12 +22,13 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import { istTodayISO } from '../../utils/istDate'
 
 // Phase 103.F.1 — `message` = an admin push saved to admin_messages
 // (the rep can re-read it). Brand-yellow tint so it stands out as a
 // direct message from the office vs the system alerts.
-const KIND_ICON  = { message: MessageSquare, approval: CheckSquare, followup: Calendar, sla: AlertTriangle, dueAction: Clock }
-const KIND_TINT  = { message: '#FFE600', approval: '#FBBF24', followup: '#60A5FA', sla: '#F87171', dueAction: '#C084FC' }
+const KIND_ICON  = { message: MessageSquare, approval: CheckSquare, followup: Calendar, sla: AlertTriangle, dueAction: Clock, workNew: CheckSquare, workLate: AlertTriangle }
+const KIND_TINT  = { message: '#FFE600', approval: '#FBBF24', followup: '#60A5FA', sla: '#F87171', dueAction: '#C084FC', workNew: '#60A5FA', workLate: '#F87171' }
 
 // Phase 93.8c (25 May 2026) — bell items are recomputed live from
 // source tables every open. No `notifications` table to mark-read
@@ -264,9 +265,42 @@ export default function NotificationPanel() {
         console.warn('[NotificationPanel] price approvals failed:', e?.message)
       }
     }
+    // Work module: tasks given to ME. New = not started and created in the last 3 days;
+    // overdue = open and past due (last 14 days only, so the bell does not nag about stale items).
+    // Best effort and own-scoped (a head can read every part, so assignee_id = me is required).
+    if (profile?.id) {
+      try {
+        const { data: wp } = await supabase
+          .from('work_task_parts')
+          .select('id, label, due_date, status, created_at, task:work_tasks(title, due_date)')
+          .eq('assignee_id', profile.id)
+          .neq('status', 'finished')
+          .order('created_at', { ascending: false })
+          .limit(40)
+        const t3 = Date.now() - 3 * 86400000
+        const istToday = istTodayISO()
+        const lateFloor = new Date(`${istToday}T00:00:00Z`).getTime() - 14 * 86400000
+        const lateFloorIso = new Date(lateFloor).toISOString().slice(0, 10)
+        ;(wp || []).forEach(r => {
+          const due = r.due_date || r.task?.due_date || null
+          const name = r.task?.title || 'Task'
+          if (due && due < istToday && due >= lateFloorIso) {
+            list.push({ kind: 'workLate', id: r.id, title: `Overdue: ${name}`,
+              sub: `${r.label ? r.label + ' · ' : ''}was due ${new Date(`${due}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`,
+              to: '/my-work', ts: due })
+          } else if (r.status === 'assigned' && new Date(r.created_at).getTime() >= t3) {
+            list.push({ kind: 'workNew', id: r.id, title: `New task: ${name}`,
+              sub: `${r.label ? r.label + ' · ' : ''}${due ? 'due ' + new Date(`${due}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'no due date'}`,
+              to: '/my-work', ts: r.created_at })
+          }
+        })
+      } catch (e) {
+        console.warn('[NotificationPanel] work tasks failed:', e?.message)
+      }
+    }
     // Sort: admin messages first (direct from the office), then SLA
     // (red), approvals, follow-ups, due actions.
-    const order = { message: 0, sla: 1, approval: 2, followup: 3, dueAction: 4 }
+    const order = { message: 0, workLate: 1, sla: 1, approval: 2, workNew: 2, followup: 3, dueAction: 4 }
     list.sort((a, b) => order[a.kind] - order[b.kind])
     setItems(list)
   }
