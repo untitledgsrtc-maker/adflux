@@ -372,7 +372,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
       const rows = (entries || []).filter((e) => e.status === 'approved')
       const byProj = new Map(); let total = 0
       rows.forEach((e) => {
-        const s = ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000
+        const s = Math.max(0, ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0))
         total += s; byProj.set(e.project_id, (byProj.get(e.project_id) || 0) + s)
       })
       const last = rows.filter((e) => e.ended_at).slice(-1)[0]
@@ -512,7 +512,7 @@ function HoursTab({ uid, entries: todayEntries, projects, projName, onAddManual,
   const all = rows || []
   const approved = all.filter((e) => e.status === 'approved')
   const asks = todayEntries.filter((e) => e.status !== 'approved')
-  const dur = (e) => ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000
+  const dur = (e) => Math.max(0, ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0))
   const total = approved.reduce((n, e) => n + dur(e), 0)
   const byClient = Object.entries(approved.reduce((m, e) => { m[e.project_id || ''] = (m[e.project_id || ''] || 0) + dur(e); return m }, {})).sort((a, b) => b[1] - a[1])
   const dayKey = (e) => new Date(new Date(e.started_at).getTime() + 5.5 * 3600e3).toISOString().slice(0, 10)

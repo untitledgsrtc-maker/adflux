@@ -47,7 +47,7 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
     const t0 = `${start}T00:00:00+05:30`, t1 = `${end}T00:00:00+05:30`
     const [u, en, lv, ho, pa] = await Promise.all([
       supabase.from('users').select('id,name,email,designation,city,manager_id,profile_image_url,created_at').eq('id', targetId).maybeSingle(),
-      supabase.from('work_time_entries').select('started_at,ended_at,status').eq('user_id', targetId).eq('status', 'approved').gte('started_at', t0).lt('started_at', t1).limit(1500),
+      supabase.from('work_time_entries').select('started_at,ended_at,status,break_seconds').eq('user_id', targetId).eq('status', 'approved').gte('started_at', t0).lt('started_at', t1).limit(1500),
       supabase.from('leaves').select('leave_date,status,is_half_day').eq('user_id', targetId).gte('leave_date', start).lt('leave_date', end).limit(100),
       supabase.from('holidays').select('holiday_date,name').eq('is_active', true).gte('holiday_date', start).lt('holiday_date', end),
       supabase.from('work_task_parts').select('id,status,due_date,finished_at').eq('assignee_id', targetId).gte('due_date', start).lt('due_date', end).limit(1000),
@@ -68,7 +68,7 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
     const m = {}
     entries.forEach((e) => {
       const { ymd, mins } = istParts(e.started_at)
-      const secs = e.ended_at ? (new Date(e.ended_at) - new Date(e.started_at)) / 1000 : 0
+      const secs = e.ended_at ? Math.max(0, (new Date(e.ended_at) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0)) : 0
       const d = m[ymd] || (m[ymd] = { first: e.started_at, firstMins: mins, secs: 0 })
       if (new Date(e.started_at) < new Date(d.first)) { d.first = e.started_at; d.firstMins = mins }
       d.secs += secs

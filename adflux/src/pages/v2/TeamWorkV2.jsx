@@ -11,13 +11,14 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { istTodayISO } from '../../utils/istDate'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, dueState, initialsOf, clientColor, istHour } from '../../utils/workUtils'
+import ActivityTab from '../../components/work/ActivityTab'
 import WorkBoard from '../../components/work/WorkBoard'
 import UserAvatar from '../../components/common/UserAvatar'
 import NewTaskModal from '../../components/work/NewTaskModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
 
 const TABS = [['overview', 'Overview'], ['tasks', 'Tasks'], ['people', 'People'], ['clients', 'Clients'],
-  ['timeline', 'Timeline'], ['hours', 'Hours & cost'], ['approvals', 'Approvals']]
+  ['timeline', 'Timeline'], ['hours', 'Hours & cost'], ['activity', 'Activity'], ['approvals', 'Approvals']]
 const RANGES = [['today', 'Today'], ['yesterday', 'Yesterday'], ['7', 'Past 7 days'], ['30', 'Past 30 days'], ['custom', 'Pick a date']]
 
 export default function TeamWorkV2() {
@@ -359,8 +360,12 @@ export default function TeamWorkV2() {
         <HoursTab report={report} cost={cost} canCost={canCost} projName={projName} nameOf={nameOf} taskTitles={taskTitles} taskClient={taskClient} taskPeople={taskPeople} users={users} rangeLabel={rangeLabel} onOpen={setOpenTask} />
       )}
 
+      {!loading && !err && tab === 'activity' && (
+        <ActivityTab users={users} memberIds={memberIds} nameOf={nameOf} projName={projName} canSettings={['admin', 'co_owner'].includes(role)} />
+      )}
+
       {!loading && !err && tab === 'approvals' && (() => {
-        const secs = (e) => (new Date(e.ended_at) - new Date(e.started_at)) / 1000
+        const secs = (e) => Math.max(0, (new Date(e.ended_at) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0))
         const total = pending.reduce((t, e) => t + secs(e), 0)
         const users_ = (id) => users.find((u) => u.id === id)
         return (
@@ -681,7 +686,7 @@ function TimelineTab({ photoOf, memberIds, nameOf, byPerson, from, to, projName 
             <div key={e.id} className="wk-log">
               <span className="wk-dot" style={{ background: clientColor(projName(e.project_id)), marginTop: 5 }} />
               <div style={{ flex: 1 }}><b>{projName(e.project_id) || '-'}</b><div className="wk-sm">{e.task_label}</div></div>
-              <div className="wk-sm" style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{fmtTimeIST(e.started_at)} - {e.ended_at ? fmtTimeIST(e.ended_at) : 'running'}<br />{fmtDur(((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000)}</div>
+              <div className="wk-sm" style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{fmtTimeIST(e.started_at)} - {e.ended_at ? fmtTimeIST(e.ended_at) : 'running'}<br />{fmtDur(Math.max(0, ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0)))}</div>
             </div>
           ))}
         </div>

@@ -21356,3 +21356,11 @@ Owner chose level A + B (app/window title/idle + screenshot every 10 min) and as
 - `work_agent_idle`: still_working = log only; break = adds idle seconds to `break_seconds`; stop / auto_stopped = ends the running entry at idle_began.
 - **STEP 2 MUST:** make `work_hours_report` / `work_cost_report` subtract `break_seconds` (not done yet - hours still count the break minutes). Also a storage-API sweep for orphan screenshot files (direct `storage.objects` delete may be blocked; the purge function swallows that and still removes the rows).
 - Internal only (revoked): `work_is_tracked`, `work_purge_activity`.
+
+## 363 · Phase 382 - Windows agent STEP 2: Activity tab + Settings + break minutes off the hours (15-10-2026)
+- `supabase_phase382_work_break_hours.sql` (APPLIED LIVE; VERIFY with_break 3, exec_ok true, anon false): `work_hours_report`, `work_cost_report` and `work_finish_part` subtract `work_time_entries.break_seconds`. All existing rows are 0, so no number moved.
+- Client durations also subtract it: MyWorkV2 (`dur`, evening report), WorkProfileV2, TeamWorkV2 (approvals, timeline row). New durations anywhere must do the same.
+- `src/components/work/ActivityTab.jsx` + new **Activity** tab in TeamWorkV2: person + day pickers, tracked/idle summary, programs bar + table (with client), idle decisions, screenshot strip (signed URLs, blur toggle, enlarge). Settings card for admin/co_owner: screenshot interval, idle minutes, retention, per-person on/off with consent status. Reads under RLS (heads/admin); writes only `work_set_tracking_person` / `work_set_tracking_settings`.
+- Empty state explains why a day is blank (not tracked / no consent / offline). Nothing records until the Windows app (step 3) exists.
+- STILL OPEN: storage-API sweep for orphan screenshot files after retention (step 3 / edge function).
+- Sandbox note: the supabase CLI needs network + `~/.supabase` write; inside the Bash sandbox it hung, so it was run with the sandbox disabled for those calls only.
