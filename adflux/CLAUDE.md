@@ -21326,3 +21326,13 @@ Push at 19:30 IST (Mon-Sat) to everyone who worked today and has not shared the 
 
 ## New task: past-work suggestions (15-10-2026)
 `NewTaskModal.jsx` shows up to 6 title chips under "What": last 600 `work_tasks` + 1800 `work_task_parts`, scored (+4 picked person did it, +3 same client), deduped by title, filtered by what is typed. Read only, no SQL, best-effort (modal works if the reads fail).
+
+## 373 · WhatsApp numbers, Morning hi card, task suggestions (15-10-2026)
+
+- **Numbers saved** (`users.whatsapp_number`, 10 digits, unique): Diya (accounts), Riya (hr), GOHIL ANKITKUMAR (operation_executive), Dixita (operation_head). Agency (Hamesh Modi, Poonama Bhavnani) stay WITHOUT numbers and excluded everywhere, owner decision.
+- **Solanki Sneha (telecaller)** had a wrong number (9723237205) so her messages never mapped and she got no morning nudges; moved to 9974973686. That number was stale on inactive user JAYNA ROHIT, cleared first (unique index). Lesson: a user with `team_assistant_requests` count 0 usually has a wrong/missing number; check this before debugging push.
+- **Morning hi dashboard card:** `src/components/work/WorkMorningHiCard.jsx`, mounted above the Evening report card in `AdminDashboardDesktop.jsx`. "Said hi" = a `team_assistant_requests` row since IST midnight (admin/co_owner read via tar_admin_read). Excludes admin/co_owner/agency. Read only.
+- **New task suggestions:** `NewTaskModal.jsx` chips under "What", from past work (last 600 tasks + 1800 parts; +4 same person, +3 same client). No AI, no cost, no SQL.
+- **Cloud credit:** the "$250 cloud session credits" (claimed 24 Sep, expires 5 Nov) is drawn by the separate Collabkeep cloud session on claude.ai, not by untitled-os2 work. This repo's sessions stay local. Not eligible for scheduled tasks/Projects.
+- **Weekly plan limit** was at 95% on 15 Oct (resets ~16 Oct 17:30 IST); batch heavy work after reset.
+- **Open:** morning follow-up nudge (~10:30) for people who have not said hi; single payout flow decision; leaderboard photo avatars.
