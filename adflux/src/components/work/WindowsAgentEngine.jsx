@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { istTodayISO } from '../../utils/istDate'
 
-const VERSION = '0.2.1'
+const VERSION = '0.2.2'
 const QKEY = 'agent_slice_queue'
 const T = () => window.__TAURI_INTERNALS__
 const invoke = (cmd, args) => T().invoke(cmd, args)
@@ -158,6 +158,11 @@ export default function WindowsAgentEngine() {
 
     ;(async () => {
       try { s.device = await invoke('device_name') } catch { /* keep default */ }
+      try {
+        // the REAL installed version of the Windows program (not this page's constant)
+        const ver = await invoke('plugin:app|version')
+        await supabase.rpc('work_agent_seen', { p_device: s.device, p_version: String(ver || VERSION) })
+      } catch { /* not critical */ }
       try {
         if (!localStorage.getItem('agent_autostart_asked')) {
           localStorage.setItem('agent_autostart_asked', '1')
