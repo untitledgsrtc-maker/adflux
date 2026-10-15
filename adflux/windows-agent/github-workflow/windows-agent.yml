@@ -5,14 +5,14 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'windows-agent/**'
+      - 'adflux/windows-agent/**'
       - '.github/workflows/windows-agent.yml'
 jobs:
   build:
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: windows-agent
+        working-directory: adflux/windows-agent
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,7 +21,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: windows-agent/src-tauri
+          workspaces: adflux/windows-agent/src-tauri
       - name: Install web dependencies
         run: npm install
       - name: Generate icons from the app icon
@@ -31,4 +31,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: UntitledWork-Setup
-          path: windows-agent/src-tauri/target/release/bundle/nsis/*.exe
+          path: adflux/windows-agent/src-tauri/target/release/bundle/nsis/*.exe
