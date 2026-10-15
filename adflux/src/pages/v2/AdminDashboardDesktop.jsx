@@ -39,8 +39,7 @@ import { istTodayISO } from '../../utils/istDate'
 import { thisMonth } from '../../utils/period'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import WaBillingBanner from '../../components/v2/WaBillingBanner'
-import WorkEveningReportCard from '../../components/work/WorkEveningReportCard'
-import WorkMorningHiCard from '../../components/work/WorkMorningHiCard'
+import DailyCheckinCard from '../../components/work/DailyCheckinCard'
 // Phase 360 - private-LED quote prices below Rs 600/screen waiting on admin.
 import QuotePriceBanner from '../../components/quotes/QuotePriceBanner'
 // Phase 12 rev3 — widgets folded in from the retired CockpitV2 page.
@@ -1174,11 +1173,7 @@ export default function AdminDashboardDesktop() {
             </section>
 
             <section style={{ marginBottom: 16 }}>
-              <WorkMorningHiCard />
-            </section>
-
-            <section style={{ marginBottom: 16 }}>
-              <WorkEveningReportCard />
+              <DailyCheckinCard />
             </section>
 
             {/* Phase 41.3 — Top hot leads + brief delivery status. */}

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
+import DailyCheckinCard from '../../components/work/DailyCheckinCard'
 
 export default function HRHomeV2() {
   const nav = useNavigate()
@@ -62,6 +63,9 @@ export default function HRHomeV2() {
         <Kpi label="Open offers" value={loading ? '…' : c.offers} onClick={() => nav('/hr/offers')} Icon={FileText} />
         <Kpi label="Team members" value={loading ? '…' : c.team} onClick={() => nav('/team')} Icon={Users} />
       </div>
+
+      {/* who said the morning hi / shared the evening report today */}
+      <div style={{ marginBottom: 18 }}><DailyCheckinCard /></div>
 
       {/* lifecycle sections */}
       <Section title="1 · Recruit" sub="find + shortlist candidates">
