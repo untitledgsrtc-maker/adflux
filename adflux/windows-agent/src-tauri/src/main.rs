@@ -230,5 +230,9 @@ fn main() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("error while running Untitled Work");
+        .unwrap_or_else(|e| {
+            // a windowed app dies silently: leave the reason in a file the owner can send
+            let dir = std::env::var("TEMP").unwrap_or_else(|_| ".".to_string());
+            let _ = std::fs::write(format!("{}\\untitled-work-error.txt", dir), format!("Untitled Work failed to start: {}", e));
+        });
 }
