@@ -46,6 +46,21 @@ ul{margin:8px 0 0;padding-left:20px}.chip{display:inline-block;border:1px solid 
 <div class="row" style="margin-top:12px"><span class="btn y">Start work</span></div>
 <div class="sm mu" style="margin-top:12px">Not recording. 9:30 check-in is the first start of the day.</div></div></div></div>
 
+<h2>2b. Inactivity popup (5 minutes)</h2><p class="lab">No keyboard or mouse for 5 minutes while a timer runs. Appears over the timer window and flashes the taskbar icon.</p>
+<div class="grid g2">
+<div class="win"><div class="wt"><span>Untitled Work</span><span>_ x</span></div><div class="wb">
+<div class="n" style="font-size:20px">No activity for 5 min</div>
+<p class="mu sm">Still working on SIRACHCHA BHARAT MISSION?</p>
+<div style="display:grid;gap:8px;margin-top:12px"><span class="btn y" style="text-align:center">Yes, still working</span><span class="btn" style="text-align:center">It was a break</span><span class="btn" style="text-align:center">Stop timer</span></div>
+<p class="sm mu" style="margin-top:12px">No answer in 5 min: timer stops at 10:42 and a note is saved.</p></div></div>
+<div class="card"><b>What each choice does</b>
+<table><tr><th>Choice</th><th>Hours</th><th>Activity tab</th></tr>
+<tr><td>Yes, still working</td><td>Idle minutes stay counted</td><td>Shown as active, tagged "confirmed"</td></tr>
+<tr><td>It was a break</td><td>The 5 idle minutes are removed, timer keeps running</td><td>Idle, tagged "break"</td></tr>
+<tr><td>Stop timer</td><td>Stops where idle began</td><td>Idle, timer stopped</td></tr>
+<tr><td>No answer 5 more min</td><td>Stops where idle began</td><td>Note: auto-stopped, idle</td></tr></table>
+<p class="sm mu">Idle that was never confirmed (break, stop, auto-stop) is shown separately and is not worked hours.</p></div></div>
+
 <h2>3. Team Work, new tab: Activity</h2><p class="lab">Admin and team head only. One person per day: what they used, how long, idle time, and the screenshots.</p>
 <div class="card">
 <div class="row" style="flex-wrap:wrap"><div><div class="mu sm">Person</div><b>Safika Bansiwala</b> <span class="mu">Today</span></div>
@@ -72,6 +87,7 @@ ul{margin:8px 0 0;padding-left:20px}.chip{display:inline-block;border:1px solid 
 <h2>5. Settings (admin only)</h2><p class="lab">One place to change how much is recorded.</p>
 <div class="card"><table>
 <tr><td>Screenshot every</td><td><span class="chip">5 min</span><span class="chip" style="border-color:var(--ac);color:var(--ac)">10 min</span><span class="chip">15 min</span><span class="chip">Off</span></td></tr>
+<tr><td>Idle popup after</td><td><span class="chip" style="border-color:var(--ac);color:var(--ac)">5 min</span><span class="chip">10 min</span><span class="chip">Off</span></td></tr>
 <tr><td>Keep screenshots for</td><td><span class="chip">7 days</span><span class="chip" style="border-color:var(--ac);color:var(--ac)">30 days</span><span class="chip">60 days</span></td></tr>
 <tr><td>Who can see</td><td>Admin and team head</td></tr>
 <tr><td>Tracked people</td><td>Pick from Work members (per person on / off)</td></tr>
@@ -83,7 +99,8 @@ ul{margin:8px 0 0;padding-left:20px}.chip{display:inline-block;border:1px solid 
 <tr><td>work_agent_devices</td><td>person, PC name, agent version, last seen, consent accepted at</td></tr>
 <tr><td>work_activity_slices</td><td>person, time entry, start, program, window title, active seconds, idle seconds (one row per minute of work)</td></tr>
 <tr><td>work_screenshots</td><td>person, time entry, taken at, storage path (private bucket), size</td></tr>
-<tr><td>work_tracking_settings</td><td>interval, retention days, per-person on / off</td></tr></table>
+<tr><td>work_idle_events</td><td>person, time entry, idle began, decision (still working / break / stop / auto-stopped), decided at</td></tr>
+<tr><td>work_tracking_settings</td><td>interval, idle minutes (5), retention days, per-person on / off</td></tr></table>
 <p class="sm mu">Access: admin and heads read; a person reads only their own. Cron deletes screenshots after the retention period. Screenshots live in a private storage bucket, opened through short-lived links.</p></div>
 
 <h2>7. Build order</h2>
