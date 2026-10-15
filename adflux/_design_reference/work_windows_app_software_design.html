@@ -1,109 +1,436 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Untitled Work for Windows - software design</title>
-<style>
-:root{--bg:#0f172a;--s:#1e293b;--s2:#334155;--bd:#334155;--tx:#f1f5f9;--mu:#94a3b8;--ac:#FFE600;--ok:#10B981;--wa:#F59E0B;--dn:#EF4444;--bl:#3B82F6}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 "DM Sans",Inter,system-ui,sans-serif;padding:24px 16px 80px}
-h1,h2,.n{font-family:"Space Grotesk",system-ui,sans-serif}.w{max-width:1100px;margin:0 auto}
-h1{font-size:26px;margin:0 0 4px}.sub{color:var(--mu);margin:0 0 24px}h2{font-size:18px;margin:36px 0 4px}.lab{color:var(--mu);font-size:14px;margin:0 0 14px}
-.card{background:var(--s);border:1px solid var(--bd);border-radius:14px;padding:18px}
-.g{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.win{border:1px solid var(--s2);border-radius:10px;background:#0b1222;overflow:hidden}
-.tb{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#0a0f1d;border-bottom:1px solid var(--bd);font-size:12px;color:var(--mu)}
-.bd{padding:16px}.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.btn{display:inline-block;border:1px solid var(--bd);border-radius:8px;padding:8px 16px;font-size:14px}.y{background:var(--ac);color:#0f172a;border-color:var(--ac);font-weight:600}
-.mu{color:var(--mu)}.sm{font-size:13px}.n{font-size:34px;font-weight:600}
-.app{display:grid;grid-template-columns:150px 1fr;min-height:360px}.rail{border-right:1px solid var(--bd);padding:12px 8px;font-size:14px}
-.rail div{padding:8px 10px;border-radius:8px;color:var(--mu)}.rail .on{background:rgba(255,230,0,.14);color:var(--ac)}
-table{width:100%;border-collapse:collapse;font-size:14px}td,th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--bd)}th{color:var(--mu);font-weight:500;font-size:12px}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
-ul{margin:6px 0 0;padding-left:20px}code{background:var(--s2);padding:1px 6px;border-radius:6px;font-size:13px}
-</style></head><body><div class="w">
-<h1>Untitled Work for Windows</h1>
-<p class="sub">Software design: how the program itself is built and behaves, not a page list. For approval; nothing built. Unsigned installer accepted by owner (15 Oct 2026). First tracked person: Safika; more added later.</p>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Untitled Work for Windows - design</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap"><style>/* =====================================================
+   UNTITLED ADFLUX — DESIGN TOKENS (DARK THEME)
+   Deep navy background with yellow accent for sales energy.
+   ===================================================== */
 
-<h2>1. What the program is</h2>
-<div class="card"><table>
-<tr><th>Item</th><th>Decision</th></tr>
-<tr><td>Name</td><td>Untitled Work</td></tr>
-<tr><td>Runs on</td><td>Windows 10 and 11 (64-bit)</td></tr>
-<tr><td>Built with</td><td>Tauri (small, about 10 MB, low memory). Same login as the web app.</td></tr>
-<tr><td>Installer</td><td>One <code>UntitledWork-Setup.exe</code>, not signed. Windows shows "Windows protected your PC": click More info, then Run anyway (one time per PC).</td></tr>
-<tr><td>Start</td><td>Starts with Windows, lives in the system tray (bottom right), main window opens on click.</td></tr>
-<tr><td>Updates</td><td>Checks for a new version at start and once a day, installs on next launch. Updates are verified with our own key even though the installer is unsigned.</td></tr>
-<tr><td>Offline</td><td>Keeps recording while offline, uploads when the internet is back (up to 48 hours stored).</td></tr>
-<tr><td>Data it sends</td><td>Timer start / stop, active program name, window title, idle seconds, screenshots (every 10 min, only while a timer runs). Nothing else. No keystrokes, no mouse positions, no file contents.</td></tr>
-</table></div>
+:root {
+  /* ---- Backgrounds ---- */
+  --bg:           #0f172a;   /* page background - deep navy */
+  --surface:      #1e293b;   /* cards, surface elements */
+  --surface-2:    #334155;   /* hover / nested surface */
+  --surface-3:    #475569;   /* inputs, disabled */
 
-<h2>2. The four parts of the program</h2>
-<p class="lab">Tray icon, widget, main window, popups. Each has a fixed size and job.</p>
-<div class="g">
-<div class="win"><div class="tb"><span>1. Tray icon and menu</span></div><div class="bd">
-<div class="sm mu">Icon states</div>
-<ul class="sm"><li><span class="dot" style="background:var(--mu)"></span>grey: signed in, no timer</li><li><span class="dot" style="background:var(--ok)"></span>green: timer running</li><li><span class="dot" style="background:var(--wa)"></span>amber: idle question waiting</li><li><span class="dot" style="background:var(--dn)"></span>red: signed out or offline over 1 h</li></ul>
-<div class="sm mu" style="margin-top:12px">Right-click menu</div>
-<div class="card" style="padding:10px;margin-top:6px"><div class="sm">Start work</div><div class="sm">Stop timer</div><div class="sm">Open Untitled Work</div><div class="sm">Open in browser</div><div class="sm">Sign out</div><div class="sm">Quit</div></div></div></div>
+  /* ---- Borders ---- */
+  --border:       #334155;   /* standard border */
+  --border-strong:#475569;   /* emphasis border */
 
-<div class="win"><div class="tb"><span>2. Widget (300 x 110, always on top)</span><span>_ x</span></div><div class="bd">
-<div class="row"><div><div class="sm mu">Running</div><div class="n" style="font-size:28px">02:14:36</div></div><span class="btn y">Stop</span></div>
-<div class="sm" style="margin-top:6px">SIRACHCHA BHARAT MISSION</div>
-<div class="sm mu">Reel 1 edit</div>
-<div class="sm mu" style="margin-top:8px"><span class="dot" style="background:var(--dn)"></span>Recording. Next screenshot in 6 min.</div></div></div>
-</div>
+  /* ---- Text ---- */
+  --text:         #f1f5f9;   /* primary text - light */
+  --text-muted:   #94a3b8;   /* secondary text, labels */
+  --text-subtle:  #64748b;   /* tertiary, placeholder */
 
-<h2>3. Main window (900 x 600)</h2>
-<p class="lab">Left rail with four items. Same data as the website My Work.</p>
-<div class="win"><div class="tb"><span>Untitled Work</span><span>_ &#9633; x</span></div>
-<div class="app"><div class="rail"><div class="on">Today</div><div>My tasks</div><div>History</div><div>Settings</div></div>
-<div class="bd">
-<div class="row"><div><div class="sm mu">Thursday, 15 Oct</div><div class="n">02:14:36</div></div><div style="text-align:right"><div class="sm mu">Day total</div><b>4h 02m</b><div class="sm mu">Check-in 09:18</div></div></div>
-<div class="row" style="margin-top:14px"><div class="btn" style="flex:1">SIRACHCHA BHARAT MISSION</div><div class="btn" style="flex:1">Reel 1 edit</div><span class="btn y">Stop</span></div>
-<table style="margin-top:16px"><tr><th>From</th><th>To</th><th>Client</th><th>Task</th><th>Time</th></tr>
-<tr><td>09:18</td><td>11:40</td><td>Anee Marcom</td><td>Post banner</td><td>2h 22m</td></tr>
-<tr><td>11:52</td><td>now</td><td>SIRACHCHA</td><td>Reel 1 edit</td><td>2h 14m</td></tr></table>
-<div class="sm mu" style="margin-top:12px">Today view = timer + slices. My tasks = the same board as the website. History = past days. Settings = start with Windows, sign out, version, check for update.</div>
-</div></div></div>
+  /* ---- Brand ---- */
+  --accent:       #FFE600;   /* brand yellow */
+  --accent-hover: #F0D800;
+  --accent-fg:    #0f172a;   /* dark text on yellow */
+  --accent-soft:  rgba(255, 230, 0, 0.14);
 
-<h2>4. Popups and notices</h2>
-<div class="g">
-<div class="win"><div class="tb"><span>Idle question (center of screen, 380 x 220)</span></div><div class="bd">
-<b>No activity for 5 min</b><div class="sm mu">Still working on SIRACHCHA BHARAT MISSION?</div>
-<div style="display:grid;gap:8px;margin-top:12px"><span class="btn y" style="text-align:center">Yes, still working</span><span class="btn" style="text-align:center">It was a break</span><span class="btn" style="text-align:center">Stop timer</span></div>
-<div class="sm mu" style="margin-top:8px">No answer in 5 min: stops at 10:42, note "auto-stopped, idle".</div></div></div>
-<div class="win"><div class="tb"><span>First run: consent (once)</span></div><div class="bd">
-<b>Before you start</b><div class="sm mu">While your timer runs this app records the program and window title you are in, when you are idle, and a screenshot every 10 minutes. Nothing is recorded when the timer is stopped. Admin and your team head can see it. Screenshots are deleted after 30 days.</div>
-<div class="row" style="margin-top:12px"><span class="btn">Not now</span><span class="btn y">I understand, continue</span></div></div></div>
-<div class="win"><div class="tb"><span>Windows toast (corner, 4 seconds)</span></div><div class="bd">
-<div class="sm">Untitled Work</div><div class="sm mu">Screenshot saved 10:30. Next in 10 min.</div></div></div>
-<div class="win"><div class="tb"><span>Other notices</span></div><div class="bd"><ul class="sm">
-<li>"Update ready, restarts when you next open it"</li><li>"No internet. Still recording, will upload later"</li><li>"No timer started yet. It is 09:45" (once a day)</li><li>"Timer stopped automatically at 21:30" (same as the web rule)</li></ul></div></div>
-</div>
+  /* ---- Status ---- */
+  --success:       #10B981;
+  --success-soft:  rgba(16, 185, 129, 0.12);
+  --warning:       #F59E0B;
+  /* Phase 35 PR 1 — danger hover sits next to other -hover tokens
+     so ActionButton variant="danger" hover state stops carrying a
+     raw #dc2626 literal inline. */
+  --danger-hover:  #DC2626;
+  --warning-soft:  rgba(245, 158, 11, 0.12);
+  --danger:        #EF4444;
+  --danger-soft:   rgba(239, 68, 68, 0.12);
+  --blue:          #3B82F6;
+  --blue-soft:     rgba(59, 130, 246, 0.12);
 
-<h2>5. Behaviour rules (state table)</h2>
-<div class="card"><table>
-<tr><th>State</th><th>Records</th><th>Shows</th></tr>
-<tr><td>Signed out</td><td>nothing</td><td>sign-in window (same phone and password as the app)</td></tr>
-<tr><td>Signed in, no timer</td><td>nothing</td><td>grey tray, Start button</td></tr>
-<tr><td>Timer running</td><td>program, title, idle, screenshot every 10 min</td><td>green tray, widget with the red dot</td></tr>
-<tr><td>Idle 5 min</td><td>idle seconds</td><td>idle question; no answer 5 min = auto stop at idle start</td></tr>
-<tr><td>Screen locked or asleep</td><td>counted as idle, no screenshot</td><td>question on return</td></tr>
-<tr><td>Offline</td><td>keeps local copy (up to 48 h)</td><td>amber note, uploads when back</td></tr>
-<tr><td>21:30 IST</td><td>stops</td><td>"Timer stopped automatically"</td></tr></table></div>
+  /* ─── Phase 35 (PR 1) — gradient tokens ──────────────────────── */
+  /* Single source of truth replacing four duplicate inline gradients
+     (V2Hero.jsx:25-27, leads.css:619-670, v2.css:61-63, TeamDashboardV2.jsx:212). */
+  --grad-hero:
+    radial-gradient(380px 140px at 100% 0%, rgba(255,230,0,.22), transparent 60%),
+    linear-gradient(135deg, #0d3d3a 0%, #134e4a 55%, #0f766e 100%);
 
-<h2>6. How it connects to the system</h2>
-<div class="card"><table>
-<tr><th>Piece</th><th>How</th></tr>
-<tr><td>Timer</td><td>Same <code>work_*</code> functions the website uses, so web, app and Team Work always agree.</td></tr>
-<tr><td>Activity and idle</td><td>Batched every minute to <code>work_activity_slices</code> and <code>work_idle_events</code>.</td></tr>
-<tr><td>Screenshots</td><td>Private storage bucket, uploaded with a short-lived link. Row in <code>work_screenshots</code>.</td></tr>
-<tr><td>Who is tracked</td><td>Per-person on / off in <code>work_tracking_settings</code>. First: Safika. The program only records when its person is switched on.</td></tr>
-<tr><td>Who sees it</td><td>Admin and team head, in Team Work, new Activity tab.</td></tr>
-<tr><td>Consent record</td><td>Accept stored with time and PC name in <code>work_agent_devices</code>.</td></tr></table></div>
+  --grad-incentive:
+    radial-gradient(420px 160px at 100% 0%, rgba(167,139,250,.18), transparent 60%),
+    linear-gradient(135deg, #2e1065 0%, #4c1d95 55%, #5b21b6 100%);
 
-<h2>7. Owner decisions recorded (15 Oct 2026)</h2>
-<div class="card"><ul class="sm">
-<li>Minimum 8 hours a day mandatory: a later rule, not part of this build.</li>
-<li>Unsigned installer accepted.</li>
-<li>First tracked person: Safika; others added later from Settings.</li>
-<li>Notice to staff: written into the offer letter and accepted with it, not a separate letter. The in-app consent screen still shows once as the technical record.</li>
-<li>One-week pilot on one PC, then all PCs. Run beside Trackdek about a week, cut over before 30 November.</li></ul></div>
-</div></body></html>
+  --grad-team:
+    linear-gradient(135deg, #1e1b4b 0%, #312e81 55%, #4338ca 100%);
+
+  /* ─── Phase 35 (PR 1) — orange status tint ────────────────────── */
+  /* Closes the warm-orange gap in the status palette. Currently
+     #f97316 is hardcoded in AdminDashboardDesktop.jsx. */
+  --orange:      #F97316;
+  --orange-soft: rgba(249, 115, 22, 0.12);
+
+  /* ─── Phase 35 (PR 1) — purple promoted from leads.css local ──── */
+  --purple:      #A78BFA;
+  --purple-soft: rgba(167, 139, 250, 0.14);
+
+  /* ---- Tints (Phase 34R — chip / pill backgrounds, brought from
+           _design_reference/salesui/sales-styles.css). Use these
+           with the matching status colour as foreground / border. */
+  --tint-success:    rgba(16, 185, 129, 0.14);
+  --tint-success-bd: rgba(16, 185, 129, 0.40);
+  --tint-warning:    rgba(245, 158, 11, 0.14);
+  --tint-warning-bd: rgba(245, 158, 11, 0.40);
+  --tint-danger:     rgba(239, 68, 68, 0.14);
+  --tint-danger-bd:  rgba(239, 68, 68, 0.40);
+  --tint-blue:       rgba(59, 130, 246, 0.14);
+  --tint-blue-bd:    rgba(59, 130, 246, 0.40);
+  --tint-purple:     rgba(192, 132, 252, 0.16);
+  --tint-purple-bd:  rgba(192, 132, 252, 0.40);
+  --tint-yellow:     rgba(255, 230, 0, 0.14);
+  --tint-yellow-bd:  rgba(255, 230, 0, 0.50);
+  /* Phase 35 PR 1 — fill the orange row in the tint grid so
+     StatusBadge tint="orange" stops carrying raw rgba inline. */
+  --tint-orange:     rgba(249, 115, 22, 0.14);
+  --tint-orange-bd:  rgba(249, 115, 22, 0.40);
+
+  /* ---- Sidebar (same as main bg for cohesion) ---- */
+  --sidebar-bg:     #0F172A;
+  --sidebar-text:   #CBD5E1;
+  --sidebar-muted:  #64748B;
+  --sidebar-hover:  #1E293B;
+  --sidebar-active-bg: rgba(255, 230, 0, 0.12);
+  --sidebar-active-text: #FFE600;
+  --sidebar-border: #334155;
+
+  /* ---- Layout ---- */
+  --sidebar-width: 240px;
+  --topbar-height: 60px;
+  --mobile-nav-height: 62px;
+
+  /* ---- Radius ---- */
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* ---- Shadows (dark theme) ---- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.4);
+
+  /* ---- Transitions ---- */
+  --transition: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---- Fonts ----
+     Phase 41.6 — owner directive: drop JetBrains Mono everywhere
+     (was previously used for currency figures, IDs, table numbers).
+     --font-mono now redefines to Space Grotesk so every existing
+     call site (43 spots across 25 files) inherits the display font
+     uniformly. Anywhere that needs aligned digits also gets
+     `font-variant-numeric: tabular-nums` set on .tabular-nums
+     utility below. Net: one visual font family across the entire
+     app — no monospace anywhere unless explicitly opted in. */
+  --font-sans: 'DM Sans', 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-display: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'Space Grotesk', 'DM Sans', system-ui, sans-serif;
+
+  /* ---- Legacy aliases ---- */
+  --y: #FFE600;
+  --bk: #0f172a;
+  --wh: #f1f5f9;
+  --gray: #94a3b8;
+  --brd: #334155;
+  --dk: #0f172a;
+  --mid: #1e293b;
+}
+
+/* Phase 41.6 — tabular numeric utility. Apply to any cell rendering
+   columns of numbers (table tds, KPI grids) so digits line up under
+   each other despite the proportional font. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+/* Work module (timeclock + tasks) - Phase 365, re-skinned Phase 368 to the owner's own
+   Claude Design ("Work Module (standalone).html"). Same class names as before (wk-*), new look.
+   Colours come from the app's global tokens (section 5) so it follows the app theme;
+   the day theme block at the bottom mirrors the design's day palette. */
+.wk {
+  --w-card: var(--surface); --w-raised: var(--surface-2); --w-bd: var(--border); --w-bd2: var(--border-strong);
+  --w-hov: rgba(51, 65, 85, .45); --w-soft: rgba(255, 255, 255, .07);
+  --w-yt: var(--accent-soft); --w-ytx: var(--accent);
+  --w-okt: #34D399; --w-wat: #FBBF24; --w-dat: #F87171; --w-int: #60A5FA;
+  max-width: 1280px; margin: 0 auto; padding: 4px 0 40px; color: var(--text);
+}
+:root[data-theme="day"] .wk, .wk[data-theme="day"] {
+  --w-hov: rgba(15, 23, 42, .04); --w-soft: #eef0f4; --w-yt: rgba(255, 230, 0, .4); --w-ytx: #0f172a;
+  --w-okt: #047857; --w-wat: #b45309; --w-dat: #b91c1c; --w-int: #1d4ed8;
+}
+.wk * { box-sizing: border-box; }
+.wk-num, .wk h1, .wk h2, .wk h3 { font-family: var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.wk-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.wk-sm { font-size: 13px; color: var(--text-muted); }
+.wk-mu { color: var(--text-muted); }
+.wk-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.wk-grp { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wk-eyb { font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
+
+/* page head */
+.wk-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.wk-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
+.wk-title { font-family: var(--font-display); font-size: 28px; font-weight: 600; margin: 2px 0 0; letter-spacing: -.01em; }
+
+/* 12-col grid (desktop 8/4, phone 1 col) */
+.wk-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 24px; }
+.wk-c12 { grid-column: span 12; } .wk-c8 { grid-column: span 8; } .wk-c4 { grid-column: span 4; } .wk-c6 { grid-column: span 6; } .wk-c3 { grid-column: span 3; }
+.wk-stack { display: grid; gap: 24px; align-content: start; }
+
+/* cards */
+.wk-card { background: var(--w-card); border: 1px solid var(--w-bd); border-radius: 16px; padding: 18px; }
+.wk-card.flush { padding: 0; }
+.wk-ch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--w-soft); }
+.wk-ch h3 { margin: 0; font: 600 14px var(--font-sans); letter-spacing: 0; display: flex; align-items: center; gap: 10px; }
+.wk-csub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.wk-tile { display: inline-grid; place-items: center; border-radius: 10px; flex: none; width: 32px; height: 32px; background: var(--w-yt); color: var(--w-ytx); }
+
+/* hero (the timer / summary banner) */
+.wk-hero { position: relative; overflow: hidden; color: #fff; border-radius: 16px; border: 1px solid #1c5856; padding: 20px;
+  background: radial-gradient(520px 200px at 100% 0%, rgba(255, 230, 0, .2), transparent 60%), linear-gradient(135deg, #0d3d3a 0%, #134e4a 55%, #0f766e 100%); }
+.wk-hero .wk-eyb { color: rgba(255, 255, 255, .72); }
+.wk-hs { color: rgba(255, 255, 255, .78); font-size: 12px; }
+.wk-ldot { width: 8px; height: 8px; border-radius: 99px; background: var(--accent); box-shadow: 0 0 0 4px rgba(255, 230, 0, .2); display: inline-block; }
+.wk-hero .wk-input { background: rgba(0, 0, 0, .25); border-color: rgba(255, 255, 255, .2); color: #fff; }
+.wk-hero .wk-input::placeholder { color: rgba(255, 255, 255, .6); }
+.wk-hero .wk-field > label { color: rgba(255, 255, 255, .78); }
+.wk-hero .wk-chip { color: #fff; border-color: rgba(255, 255, 255, .22); background: rgba(0, 0, 0, .2); }
+.wk-hero .wk-chip:hover { background: rgba(0, 0, 0, .35); }
+.wk-timer { font-family: var(--font-display); font-variant-numeric: tabular-nums; font-size: 72px; font-weight: 600; line-height: 1.05; letter-spacing: -.02em; margin: 8px 0 4px; color: var(--accent); }
+.wk-timer.paused { color: #fff; }
+.wk-hsegs { display: grid; margin-top: 14px; }
+.wk-hseg { padding: 4px 20px; } .wk-hseg:first-child { padding-left: 0; } .wk-hseg + .wk-hseg { border-left: 1px solid rgba(255, 255, 255, .16); }
+
+/* buttons - pill shaped, 40px (44 on touch) */
+.wk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 18px; border-radius: 999px;
+  font: 500 13px var(--font-sans); border: 1px solid var(--w-bd); background: var(--w-raised); color: var(--text); cursor: pointer; white-space: nowrap; text-decoration: none;
+  transition: background-color .12s, border-color .12s, filter .12s; }
+.wk-btn:hover:not(:disabled) { border-color: var(--w-bd2); filter: brightness(1.12); }
+.wk-btn:disabled { opacity: .4; cursor: default; }
+.wk-btn:focus-visible, .wk-chip:focus-visible, .wk-tab:focus-visible, .wk-seg button:focus-visible, .wk-input:focus-visible, .wk-lrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wk-btn.y { background: var(--accent); border-color: var(--accent); color: #0f172a; font-weight: 600; box-shadow: 0 6px 20px rgba(255, 230, 0, .22); }
+.wk-btn.y:hover:not(:disabled) { background: #fff06b; filter: none; }
+.wk-btn.g { background: var(--w-raised); color: var(--text); }
+.wk-btn.o { background: transparent; border-color: var(--w-bd); color: var(--text); }
+.wk-btn.o:hover:not(:disabled) { background: var(--w-hov); filter: none; }
+.wk-btn.glass { background: rgba(0, 0, 0, .25); border-color: rgba(255, 255, 255, .22); color: #fff; }
+.wk-btn.glass:hover:not(:disabled) { background: rgba(0, 0, 0, .35); filter: none; }
+.wk-btn.sm { min-height: 34px; padding: 0 14px; }
+.wk-btn.lg { min-height: 48px; font-size: 14px; width: 100%; }
+.wk-btn.ic { width: 40px; padding: 0; } .wk-btn.sm.ic { width: 34px; }
+.wk-btn.on { background: var(--w-yt); border-color: transparent; color: var(--w-ytx); }
+
+/* tabs (pill segmented) + seg */
+.wk-tabs { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--w-bd); border-radius: 999px; background: var(--w-card); max-width: 100%; overflow-x: auto; margin: 0 0 18px; flex-wrap: nowrap; }
+.wk-tab { height: 34px; padding: 0 14px; background: none; border: 0; border-radius: 999px; color: var(--text-muted); font: 500 13px var(--font-sans);
+  cursor: pointer; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; text-decoration: none; }
+.wk-tab:hover { color: var(--text); background: var(--w-hov); }
+.wk-tab.on { color: #0f172a; background: var(--accent); font-weight: 600; }
+.wk-tab .wk-cnt { background: rgba(239, 68, 68, .9); color: #fff; padding: 0 6px; line-height: 18px; font-size: 11px; }
+.wk-tab.on .wk-cnt { background: rgba(15, 23, 42, .18); color: #0f172a; }
+.wk-seg { display: inline-flex; background: var(--w-card); border: 1px solid var(--w-bd); border-radius: 999px; padding: 3px; gap: 2px; }
+.wk-seg button { height: 30px; padding: 0 12px; border-radius: 999px; border: 0; background: none; color: var(--text-muted); font: 500 13px var(--font-sans); cursor: pointer; white-space: nowrap; }
+.wk-seg button:hover { color: var(--text); background: var(--w-hov); }
+.wk-seg button.on { background: var(--w-yt); color: var(--w-ytx); font-weight: 600; }
+
+/* chips + fields */
+.wk-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--w-bd); background: transparent; color: var(--text); font: 13px var(--font-sans); cursor: pointer; }
+.wk-chip:hover { background: var(--w-hov); }
+.wk-chip.on { background: var(--w-yt); color: var(--w-ytx); border-color: transparent; }
+.wk-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+.wk-field { display: block; margin-top: 14px; }
+.wk-field > label, .wk-lbl { display: block; font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 6px; }
+.wk-input { width: 100%; min-width: 0; height: 40px; padding: 0 12px; background: var(--bg); color: var(--text); border: 1px solid var(--w-bd); border-radius: 8px; font: 14px var(--font-sans); }
+.wk-input:hover { border-color: var(--w-bd2); }
+select.wk-input { appearance: none; padding-right: 32px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; }
+textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: vertical; }
+.wk-hero select.wk-input { background-color: rgba(0, 0, 0, .25); }
+
+/* pills (status) */
+.wk-pill { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; background: var(--w-raised); color: var(--text-muted); }
+.wk-pill.ok { background: rgba(16, 185, 129, .14); color: var(--w-okt); }
+.wk-pill.warn { background: rgba(245, 158, 11, .14); color: var(--w-wat); }
+.wk-pill.bad { background: rgba(239, 68, 68, .14); color: var(--w-dat); }
+.wk-pill.in { background: rgba(59, 130, 246, .14); color: var(--w-int); }
+.wk-pill.y { background: var(--w-yt); color: var(--w-ytx); }
+.wk-cnt { min-width: 24px; text-align: center; padding: 0 8px; border-radius: 999px; background: var(--w-raised); font-size: 12px; line-height: 22px; }
+
+/* board */
+.wk-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 4px; align-items: start; }
+.wk-col { background: var(--w-card); border: 1px solid var(--w-bd); border-radius: 16px; padding: 14px; min-height: 200px; transition: border-color .15s, background-color .15s; }
+.wk-col.over { border-color: var(--accent); background: var(--w-yt); }
+.wk-col.over.fin { border-color: var(--success); background: var(--success-soft); }
+.wk-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.wk-bar { height: 4px; border-radius: 4px; background: var(--w-raised); overflow: hidden; margin: 10px 0 4px; }
+.wk-bar > i { display: block; height: 100%; background: var(--accent); }
+.wk-tk { background: var(--bg); border: 1px solid var(--w-bd); border-radius: 12px; padding: 14px; margin-top: 10px; cursor: pointer; transition: border-color .12s, opacity .12s; }
+.wk-tk:hover { border-color: var(--w-bd2); }
+.wk-tk.drag { opacity: .35; }
+.wk-tk.done { border-color: rgba(16, 185, 129, .5); }
+.wk-tk.late { border-color: rgba(239, 68, 68, .6); }
+.wk-ctile { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 10px; background: var(--w-raised); font-family: var(--font-display); font-weight: 700; }
+.wk-av { width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 50%; background: var(--w-yt); color: var(--w-ytx); font-family: var(--font-display); font-size: 12px; font-weight: 600; flex: none; }
+.wk-dz { margin-top: 12px; min-height: 52px; display: grid; place-items: center; border: 1px dashed var(--w-bd2); border-radius: 12px; color: var(--text-muted); font-size: 13px; }
+
+/* lists, rows, report block, key/value */
+.wk-list > * + * { border-top: 1px solid var(--w-soft); }
+.wk-lrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 0 18px; background: none; border: 0; color: var(--text); font: 14px var(--font-sans); cursor: pointer; text-align: left; text-decoration: none; }
+.wk-lrow:hover { background: var(--w-hov); }
+.wk-hov { cursor: pointer; transition: background-color .12s; } .wk-hov:hover { background: var(--w-hov); }
+.wk-rep { display: grid; gap: 8px; padding: 14px; border-radius: 12px; background: var(--bg); border: 1px solid var(--w-bd); }
+.wk-dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--w-soft); }
+.wk-dl dt { color: var(--text-muted); } .wk-dl dd { margin: 0; text-align: right; }
+
+/* states */
+.wk-empty { text-align: center; padding: 28px 12px; color: var(--text-muted); }
+.wk-empty b { display: block; color: var(--text); margin-bottom: 4px; }
+.wk-err { background: var(--danger-soft); border: 1px solid var(--danger); color: var(--w-dat); border-radius: 12px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.wk-skel { background: linear-gradient(90deg, var(--w-raised) 0%, var(--w-bd2) 50%, var(--w-raised) 100%); background-size: 200% 100%; animation: wksh 1.4s linear infinite; border-radius: 8px; opacity: .6; }
+@keyframes wksh { to { background-position: -200% 0; } }
+
+/* kpis + tables + hours bars (head views) */
+.wk-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin: 0 0 16px; }
+.wk-kpi-n { font-family: var(--font-display); font-variant-numeric: tabular-nums; font-size: 28px; font-weight: 600; margin-top: 2px; }
+.wk-table { width: 100%; border-collapse: collapse; }
+.wk-table th { color: var(--text-muted); font-weight: 600; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--w-bd); background: var(--w-hov); }
+.wk-table td { padding: 12px 14px; border-bottom: 1px solid var(--w-soft); font-size: 14px; }
+.wk-table tr.click { cursor: pointer; }
+.wk-table tr.click:hover td { background: var(--w-hov); }
+.wk-bar-h { height: 10px; border-radius: 5px; background: var(--w-raised); overflow: hidden; }
+.wk-bar-h > i { display: block; height: 100%; background: var(--accent); }
+.wk-hrow { display: grid; grid-template-columns: minmax(120px, 220px) 1fr 90px; gap: 12px; align-items: center; min-height: 44px; }
+.wk-cal { border: 1px solid transparent; border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 2px; min-height: 88px; }
+
+/* side panel (task / new task) */
+.wk-modal-back { position: fixed; inset: 0; background: rgba(7, 11, 22, .6); z-index: 9000; display: flex; justify-content: flex-end; }
+.wk-modal { width: min(520px, 100%); height: 100%; overflow-y: auto; background: var(--w-card); border-left: 1px solid var(--w-bd2); padding: 20px; border-radius: 16px 0 0 16px; }
+.wk-part { background: var(--bg); border: 1px solid var(--w-bd); border-radius: 12px; padding: 12px 14px; margin-top: 10px; }
+.wk-log { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--w-soft); font-size: 13px; }
+.wk-log:last-child { border: 0; }
+.wk-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: min(92vw, 620px); padding: 14px 18px; background: var(--w-card); border: 1px solid var(--accent); border-radius: 16px; z-index: 9999; box-shadow: 0 14px 28px rgba(0, 0, 0, .5); }
+
+/* on/off switch (Head toggle) */
+.wk-sw { width: 38px; height: 22px; border-radius: 999px; background: var(--w-raised); border: 1px solid var(--w-bd2); position: relative; cursor: pointer; padding: 0; transition: .15s; }
+.wk-sw i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 999px; background: var(--text-muted); transition: .15s; }
+.wk-sw.on { background: var(--accent); border-color: var(--accent); }
+.wk-sw.on i { left: 18px; background: #0f172a; }
+.wk-sw:disabled { opacity: .5; cursor: default; }
+
+/* legacy: running card (kept so nothing breaks) */
+.wk-run { background: var(--w-card); border: 2px solid var(--accent); border-radius: 16px; padding: 18px; }
+
+@media (max-width: 860px) {
+  .wk-grid { gap: 16px; }
+  .wk-c8, .wk-c4, .wk-c6, .wk-c3 { grid-column: span 12; }
+  .wk-board { grid-template-columns: 1fr; }
+  .wk-timer { font-size: 52px; }
+  .wk-title { font-size: 24px; }
+  .wk-hrow { grid-template-columns: 1fr 70px; }
+  .wk-hrow .wk-bar-h { grid-column: 1 / -1; order: 3; }
+  .wk-btn { min-height: 44px; } .wk-btn.sm { min-height: 40px; }
+  .wk-input { height: 44px; }
+  .wk-tab { height: 38px; }
+  .wk-modal { border-radius: 0; }
+  .wk-hseg { padding: 0 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .wk * { transition: none !important; animation: none !important; } }
+.wk .spin, .wk-modal .spin { animation: wkspin 1s linear infinite; }
+@keyframes wkspin { to { transform: rotate(360deg); } }
+
+/* the hero grows to fill its column so there is no empty hole beside a taller card */
+.wk-c8 > .wk-hero, .wk-c8 > .wk-run { flex: 1 1 auto; }
+
+/* Phase 368.14 - hero segment labels uppercase like the design */
+.wk-hseg > .wk-hs:first-child { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans)}
+.shell{padding:24px 16px 80px}.in{max-width:1180px;margin:0 auto}
+.note{color:var(--text-muted);margin:0 0 8px}.sec{font-family:var(--font-display);font-size:18px;margin:34px 0 10px}
+.winf{border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;background:var(--bg)}
+.winbar{display:flex;justify-content:space-between;padding:7px 12px;background:#0a0f1d;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-muted)}
+</style></head><body>
+<div class="shell"><div class="in">
+<div class="wk" style="padding:0;margin-bottom:8px"><div class="wk-head"><div><div class="wk-eyebrow">Untitled Work for Windows</div><h1 class="wk-title">Software design</h1></div></div></div>
+<p class="note">Built with the real My Work look (same colours, cards, fonts, buttons). The Windows program shows the same screen as the website My Work, in a window, plus a tray icon, a small widget and two popups. Unsigned installer accepted. First tracked person: Safika. Nothing built yet.</p>
+
+<h2 class="sec">1. Main window (900 x 600) - same as My Work</h2>
+<div class="winf"><div class="winbar"><span>Untitled Work</span><span>&#8212; &nbsp;&#9633; &nbsp;&#10005;</span></div>
+<div class="wk" style="padding:20px">
+ <div class="wk-head"><div><div class="wk-eyebrow">Thursday, 15 Oct</div><h1 class="wk-title">My Work</h1></div>
+  <div class="wk-grp"><span class="wk-btn y">+ Ask for work</span></div></div>
+ <div class="wk-tabs"><span class="wk-tab on">My work</span><span class="wk-tab">My tasks <span class="wk-cnt">3</span></span><span class="wk-tab">My hours</span><span class="wk-tab">Settings</span></div>
+ <div class="wk-grid">
+  <div class="wk-c8" style="display:flex;flex-direction:column;gap:24px">
+   <div class="wk-hero">
+    <div class="wk-row"><span class="wk-grp"><span class="wk-ldot"></span><span class="wk-eyb">Running · SIRACHCHA BHARAT MISSION</span></span><span class="wk-mono wk-hs">Started 11:52</span></div>
+    <div class="wk-row" style="flex-wrap:wrap;align-items:flex-end;gap:20px">
+     <div><div class="wk-timer">02:14:36</div><div class="wk-hs">Reel 1 edit</div></div>
+     <div class="wk-grp"><span class="wk-btn glass">Pause</span><span class="wk-btn y">Finish</span></div></div>
+   </div>
+   <div class="wk-card flush"><div class="wk-ch"><h3><span class="wk-tile">&#9201;</span>Today, by hour</h3></div>
+    <div style="padding:16px"><div style="position:relative;height:28px;background:var(--w-hov);border-radius:6px">
+     <span style="position:absolute;left:12%;width:26%;top:3px;bottom:3px;border-radius:6px;background:#60A5FA"></span>
+     <span style="position:absolute;left:41%;width:22%;top:3px;bottom:3px;border-radius:6px;background:#F59E0B"></span>
+     <span style="position:absolute;left:64%;width:2px;top:-4px;bottom:-4px;background:var(--accent)"></span></div>
+     <div class="wk-sm" style="margin-top:10px">Yellow line is now. Colour = client.</div></div></div>
+  </div>
+  <div class="wk-c4"><div class="wk-stack">
+   <div class="wk-card"><div class="wk-eyb">Today</div><div class="wk-num" style="font-size:32px;font-weight:600">4h 02m</div><div class="wk-sm">Check-in 09:18 · on time</div></div>
+   <div class="wk-card flush"><div class="wk-list">
+     <div class="wk-row wk-hov" style="padding:16px 20px"><span>My profile</span><span>&rsaquo;</span></div>
+     <div class="wk-row wk-hov" style="padding:16px 20px"><span>Leave request</span><span>&rsaquo;</span></div>
+     <div class="wk-row wk-hov" style="padding:16px 20px"><span>Salary slips</span><span>&rsaquo;</span></div></div></div>
+   <div class="wk-card"><div class="wk-eyb">Recording</div><div class="wk-grp" style="margin-top:6px"><span class="wk-pill bad">Recording on</span></div><div class="wk-sm" style="margin-top:8px">Program, window title, idle time and a screenshot every 10 min, only while a timer runs.</div></div>
+  </div></div>
+ </div></div></div>
+
+<h2 class="sec">2. Not running (same start form as My Work)</h2>
+<div class="winf" style="max-width:640px"><div class="winbar"><span>Untitled Work</span><span>&#8212; &nbsp;&#9633; &nbsp;&#10005;</span></div>
+<div class="wk" style="padding:20px"><div class="wk-hero"><span class="wk-eyb">Not running · start work</span>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end;margin-top:14px">
+  <div class="wk-field" style="margin:0"><label>Client</label><div class="wk-input">Pick a client</div></div>
+  <div class="wk-field" style="margin:0"><label>What are you doing</label><div class="wk-input" style="opacity:.7">For example: LED loop, 15 sec cut</div></div>
+  <span class="wk-btn y">Start</span></div>
+ <div class="wk-chips" style="margin-top:12px"><span class="wk-chip">Reel 1 edit</span><span class="wk-chip">Post banner</span><span class="wk-chip">Brochure layout</span></div></div></div></div>
+
+<h2 class="sec">3. Widget (300 x 120, always on top)</h2>
+<div class="winf" style="max-width:320px"><div class="winbar"><span>Untitled Work</span><span>&#8212; &#10005;</span></div>
+<div class="wk" style="padding:10px"><div class="wk-hero" style="padding:14px">
+ <div class="wk-row"><span class="wk-grp"><span class="wk-ldot"></span><span class="wk-eyb">SIRACHCHA</span></span><span class="wk-btn y sm">Stop</span></div>
+ <div class="wk-timer" style="font-size:36px;margin:4px 0">02:14:36</div>
+ <div class="wk-hs">Reel 1 edit · next screenshot in 6 min</div></div></div></div>
+
+<h2 class="sec">4. Idle question (center of screen, 400 x 240)</h2>
+<div class="winf" style="max-width:420px"><div class="winbar"><span>Still working?</span><span>&#10005;</span></div>
+<div class="wk" style="padding:18px"><div class="wk-card" style="border-color:var(--w-wat)">
+ <div class="wk-eyb">No activity for 5 min</div>
+ <div style="font-size:18px;margin:6px 0 12px">Still working on SIRACHCHA BHARAT MISSION?</div>
+ <div style="display:grid;gap:8px"><span class="wk-btn y" style="justify-content:center">Yes, still working</span><span class="wk-btn o" style="justify-content:center">It was a break</span><span class="wk-btn o" style="justify-content:center">Stop timer</span></div>
+ <div class="wk-sm" style="margin-top:10px">No answer in 5 min: stops at 10:42, note "auto-stopped, idle".</div></div></div></div>
+
+<h2 class="sec">5. First run consent (once)</h2>
+<div class="winf" style="max-width:460px"><div class="winbar"><span>Before you start</span><span>&#10005;</span></div>
+<div class="wk" style="padding:18px"><div class="wk-card">
+ <div style="font-size:20px;font-weight:600">While your timer runs, this app records</div>
+ <ul class="wk-sm" style="margin:10px 0 0 18px;font-size:14px"><li>the program and window title you are in</li><li>when you are idle</li><li>a screenshot every 10 minutes</li></ul>
+ <div class="wk-sm" style="margin-top:10px">Nothing is recorded when the timer is stopped. Admin and your team head can see it. Screenshots are deleted after 30 days.</div>
+ <div class="wk-row" style="margin-top:14px"><span class="wk-btn o">Not now</span><span class="wk-btn y">I understand, continue</span></div></div></div></div>
+
+<h2 class="sec">6. Tray icon (bottom right)</h2>
+<div class="wk-card" style="max-width:460px"><div class="wk-list">
+ <div class="wk-row" style="padding:10px 16px"><span class="wk-grp"><span class="wk-dot" style="background:#94a3b8"></span>Grey: signed in, no timer</span></div>
+ <div class="wk-row" style="padding:10px 16px"><span class="wk-grp"><span class="wk-dot" style="background:var(--w-okt)"></span>Green: timer running</span></div>
+ <div class="wk-row" style="padding:10px 16px"><span class="wk-grp"><span class="wk-dot" style="background:var(--w-wat)"></span>Amber: idle question waiting</span></div>
+ <div class="wk-row" style="padding:10px 16px"><span class="wk-grp"><span class="wk-dot" style="background:var(--w-dat)"></span>Red: signed out or offline over 1 hour</span></div></div>
+ <div class="wk-sm" style="margin-top:10px">Right-click: Start work, Stop timer, Open Untitled Work, Open in browser, Sign out, Quit.</div></div>
+
+<h2 class="sec">7. Rules</h2>
+<div class="wk-card"><ul class="wk-sm" style="margin:0 0 0 18px;font-size:14px;line-height:1.8">
+<li>Windows 10 and 11, Tauri, about 10 MB, starts with Windows, unsigned installer (More info, then Run anyway, once per PC).</li>
+<li>Same login and same timer functions as the website, so web, app and Team Work always agree.</li>
+<li>Records only while a timer runs. No keystrokes, no mouse positions, no file contents.</li>
+<li>Offline: keeps recording, uploads later (up to 48 hours). Auto-stop 21:30 IST as on the web.</li>
+<li>Admin and team head see it in Team Work, new Activity tab. Tracked people switched on one by one (Safika first).</li>
+<li>Later rule, not in this build: minimum 8 hours a day.</li></ul></div>
+</div></div></body></html>
