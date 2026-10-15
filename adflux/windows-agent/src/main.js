@@ -15,6 +15,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const pad = (n) => String(n).padStart(2, '0')
 const clock = (s) => { s = Math.max(0, Math.floor(s)); return `${pad(Math.floor(s / 3600))}:${pad(Math.floor(s % 3600 / 60))}:${pad(s % 60)}` }
 const dur = (s) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h}h ${pad(m)}m` : `${m}m` }
+const dayShort = (ymd) => new Date(`${ymd}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 const timeIST = (iso) => new Date(iso).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false })
 const istToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
 
@@ -24,15 +25,17 @@ else runMain()
 
 // ---------------------------------------------------------------- widget
 function runWidget() {
-  root.innerHTML = '<div class="wk" style="padding:10px"><div class="wk-hero" id="w"></div></div>'
+  root.innerHTML = '<div class="wk" style="padding:8px"><div class="wk-hero" id="w" style="padding:12px 14px"></div></div>'
   const w = document.getElementById('w')
   let s = { running: false }
   const paint = () => {
-    if (!s.running) { w.innerHTML = '<span class="wk-eyb">Not running</span><div class="wk-timer" style="font-size:36px">00:00:00</div><button class="wk-btn y sm" id="open">Open</button>'; }
-    else {
-      w.innerHTML = `<div class="wk-row"><span class="wk-grp"><span class="wk-ldot"></span><span class="wk-eyb">${esc(s.client || 'No client')}</span></span><button class="wk-btn y sm" id="stop">Stop</button></div>
-        <div class="wk-timer" style="font-size:36px;margin:4px 0">${clock(s.secs)}</div>
-        <div class="wk-hs">${esc(s.label || '')}${s.recording ? ' · recording' : ''}</div>`
+    if (!s.running) {
+      w.innerHTML = `<div class="wk-row"><span class="wk-eyb">Not running</span><button class="wk-btn y sm" id="open">Open</button></div>
+        <div class="wk-timer" style="font-size:34px;margin:6px 0 0">00:00:00</div>`
+    } else {
+      w.innerHTML = `<div class="wk-row"><span class="wk-grp" style="min-width:0"><span class="wk-ldot"></span><span class="wk-eyb" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px">${esc(s.client || 'No client')}</span></span><button class="wk-btn y sm" id="stop">Stop</button></div>
+        <div class="wk-timer" style="font-size:34px;margin:6px 0 2px">${clock(s.secs)}</div>
+        <div class="wk-hs" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.label || '')}${s.recording ? ' · recording' : ''}</div>`
     }
     document.getElementById('stop')?.addEventListener('click', () => emit('agent:cmd', { type: 'stop' }))
     document.getElementById('open')?.addEventListener('click', () => emit('agent:cmd', { type: 'open' }))
@@ -284,7 +287,7 @@ function runMain() {
       const late = due && due < istToday()
       const mine = st.running?.part_id === p.id
       return `<div class="ag-list-row"><div style="min-width:0"><b>${esc(title)}</b><div class="wk-sm">${esc(projName(p.task?.project_id) || 'No client')}${p.label ? ' · ' + esc(p.label) : ''}</div>
-        <div style="margin-top:6px"><span class="wk-pill ${late ? 'bad' : due === istToday() ? 'warn' : 'ok'}">${due ? (late ? 'Overdue, ' : due === istToday() ? 'Due today' : 'Due ') + (due === istToday() ? '' : esc(due)) : 'No due date'}</span></div></div>
+        <div style="margin-top:6px"><span class="wk-pill ${late ? 'bad' : due === istToday() ? 'warn' : 'ok'}">${due ? (due === istToday() ? 'Due today' : (late ? 'Overdue, ' : 'Due ') + dayShort(due)) : 'No due date'}</span></div></div>
         <div class="wk-grp">${mine ? '<span class="wk-pill y">Running</span>' : `<button class="wk-btn g sm" data-act="start-part" data-id="${p.id}">Start</button>`}
         <button class="wk-btn g sm" data-act="finish-part" data-id="${p.id}">Finish</button></div></div>`
     }).join('')}</div>`
@@ -312,7 +315,7 @@ function runMain() {
       <div class="wk-field"><label>Email</label><input class="wk-input" id="l-email" type="email" autocomplete="username" value="${esc(st.email || '')}"></div>
       <div class="wk-field"><label>Password</label><input class="wk-input" id="l-pass" type="password" autocomplete="current-password"></div>
       ${st.msg ? `<div class="wk-err" role="alert"><span>${esc(st.msg)}</span></div>` : ''}
-      <button class="wk-btn y ag-btn-full" id="l-go"${st.busy ? ' disabled' : ''}>Sign in</button>
+      <button class="wk-btn y ag-btn-full" style="margin-top:14px" id="l-go"${st.busy ? ' disabled' : ''}>Sign in</button>
       <div class="ag-small" style="margin-top:10px">Same email and password as the Untitled OS website.</div></div></div>`
     const go = async () => {
       // read the fields BEFORE re-rendering (a re-render empties them)

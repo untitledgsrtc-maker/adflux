@@ -14,7 +14,7 @@
     "windows": [
       { "label": "main", "title": "Untitled Work", "url": "index.html?view=main", "width": 960, "height": 680, "minWidth": 720, "minHeight": 520, "visible": true },
       { "label": "widget", "title": "Untitled Work timer", "url": "index.html?view=widget", "width": 320, "height": 150, "resizable": false, "alwaysOnTop": true, "visible": false, "skipTaskbar": true, "maximizable": false },
-      { "label": "idle", "title": "Still working?", "url": "index.html?view=idle", "width": 420, "height": 300, "resizable": false, "alwaysOnTop": true, "visible": false, "center": true, "maximizable": false, "minimizable": false }
+      { "label": "idle", "title": "Still working?", "url": "index.html?view=idle", "width": 420, "height": 350, "resizable": false, "alwaysOnTop": true, "visible": false, "center": true, "maximizable": false, "minimizable": false }
     ],
     "security": { "csp": null }
   },
