@@ -42,6 +42,13 @@ const sbCount = async (path) => {
   } catch { return 0 }
 }
 
+// Run fn over items with a small concurrency. The old loops were fully sequential (3 reads + 1 WhatsApp send per
+// person) and, with ~25 people, ran past the 8 s the pg_cron caller waits; the caller then hung up and the Edge
+// function was cut mid-loop, so only the first people got a nudge. Parallel batches finish in a couple of seconds.
+const pool = async (items, size, fn) => {
+  for (let i = 0; i < items.length; i += size) await Promise.all(items.slice(i, i + size).map(fn))
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') return nope('method_not_allowed', 405)
   if (!SUPABASE_URL || !SERVICE_KEY || !WA_TOKEN || !TA_SECRET) return nope('not_configured', 503)
@@ -75,42 +82,42 @@ export default async function handler(req) {
   // Evening report reminder (Phase 371): only people with an open window who have NOT shared today's report.
   if (mode === 'evening') {
     if (istHour < 19 || istHour >= 21) return ok({ skipped: 'not_evening', istHour })
-    for (const r of reps) {
-      if (['admin', 'co_owner', 'agency'].includes(r.role)) continue
+    await pool(reps, 8, async (r) => {
+      if (['admin', 'co_owner', 'agency'].includes(r.role)) return
       const uid = r.id
       const shared = (await sbCount(`work_sessions?user_id=eq.${uid}&work_date=eq.${istToday}&evening_summary_sent_at=not.is.null`))
         + (await sbCount(`work_report_shares?user_id=eq.${uid}&work_date=eq.${istToday}`))
-      if (shared > 0) { clear++; continue }
+      if (shared > 0) { clear++; return }
       const worked = (await sbCount(`work_sessions?user_id=eq.${uid}&work_date=eq.${istToday}&check_in_at=not.is.null`)) > 0
-      if (!worked) { clear++; continue }
+      if (!worked) { clear++; return }
       const last = (await sbRows(`team_assistant_requests?user_id=eq.${uid}&created_at=gte.${dayAgo}&select=phone_number_id,wa_from&order=created_at.desc&limit=1`))?.[0]
       const to = String(last?.wa_from || '').replace(/\D/g, '')
       const pnid = String(last?.phone_number_id || '')
-      if (to.length < 10 || !/^\d+$/.test(pnid)) { closed++; continue }
+      if (to.length < 10 || !/^\d+$/.test(pnid)) { closed++; return }
       const first = String(r.name || '').trim().split(/\s+/)[0] || 'there'
       try { await sendText(pnid, to, `${first}, your evening report is not shared yet. Open the app and tap Share to send it.`); sent++ } catch { /* skip */ }
-    }
+    })
     return ok({ mode, reps: reps.length, sent, window_closed: closed, already_shared_or_off: clear })
   }
 
-  for (const r of reps) {
+  await pool(reps, 8, async (r) => {
     const uid = r.id
     let pending
     let what = 'follow-up'
     if (r.role === 'staff') { pending = await sbCount(`work_task_parts?assignee_id=eq.${uid}&status=neq.finished&due_date=lte.${istToday}`); what = 'task' }
     else if (r.role === 'operation_executive') { pending = await sbCount(`ops_tickets?assigned_to=eq.${uid}&status=in.(open,in_progress)`); what = 'open fault' }
-    else if (['operation_head', 'hr', 'accounts', 'office_staff', 'office_admin'].includes(r.role)) { clear++; continue }
+    else if (['operation_head', 'hr', 'accounts', 'office_staff', 'office_admin'].includes(r.role)) { clear++; return }
     else pending = await sbCount(`follow_ups?assigned_to=eq.${uid}&is_done=eq.false&follow_up_date=lte.${istToday}`)
-    if (pending < 1) { clear++; continue }                       // nothing pending → no nudge
+    if (pending < 1) { clear++; return }                       // nothing pending → no nudge
     // Open 24h window? = they messaged our number in the last 24h (team_assistant_requests).
     const last = (await sbRows(`team_assistant_requests?user_id=eq.${uid}&created_at=gte.${dayAgo}&select=phone_number_id,wa_from&order=created_at.desc&limit=1`))?.[0]
     const to = String(last?.wa_from || '').replace(/\D/g, '')
     const pnid = String(last?.phone_number_id || '')
-    if (to.length < 10 || !/^\d+$/.test(pnid)) { closed++; continue }   // window closed → skip (v1, no template)
+    if (to.length < 10 || !/^\d+$/.test(pnid)) { closed++; return }   // window closed → skip (v1, no template)
     const first = String(r.name || '').trim().split(/\s+/)[0] || 'there'
     const text = `👋 ${first}, quick reminder — you have ${pending} ${what}${pending > 1 ? 's' : ''} ${what === 'open fault' ? 'waiting' : 'due or overdue today'}. Reply "hi" for your full plan.`
     try { await sendText(pnid, to, text); sent++ } catch { /* skip this rep, continue */ }
-  }
+  })
 
   return ok({ reps: reps.length, sent, window_closed: closed, no_pending: clear })
 }
