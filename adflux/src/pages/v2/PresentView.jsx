@@ -133,7 +133,8 @@ export default function PresentView() {
   // Both the "End" button and the "Back" arrow call this, so a rep can't lose
   // the timing by exiting the "wrong" way. Phase 322 — only the explicit "End
   // Presentation" button (offerThanks=true) then offers to WhatsApp the customer
-  // a thank-you + brochure; the Back arrow just logs and leaves.
+  // a thank-you + brochure. Phase 396 (16 Oct 2026): the Back arrow offers it too (a rep who left with Back never saw
+  // the WhatsApp / email prompt); Skip leaves at once.
   const end = useCallback(async (offerThanks = false) => {
     if (endingRef.current) return
     endingRef.current = true
@@ -278,7 +279,7 @@ export default function PresentView() {
         }}
       >
         <button
-          onClick={() => end(false)}
+          onClick={() => end(true)}   // Phase 396: Back also offers the WhatsApp / email follow-up (Skip is one tap)
           aria-label="Back to lead"
           style={{
             display: 'inline-flex',
