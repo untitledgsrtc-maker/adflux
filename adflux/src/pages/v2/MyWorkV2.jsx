@@ -12,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { istTodayISO } from '../../utils/istDate'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { openWhatsAppShare } from '../../utils/whatsappSummary'
 import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, istHour, dueState, initialsOf, clientColor } from '../../utils/workUtils'
 import WorkBoard from '../../components/work/WorkBoard'
@@ -191,6 +192,8 @@ export default function MyWorkV2() {
                       onPause={() => rpc('work_clock_stop', {})}
                       onFinish={running.part_id ? () => rpc('work_finish_part', { p_part: running.part_id, p_note: null }, 'Finished.') : null} />
                   : <StartForm projects={projects} busy={busy} entries={entries}
+                      openCards={items.filter((i) => i.status === 'assigned' || i.status === 'in_process')}
+                      onStartCard={(id) => rpc('work_clock_start', { p_project: null, p_label: null, p_part: id })}
                       onAddProject={addProject}
                       onStart={(project, label) => rpc('work_clock_start', { p_project: project, p_label: label, p_part: null })} />}
                 {istHour() >= 19 && <TodayStrip secs={todaySecs} firstIn={firstIn} />}
@@ -319,7 +322,23 @@ function RunningCard({ running, secs, projName, busy, onPause, onFinish }) {
   )
 }
 
-function StartForm({ projects, busy, entries, onAddProject, onStart }) {
+// Words that say nothing about WHICH task it is.
+const MATCH_SKIP = new Set(['work', 'and', 'the', 'for', 'edit', 'new', 'with', 'from', 'task'])
+const words = (t) => new Set((t || '').toLowerCase().replace(/[^a-z0-9\u0900-\u0dff ]+/g, ' ').split(/\s+/).filter((w) => w.length >= 3 && !MATCH_SKIP.has(w)))
+// A typed name that clearly describes one of the person's own open task cards (2 shared words, or all words of a short title).
+function matchCard(label, cards) {
+  const a = words(label); if (a.size === 0) return null
+  let best = null; let bestScore = 0
+  for (const c of cards || []) {
+    const b = words(c.title); if (b.size === 0) continue
+    let n = 0; a.forEach((w) => { if (b.has(w)) n += 1 })
+    const ok = n >= 2 || (n >= 1 && b.size <= 2 && n === b.size)
+    if (ok && n > bestScore) { best = c; bestScore = n }
+  }
+  return best
+}
+
+function StartForm({ projects, busy, entries, openCards, onStartCard, onAddProject, onStart }) {
   const [project, setProject] = useState(() => { try { return localStorage.getItem('wk_last_project') || '' } catch { return '' } })
   const [label, setLabel] = useState('')
   const [newClient, setNewClient] = useState('')
@@ -350,6 +369,16 @@ function StartForm({ projects, busy, entries, onAddProject, onStart }) {
     if (!pid) return toastError('', 'Pick a client.')
     if (!label.trim()) return toastError('', 'Type what you are doing.')
     try { localStorage.setItem('wk_last_project', pid) } catch { /* ignore */ }
+    // If what was typed is really one of my task cards, offer the card: then Finish works and the head sees the task done.
+    const card = matchCard(label, openCards)
+    if (card) {
+      const useCard = await confirmDialog({
+        title: 'Is this your task card?',
+        message: `"${card.title}"${card.due ? ` (due ${card.due})` : ''} is on your list. Start the timer on that card so it can be finished here?`,
+        confirmLabel: 'Use the task card', cancelLabel: 'No, just track time',
+      })
+      if (useCard) { await onStartCard(card.id); setLabel(''); return }
+    }
     await onStart(pid, label.trim())
     setLabel('')
   }
