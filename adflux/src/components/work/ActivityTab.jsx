@@ -2,8 +2,8 @@
 // One person + one day: tracked / active / idle, day timeline by program, program table with client,
 // idle decisions, screenshot strip (blur toggle, click to enlarge). Settings card for admin / co-owner.
 // Reads only; writes go through work_set_tracking_person / work_set_tracking_settings.
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Monitor, Camera, Moon, Loader2, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Monitor, Camera, Moon, Loader2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toastError, toastSuccess } from '../v2/Toast'
 import { istTodayISO } from '../../utils/istDate'
@@ -23,6 +23,7 @@ export default function ActivityTab({ users, memberIds, nameOf, projName, canSet
   const [data, setData] = useState(null)       // { slices, idle, shots, entries, urls }
   const [blur, setBlur] = useState(true)
   const [big, setBig] = useState(null)
+  const stripRef = useRef(null)
   const [settings, setSettings] = useState(null)
   const [tracked, setTracked] = useState([])   // work_tracking_people
   const [devices, setDevices] = useState([])
@@ -195,15 +196,23 @@ export default function ActivityTab({ users, memberIds, nameOf, projName, canSet
                   {data.shots.length === 0 ? (
                     <div className="wk-empty"><b>No screenshots</b>Screenshots are taken while a timer runs, at the interval set below.</div>
                   ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10, padding: 16 }}>
-                      {data.shots.map((s) => (
-                        <button key={s.id} onClick={() => setBig(s)} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 0, overflow: 'hidden', background: 'var(--surface-2)', cursor: 'pointer', textAlign: 'left' }}>
-                          {data.urls[s.storage_path]
-                            ? <img src={data.urls[s.storage_path]} alt="" loading="lazy" style={{ width: '100%', aspectRatio: '16/10', objectFit: 'cover', display: 'block', filter: blur ? 'blur(6px)' : 'none' }} />
-                            : <div style={{ aspectRatio: '16/10', display: 'grid', placeItems: 'center' }} className="wk-sm">Expired</div>}
-                          <div className="wk-sm wk-num" style={{ padding: '6px 8px' }}>{fmtTimeIST(s.taken_at)}</div>
-                        </button>
-                      ))}
+                    <div style={{ position: 'relative' }}>
+                      <button className="wk-btn o sm" aria-label="Scroll left" onClick={() => stripRef.current?.scrollBy({ left: -600, behavior: 'smooth' })}
+                        style={{ position: 'absolute', left: 8, top: 56, zIndex: 2 }}><ChevronLeft size={16} aria-hidden="true" /></button>
+                      <button className="wk-btn o sm" aria-label="Scroll right" onClick={() => stripRef.current?.scrollBy({ left: 600, behavior: 'smooth' })}
+                        style={{ position: 'absolute', right: 8, top: 56, zIndex: 2 }}><ChevronRight size={16} aria-hidden="true" /></button>
+                      <div ref={stripRef} style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '16px 16px 12px', scrollSnapType: 'x proximity' }}>
+                        {data.shots.map((sh) => (
+                          <button key={sh.id} onClick={() => setBig(sh)}
+                            style={{ flex: '0 0 190px', scrollSnapAlign: 'start', border: '1px solid var(--border)', borderRadius: 10, padding: 0, overflow: 'hidden', background: 'var(--surface-2)', cursor: 'pointer', textAlign: 'left' }}>
+                            {data.urls[sh.storage_path]
+                              ? <img src={data.urls[sh.storage_path]} alt="" loading="lazy" style={{ width: '100%', aspectRatio: '16/10', objectFit: 'cover', display: 'block', filter: blur ? 'blur(6px)' : 'none' }} />
+                              : <div style={{ aspectRatio: '16/10', display: 'grid', placeItems: 'center' }} className="wk-sm">Expired</div>}
+                            <div className="wk-sm wk-num" style={{ padding: '6px 8px' }}>{fmtTimeIST(sh.taken_at)}</div>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="wk-sm" style={{ padding: '0 16px 12px' }}>{data.shots.length} screenshots, {fmtTimeIST(data.shots[0].taken_at)} to {fmtTimeIST(data.shots[data.shots.length - 1].taken_at)}. Scroll sideways or use the arrows.</div>
                     </div>
                   )}
                 </div>
@@ -263,17 +272,25 @@ export default function ActivityTab({ users, memberIds, nameOf, projName, canSet
         </div>
       )}
 
-      {big && (
-        <div className="wk-modal-back" onClick={() => setBig(null)} style={{ justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1100, width: '100%' }}>
-            <div className="wk-row" style={{ marginBottom: 8 }}>
-              <b>{nameOf(person)} · {fmtTimeIST(big.taken_at)}</b>
-              <button className="wk-btn o sm" onClick={() => setBig(null)} aria-label="Close"><X size={16} aria-hidden="true" /> Close</button>
+      {big && (() => {
+        const i = data.shots.findIndex((x) => x.id === big.id)
+        const go = (d) => { const n = data.shots[i + d]; if (n) setBig(n) }
+        return (
+          <div className="wk-modal-back" onClick={() => setBig(null)} style={{ justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1100, width: '100%' }}>
+              <div className="wk-row" style={{ marginBottom: 8 }}>
+                <b>{nameOf(person)} · {fmtTimeIST(big.taken_at)} <span className="wk-sm">({i + 1} of {data.shots.length})</span></b>
+                <span className="wk-grp">
+                  <button className="wk-btn o sm" disabled={i <= 0} onClick={() => go(-1)} aria-label="Previous"><ChevronLeft size={16} aria-hidden="true" /> Earlier</button>
+                  <button className="wk-btn o sm" disabled={i >= data.shots.length - 1} onClick={() => go(1)} aria-label="Next">Later <ChevronRight size={16} aria-hidden="true" /></button>
+                  <button className="wk-btn o sm" onClick={() => setBig(null)} aria-label="Close"><X size={16} aria-hidden="true" /> Close</button>
+                </span>
+              </div>
+              {data.urls[big.storage_path] && <img src={data.urls[big.storage_path]} alt="" style={{ width: '100%', borderRadius: 12 }} />}
             </div>
-            {data.urls[big.storage_path] && <img src={data.urls[big.storage_path]} alt="" style={{ width: '100%', borderRadius: 12 }} />}
           </div>
-        </div>
-      )}
+        )
+      })()}
       {busy && <Loader2 size={16} className="wk-spin" aria-hidden="true" style={{ position: 'fixed', right: 16, bottom: 16 }} />}
     </div>
   )
