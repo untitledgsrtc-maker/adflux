@@ -1,0 +1,3 @@
+# iCloud: folders renamed to .nosync are not synced (a symlink keeps the old name)
+*.nosync
+.DS_Store
