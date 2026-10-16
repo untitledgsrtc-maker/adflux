@@ -161,7 +161,7 @@ export function SalarySlipDocument({ rep, monthLabel, salary, payout, logoSrc })
         <View style={S.row}>
           <View>
             <Text style={S.rowLabel}>Leave deduction</Text>
-            <Text style={S.rowNote}>{leaveDays} day(s) · salary ÷ 26 per day</Text>
+            <Text style={S.rowNote}>{leaveDays} day(s) · salary ÷ {Number(salary?.unpaid_divisor || 26)} per day</Text>
           </View>
           <Text style={S.rowAmt}>{leaveCut > 0 ? '- ' + inr(leaveCut) : inr(0)}</Text>
         </View>

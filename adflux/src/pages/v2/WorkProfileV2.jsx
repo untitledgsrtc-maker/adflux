@@ -1,7 +1,7 @@
 // src/pages/v2/WorkProfileV2.jsx - Phase 365. A person's work profile: details, photo,
 // monthly check-in attendance calendar, hours + tasks this month. Own profile by default;
 // a head opens anyone's with ?user=<id>. Check-in = the first timer start of the IST day
-// (by 9:30 on time, to 11:30 late, after that half day - same rules as sales).
+// (by 9:55 on time for office staff - 9:30 for sales / telecaller - to 11:30 late, after that half day).
 // Attendance here does NOT change pay: leave deduction still comes from the leave requests.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -46,7 +46,7 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
     const end = addDaysISO(shiftMonth(ym, 1) + '-01', 0)
     const t0 = `${start}T00:00:00+05:30`, t1 = `${end}T00:00:00+05:30`
     const [u, en, lv, ho, pa] = await Promise.all([
-      supabase.from('users').select('id,name,email,designation,city,manager_id,profile_image_url,created_at').eq('id', targetId).maybeSingle(),
+      supabase.from('users').select('id,name,email,role,designation,city,manager_id,profile_image_url,created_at').eq('id', targetId).maybeSingle(),
       supabase.from('work_time_entries').select('started_at,ended_at,status,break_seconds').eq('user_id', targetId).eq('status', 'approved').gte('started_at', t0).lt('started_at', t1).limit(1500),
       supabase.from('leaves').select('leave_date,status,is_half_day').eq('user_id', targetId).gte('leave_date', start).lt('leave_date', end).limit(100),
       supabase.from('holidays').select('holiday_date,name').eq('is_active', true).gte('holiday_date', start).lt('holiday_date', end),
@@ -78,6 +78,9 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
   const leaveBy = useMemo(() => { const m = {}; leaves.forEach((l) => { if (l.status === 'approved') m[l.leave_date] = l }); return m }, [leaves])
   const holBy = useMemo(() => { const m = {}; holidays.forEach((h) => { m[h.holiday_date] = h }); return m }, [holidays])
 
+  // owner 16 Oct 2026: office staff are on time by 9:55; sales + telecaller (field) stay at 9:30
+  const onTimeMins = ['sales', 'telecaller'].includes(person?.role) ? 9 * 60 + 30 : 9 * 60 + 55
+  const onTimeLabel = onTimeMins === 9 * 60 + 55 ? '09:55' : '09:30'
   const cells = useMemo(() => {
     const first = new Date(`${ym}-01T00:00:00Z`)
     const dow = (first.getUTCDay() + 6) % 7                       // Monday first
@@ -90,7 +93,7 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
       let kind = 'future', label = ''
       if (ymd > today) kind = 'future'
       else if (day) {
-        kind = day.firstMins <= 9 * 60 + 30 ? 'ok' : day.firstMins <= 11 * 60 + 30 ? 'late' : 'half'
+        kind = day.firstMins <= onTimeMins ? 'ok' : day.firstMins <= 11 * 60 + 30 ? 'late' : 'half'
         label = fmtTimeIST(day.first)
       } else if (leaveBy[ymd]) { kind = 'leave'; label = 'Leave' }
       else if (holBy[ymd]) { kind = 'off'; label = 'Holiday' }
@@ -99,7 +102,7 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
       out.push({ d, ymd, kind, label, secs: day?.secs || 0 })
     }
     return out
-  }, [ym, days, leaveBy, holBy, today])
+  }, [ym, days, leaveBy, holBy, today, onTimeMins])
 
   const present = cells.filter((c) => c && ['ok', 'late', 'half'].includes(c.kind))
   const onTime = cells.filter((c) => c?.kind === 'ok').length
@@ -220,7 +223,7 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
             </div>
             <div className="wk-kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
               {kpi('Present days', present.length)}
-              {kpi('On time', onTime, 'By 09:30', 'var(--success)')}
+              {kpi('On time', onTime, `By ${onTimeLabel}`, 'var(--success)')}
               {kpi('Late', late, 'Incl. half days', 'var(--warning)')}
               {kpi('Average check-in', avgIn == null ? '-' : `${String(Math.floor(avgIn / 60)).padStart(2, '0')}:${String(avgIn % 60).padStart(2, '0')}`)}
               {kpi('Tasks this month', taskTotal, `${tasksFinished} finished`)}
@@ -252,7 +255,7 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
                     </div>
                   ) : <div key={`e${i}`} />)}
                 </div>
-                <div className="wk-sm" style={{ marginTop: 14 }}>First timer start of the day is the check-in: by 9:30 on time, to 11:30 late, after that a half day. Attendance does not change pay by itself.</div>
+                <div className="wk-sm" style={{ marginTop: 14 }}>First timer start of the day is the check-in: by {onTimeLabel.replace(/^0/, '')} on time, to 11:30 late, after that a half day. Attendance does not change pay by itself.</div>
               </div>
             </div>
           </div>

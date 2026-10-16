@@ -57,6 +57,8 @@ DECLARE
   v_fy             text;
   v_paid_quota     numeric;
   v_unpaid_divisor int;
+  v_div_new        int;
+  v_div_from       text;
   v_monthly_salary numeric := 0;
   v_base           numeric := 0;
   v_variable       numeric := 0;
@@ -85,11 +87,21 @@ BEGIN
                           THEN make_date(p_year, 4, 1)
                           ELSE make_date(p_year - 1, 4, 1) END;
 
-  SELECT paid_quota_days, unpaid_divisor
-    INTO v_paid_quota, v_unpaid_divisor
+  SELECT paid_quota_days, unpaid_divisor, unpaid_divisor_new, unpaid_divisor_from
+    INTO v_paid_quota, v_unpaid_divisor, v_div_new, v_div_from
     FROM public.salary_policy WHERE fy = v_fy;
   v_paid_quota     := COALESCE(v_paid_quota, 12);
   v_unpaid_divisor := COALESCE(v_unpaid_divisor, 26);
+  -- Phase 390 (owner 16 Oct 2026): from the policy's `unpaid_divisor_from` month the daily rate is salary / 30 (was 26).
+  -- Earlier months keep the old divisor so months already paid do not move. Lexical 'YYYY-MM' compare.
+  -- a new FY row without the new-divisor columns must not silently drop back to 26: use the latest row that has them
+  IF v_div_new IS NULL THEN
+    SELECT unpaid_divisor_new, unpaid_divisor_from INTO v_div_new, v_div_from
+      FROM public.salary_policy WHERE unpaid_divisor_new IS NOT NULL ORDER BY effective_from DESC LIMIT 1;
+  END IF;
+  IF v_div_from IS NOT NULL AND v_div_new IS NOT NULL AND v_month_year >= v_div_from THEN
+    v_unpaid_divisor := v_div_new;
+  END IF;
 
   SELECT * INTO v_score_row
     FROM public.monthly_score(p_user_id, v_month_start)
@@ -192,13 +204,14 @@ GRANT EXECUTE ON FUNCTION public._compute_monthly_salary_base(uuid, integer, int
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All six must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All seven must be TRUE.
 -- ============================================================================
 -- SELECT
 --   pg_get_functiondef(p.oid) LIKE '%_assert_self_or_admin%'   AS auth_gate,
 --   pg_get_functiondef(p.oid) LIKE '%monthly_score%'           AS reads_score,
 --   pg_get_functiondef(p.oid) LIKE '%unpaid_divisor%'          AS unpaid_divisor_logic,
 --   pg_get_functiondef(p.oid) LIKE '%v_monthly_salary / v_unpaid_divisor%' AS rule2_full_salary_leave,
+--   pg_get_functiondef(p.oid) LIKE '%unpaid_divisor_from%'      AS divisor_30_from_oct_2026,
 --   pg_get_functiondef(p.oid) LIKE '%unpaid_deduction%'        AS unpaid_deduction,
 --   pg_get_functiondef(p.oid) LIKE '%is_half_day%'             AS half_day_aware,
 --   pg_get_functiondef(p.oid) LIKE '%net_payable%'             AS returns_net

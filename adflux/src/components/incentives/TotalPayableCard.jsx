@@ -140,7 +140,7 @@ export default function TotalPayableCard() {
         base, variable, variableCap,
         incentive, incentiveProposed,
         taDaTotal,
-        leaveUnpaid, unpaidDeduction,
+        leaveUnpaid, unpaidDeduction, unpaidDivisor: Number(salary.unpaid_divisor || 26),
         netPayable,
         taDaPending, pendingCount: pendingRows.length,
       })
@@ -205,7 +205,7 @@ export default function TotalPayableCard() {
         <Row
           label="Unpaid-leave deduction"
           value={-data.unpaidDeduction}
-          sub={`${data.leaveUnpaid} day${data.leaveUnpaid === 1 ? '' : 's'} · base ÷ 26`}
+          sub={`${data.leaveUnpaid} day${data.leaveUnpaid === 1 ? '' : 's'} · salary ÷ ${data.unpaidDivisor || 26}`}
           negative
         />
       )}

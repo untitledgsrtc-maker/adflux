@@ -94,6 +94,8 @@ export default function SalaryAdminV2({ embedded = false }) {
   // from approved ta_da_requests rows in the selected month.
   const [taBreakdown, setTaBreakdown] = useState({})
   const [policy, setPolicy] = useState(null)
+  // Phase 390: 30-day divisor from the policy's unpaid_divisor_from month (earlier months keep the old one)
+  const divisorFor = (ym) => (policy?.unpaid_divisor_from && policy?.unpaid_divisor_new && ym >= policy.unpaid_divisor_from ? policy.unpaid_divisor_new : (policy?.unpaid_divisor || 26))
   const [err,   setErr]     = useState('')
   const [loading, setLoading] = useState(true)
   const [payoutTarget, setPayoutTarget] = useState(null) // { user_id, name, computed }
@@ -358,7 +360,7 @@ export default function SalaryAdminV2({ embedded = false }) {
             <h1 className="v2d-page-title">Salary Sheet</h1>
             <div className="v2d-page-sub">
               Per-person monthly breakdown: base + variable + incentive + TA – leave
-              deduction. Policy: {policy ? `every leave deducted · salary ÷ ${policy.unpaid_divisor} per day` : 'loading…'}.
+              deduction. Policy: {policy ? `every leave deducted · salary ÷ ${divisorFor(month)} per day` : 'loading…'}.
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>
@@ -419,7 +421,7 @@ export default function SalaryAdminV2({ embedded = false }) {
               label="Unpaid Leave Cut"
               value={totals.deduction > 0 ? '−' + fmtINR(totals.deduction) : '—'}
               valueColor={totals.deduction > 0 ? 'var(--v2-rose, #EF4444)' : 'var(--v2-ink-2)'}
-              sub={`${totalLeaveDays.toFixed(1)} days · base ÷ ${policy?.unpaid_divisor || 26}`}
+              sub={`${totalLeaveDays.toFixed(1)} days · salary ÷ ${divisorFor(month)}`}
             />
           </div>
         )
