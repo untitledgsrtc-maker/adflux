@@ -113,7 +113,7 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 .wk-cnt { min-width: 24px; text-align: center; padding: 0 8px; border-radius: 999px; background: var(--w-raised); font-size: 12px; line-height: 22px; }
 
 /* board */
-.wk-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 4px; align-items: start; }
+.wk-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 4px; align-items: start; }
 .wk-col { background: var(--w-card); border: 1px solid var(--w-bd); border-radius: 16px; padding: 14px; min-height: 200px; transition: border-color .15s, background-color .15s; }
 .wk-col.over { border-color: var(--accent); background: var(--w-yt); }
 .wk-col.over.fin { border-color: var(--success); background: var(--success-soft); }

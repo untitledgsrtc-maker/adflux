@@ -168,7 +168,7 @@ export default async function handler(req) {
       : [`${firstName}, I can only show your day here (tasks and approvals). For anything else, please ask your head or open the app.`, '']
     try {
       if (user.role === 'staff') {
-        const parts = await sbRows(`work_task_parts?assignee_id=eq.${uid}&status=neq.finished&due_date=lte.${istToday}&select=label,due_date,work_tasks(title)&order=due_date.asc&limit=20`)
+        const parts = await sbRows(`work_task_parts?assignee_id=eq.${uid}&status=not.in.(finished,postponed)&due_date=lte.${istToday}&select=label,due_date,work_tasks(title)&order=due_date.asc&limit=20`)
         if (parts.length) {
           L.push(`📋 Tasks due today or overdue: ${parts.length}`)
           parts.slice(0, 6).forEach((p) => L.push(`• ${(p.work_tasks && p.work_tasks.title) || p.label || 'task'}${p.due_date < istToday ? ' (overdue)' : ''}`))

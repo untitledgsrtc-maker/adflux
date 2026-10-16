@@ -104,7 +104,7 @@ export default async function handler(req) {
     const uid = r.id
     let pending
     let what = 'follow-up'
-    if (r.role === 'staff') { pending = await sbCount(`work_task_parts?assignee_id=eq.${uid}&status=neq.finished&due_date=lte.${istToday}`); what = 'task' }
+    if (r.role === 'staff') { pending = await sbCount(`work_task_parts?assignee_id=eq.${uid}&status=not.in.(finished,postponed)&due_date=lte.${istToday}`); what = 'task' }
     else if (r.role === 'operation_executive') { pending = await sbCount(`ops_tickets?assigned_to=eq.${uid}&status=in.(open,in_progress)`); what = 'open fault' }
     else if (['operation_head', 'hr', 'accounts', 'office_staff', 'office_admin'].includes(r.role)) { clear++; return }
     else pending = await sbCount(`follow_ups?assigned_to=eq.${uid}&is_done=eq.false&follow_up_date=lte.${istToday}`)

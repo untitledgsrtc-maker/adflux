@@ -15,6 +15,7 @@ import ActivityTab from '../../components/work/ActivityTab'
 import WorkBoard from '../../components/work/WorkBoard'
 import UserAvatar from '../../components/common/UserAvatar'
 import NewTaskModal from '../../components/work/NewTaskModal'
+import PostponeModal from '../../components/work/PostponeModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
 
 const TABS = [['overview', 'Overview'], ['tasks', 'Tasks'], ['people', 'People'], ['clients', 'Clients'],
@@ -52,6 +53,7 @@ export default function TeamWorkV2() {
   const [openTask, setOpenTask] = useState(null)
   const [fPerson, setFPerson] = useState('')
   const [fClient, setFClient] = useState('')
+  const [postponing, setPostponing] = useState(null)   // item being postponed (Postpone box)
   const [showLater, setShowLater] = useState(false)   // Tasks board: also show open tasks due after the chosen range
   const [busy, setBusy] = useState(false)
   const latch = useRef(false)
@@ -75,7 +77,7 @@ export default function TeamWorkV2() {
       supabase.from('work_time_entries').select('*').is('ended_at', null),
       supabase.from('work_time_entries').select('*').eq('status', 'pending').order('started_at', { ascending: false }).limit(100),
       supabase.from('work_task_parts')
-        .select('id,task_id,assignee_id,label,due_date,status,finished_at,seconds,task:work_tasks(id,title,project_id,created_by,due_date,template_id,created_at)')
+        .select('id,task_id,assignee_id,label,due_date,status,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,template_id,created_at)')
         .or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -7))}`).limit(600),
       supabase.from('work_templates').select('id,title,project_id,assignee_id,repeat_kind,weekday,month_day,is_active,last_run_date').eq('is_active', true),
       supabase.rpc('work_hours_report', { p_from: from, p_to: to }),
@@ -145,19 +147,22 @@ export default function TeamWorkV2() {
         const ft = p.finished_at ? Date.parse(p.finished_at) : NaN
         return ft >= f0 && ft < f1
       }
+      if (p.status === 'postponed') return true   // the Postponed column always shows what is waiting
       const d = p.due_date || p.task?.due_date
       return showLater || p.status === 'in_process' || !d || d <= to
     }
     return parts
       .filter((p) => inRange(p) && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient))
       .map((p) => ({
+        postponedUntil: p.postponed_until, postponeCount: p.postpone_count || 0,
+        postponedBy: [...(p.postponed_by_users || []).map((id) => nameOf(id)), p.postponed_by_client ? `${p.postponed_by_client} (client)` : ''].filter(Boolean).join(', '),
         id: p.id, taskId: p.task_id, finishedAt: p.finished_at, status: p.status, title: p.task?.title || 'Task', label: p.label,
         client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, assigneeId: p.assignee_id,
         assigneeName: nameOf(p.assignee_id), assigneePhoto: users.find((u) => u.id === p.assignee_id)?.profile_image_url || null, partsTotal: total[p.task_id] || 1, partsDone: done[p.task_id] || 0,
         seconds: taskCostByTask[p.task_id]?.seconds ?? p.seconds, cost: taskCostByTask[p.task_id]?.cost ?? null,
       }))
   }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask, users, from, to, showLater])
-  const laterCount = useMemo(() => showLater ? 0 : parts.filter((p) => p.status !== 'finished' && p.status !== 'in_process' && (p.due_date || p.task?.due_date) > to && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient)).length, [parts, to, showLater, fPerson, fClient])
+  const laterCount = useMemo(() => showLater ? 0 : parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed' && p.status !== 'in_process' && (p.due_date || p.task?.due_date) > to && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient)).length, [parts, to, showLater, fPerson, fClient])
 
   if (authLoading || !uid) return null
   if (isHead === false) return <Navigate to="/my-work" replace />
@@ -169,8 +174,8 @@ export default function TeamWorkV2() {
     if (p.task_id && p.task?.project_id) taskClient[p.task_id] = projName(p.task.project_id)
     if (p.task_id && p.assignee_id) { const a = (taskPeople[p.task_id] = taskPeople[p.task_id] || []); if (!a.includes(p.assignee_id)) a.push(p.assignee_id) }
   })
-  const openCount = parts.filter((p) => p.status !== 'finished').length
-  const lateParts = parts.filter((p) => p.status !== 'finished' && dueState(p.due_date || p.task?.due_date, p.status).cls === 'bad')
+  const openCount = parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed').length
+  const lateParts = parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed' && dueState(p.due_date || p.task?.due_date, p.status).cls === 'bad')
   const finishedToday = parts.filter((p) => p.status === 'finished' && p.finished_at && p.finished_at >= dayStartISO(today)).length
   const teamSecs = (report?.by_person || []).reduce((s, p) => s + Number(p.seconds || 0), 0)
   const memberIds = members.map((m) => m.user_id)
@@ -328,7 +333,7 @@ export default function TeamWorkV2() {
             <select className="wk-input" style={{ width: 240 }} value={fClient} onChange={(e) => setFClient(e.target.value)} aria-label="Filter by client">
               <option value="">All clients</option>{activeProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <span className="wk-sm">{canCost ? '₹ Cost shows for admin and accounts only · ' : ''}{items.filter((i) => i.status !== 'finished').length} open · {lateParts.length} overdue</span>
+            <span className="wk-sm">{canCost ? '₹ Cost shows for admin and accounts only · ' : ''}{items.filter((i) => i.status !== 'finished' && i.status !== 'postponed').length} open · {lateParts.length} overdue</span>
             {(laterCount > 0 || showLater) && (
               <button className="wk-btn o sm" onClick={() => setShowLater((v) => !v)}>
                 {showLater ? 'Hide later tasks' : `Show ${laterCount} later task${laterCount === 1 ? '' : 's'}`}
@@ -337,7 +342,7 @@ export default function TeamWorkV2() {
           </div>
           <div className="wk-sm" style={{ marginTop: 8 }}>Drag a card to change its status. A task with several people finishes when every part is finished.</div>
           <WorkBoard items={items} uid={uid} showCost={canCost} actForAll onMove={(id, to2) => rpc('work_move_part', { p_part: id, p_to: to2 })}
-            onStart={(it) => rpc('work_move_part', { p_part: it.id, p_to: 'in_process' })} onFinish={(it) => rpc('work_move_part', { p_part: it.id, p_to: 'finished' })} onOpen={setOpenTask} />
+            onStart={(it) => rpc('work_move_part', { p_part: it.id, p_to: 'in_process' })} onFinish={(it) => rpc('work_move_part', { p_part: it.id, p_to: 'finished' })} onOpen={setOpenTask} onPostpone={(it) => setPostponing(it)} />
         </>
       )}
 
@@ -396,6 +401,10 @@ export default function TeamWorkV2() {
           </>
         )
       })()}
+
+      {postponing && (
+        <PostponeModal item={postponing} users={users.filter((u) => u.is_active && u.role !== 'agency')} meId={uid} onClose={() => setPostponing(null)} onDone={() => { setPostponing(null); load() }} />
+      )}
 
       {newTask && (
         <NewTaskModal projects={activeProjects} users={users.filter((u) => u.is_active && u.role !== 'agency')} meId={uid} onAddProject={addProject}

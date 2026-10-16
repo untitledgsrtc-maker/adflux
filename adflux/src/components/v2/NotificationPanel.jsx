@@ -272,9 +272,10 @@ export default function NotificationPanel() {
       try {
         const { data: wp } = await supabase
           .from('work_task_parts')
-          .select('id, label, due_date, status, created_at, task:work_tasks(title, due_date)')
+          .select('id, label, due_date, status, created_at, returned_at, task:work_tasks(title, due_date)')
           .eq('assignee_id', profile.id)
           .neq('status', 'finished')
+          .neq('status', 'postponed')   // Phase 395: a postponed task is neither new nor overdue until it returns
           .order('created_at', { ascending: false })
           .limit(40)
         const t3 = Date.now() - 3 * 86400000
@@ -288,8 +289,8 @@ export default function NotificationPanel() {
             list.push({ kind: 'workLate', id: r.id, title: `Overdue: ${name}`,
               sub: `${r.label ? r.label + ' · ' : ''}was due ${new Date(`${due}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`,
               to: '/my-work', ts: due })
-          } else if (r.status === 'assigned' && new Date(r.created_at).getTime() >= t3) {
-            list.push({ kind: 'workNew', id: r.id, title: `New task: ${name}`,
+          } else if (r.status === 'assigned' && Math.max(new Date(r.created_at).getTime(), r.returned_at ? new Date(r.returned_at).getTime() : 0) >= t3) {
+            list.push({ kind: 'workNew', id: (r.returned_at && new Date(r.returned_at).getTime() >= t3) ? `${r.id}:back` : r.id, title: r.returned_at && new Date(r.returned_at).getTime() >= t3 ? `Back on your list: ${name}` : `New task: ${name}`,
               sub: `${r.label ? r.label + ' · ' : ''}${due ? 'due ' + new Date(`${due}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'no due date'}`,
               to: '/my-work', ts: r.created_at })
           }

@@ -8,6 +8,9 @@ import UserAvatar from '../common/UserAvatar'
 import { fmtDur, fmtDateShort, dueState, STATUS_LABEL, initialsOf } from '../../utils/workUtils'
 
 const EVENT_TEXT = {
+  postponed: 'postponed this task',
+  unpostponed: 'brought this task back',
+  returned: 'task came back on its date',
   created: 'created the task', started: 'started', paused: 'paused', finished: 'finished their part',
   reopened: 'reopened a part', moved: 'moved a part', reassigned: 'reassigned a part',
   due_changed: 'changed a due date', commented: 'added a comment',
@@ -26,7 +29,7 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
     setErr('')
     const [t, p, s, c, l] = await Promise.all([
       supabase.from('work_tasks').select('id,title,project_id,note,created_by,due_date,status,template_id,finished_at,created_at').eq('id', taskId).maybeSingle(),
-      supabase.from('work_task_parts').select('id,task_id,assignee_id,label,due_date,status,started_at,finished_at,finish_note,seconds,created_at').eq('task_id', taskId).order('created_at'),
+      supabase.from('work_task_parts').select('id,task_id,assignee_id,label,due_date,status,started_at,finished_at,finish_note,seconds,created_at,postponed_until,postponed_by_users,postponed_by_client,postpone_count').eq('task_id', taskId).order('created_at'),
       supabase.from('work_task_steps').select('*').eq('task_id', taskId).order('position'),
       supabase.from('work_task_comments').select('*').eq('task_id', taskId).order('created_at'),
       supabase.from('work_task_log').select('*').eq('task_id', taskId).order('created_at', { ascending: false }).limit(60),
@@ -86,12 +89,18 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                       <UserAvatar className="wk-av" name={nameOf(p.assignee_id)} userId={p.assignee_id} />
                       <b>{nameOf(p.assignee_id)}</b>
                     </span>
-                    <span className={`wk-pill ${p.status === 'finished' ? 'ok' : p.status === 'in_process' ? 'warn' : ''}`}>{STATUS_LABEL[p.status]}</span>
+                    <span className={`wk-pill ${p.status === 'finished' ? 'ok' : p.status === 'in_process' || p.status === 'postponed' ? 'warn' : ''}`}>{STATUS_LABEL[p.status]}</span>
                   </div>
                   <div className="wk-sm" style={{ marginTop: 4 }}>
                     {p.label || 'Their part'}{p.due_date ? ` - due ${fmtDateShort(p.due_date)}` : ''}{p.seconds != null ? ` - ${fmtDur(p.seconds)}` : ''}
                   </div>
                   {p.finish_note && <div className="wk-sm">Note: {p.finish_note}</div>}
+                  {p.status === 'postponed' && (
+                    <div className="wk-sm" style={{ color: 'var(--w-wat, #FBBF24)' }}>
+                      Postponed until {p.postponed_until ? fmtDateShort(p.postponed_until) : ''} - asked by {[...(p.postponed_by_users || []).map((id) => nameOf(id)), p.postponed_by_client ? `${p.postponed_by_client} (client)` : ''].filter(Boolean).join(', ') || 'someone'}
+                      {p.postpone_count > 1 ? ` - postponed ${p.postpone_count} times` : ''}
+                    </div>
+                  )}
                   {p.status !== 'finished' && (isHead || task.created_by === uid || p.assignee_id === uid) && (
                     <select className="wk-input" style={{ marginTop: 8, minHeight: 40 }} value="" disabled={busy} aria-label="Give this task to someone else"
                       onChange={(e) => { const to = e.target.value; if (to) run(() => rpc('work_reassign_part', { p_part: p.id, p_to: to })) }}>
@@ -154,7 +163,9 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
               if (!mine) return null
               return (
                 <div style={{ position: 'sticky', bottom: -20, margin: '20px -20px -20px', padding: 16, background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
-                  {mine.status === 'assigned'
+                  {mine.status === 'postponed'
+                    ? <button className="wk-btn y lg" disabled={busy} onClick={() => run(() => rpc('work_move_part', { p_part: mine.id, p_to: 'assigned' }))}>Bring back now</button>
+                    : mine.status === 'assigned'
                     ? <button className="wk-btn y lg" disabled={busy} onClick={() => run(() => rpc('work_clock_start', { p_project: null, p_label: null, p_part: mine.id }))}><Play size={16} aria-hidden="true" /> Start my part</button>
                     : <button className="wk-btn y lg" disabled={busy} onClick={() => run(() => rpc('work_finish_part', { p_part: mine.id, p_note: null }))}><Check size={16} aria-hidden="true" /> Finish my part</button>}
                 </div>

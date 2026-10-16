@@ -30,8 +30,9 @@ export const fmtDateShort = (ymd) => {
 export const istHour = () => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: false }).format(new Date()))
 export const initialsOf = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 export const todayIST = istTodayISO
-export const STATUS_LABEL = { assigned: 'Assigned', in_process: 'In process', finished: 'Finished' }
+export const STATUS_LABEL = { assigned: 'Assigned', in_process: 'In process', finished: 'Finished', postponed: 'Postponed' }
 export const dueState = (due, status) => {
+  if (status === 'postponed') return { cls: '', label: 'Postponed' }   // never overdue while postponed
   if (!due || status === 'finished') return { cls: '', label: due ? fmtDateShort(due) : 'No due date' }
   const t = istTodayISO()
   if (due < t) return { cls: 'bad', label: 'Late ' + Math.max(1, Math.round((new Date(t) - new Date(due)) / 86400000)) + 'd' }

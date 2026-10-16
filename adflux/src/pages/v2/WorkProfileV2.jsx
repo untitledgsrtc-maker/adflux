@@ -113,13 +113,14 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
   // or finished after the due date).
   const taskTotal = parts.length
   const taskOnTime = parts.filter((p) => p.status === 'finished' && p.finished_at && istParts(p.finished_at).ymd <= p.due_date).length
-  const taskOverdue = parts.filter((p) => (p.status !== 'finished' && p.due_date < today) || (p.status === 'finished' && p.finished_at && istParts(p.finished_at).ymd > p.due_date)).length
+  const taskOverdue = parts.filter((p) => (p.status !== 'finished' && p.status !== 'postponed' && p.due_date < today) || (p.status === 'finished' && p.finished_at && istParts(p.finished_at).ymd > p.due_date)).length
   const tasksFinished = parts.filter((p) => p.status === 'finished').length
   // Work score (display only, no pay effect): 40 tasks on time + 30 on-time clock-in + 30 hours vs 8 h/day.
   // Days before today only; leave, Sundays and holidays are not counted; a part with no data is left out
   // and the rest is scaled to 100.
   const score = (() => {
-    const due = parts.filter((p) => p.due_date && (p.due_date <= today || p.status === 'finished'))
+    // a postponed task is neither due nor late (Phase 395) - it counts again once it returns
+    const due = parts.filter((p) => p.status !== 'postponed' && p.due_date && (p.due_date <= today || p.status === 'finished'))
     const dueOnTime = due.filter((p) => p.status === 'finished' && p.finished_at && istParts(p.finished_at).ymd <= p.due_date).length
     const work = cells.filter((c) => c && c.ymd < today && ['ok', 'late', 'half', 'absent'].includes(c.kind))
     const inOnTime = work.filter((c) => c.kind === 'ok').length

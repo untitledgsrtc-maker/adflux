@@ -16,6 +16,7 @@ import { openWhatsAppShare } from '../../utils/whatsappSummary'
 import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, istHour, dueState, initialsOf, clientColor } from '../../utils/workUtils'
 import WorkBoard from '../../components/work/WorkBoard'
 import NewTaskModal from '../../components/work/NewTaskModal'
+import PostponeModal from '../../components/work/PostponeModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
 
 export default function MyWorkV2() {
@@ -30,6 +31,8 @@ export default function MyWorkV2() {
   const [running, setRunning] = useState(null)
   const [entries, setEntries] = useState([])       // today's entries
   const [parts, setParts] = useState([])
+  const [postponing, setPostponing] = useState(null)   // item being postponed (Postpone box)
+  const [tagged, setTagged] = useState([])             // tasks postponed at MY request (I was tagged)
   const [viewFrom, setViewFrom] = useState(null)   // null = Today (today's tasks + anything overdue)
   const [viewTo, setViewTo] = useState(null)
   const [asked, setAsked] = useState([])
@@ -56,7 +59,7 @@ export default function MyWorkV2() {
       supabase.from('work_time_entries').select('*').eq('user_id', uid).is('ended_at', null).maybeSingle(),
       supabase.from('work_time_entries').select('*').eq('user_id', uid).gte('started_at', t0).order('started_at'),
       supabase.from('work_task_parts')
-        .select('id,task_id,assignee_id,label,due_date,status,started_at,finished_at,seconds,task:work_tasks(id,title,project_id,created_by,due_date,status)')
+        .select('id,task_id,assignee_id,label,due_date,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status)')
         .eq('assignee_id', uid).or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -14))}`).limit(300),
       supabase.from('work_tasks')
         .select('id,title,project_id,due_date,status,created_at,parts:work_task_parts(id,assignee_id,label,status,due_date)')
@@ -69,6 +72,10 @@ export default function MyWorkV2() {
     setRunning(run.data || null); setEntries(en.data || []); setParts(pa.data || [])
     setAsked(ak.data || []); setShared(sh.data || null)
     setLoading(false)
+    // tasks someone postponed and tagged ME as the one who asked (read only, best effort)
+    supabase.from('work_task_parts').select('id,assignee_id,postponed_until,postponed_by_client,task:work_tasks(title)')
+      .eq('status', 'postponed').contains('postponed_by_users', [uid]).limit(30)
+      .then(({ data }) => setTagged(data || []))
   }, [uid, today])
 
   useEffect(() => { load() }, [load])
@@ -100,6 +107,8 @@ export default function MyWorkV2() {
 
   // board items
   const items = useMemo(() => parts.map((p) => ({
+    postponedUntil: p.postponed_until, postponeCount: p.postpone_count || 0,
+    postponedBy: [...(p.postponed_by_users || []).map((id) => nameOf(id)), p.postponed_by_client ? `${p.postponed_by_client} (client)` : ''].filter(Boolean).join(', '),
     id: p.id, taskId: p.task_id, finishedAt: p.finished_at, status: p.status, title: p.task?.title || 'Task', label: p.label,
     client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, assigneeId: p.assignee_id,
     assigneeName: nameOf(p.assignee_id), assigneePhoto: photoOf(p.assignee_id), finishedDay: p.finished_at ? new Date(p.finished_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : null, partsTotal: 1, partsDone: 0, seconds: p.seconds, cost: null,
@@ -111,12 +120,14 @@ export default function MyWorkV2() {
   const rFrom = viewFrom || today
   const rTo = (viewTo && viewTo >= rFrom) ? viewTo : rFrom
   const boardItems = items.filter((i) => {
+    if (i.status === 'postponed') return true   // the Postponed column always shows what is waiting
     if (i.status === 'finished') return isToday ? i.finishedDay === today : (i.finishedDay >= rFrom && i.finishedDay <= rTo)
     if (isToday) return !i.due || i.due <= today
     return i.due && i.due >= rFrom && i.due <= rTo
   })
-  const dayOpen = boardItems.filter((i) => i.status !== 'finished').length
-  const dayLate = boardItems.filter((i) => i.status !== 'finished' && i.due && i.due < today).length
+  const isOpen = (i) => i.status !== 'finished' && i.status !== 'postponed'
+  const dayOpen = boardItems.filter(isOpen).length
+  const dayLate = boardItems.filter((i) => isOpen(i) && i.due && i.due < today).length
   const rangeLabel = isToday ? 'Today' : (rFrom === rTo ? fmtDateShort(rFrom) : `${fmtDateShort(rFrom)} - ${fmtDateShort(rTo)}`)
 
   const runSecs = running ? (now - new Date(running.started_at).getTime()) / 1000 : 0
@@ -124,7 +135,7 @@ export default function MyWorkV2() {
     .reduce((s, e) => s + (new Date(e.ended_at) - new Date(e.started_at)) / 1000, 0)
   const todaySecs = doneSecs + runSecs
   const firstIn = entries.find((e) => e.status === 'approved')?.started_at
-  const lateCount = items.filter((i) => i.status !== 'finished' && dueState(i.due, i.status).cls === 'bad').length
+  const lateCount = items.filter((i) => isOpen(i) && dueState(i.due, i.status).cls === 'bad').length
 
   const onStart = (it) => rpc('work_clock_start', { p_project: null, p_label: null, p_part: it.id })
   const onFinish = (it) => rpc('work_finish_part', { p_part: it.id, p_note: null }, 'Finished. The person who asked is told.')
@@ -133,7 +144,7 @@ export default function MyWorkV2() {
   if (!uid) return null
 
   const dateLine = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: '2-digit', month: 'short' })
-  const openAll = items.filter((i) => i.status !== 'finished').length
+  const openAll = items.filter(isOpen).length
   const showTabs = [
     isMember && ['work', 'My work'],
     ['asked', 'Asked by me', asked.length],
@@ -200,6 +211,22 @@ export default function MyWorkV2() {
                       ))}
                     </div>
                   </div>
+                  {tagged.length > 0 && (
+                    <div className="wk-card flush">
+                      <div className="wk-ch"><h3>Postponed at your request</h3></div>
+                      <div className="wk-list">
+                        {tagged.map((t) => (
+                          <div key={t.id} className="wk-row" style={{ padding: '12px 20px' }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 500 }}>{t.task?.title || 'Task'}</div>
+                              <div className="wk-sm">{nameOf(t.assignee_id)}</div>
+                            </div>
+                            <span className="wk-pill warn">Back {t.postponed_until ? fmtDateShort(t.postponed_until).replace(/^\w+,\s*/, '') : ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="wk-c12">
@@ -222,7 +249,7 @@ export default function MyWorkV2() {
                     <button className={`wk-btn ${isToday ? 'y' : 'o'}`} onClick={() => { setViewFrom(null); setViewTo(null) }}>Today</button>
                   </div>
                 </div>
-                <WorkBoard items={boardItems} uid={uid} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} />
+                <WorkBoard items={boardItems} uid={uid} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} onPostpone={(it) => setPostponing(it)} />
                 <div className="wk-sm" style={{ marginTop: 10 }}>Drag your own task forward: Assigned to In process starts the clock, In process to Finished stops it. Or use Start / Finish.</div>
               </div>
             </div>
@@ -232,6 +259,10 @@ export default function MyWorkV2() {
           {tab === 'hours' && isMember && <HoursTab uid={uid} entries={entries} projects={projects} projName={projName} onAddManual={(a) => rpc('work_add_manual_time', a, 'Sent for approval.')} onAddProject={addProject} />}
           {!isMember && tab !== 'asked' && <div className="wk-empty">You can ask for work and follow it here.</div>}
         </>
+      )}
+
+      {postponing && (
+        <PostponeModal item={postponing} users={users} meId={uid} onClose={() => setPostponing(null)} onDone={() => { setPostponing(null); load() }} />
       )}
 
       {newTask && (
@@ -361,7 +392,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
   if (hour < 19) return null
   const finished = items.filter((i) => i.status === 'finished' && i.finishedDay === today).length   // finished TODAY only
   const proc = items.filter((i) => i.status === 'in_process').length
-  const late = items.filter((i) => i.status !== 'finished' && dueState(i.due, i.status).cls === 'bad').length
+  const late = items.filter((i) => i.status !== 'finished' && i.status !== 'postponed' && dueState(i.due, i.status).cls === 'bad').length
   // The WhatsApp window MUST open straight from the tap: iPhone blocks a link opened after an
   // await (that is why the share did nothing and only "Last shared" updated). So the text is built
   // from the entries already on the page, opened first, and the "shared" mark is saved afterwards.
@@ -426,7 +457,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
   )
 }
 
-const PART_PILL = { assigned: ['', 'Assigned'], in_process: ['in', 'In process'], finished: ['ok', 'Finished'] }
+const PART_PILL = { assigned: ['', 'Assigned'], in_process: ['in', 'In process'], finished: ['ok', 'Finished'], postponed: ['warn', 'Postponed'] }
 
 function AskedTab({ asked, nameOf, projName, onOpen, onNew }) {
   const waiting = asked.reduce((n, t) => n + t.parts.filter((p) => p.status !== 'finished').length, 0)

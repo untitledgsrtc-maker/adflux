@@ -12,10 +12,12 @@ const COLS = [
   { key: 'assigned',   title: 'Assigned',   color: 'var(--text-muted)' },
   { key: 'in_process', title: 'In process', color: 'var(--accent)' },
   { key: 'finished',   title: 'Finished',   color: 'var(--success)' },
+  { key: 'postponed',  title: 'Postponed',  color: 'var(--w-wat, #FBBF24)' },
 ]
 
 // Due pill as in the owner's design: "On track, 18 Oct" / "Due today" / "Overdue, 12 Oct" / "Finished 12:40".
 function duePill(it) {
+  if (it.status === 'postponed') return { cls: 'warn', Icon: Clock, text: `Back ${fmtDateShort(it.postponedUntil || '').replace(/^\w+,\s*/, '')}` }
   if (it.status === 'finished') return { cls: 'ok', Icon: Check, text: it.finishedAt ? `Finished ${fmtTimeIST(it.finishedAt)}` : 'Finished' }
   if (!it.due) return { cls: '', Icon: Clock, text: 'No due date' }
   const t = istTodayISO()
@@ -25,7 +27,7 @@ function duePill(it) {
   return { cls: 'ok', Icon: Check, text: `On track, ${short}` }
 }
 
-export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, uid, showCost, actForAll, emptyText = 'Drop a task here' }) {
+export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, onPostpone, uid, showCost, actForAll, emptyText = 'Drop a task here' }) {
   const [drag, setDrag] = useState(null)
   const [over, setOver] = useState('')
   const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches)
@@ -60,7 +62,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, ui
               onDragLeave={() => setOver('')}
               onDrop={(e) => {
                 e.preventDefault(); setOver('')
-                if (drag && drag.status !== c.key) onMove(drag.id, c.key)
+                if (drag && drag.status !== c.key) { if (c.key === 'postponed') onPostpone?.(drag); else onMove(drag.id, c.key) }
                 setDrag(null)
               }}
             >
@@ -88,6 +90,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, ui
                       if (e.key === 'Enter') onOpen(it.taskId)
                       const order = ['assigned', 'in_process', 'finished']
                       const i = order.indexOf(it.status)
+                      if (i < 0) return   // postponed: use the Bring back button
                       if (e.key === 'ArrowRight' && i < 2) onMove(it.id, order[i + 1])
                       if (e.key === 'ArrowLeft' && i > 0) onMove(it.id, order[i - 1])
                     }}
@@ -107,6 +110,11 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, ui
                     <div style={{ margin: '8px 0 0 24px' }}>
                       <span className={`wk-pill ${dp.cls}`}><Pi size={13} aria-hidden="true" /> {dp.text}</span>
                     </div>
+                    {it.status === 'postponed' && (
+                      <div className="wk-sm" style={{ margin: '8px 0 0 24px' }}>
+                        Asked by {it.postponedBy || 'someone'}{it.postponeCount > 1 ? ` · postponed ${it.postponeCount} times` : ''}
+                      </div>
+                    )}
                     {it.partsTotal > 1 && (
                       <div className="wk-sm" style={{ margin: '8px 0 0 24px' }}>{it.partsDone} of {it.partsTotal} people done</div>
                     )}
@@ -123,6 +131,11 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, ui
                       {mine && it.status === 'assigned' && onStart && (
                         <button className="wk-btn g sm" onClick={(e) => { e.stopPropagation(); onStart(it) }}>
                           <Play size={14} aria-hidden="true" /> Start
+                        </button>
+                      )}
+                      {mine && it.status === 'postponed' && (
+                        <button className="wk-btn g sm" onClick={(e) => { e.stopPropagation(); onMove(it.id, 'assigned') }}>
+                          Bring back
                         </button>
                       )}
                       {mine && it.status === 'in_process' && onFinish && (
