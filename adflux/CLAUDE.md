@@ -21444,3 +21444,10 @@ Owner (screenshots): the Postponed column tab bar is cut off on a phone; native 
 - **Popup (idle window `src/main.js`):** running time big, client / task, RESUME (yellow) + STOP (red), "It was a break" below; `worked` seconds come from the engine.
 - **Website:** `work.css` colours native selects (`color-scheme: dark` + explicit option colours; day theme kept); `WorkBoard` phone tab bar is a 2 x 2 grid (4 columns).
 - Risk to watch: some antivirus tools dislike unsigned apps with keyboard hooks; the app only stores the time of the last real input.
+
+## 377 · Nothing important lives only on one Mac (16-10-2026)
+Owner: "so when I change the device we do not need a local file to move"; and "if possible, work in iCloud only". Decision: STAY in the iCloud folder, but make GitHub the single source and keep iCloud away from the risky parts.
+- `adflux/docs/NEW_DEVICE_SETUP.md` = the checklist for a fresh Mac (clone, install, secrets table by NAME only, CLI logins, restore steps).
+- `adflux/docs/workspace-backup/` = a mirror of the files that sit OUTSIDE the git repo: the old workspace `CLAUDE.md` (sections 1-33), `AGENTS.md`, the 3 other workspace `.md` files, `.mcp.json`, `.claude/` (agents, skills, settings, launch), and Claude's saved memory notes. After editing a live workspace file or a memory note, copy it into the mirror and commit.
+- The old untracked SQL / design files in `adflux/` were committed. Secrets are never committed (values stay in Vercel, the local `.env`, GitHub and the keychain).
+- iCloud hygiene: `.git`, `node_modules`, `dist` are renamed to `*.nosync` with a symlink of the old name so iCloud does not sync them (iCloud had left 292 broken temp files in `.git/objects`; they were deleted, `git fsck` was clean). A second Mac must CLONE from GitHub. Repo path stays `~/Library/Mobile Documents/com~apple~CloudDocs/Documents/untitled-os2/Untitled` (the push command in section 14 of the owner rules uses this, not `~/Documents/...`).

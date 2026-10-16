@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "deck",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8794", "--bind", "127.0.0.1", "--directory", "/Users/apple/Documents/untitled-os2/Untitled/adflux/public/deck"],
+      "port": 8794
+    },
+    {
+      "name": "led-static",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["/private/tmp/claude-501/-Users-apple-Documents-untitled-os2/3d512acd-19eb-4e9b-87b6-351434ebf5e3/scratchpad/led-server.js"],
+      "port": 8899
+    }
+  ]
+}

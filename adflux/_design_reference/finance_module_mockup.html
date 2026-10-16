@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Untitled OS · Finance Module — Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== Untitled OS brand tokens (CLAUDE.md §5) ===== */
+:root{
+ --bg:#0f172a;--surface:#1e293b;--surface-2:#334155;--surface-3:#475569;
+ --border:#334155;--border-strong:#475569;--border-soft:rgba(255,255,255,.06);
+ --text:#f1f5f9;--text-muted:#94a3b8;--text-subtle:#64748b;
+ --accent:#FFE600;--accent-hover:#F0D800;--accent-fg:#0f172a;--accent-soft:rgba(255,230,0,.14);
+ --success:#10B981;--success-soft:rgba(16,185,129,.12);
+ --warning:#F59E0B;--warning-soft:rgba(245,158,11,.12);
+ --danger:#EF4444;--danger-soft:rgba(239,68,68,.12);
+ --blue:#3B82F6;--blue-soft:rgba(59,130,246,.12);
+ --purple:#c084fc;--purple-soft:rgba(192,132,252,.14);
+ --sidebar-bg:#0b1220;--page-bg:#0a0f1c;
+ --radius-sm:6px;--radius:10px;--radius-lg:14px;--radius-xl:20px;
+}
+[data-theme="day"]{
+ --bg:#f4f5f8;--surface:#ffffff;--surface-2:#eef1f6;--surface-3:#e3e6ee;
+ --border:#e3e6ee;--border-strong:#cdd3e0;--border-soft:rgba(0,0,0,.05);
+ --text:#0c1224;--text-muted:#4a5474;--text-subtle:#94a3b8;
+ --sidebar-bg:#ffffff;--page-bg:#eceff4;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{background:var(--page-bg);color:var(--text);font-family:'DM Sans',system-ui,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.num,.display,h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;font-variant-numeric:tabular-nums}
+h1,h2,h3,h4{letter-spacing:-.01em;margin:0}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-subtle);font-weight:600}
+.muted{color:var(--text-muted)} .subtle{color:var(--text-subtle)} .note{font-size:12px;color:var(--text-subtle)}
+svg{stroke-width:1.6}
+
+/* ===== app shell ===== */
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.sidebar{background:var(--sidebar-bg);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 8px 14px}
+.brand .mark{width:34px;height:34px;border-radius:9px;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;font-family:'Space Grotesk';font-weight:700;font-size:18px}
+.brand .nm{font-family:'Space Grotesk';font-weight:600;font-size:15px;line-height:1.1}
+.brand .nm small{display:block;font-size:10px;letter-spacing:.12em;color:var(--text-subtle);font-weight:500}
+.navlbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-subtle);font-weight:600;padding:14px 10px 4px}
+.nav{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--radius);color:var(--text-muted);font-size:13.5px;font-weight:500;cursor:pointer;border:1px solid transparent}
+.nav:hover{background:var(--surface);color:var(--text)}
+.nav.active{background:var(--accent-soft);color:var(--text);border-color:rgba(255,230,0,.25)}
+.nav.active svg{color:var(--accent)}
+.nav svg{color:var(--text-subtle);flex-shrink:0}
+.nav.active svg{color:var(--accent)}
+.sidebar .foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-top:1px solid var(--border);color:var(--text-muted);font-size:13px}
+.av{width:30px;height:30px;border-radius:8px;background:var(--surface-2);display:grid;place-items:center;font-weight:600;font-size:12px;color:var(--text);font-family:'Space Grotesk'}
+
+/* topbar */
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{height:58px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--page-bg) 86%,transparent);backdrop-filter:blur(8px);display:flex;align-items:center;gap:14px;padding:0 24px;position:sticky;top:0;z-index:20}
+.crumb{font-size:13px;color:var(--text-muted)} .crumb b{color:var(--text);font-weight:600}
+.spacer{flex:1}
+.tsearch{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:7px 14px;color:var(--text-subtle);font-size:12.5px;min-width:230px}
+.iconbtn{width:36px;height:36px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);display:grid;place-items:center;cursor:pointer;position:relative}
+.iconbtn:hover{color:var(--text)}
+.dot-badge{position:absolute;top:-4px;right:-4px;background:var(--danger);color:#fff;font-size:10px;font-weight:600;border-radius:999px;min-width:16px;height:16px;display:grid;place-items:center;padding:0 4px}
+
+.content{padding:24px;max-width:1640px;width:100%}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:999px;font-size:13px;font-weight:600;border:1px solid var(--border);background:var(--surface-2);color:var(--text);cursor:pointer;font-family:inherit}
+.btn:hover{border-color:var(--border-strong)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn.sm{padding:6px 12px;font-size:12px}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--text-muted)}
+
+/* tabs */
+.tabs{display:flex;gap:4px;margin:16px 0 18px;border-bottom:1px solid var(--border);padding-bottom:0}
+.tab{padding:9px 16px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+
+/* cards / grid */
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.between{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.grid{display:grid;gap:14px}
+@media(min-width:1000px){.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px}
+.ch{font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.tile{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex-shrink:0}
+.tile svg{width:17px;height:17px}
+.t-blue{background:var(--blue-soft);color:var(--blue)} .t-green{background:var(--success-soft);color:var(--success)}
+.t-amber{background:var(--warning-soft);color:var(--warning)} .t-red{background:var(--danger-soft);color:var(--danger)}
+.t-purple{background:var(--purple-soft);color:var(--purple)} .t-yellow{background:var(--accent-soft);color:var(--accent)}
+.t-slate{background:var(--surface-2);color:var(--text-muted)}
+
+/* hero */
+.hero{position:relative;overflow:hidden;border:1px solid var(--border-strong);border-radius:var(--radius-xl);padding:24px 26px;background:radial-gradient(480px 220px at 92% -10%,rgba(255,230,0,.16),transparent 60%),linear-gradient(160deg,#10192e,#0c1424)}
+[data-theme="day"] .hero{background:radial-gradient(480px 220px at 92% -10%,rgba(255,230,0,.35),transparent 60%),linear-gradient(160deg,#ffffff,#f4f6fb)}
+.hero .l{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-subtle);font-weight:600}
+.hero .v{font-family:'Space Grotesk';font-weight:600;font-size:46px;line-height:1.05;margin:8px 0 4px;font-variant-numeric:tabular-nums}
+.hero .v.pos{color:var(--accent)} .hero .v.neg{color:var(--danger)}
+.hero .d{font-size:13px;color:var(--text-muted)}
+.hero .pillbox{position:absolute;top:22px;right:24px}
+
+/* kpi */
+.kpi .l{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-subtle);font-weight:600}
+.kpi .v{font-family:'Space Grotesk';font-weight:600;font-size:25px;margin-top:8px;font-variant-numeric:tabular-nums}
+.kpi .sub{font-size:11.5px;margin-top:3px}
+
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:999px;font-size:11px;font-weight:600}
+.pill.s{background:var(--success-soft);color:var(--success)} .pill.w{background:var(--warning-soft);color:var(--warning)}
+.pill.d{background:var(--danger-soft);color:var(--danger)} .pill.b{background:var(--blue-soft);color:var(--blue)}
+.pill.p{background:var(--purple-soft);color:var(--purple)} .pill.slate{background:var(--surface-2);color:var(--text-muted)}
+
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-subtle);font-weight:600;padding:9px 10px;border-bottom:1px solid var(--border)}
+td{padding:10px;border-bottom:1px solid var(--border-soft);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+.num-c{font-family:'Space Grotesk';font-weight:600;font-variant-numeric:tabular-nums}
+.tot td{font-weight:700;background:var(--surface-2)}
+tbody tr:hover{background:var(--surface-2)}
+.bar{height:7px;border-radius:4px;background:var(--surface-2);overflow:hidden;min-width:60px}
+.bar>i{display:block;height:100%;border-radius:4px}
+.seg-name{display:flex;align-items:center;gap:8px}
+.dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+
+/* role banner */
+.rolebar{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:12.5px}
+.rolebar .who{display:flex;gap:7px;align-items:center;font-weight:600}
+.seg-toggle{display:flex;gap:3px;background:var(--surface-2);border-radius:999px;padding:3px}
+.seg-toggle span{padding:5px 12px;border-radius:999px;font-size:12px;font-weight:600;color:var(--text-muted);cursor:pointer}
+.seg-toggle span.on{background:var(--accent);color:var(--accent-fg)}
+
+/* flags */
+.flag{display:flex;gap:9px;align-items:flex-start;background:var(--danger-soft);border:1px solid rgba(239,68,68,.3);border-radius:var(--radius);padding:11px 14px;font-size:13px;color:var(--text-muted);margin-top:10px}
+.flag svg{color:var(--danger);flex-shrink:0;margin-top:1px}
+
+/* import */
+.dropzone{border:2px dashed var(--border-strong);border-radius:var(--radius-lg);padding:48px 20px;text-align:center;color:var(--text-muted);background:var(--surface)}
+.dropzone .big{width:64px;height:64px;border-radius:var(--radius-lg);margin:0 auto 14px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
+.step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-subtle);font-weight:600}
+.step b{width:22px;height:22px;border-radius:7px;background:var(--surface-2);display:grid;place-items:center;font-family:'Space Grotesk'}
+.step.on b{background:var(--accent);color:var(--accent-fg)}
+.step.on{color:var(--text)}
+.field label{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-subtle);font-weight:600;margin-bottom:6px}
+.sel{display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 11px;font-size:13px;color:var(--text)}
+.sel svg{color:var(--text-subtle)}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;background:var(--surface-2);color:var(--text-muted)}
+
+/* accounts home + tasks */
+.atile{cursor:pointer;position:relative} .atile:hover{border-color:var(--border-strong)}
+.atile .go{position:absolute;top:16px;right:16px;color:var(--text-subtle)}
+.cbox{width:19px;height:19px;border-radius:5px;border:1.6px solid var(--border-strong);display:inline-grid;place-items:center;flex-shrink:0;cursor:pointer}
+.cbox svg{width:12px;height:12px;color:transparent}
+.cbox.done{background:var(--success);border-color:var(--success)} .cbox.done svg{color:#fff}
+.trow{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--border-soft)}
+.trow:last-child{border-bottom:0}
+.trow .tt{flex:1;font-size:13.5px;font-weight:500} .trow.dn .tt{color:var(--text-subtle);text-decoration:line-through;font-weight:400}
+.trow .tsub{font-size:11.5px;color:var(--text-subtle);font-weight:400}
+
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+
+ <!-- ===== SIDEBAR ===== -->
+ <aside class="sidebar">
+   <div class="brand">
+     <div class="mark">U</div>
+     <div class="nm">Untitled OS<small>FINANCE</small></div>
+   </div>
+   <div class="navlbl">Workspace</div>
+   <div class="nav"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</div>
+   <div class="nav"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>Leads</div>
+   <div class="nav"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8"/></svg>Quotes</div>
+   <div class="navlbl">Finance</div>
+   <div class="nav active"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"><line x1="3" y1="22" x2="21" y2="22"/><path d="M5 22V11M19 22V11M9 22V11M15 22V11"/><path d="M12 2 21 8H3z"/></svg>Finance P&amp;L</div>
+   <div class="nav"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>Approvals</div>
+   <div class="nav"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Salary &amp; Payroll</div>
+   <div class="navlbl">Admin</div>
+   <div class="nav"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>People</div>
+   <div class="nav"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Master</div>
+   <div class="foot"><div class="av">BR</div><div>Brijesh<div class="note">Owner · admin</div></div></div>
+ </aside>
+
+ <!-- ===== MAIN ===== -->
+ <div class="main">
+   <div class="topbar">
+     <div class="crumb">Finance · <b>P&amp;L</b></div>
+     <div class="spacer"></div>
+     <div class="tsearch"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Search transactions…</div>
+     <div class="iconbtn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dot-badge">3</span></div>
+     <div class="av">BR</div>
+   </div>
+
+   <div class="content">
+
+     <div class="between">
+       <div><div class="eyebrow">Untitled Group · Consolidated</div><h1 style="font-size:25px;margin-top:3px">Finance P&amp;L</h1></div>
+       <div class="row" style="gap:10px">
+         <div class="sel" style="min-width:130px;cursor:pointer">All months <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"><path d="m6 9 6 6 6-6"/></svg></div>
+         <button class="btn primary"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg>Import statement</button>
+       </div>
+     </div>
+
+     <!-- role / segment scope banner -->
+     <div class="rolebar" style="margin-top:16px">
+       <div class="who"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" style="color:var(--accent)"><path d="M12 2 4 5v6c0 5 3.4 8.4 8 10 4.6-1.6 8-5 8-10V5z"/></svg>Owner — full access</div>
+       <div class="note">You + Accounts see everything · Vishal (co-owner) sees Government only</div>
+       <div class="spacer"></div>
+       <div class="seg-toggle"><span class="on">All</span><span>Private</span><span>Government</span></div>
+     </div>
+
+     <!-- tabs -->
+     <div class="tabs">
+       <div class="tab active" data-tab="dash">Owner · P&amp;L</div>
+       <div class="tab" data-tab="home">Accounts Home</div>
+       <div class="tab" data-tab="tasks">Tasks</div>
+       <div class="tab" data-tab="import">Import</div>
+       <div class="tab" data-tab="register">Register</div>
+     </div>
+
+     <!-- ============ DASHBOARD ============ -->
+     <section id="tab-dash">
+
+       <div class="hero">
+         <div class="pillbox"><span class="pill s"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"><path d="m23 6-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>Profit</span></div>
+         <div class="l">Operating Profit / (Loss) · All months</div>
+         <div class="v pos">₹2,48,640</div>
+         <div class="d">Revenue ₹12,41,300 · Costs ₹9,92,660 · Margin 20.0%</div>
+       </div>
+
+       <div class="grid g4" style="margin-top:14px">
+         <div class="card kpi"><div class="between"><div class="l">Operating Income</div><span class="tile t-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m23 6-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg></span></div><div class="v">₹12,41,300</div><div class="sub note">across 4 segments</div></div>
+         <div class="card kpi"><div class="between"><div class="l">Operating Costs</div><span class="tile t-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m23 18-9.5-9.5-5 5L1 6"/><path d="M17 18h6v-6"/></svg></span></div><div class="v">₹9,92,660</div><div class="sub note">direct + common</div></div>
+         <div class="card kpi"><div class="between"><div class="l">Operating P&amp;L</div><span class="tile t-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 4-6"/></svg></span></div><div class="v" style="color:var(--success)">₹2,48,640</div><div class="sub note">profit this period</div></div>
+         <div class="card kpi"><div class="between"><div class="l">Margin</div><span class="tile t-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span></div><div class="v">20.0%</div><div class="sub note">healthy</div></div>
+       </div>
+
+       <div class="grid g2" style="margin-top:14px">
+         <!-- trend -->
+         <div class="card">
+           <div class="ch"><span class="tile t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></span>Monthly Trend <span class="note" style="font-weight:400">income vs costs</span></div>
+           <div class="row" style="gap:14px;margin-bottom:6px">
+             <span class="row" style="gap:6px;font-size:11px;color:var(--text-muted)"><span class="dot" style="background:var(--blue)"></span>Income</span>
+             <span class="row" style="gap:6px;font-size:11px;color:var(--text-muted)"><span class="dot" style="background:var(--danger)"></span>Costs</span>
+             <span class="note">net above each month</span>
+           </div>
+           <svg width="100%" viewBox="0 0 560 200" style="display:block">
+             <line x1="10" x2="550" y1="172" y2="172" stroke="var(--border)"/>
+             <!-- Apr --><text x="95" y="20" text-anchor="middle" font-size="13" font-family="Space Grotesk" font-weight="600" fill="var(--danger)">−₹1.2L</text>
+             <rect x="70" y="92" width="26" height="80" rx="3" fill="var(--blue)"/><rect x="100" y="64" width="26" height="108" rx="3" fill="var(--danger)"/>
+             <text x="95" y="188" text-anchor="middle" font-size="10" fill="var(--text-subtle)" font-family="Space Grotesk">Apr-26</text>
+             <!-- May --><text x="230" y="20" text-anchor="middle" font-size="13" font-family="Space Grotesk" font-weight="600" fill="var(--success)">+₹1.9L</text>
+             <rect x="205" y="54" width="26" height="118" rx="3" fill="var(--blue)"/><rect x="235" y="92" width="26" height="80" rx="3" fill="var(--danger)"/>
+             <text x="230" y="188" text-anchor="middle" font-size="10" fill="var(--text-subtle)" font-family="Space Grotesk">May-26</text>
+             <!-- Jun --><text x="365" y="20" text-anchor="middle" font-size="13" font-family="Space Grotesk" font-weight="600" fill="var(--success)">+₹1.6L</text>
+             <rect x="340" y="62" width="26" height="110" rx="3" fill="var(--blue)"/><rect x="370" y="98" width="26" height="74" rx="3" fill="var(--danger)"/>
+             <text x="365" y="188" text-anchor="middle" font-size="10" fill="var(--text-subtle)" font-family="Space Grotesk">Jun-26</text>
+           </svg>
+         </div>
+         <!-- mix donut -->
+         <div class="card">
+           <div class="ch"><span class="tile t-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span>Revenue Mix by Segment</div>
+           <div class="row" style="gap:18px;align-items:center">
+             <svg width="150" height="150" viewBox="0 0 150 150">
+               <circle cx="75" cy="75" r="54" fill="none" stroke="var(--success)" stroke-width="22" stroke-dasharray="170 169" stroke-dashoffset="0" transform="rotate(-90 75 75)"/>
+               <circle cx="75" cy="75" r="54" fill="none" stroke="var(--blue)" stroke-width="22" stroke-dasharray="110 229" stroke-dashoffset="-170" transform="rotate(-90 75 75)"/>
+               <circle cx="75" cy="75" r="54" fill="none" stroke="var(--purple)" stroke-width="22" stroke-dasharray="40 299" stroke-dashoffset="-280" transform="rotate(-90 75 75)"/>
+               <circle cx="75" cy="75" r="54" fill="none" stroke="var(--accent)" stroke-width="22" stroke-dasharray="19 320" stroke-dashoffset="-320" transform="rotate(-90 75 75)"/>
+               <text x="75" y="73" text-anchor="middle" font-family="Space Grotesk" font-weight="600" font-size="18" fill="var(--text)">₹12.4L</text>
+               <text x="75" y="90" text-anchor="middle" font-size="8" fill="var(--text-subtle)" letter-spacing="1.5">REVENUE</text>
+             </svg>
+             <div style="flex:1;min-width:180px">
+               <div class="row between" style="padding:4px 0"><span class="seg-name"><span class="dot" style="background:var(--success)"></span>Pvt · Other Media</span><span class="num-c">₹6.2L</span><span class="note">50%</span></div>
+               <div class="row between" style="padding:4px 0"><span class="seg-name"><span class="dot" style="background:var(--blue)"></span>Govt · GSRTC LED</span><span class="num-c">₹4.0L</span><span class="note">32%</span></div>
+               <div class="row between" style="padding:4px 0"><span class="seg-name"><span class="dot" style="background:var(--purple)"></span>Pvt · LED Cities</span><span class="num-c">₹1.5L</span><span class="note">12%</span></div>
+               <div class="row between" style="padding:4px 0"><span class="seg-name"><span class="dot" style="background:var(--accent)"></span>Govt · Auto Hood</span><span class="num-c">₹0.7L</span><span class="note">6%</span></div>
+             </div>
+           </div>
+         </div>
+       </div>
+
+       <div class="grid g2" style="margin-top:14px">
+         <!-- segment net -->
+         <div class="card">
+           <div class="ch"><span class="tile t-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20z"/></svg></span>True Net Profit by Segment <span class="note" style="font-weight:400">common split by income share</span></div>
+           <table>
+             <tr><th>Segment</th><th class="r">Income</th><th class="r">Cost + Common</th><th class="r">Net</th></tr>
+             <tr><td><span class="seg-name"><span class="dot" style="background:var(--success)"></span>Private · Other Media</span></td><td class="r num-c">₹6,20,000</td><td class="r num-c" style="color:var(--danger)">₹4,38,000</td><td class="r num-c" style="color:var(--success)">₹1,82,000</td></tr>
+             <tr><td><span class="seg-name"><span class="dot" style="background:var(--blue)"></span>Government · GSRTC LED</span></td><td class="r num-c">₹4,00,000</td><td class="r num-c" style="color:var(--danger)">₹3,12,000</td><td class="r num-c" style="color:var(--success)">₹88,000</td></tr>
+             <tr><td><span class="seg-name"><span class="dot" style="background:var(--purple)"></span>Private · LED Cities</span></td><td class="r num-c">₹1,50,000</td><td class="r num-c" style="color:var(--danger)">₹1,32,000</td><td class="r num-c" style="color:var(--success)">₹18,000</td></tr>
+             <tr><td><span class="seg-name"><span class="dot" style="background:var(--accent)"></span>Government · Auto Hood</span></td><td class="r num-c">₹71,300</td><td class="r num-c" style="color:var(--danger)">₹1,10,660</td><td class="r num-c" style="color:var(--danger)">(₹39,360)</td></tr>
+             <tr class="tot"><td>TOTAL</td><td class="r num-c">₹12,41,300</td><td class="r num-c">₹9,92,660</td><td class="r num-c" style="color:var(--success)">₹2,48,640</td></tr>
+           </table>
+         </div>
+         <!-- common expense split -->
+         <div class="card">
+           <div class="ch"><span class="tile t-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="6" r="1.5"/><line x1="5" y1="12" x2="19" y2="12"/><circle cx="12" cy="18" r="1.5"/></svg></span>Common Expense — split by income share</div>
+           <table>
+             <tr><th>Segment</th><th class="r">Income</th><th class="r">Share</th><th class="r">Common ₹</th></tr>
+             <tr><td><span class="seg-name"><span class="dot" style="background:var(--success)"></span>Pvt · Other Media</span></td><td class="r num-c">₹6,20,000</td><td class="r num-c">50%</td><td class="r num-c" style="color:var(--warning)">₹1,55,000</td></tr>
+             <tr><td><span class="seg-name"><span class="dot" style="background:var(--blue)"></span>Govt · GSRTC LED</span></td><td class="r num-c">₹4,00,000</td><td class="r num-c">32%</td><td class="r num-c" style="color:var(--warning)">₹99,200</td></tr>
+             <tr><td><span class="seg-name"><span class="dot" style="background:var(--purple)"></span>Pvt · LED Cities</span></td><td class="r num-c">₹1,50,000</td><td class="r num-c">12%</td><td class="r num-c" style="color:var(--warning)">₹37,200</td></tr>
+             <tr><td><span class="seg-name"><span class="dot" style="background:var(--accent)"></span>Govt · Auto Hood</span></td><td class="r num-c">₹71,300</td><td class="r num-c">6%</td><td class="r num-c" style="color:var(--warning)">₹18,600</td></tr>
+             <tr class="tot"><td>POOL (common)</td><td class="r"></td><td class="r"></td><td class="r num-c">₹3,10,000</td></tr>
+           </table>
+         </div>
+       </div>
+
+       <div class="grid g2" style="margin-top:14px">
+         <!-- per company -->
+         <div class="card">
+           <div class="ch"><span class="tile t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg></span>Per Company — Operating P&amp;L</div>
+           <table>
+             <tr><th>Company</th><th class="r">Income</th><th class="r">Op P&amp;L</th><th class="r">Margin</th></tr>
+             <tr><td>Untitled Advertising</td><td class="r num-c">₹4,71,300</td><td class="r num-c" style="color:var(--success)">₹48,640</td><td class="r num-c">10.3%</td></tr>
+             <tr><td>Untitled Adflux Pvt Ltd</td><td class="r num-c">₹7,70,000</td><td class="r num-c" style="color:var(--success)">₹2,05,000</td><td class="r num-c">26.6%</td></tr>
+             <tr><td>Trade Venture</td><td class="r num-c">—</td><td class="r num-c" style="color:var(--text-muted)">(₹5,000)</td><td class="r num-c">—</td></tr>
+             <tr class="tot"><td>GROUP</td><td class="r num-c">₹12,41,300</td><td class="r num-c" style="color:var(--success)">₹2,48,640</td><td class="r num-c">20.0%</td></tr>
+           </table>
+         </div>
+         <!-- financing -->
+         <div class="card">
+           <div class="ch"><span class="tile t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m17 2 4 4-4 4"/><path d="M3 6h18"/><path d="m7 22-4-4 4-4"/><path d="M21 18H3"/></svg></span>Loans &amp; Transfers <span class="note" style="font-weight:400">not profit</span></div>
+           <table>
+             <tr><td>Loan In (borrowed)</td><td class="r num-c" style="color:var(--success)">₹17,90,000</td></tr>
+             <tr><td>Loan Out (repaid / given)</td><td class="r num-c" style="color:var(--danger)">₹7,52,810</td></tr>
+             <tr class="tot"><td>Net loan position</td><td class="r num-c" style="color:var(--success)">₹10,37,190</td></tr>
+             <tr><td>Internal transfers <span class="note">own accounts</span></td><td class="r num-c" style="color:var(--blue)">₹41,57,000</td></tr>
+             <tr><td>Owner drawings</td><td class="r num-c" style="color:var(--warning)">₹2,92,000</td></tr>
+           </table>
+           <div class="note" style="margin-top:8px">Cash movements — kept out of Operating P&amp;L.</div>
+         </div>
+       </div>
+
+       <div class="grid g2" style="margin-top:14px">
+         <!-- assets -->
+         <div class="card">
+           <div class="ch"><span class="tile t-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m21 16-9 5-9-5V8l9-5 9 5z"/><path d="m3 8 9 5 9-5"/><path d="M12 21V13"/></svg></span>Assets &amp; Investments <span class="note" style="font-weight:400">capital</span></div>
+           <table>
+             <tr><th>Date</th><th>Remark</th><th>Type</th><th class="r">Amount</th></tr>
+             <tr><td class="num-c" style="white-space:nowrap">18/04/26</td><td>PCG Infraspace — property</td><td><span class="pill p">Investment</span></td><td class="r num-c">₹24,50,000</td></tr>
+             <tr><td class="num-c" style="white-space:nowrap">17/04/26</td><td>PCG Infraspace — booking</td><td><span class="pill p">Investment</span></td><td class="r num-c">₹50,000</td></tr>
+             <tr><td class="num-c" style="white-space:nowrap">11/05/26</td><td>LED panels — new stock</td><td><span class="pill p">Assets</span></td><td class="r num-c">₹3,80,000</td></tr>
+             <tr class="tot"><td colspan="3">Total capital</td><td class="r num-c">₹28,80,000</td></tr>
+           </table>
+         </div>
+         <!-- expense by head -->
+         <div class="card">
+           <div class="ch"><span class="tile t-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>Operating Expense by Head</div>
+           <table>
+             <tr><td>Staff Salaries &amp; Benefits</td><td style="width:100px"><div class="bar"><i style="width:100%;background:var(--accent)"></i></div></td><td class="r num-c">₹3,42,000</td></tr>
+             <tr><td>Vendor Payment</td><td><div class="bar"><i style="width:78%;background:var(--accent)"></i></div></td><td class="r num-c">₹2,66,000</td></tr>
+             <tr><td>Marketing &amp; Promotion</td><td><div class="bar"><i style="width:50%;background:var(--accent)"></i></div></td><td class="r num-c">₹1,72,000</td></tr>
+             <tr><td>Rent &amp; Utilities</td><td><div class="bar"><i style="width:28%;background:var(--accent)"></i></div></td><td class="r num-c">₹96,000</td></tr>
+             <tr><td>Travel &amp; Conveyance</td><td><div class="bar"><i style="width:25%;background:var(--accent)"></i></div></td><td class="r num-c">₹84,000</td></tr>
+             <tr><td>Duties &amp; Taxes</td><td><div class="bar"><i style="width:20%;background:var(--accent)"></i></div></td><td class="r num-c">₹68,000</td></tr>
+           </table>
+         </div>
+       </div>
+
+       <div style="margin-top:18px">
+         <div class="eyebrow" style="color:var(--danger);margin-bottom:4px">Action needed</div>
+         <div class="flag"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><div><b>4 transactions in REVIEW</b> — ₹62,400 unclassified. Open Register, filter Bucket = REVIEW, and tag them so the P&amp;L is complete.</div></div>
+       </div>
+     </section>
+
+     <!-- ============ ACCOUNTS HOME ============ -->
+     <section id="tab-home" class="hidden">
+       <div class="between" style="margin-bottom:3px">
+         <div><div class="eyebrow">Accountant workspace</div><h2 style="font-size:22px;margin-top:3px">Good afternoon, Riya</h2></div>
+         <span class="pill w"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>5 items need you today</span>
+       </div>
+       <div class="note" style="margin-bottom:16px">Saturday, 14 June 2026 — everything that needs action, in one place.</div>
+
+       <div class="grid g3">
+         <div class="card kpi atile"><span class="go"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"><path d="m9 18 6-6-6-6"/></svg></span><div class="between"><div class="l">To collect</div><span class="tile t-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div><div class="v" style="color:var(--danger)">₹2,05,953</div><div class="sub note">8 clients · 3 overdue</div></div>
+         <div class="card kpi atile"><span class="go"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"><path d="m9 18 6-6-6-6"/></svg></span><div class="between"><div class="l">Approvals pending</div><span class="tile t-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></span></div><div class="v">3</div><div class="sub note">payments from reps</div></div>
+         <div class="card kpi atile"><span class="go"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"><path d="m9 18 6-6-6-6"/></svg></span><div class="between"><div class="l">Payouts due</div><span class="tile t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span></div><div class="v">₹3,42,000</div><div class="sub note">June salary · run on 1st</div></div>
+         <div class="card kpi atile"><span class="go"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"><path d="m9 18 6-6-6-6"/></svg></span><div class="between"><div class="l">Bank import</div><span class="tile t-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg></span></div><div class="v" style="font-size:20px">May pending</div><div class="sub note" style="color:var(--danger)">5 days overdue</div></div>
+         <div class="card kpi atile"><span class="go"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"><path d="m9 18 6-6-6-6"/></svg></span><div class="between"><div class="l">REVIEW to tag</div><span class="tile t-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span></div><div class="v">4</div><div class="sub note">unclassified entries</div></div>
+         <div class="card kpi atile"><span class="go"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"><path d="m9 18 6-6-6-6"/></svg></span><div class="between"><div class="l">Reminders due</div><span class="tile t-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span></div><div class="v">2</div><div class="sub note" style="color:var(--danger)">overdue tasks</div></div>
+       </div>
+
+       <div class="grid g2" style="margin-top:14px">
+         <!-- today's tasks -->
+         <div class="card">
+           <div class="ch"><span class="tile t-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M9 11l3 3L22 4"/></svg></span>Today's tasks</div>
+           <div class="trow"><span class="cbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span><div class="tt">Approve 3 pending payments</div><span class="pill b">Due today</span></div>
+           <div class="trow"><span class="cbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span><div class="tt">Import May bank statement<div class="tsub">Axis Bank</div></div><span class="pill d">Overdue 5d</span></div>
+           <div class="trow"><span class="cbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span><div class="tt">Send outstanding reminders to 8 clients</div><span class="pill d">Overdue 1d</span></div>
+           <div class="trow"><span class="cbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span><div class="tt">Tag 4 REVIEW entries from last import</div><span class="pill w">Today</span></div>
+           <div class="trow dn"><span class="cbox done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span><div class="tt">File GSTR-3B (May)</div><span class="pill s">Done</span></div>
+         </div>
+         <!-- money to collect -->
+         <div class="card">
+           <div class="ch"><span class="tile t-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>Money to collect <span class="note" style="font-weight:400">oldest first</span></div>
+           <table>
+             <tr><th>Client</th><th class="r">Overdue</th><th class="r">Amount</th><th></th></tr>
+             <tr><td>K.J.Institute of Engg.</td><td class="r"><span class="pill d">42 days</span></td><td class="r num-c">₹94,447</td><td class="r"><span class="btn sm ghost" style="color:var(--accent)">Remind</span></td></tr>
+             <tr><td>Entertainment Network</td><td class="r"><span class="pill d">38 days</span></td><td class="r num-c">₹46,020</td><td class="r"><span class="btn sm ghost" style="color:var(--accent)">Remind</span></td></tr>
+             <tr><td>UGVCL</td><td class="r"><span class="pill w">19 days</span></td><td class="r num-c">₹19,116</td><td class="r"><span class="btn sm ghost" style="color:var(--accent)">Remind</span></td></tr>
+             <tr><td>Kalap Hospital</td><td class="r"><span class="pill w">12 days</span></td><td class="r num-c">₹13,000</td><td class="r"><span class="btn sm ghost" style="color:var(--accent)">Remind</span></td></tr>
+             <tr class="tot"><td>8 clients</td><td class="r"></td><td class="r num-c">₹2,05,953</td><td></td></tr>
+           </table>
+         </div>
+       </div>
+
+       <div class="card" style="margin-top:14px">
+         <div class="ch"><span class="tile t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>Coming up this week</div>
+         <div class="row" style="gap:10px">
+           <div class="chip" style="background:var(--danger-soft);color:var(--danger)">Today · Approve payments</div>
+           <div class="chip" style="background:var(--warning-soft);color:var(--warning)">Jun 20 · GSTR-3B + collections sweep</div>
+           <div class="chip">Jul 1 · Run June payroll</div>
+           <div class="chip">Jul 7 · Pay TDS</div>
+           <div class="chip">Weekly Mon · Import statement</div>
+         </div>
+       </div>
+     </section>
+
+     <!-- ============ TASKS ============ -->
+     <section id="tab-tasks" class="hidden">
+       <div class="between" style="margin-bottom:13px">
+         <div><div class="eyebrow">Recurring + one-off reminders</div><h2 style="font-size:22px;margin-top:3px">Accounts Tasks</h2></div>
+         <button class="btn primary"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add task</button>
+       </div>
+       <div class="rolebar" style="margin-bottom:16px">
+         <div class="who"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" style="color:var(--accent)"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Reminders fire as app notifications</div>
+         <div class="note">Key ones also ping WhatsApp · overdue turns red and nags daily until done — so nothing gets forgotten.</div>
+       </div>
+
+       <div class="card">
+         <div class="ch"><span class="tile t-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span>Recurring</div>
+         <table>
+           <tr><th>Task</th><th>Frequency</th><th>Next due</th><th>Reminder</th><th class="r">Status</th></tr>
+           <tr><td>Approve pending payments</td><td>Daily</td><td>Today</td><td><span class="chip">Push</span></td><td class="r"><span class="pill b">Open · 3</span></td></tr>
+           <tr><td>Import bank statement</td><td>Weekly · Mon</td><td>Jun 9</td><td><span class="chip">Push</span></td><td class="r"><span class="pill d">Overdue 5d</span></td></tr>
+           <tr><td>Tag REVIEW entries</td><td>After each import</td><td>Now</td><td><span class="chip">Push</span></td><td class="r"><span class="pill w">4 pending</span></td></tr>
+           <tr><td>Send outstanding reminders</td><td>Weekly · Fri</td><td>Jun 13</td><td><span class="chip">Push</span></td><td class="r"><span class="pill d">Overdue 1d</span></td></tr>
+           <tr><td>Run payroll</td><td>Monthly · 1st</td><td>Jul 1</td><td><span class="chip">Push + WA</span></td><td class="r"><span class="pill slate">Scheduled</span></td></tr>
+           <tr><td>Pay TDS</td><td>Monthly · 7th</td><td>Jul 7</td><td><span class="chip">Push + WA</span></td><td class="r"><span class="pill slate">Scheduled</span></td></tr>
+           <tr><td>File GSTR-1</td><td>Monthly · 11th</td><td>Jul 11</td><td><span class="chip">Push</span></td><td class="r"><span class="pill slate">Scheduled</span></td></tr>
+           <tr><td>File GSTR-3B</td><td>Monthly · 20th</td><td>Jun 20</td><td><span class="chip">Push</span></td><td class="r"><span class="pill w">In 6 days</span></td></tr>
+           <tr><td>Pay vendor dues</td><td>As scheduled</td><td>Jun 16</td><td><span class="chip">Push</span></td><td class="r"><span class="pill w">2 due</span></td></tr>
+         </table>
+         <div class="note" style="margin-top:10px">These are a proposed starter set — turn any off, change the day, or add your own. GST/TDS rows only if you file in-house (drop them if your CA does).</div>
+       </div>
+
+       <div class="card" style="margin-top:14px">
+         <div class="ch"><span class="tile t-slate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></span>One-off</div>
+         <div class="trow"><span class="cbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span><div class="tt">Reconcile Axis Bank — April<div class="tsub">match bank balance to register</div></div><span class="pill w">Jun 16</span></div>
+         <div class="trow"><span class="cbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span><div class="tt">Share May P&amp;L with owner</div><span class="pill b">Jun 15</span></div>
+         <div class="trow dn"><span class="cbox done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span><div class="tt">Collect GST docs from Modern Advertis</div><span class="pill s">Done</span></div>
+       </div>
+     </section>
+
+     <!-- ============ IMPORT ============ -->
+     <section id="tab-import" class="hidden">
+       <div class="row" style="gap:22px;margin-bottom:18px">
+         <div class="step on"><b>1</b>Upload</div>
+         <div class="step"><b>2</b>Map columns</div>
+         <div class="step"><b>3</b>Review &amp; classify</div>
+       </div>
+       <div class="dropzone">
+         <div class="big"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg></div>
+         <div style="font-size:16px;font-weight:600;color:var(--text)">Drag &amp; drop your bank statement</div>
+         <div class="note" style="margin-top:6px">or click to choose · CSV or Excel (.xlsx / .xls)</div>
+         <div class="note" style="margin-top:14px">Already-imported entries are auto-skipped — re-importing the same month is safe.</div>
+       </div>
+       <div class="card" style="margin-top:14px">
+         <div class="ch"><span class="tile t-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></span>Smart auto-tagging</div>
+         <div class="row" style="gap:8px">
+           <span class="chip">SALARY → Staff Salaries</span><span class="chip">FACEBOOK → Marketing</span><span class="chip">TORRENT POWER → GSRTC · Rent</span><span class="chip">BRIJESH self → Internal Transfer</span><span class="chip">EMI / pharmacy → Owner Drawings</span><span class="chip">MODERN ADVERTIS → Loan</span>
+         </div>
+         <div class="note" style="margin-top:10px">Rules learn over time — editable in Master → Finance Rules. You only correct what it gets wrong.</div>
+       </div>
+     </section>
+
+     <!-- ============ REGISTER ============ -->
+     <section id="tab-register" class="hidden">
+       <div class="card">
+         <div class="between" style="margin-bottom:12px">
+           <div class="ch" style="margin:0"><span class="tile t-slate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>312 transactions</div>
+           <div class="row" style="gap:8px">
+             <span class="chip">Company: All</span><span class="chip">Bucket: All</span><span class="chip">Segment: All</span><span class="chip">Bank: All</span>
+           </div>
+         </div>
+         <div style="overflow:auto;border:1px solid var(--border);border-radius:var(--radius)">
+           <table>
+             <thead><tr><th>Date</th><th>Description</th><th class="r">Amount</th><th>Type</th><th>Company</th><th>Bucket</th><th>Segment</th><th>Head</th></tr></thead>
+             <tbody>
+               <tr><td class="num-c" style="white-space:nowrap">23/04/26</td><td>NEFT / IDP EDUCATION INDIA PRIVATE</td><td class="r num-c" style="color:var(--success)">+₹1,00,620</td><td><span class="pill s">Income</span></td><td>Untitled Adflux Pvt Ltd</td><td>Income</td><td>Pvt · Other Media</td><td>—</td></tr>
+               <tr><td class="num-c" style="white-space:nowrap">16/04/26</td><td>RTGS / AAI RUPAL PRINT</td><td class="r num-c">₹6,00,000</td><td><span class="pill d">Expense</span></td><td>Untitled Advertising</td><td>Direct Cost</td><td>Pvt · Other Media</td><td>Vendor Payment</td></tr>
+               <tr><td class="num-c" style="white-space:nowrap">08/04/26</td><td>AUTOBPay / Torrent Power</td><td class="r num-c">₹9,670</td><td><span class="pill d">Expense</span></td><td>Untitled Advertising</td><td>Direct Cost</td><td>Govt · GSRTC LED</td><td>Rent &amp; Utilities</td></tr>
+               <tr><td class="num-c" style="white-space:nowrap">02/04/26</td><td>NEFT / salary pay to dhara</td><td class="r num-c">₹18,335</td><td><span class="pill d">Expense</span></td><td>Untitled Advertising</td><td>Common Expense</td><td>↔ all</td><td>Staff Salaries</td></tr>
+               <tr><td class="num-c" style="white-space:nowrap">10/04/26</td><td>EMI · SOLANKI BRIJESH R</td><td class="r num-c">₹26,131</td><td><span class="pill slate">Other</span></td><td>Untitled Advertising</td><td>Owner Drawings</td><td>—</td><td>—</td></tr>
+               <tr><td class="num-c" style="white-space:nowrap">18/04/26</td><td>RTGS / PCG INFRASPACE</td><td class="r num-c">₹24,50,000</td><td><span class="pill p">Asset</span></td><td>Untitled Advertising</td><td>Investment</td><td>—</td><td>—</td></tr>
+               <tr style="opacity:.6"><td class="num-c" style="white-space:nowrap">30/04/26</td><td>RTGS / EFFORTS SOLAR PVT LTD</td><td class="r num-c">+₹3,00,000</td><td><span class="pill w">Review</span></td><td>Untitled Advertising</td><td style="color:var(--warning);font-weight:600">REVIEW</td><td>—</td><td>—</td></tr>
+             </tbody>
+           </table>
+         </div>
+         <div class="note" style="margin-top:10px">Inline dropdowns to fix any tag · duplicate rows blocked on import · everything saved to Supabase, role-scoped.</div>
+       </div>
+     </section>
+
+   </div>
+ </div>
+</div>
+
+<script>
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  ['dash','home','tasks','import','register'].forEach(id=>document.getElementById('tab-'+id).classList.add('hidden'));
+  document.getElementById('tab-'+t.dataset.tab).classList.remove('hidden');
+}));
+document.querySelectorAll('.seg-toggle span').forEach(s=>s.addEventListener('click',()=>{
+  document.querySelectorAll('.seg-toggle span').forEach(x=>x.classList.remove('on'));
+  s.classList.add('on');
+}));
+</script>
+</body>
+</html>

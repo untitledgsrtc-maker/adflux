@@ -1,0 +1,2 @@
+- [Android signing key parked](project_android_signing_key_parked.md) — key lost with old iMac; new APK parked, web changes unaffected
+- [No cloud sessions](feedback_no_cloud_sessions.md) — don't use cloud credits: no move-to-cloud, routines, ultrareview
