@@ -98,7 +98,7 @@ BEGIN
                         'ops_notify_outages', 'ops_morning_digest', 'ops_head_evening_push',
                         -- Phase 365 work module internals (supabase_phase365_work_timeclock.sql)
                         'work_user_rate', 'work_log', 'work_push', 'work_refresh_task', 'work__stop_running',
-                        'work_autostop_all', 'work_run_recurring', 'work_return_postponed',
+                        'work_autostop_all', 'work_run_recurring', 'work_return_postponed','work_is_tracked','work_purge_activity', 'work_is_tracked', 'work_purge_activity',
                         'ops_ticket_assignment_push', 'ops_ticket_resolved_push',
                         'ops_tech_day_block',
                         -- Already REVOKEd on live by their own files (a 2026-10-08 rolled-back dry-run of
