@@ -220,7 +220,15 @@ export default function PresentView() {
   }, [emailTo, emailSending, leadName, leadId, exit])
 
   // Safety net: if the rep leaves via hardware/browser back (no button tap),
-  // still log the elapsed time on unmount (fire-and-forget — the view is gone).
+  // still log the elapsed time on UNMOUNT (fire-and-forget - the view is gone).
+  // Phase 397 (16 Oct 2026): this used to list [leadId, profile] as dependencies, so the cleanup ran every time the
+  // profile object changed (it is still loading when /present is opened from a link or after a resume) and it ERASED
+  // the running presentation: the timer sat at 0:00, End logged nothing, and the WhatsApp / email prompt never came.
+  // The cleanup now runs ONLY on a real unmount; the latest profile / lead are read through refs.
+  const profileRef = useRef(profile)
+  const leadIdRef = useRef(leadId)
+  profileRef.current = profile
+  leadIdRef.current = leadId
   useEffect(() => {
     return () => {
       if (endingRef.current) return
@@ -228,17 +236,18 @@ export default function PresentView() {
       if (!active) return
       const dur = Math.min(elapsedSeconds(active), CAP_SECONDS)
       clearPresentation()
-      if (dur < 3 || !profile?.id) return
+      const p = profileRef.current
+      if (dur < 3 || !p?.id) return
       supabase.from('presentation_sessions').insert({
-        user_id: profile.id,
-        lead_id: leadId || null,
+        user_id: p.id,
+        lead_id: leadIdRef.current || null,
         started_at: new Date(active.startedAt).toISOString(),
         ended_at: new Date().toISOString(),
         duration_seconds: dur,
         source: 'meeting',
       }).then(() => {}, () => {})
     }
-  }, [leadId, profile])
+  }, [])
 
   const capped = elapsed >= CAP_SECONDS
 

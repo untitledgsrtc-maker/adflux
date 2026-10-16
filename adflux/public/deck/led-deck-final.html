@@ -2349,6 +2349,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
   /* ---- Leaflet map fills the panel; dark chrome to match the deck ---- */
   #s5map{position:absolute;inset:0;width:100%;height:100%;background:transparent;z-index:1;}
   #s5map .leaflet-container{background:transparent;font-family:var(--disp);}
+  @media (hover:none) and (pointer:coarse){ #s5map, #s5map.leaflet-container{touch-action:pan-y !important;} }
   /* OSM tiles are light; invert -> dark so they match the deck. (cartocdn dark
      was 503-throttling.) circleMarker dots live in the overlay pane, unaffected. */
   #s5map .leaflet-tile{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.95) saturate(.55);}
@@ -2569,6 +2570,10 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
         maxBounds: L.latLngBounds([19.6,67.4],[25.3,75.4]), maxBoundsViscosity: 0.85,
         zoomControl: true,
         scrollWheelZoom: false,
+        // Phase 397: on a phone the map filled the top of slide 5 and ate every one-finger swipe, so the slide could not scroll.
+        // Touch devices: no one-finger map drag (the +/- buttons still zoom); desktop keeps dragging.
+        dragging: !(L.Browser && L.Browser.mobile),
+        tap: false,
         attributionControl: false,
         zoomSnap: 0.25
       });
