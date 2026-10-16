@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { istTodayISO } from '../../utils/istDate'
 
-const VERSION = '0.2.3'
+const VERSION = '0.2.4'
 const QKEY = 'agent_slice_queue'
 const T = () => window.__TAURI_INTERNALS__
 const invoke = (cmd, args) => T().invoke(cmd, args)
@@ -34,7 +34,7 @@ export default function WindowsAgentEngine() {
   const [diag, setDiag] = useState(null)        // tiny status pill: idle seconds, recording, last error
   const S = useRef({
     device: 'Windows PC', config: null, running: null, projects: {}, buckets: new Map(),
-    lastShot: 0, asking: null, askTimer: null, suppress: false, runId: null, ticking: false, lastTickAt: 0, lastSampleAt: 0, lastErr: '', idleNow: 0, answer: null, lastStopped: null,
+    lastShot: 0, asking: null, askTimer: null, suppress: false, runId: null, ticking: false, lastTickAt: 0, lastSampleAt: 0, lastErr: '', idleNow: 0, sysIdle: null, injected: 0, answer: null, lastStopped: null,
   })
 
   useEffect(() => {
@@ -137,7 +137,8 @@ export default function WindowsAgentEngine() {
       if (s.asking || s.suppress || idle < mins * 60) return
       const began = new Date(Date.now() - idle * 1000)
       s.asking = { began: began.toISOString(), entry: s.running.id }
-      const info = { minutes: mins, waitMin: 5, client: clientName(s.running.project_id) || s.running.task_label, stopAt: timeIST(began.toISOString()) }
+      const worked = Math.max(0, (began.getTime() - new Date(s.running.started_at).getTime()) / 1000 - (s.running.break_seconds || 0))
+      const info = { minutes: mins, waitMin: 5, client: clientName(s.running.project_id) || s.running.task_label, label: s.running.task_label, worked, stopAt: timeIST(began.toISOString()) }
       setAsk(info)
       await emit('agent:idle-ask', info)
       invoke('bring_to_front', { label: 'idle' }).catch(() => { invoke('show_window', { label: 'idle' }).catch(() => {}) })
@@ -150,7 +151,13 @@ export default function WindowsAgentEngine() {
       if (s.ticking || !s.running) return
       s.ticking = true; s.tickStart = Date.now()
       try {
-        const [idle, win] = await Promise.all([invoke('idle_seconds'), invoke('active_window')])
+        // idle = seconds since the last REAL keyboard / mouse use (hook); sys = Windows' own clock (also counts input that
+        // other programs fake); injected = how many such fake events were seen. Old installers lack the last two.
+        const [idle, win, sys, inj] = await Promise.all([
+          invoke('idle_seconds'), invoke('active_window'),
+          invoke('idle_system_seconds').catch(() => null), invoke('injected_input_count').catch(() => null),
+        ])
+        s.sysIdle = sys; s.injected = inj || 0
         s.lastSampleAt = Date.now(); s.lastErr = ''; s.idleNow = idle
         if (recordOk()) {
           sample(win, idle)
@@ -203,7 +210,7 @@ export default function WindowsAgentEngine() {
     })()
 
     const diagTimer = setInterval(() => {
-      setDiag({ run: !!s.running, rec: recordOk() && Date.now() - s.lastSampleAt < 30000, idle: s.idleNow || 0, err: s.lastErr, asking: !!s.asking })
+      setDiag({ run: !!s.running, rec: recordOk() && Date.now() - s.lastSampleAt < 30000, idle: s.idleNow || 0, sys: s.sysIdle, inj: s.injected || 0, err: s.lastErr, asking: !!s.asking })
     }, 2000)
     const timers = [diagTimer, setInterval(tick, 5000), setInterval(pushState, 1000), setInterval(loadAll, 15000), setInterval(() => uploadQueue().catch(() => {}), 30000)]
     return () => { alive = false; timers.forEach(clearInterval) }
@@ -222,7 +229,7 @@ export default function WindowsAgentEngine() {
   const pill = diag && diag.run ? (
     <div className="wk" style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 8999, pointerEvents: 'none' }}>
       <span className={`wk-pill ${diag.rec ? 'ok' : 'warn'}`} style={{ opacity: .9 }}>
-        {diag.rec ? 'Recording' : (diag.err ? 'Cannot record' : 'Not recording')} · idle {Math.floor(diag.idle / 60)}:{String(diag.idle % 60).padStart(2, '0')}
+        {diag.rec ? 'Recording' : (diag.err ? 'Cannot record' : 'Not recording')} · idle {Math.floor(diag.idle / 60)}:{String(diag.idle % 60).padStart(2, '0')}{diag.sys != null && Math.abs(diag.sys - diag.idle) > 20 ? ` (PC clock ${Math.floor(diag.sys / 60)}:${String(diag.sys % 60).padStart(2, '0')}, ${diag.inj} faked)` : ''}
       </span>
     </div>
   ) : null
@@ -245,7 +252,7 @@ export default function WindowsAgentEngine() {
         <div className="wk-eyb">No activity for {ask.minutes} min</div>
         <div style={{ fontSize: 18, margin: '6px 0 12px' }}>Still working on {ask.client || 'your task'}?</div>
         <div style={{ display: 'grid', gap: 8 }}>
-          <button className="wk-btn y" onClick={() => S.current.answer?.('still_working')}>Yes, still working</button>
+          <button className="wk-btn y" onClick={() => S.current.answer?.('still_working')}>Resume - I am here</button>
           <button className="wk-btn o" onClick={() => S.current.answer?.('break')}>It was a break</button>
           <button className="wk-btn o" onClick={() => S.current.answer?.('stop')}>Stop timer</button>
         </div>

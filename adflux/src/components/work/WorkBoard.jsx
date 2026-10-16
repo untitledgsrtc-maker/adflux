@@ -43,9 +43,9 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
   return (
     <>
       {phone && (
-        <div className="wk-seg" style={{ display: 'flex', marginBottom: 12 }}>
+        <div className="wk-seg" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 4, marginBottom: 12, borderRadius: 16 }}>
           {COLS.map((c) => (
-            <button key={c.key} style={{ flex: 1 }} className={col === c.key ? 'on' : ''} onClick={() => setCol(c.key)}>
+            <button key={c.key} style={{ minWidth: 0, whiteSpace: 'nowrap' }} className={col === c.key ? 'on' : ''} onClick={() => setCol(c.key)}>
               {c.title} {items.filter((i) => i.status === c.key).length}
             </button>
           ))}

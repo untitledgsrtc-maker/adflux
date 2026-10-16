@@ -4,6 +4,8 @@ fn main() {
     tauri_build::try_build(
         tauri_build::Attributes::new().app_manifest(tauri_build::AppManifest::new().commands(&[
             "idle_seconds",
+            "idle_system_seconds",
+            "injected_input_count",
             "active_window",
             "take_screenshot",
             "device_name",

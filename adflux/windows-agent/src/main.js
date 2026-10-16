@@ -40,14 +40,16 @@ function runWidget() {
 // ---------------------------------------------------------------- idle question
 function runIdle() {
   const card = (inner) => `<div class="wk" style="padding:16px"><div class="wk-card" style="border-color:var(--w-wat,#FBBF24)">${inner}</div></div>`
-  const askView = (p) => card(`<div class="wk-eyb">No activity for ${p.minutes || 5} min</div>
-    <div style="font-size:18px;margin:6px 0 12px">Still working on ${esc(p.client || 'your task')}?</div>
-    <div style="display:grid;gap:8px">
-      <button class="wk-btn y" data-d="still_working">Yes, still working</button>
-      <button class="wk-btn o" data-d="break">It was a break</button>
-      <button class="wk-btn o" data-d="stop">Stop timer</button>
+  const hms = (t) => { t = Math.max(0, Math.floor(t || 0)); return `${String(Math.floor(t / 3600)).padStart(2, '0')}:${String(Math.floor(t % 3600 / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}` }
+  const askView = (p) => card(`<div class="wk-eyb">No activity for ${p.minutes || 5} min - timer waiting</div>
+    <div class="wk-row" style="margin:8px 0 2px"><div><div class="wk-timer" style="font-size:44px;margin:0">${hms(p.worked)}</div>
+      <div class="wk-hs">${esc(p.client || 'Your task')}${p.label ? ' - ' + esc(p.label) : ''}</div></div></div>
+    <div class="wk-sm" style="margin:8px 0 12px">Are you still working? No answer in ${p.waitMin || 5} min: the timer stops at ${esc(p.stopAt || 'when you went idle')}.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button class="wk-btn y" data-d="still_working" style="justify-content:center;min-height:48px">RESUME</button>
+      <button class="wk-btn" data-d="stop" style="justify-content:center;min-height:48px;background:var(--danger,#EF4444);border-color:var(--danger,#EF4444);color:#fff">STOP</button>
     </div>
-    <div class="wk-sm" style="margin-top:10px">No answer in ${p.waitMin || 5} min: the timer stops at ${esc(p.stopAt || 'when you went idle')}.</div>`)
+    <button class="wk-btn o" data-d="break" style="width:100%;justify-content:center;margin-top:10px">It was a break (take these minutes off)</button>`)
   const stoppedView = (p) => card(`<div class="wk-eyb" style="color:var(--w-dat,#F87171)">Your timer is stopped</div>
     <div style="font-size:18px;margin:6px 0 4px">Stopped at ${esc(p.stopAt || '')}${p.auto ? ' because you were away' : ''}.</div>
     <div class="wk-sm" style="margin-bottom:12px">${esc(p.client || '')}${p.label ? ' - ' + esc(p.label) : ''}. Time since then is not counted.</div>

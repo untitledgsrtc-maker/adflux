@@ -17,9 +17,98 @@ struct ActiveWindow {
     title: String,
 }
 
+// ---- physical input watcher (Windows) -------------------------------------------------------------------------
+// Windows' own idle clock (GetLastInputInfo) is reset by ANY input, including input injected by other programs
+// (remote-desktop tools, trackers, "keep awake" tools) and by tiny optical-mouse jitter. A low-level hook that only
+// NOTES THE TIME of REAL input is used instead: keyboard / mouse events that are not flagged "injected", and mouse
+// movement only when it moved at least 10 px from the last counted position. It never reads which key was pressed.
+#[cfg(windows)]
+mod input_watch {
+    use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
+    use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage, HHOOK, KBDLLHOOKSTRUCT, MSG,
+        MSLLHOOKSTRUCT, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_MOUSEMOVE,
+    };
+
+    pub static LAST_REAL_MS: AtomicU64 = AtomicU64::new(0);
+    pub static INJECTED: AtomicU64 = AtomicU64::new(0);
+    pub static READY: AtomicBool = AtomicBool::new(false);
+    static ACC_X: AtomicI32 = AtomicI32::new(i32::MIN);
+    static ACC_Y: AtomicI32 = AtomicI32::new(i32::MIN);
+
+    pub fn now_ms() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0)
+    }
+
+    unsafe extern "system" fn kb_proc(code: i32, w: WPARAM, l: LPARAM) -> LRESULT {
+        if code >= 0 {
+            let info = &*(l.0 as *const KBDLLHOOKSTRUCT);
+            if info.flags.0 & 0x10 != 0 {
+                INJECTED.fetch_add(1, Ordering::Relaxed);
+            } else {
+                LAST_REAL_MS.store(now_ms(), Ordering::Relaxed);
+            }
+        }
+        CallNextHookEx(HHOOK::default(), code, w, l)
+    }
+
+    unsafe extern "system" fn mouse_proc(code: i32, w: WPARAM, l: LPARAM) -> LRESULT {
+        if code >= 0 {
+            let info = &*(l.0 as *const MSLLHOOKSTRUCT);
+            if info.flags & 0x1 != 0 {
+                INJECTED.fetch_add(1, Ordering::Relaxed);
+            } else if w.0 as u32 == WM_MOUSEMOVE {
+                let (x, y) = (info.pt.x, info.pt.y);
+                let (ax, ay) = (ACC_X.load(Ordering::Relaxed), ACC_Y.load(Ordering::Relaxed));
+                if ax == i32::MIN || (x - ax).abs() + (y - ay).abs() >= 10 {
+                    ACC_X.store(x, Ordering::Relaxed);
+                    ACC_Y.store(y, Ordering::Relaxed);
+                    LAST_REAL_MS.store(now_ms(), Ordering::Relaxed);
+                }
+            } else {
+                LAST_REAL_MS.store(now_ms(), Ordering::Relaxed); // click, wheel
+            }
+        }
+        CallNextHookEx(HHOOK::default(), code, w, l)
+    }
+
+    pub fn start() {
+        LAST_REAL_MS.store(now_ms(), Ordering::Relaxed);
+        std::thread::spawn(|| unsafe {
+            let k = SetWindowsHookExW(WH_KEYBOARD_LL, Some(kb_proc), HINSTANCE::default(), 0);
+            let m = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), HINSTANCE::default(), 0);
+            if k.is_ok() && m.is_ok() {
+                READY.store(true, Ordering::Relaxed);
+            }
+            let mut msg = MSG::default();
+            while GetMessageW(&mut msg, HWND::default(), 0, 0).as_bool() {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        });
+    }
+}
+
+// Seconds since the last REAL (physical) keyboard / mouse activity. Falls back to Windows' idle clock if the watcher
+// could not start.
 #[cfg(windows)]
 #[tauri::command]
 fn idle_seconds() -> u64 {
+    if input_watch::READY.load(std::sync::atomic::Ordering::Relaxed) {
+        let last = input_watch::LAST_REAL_MS.load(std::sync::atomic::Ordering::Relaxed);
+        return input_watch::now_ms().saturating_sub(last) / 1000;
+    }
+    idle_system_seconds()
+}
+
+// Windows' own idle clock (counts injected input too) - shown next to the real one so a difference is visible.
+#[cfg(windows)]
+#[tauri::command]
+fn idle_system_seconds() -> u64 {
     use windows::Win32::System::SystemInformation::GetTickCount;
     use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
     unsafe {
@@ -35,9 +124,26 @@ fn idle_seconds() -> u64 {
     0
 }
 
+// How many injected (software-made) input events were seen: tells whether another program is faking activity.
+#[cfg(windows)]
+#[tauri::command]
+fn injected_input_count() -> u64 {
+    input_watch::INJECTED.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 #[cfg(not(windows))]
 #[tauri::command]
 fn idle_seconds() -> u64 {
+    0
+}
+#[cfg(not(windows))]
+#[tauri::command]
+fn idle_system_seconds() -> u64 {
+    0
+}
+#[cfg(not(windows))]
+#[tauri::command]
+fn injected_input_count() -> u64 {
     0
 }
 
@@ -179,6 +285,8 @@ fn main() {
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .invoke_handler(tauri::generate_handler![
             idle_seconds,
+            idle_system_seconds,
+            injected_input_count,
             active_window,
             take_screenshot,
             device_name,
@@ -191,6 +299,8 @@ fn main() {
             quit_app
         ])
         .setup(|app| {
+            #[cfg(windows)]
+            input_watch::start();
             let open = MenuItem::with_id(app, "open", "Open Untitled Work", true, None::<&str>)?;
             let widget = MenuItem::with_id(app, "widget", "Show timer", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;

@@ -22,6 +22,8 @@
     "allow-set-tray-tooltip",
     "allow-autostart-enabled",
     "allow-set-autostart",
-    "allow-bring-to-front"
+    "allow-bring-to-front",
+    "allow-idle-system-seconds",
+    "allow-injected-input-count"
   ]
 }

@@ -199,3 +199,10 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 
 /* Phase 368.14 - hero segment labels uppercase like the design */
 .wk-hseg > .wk-hs:first-child { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+
+/* Phase 398: native dropdown lists (client picker etc.) were light text on a white list in the dark theme, so the
+   options could not be read. Tell the browser to draw them dark and colour the options explicitly. */
+.wk select, .wk-modal select, select.wk-input { color-scheme: dark; }
+.wk select option, .wk-modal select option, select.wk-input option { background: #1e293b; color: #f1f5f9; }
+:root[data-theme="day"] .wk select, :root[data-theme="day"] .wk-modal select, .wk[data-theme="day"] select { color-scheme: light; }
+:root[data-theme="day"] .wk select option, :root[data-theme="day"] .wk-modal select option, .wk[data-theme="day"] select option { background: #ffffff; color: #0f172a; }
