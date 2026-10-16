@@ -37,3 +37,6 @@ android/app/google-services.json
 *.aab
 *.keystore
 *.jks
+
+# iCloud: folders renamed to .nosync are not synced (symlink keeps the old name)
+*.nosync
