@@ -131,6 +131,7 @@ const SALES_NAV = [
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/campaigns/inbox',   label: 'WhatsApp',       icon: MessageCircle },   // Phase 205 — assigned WhatsApp chats
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
+  { to: '/my-work',           label: 'Ask for work',   icon: Briefcase },   // Phase 393 - ask the Work team for design / video work
   // Phase 33N — owner directive: voice is no longer a standalone
   // surface. Voice input lives inside the Note activity modal
   // (LogActivityModal) where reps already record free-text notes.
@@ -199,6 +200,7 @@ const TELECALLER_NAV = [
   // here. Sidebar/drawer only; mobile bottom nav stays at 4 thumb tabs.
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
+  { to: '/my-work',           label: 'Ask for work',   icon: Briefcase },   // Phase 393
   // Phase 43.1 — /voice dropped per Phase 33N (sales already removed
   // it). Voice input lives inside lead activity note flow now, not as
   // a standalone surface. /voice route + page kept as deep-link.

@@ -48,6 +48,8 @@ export default function MyWorkV2() {
   const isAdmin = profile?.role === 'admin'
   const isHead = isAdmin || !!member?.is_head
   const isMember = isAdmin || !!member
+  // A person who is not on the timeclock (sales / telecaller asking for work) has no Work tab: open on 'Asked by me'.
+  useEffect(() => { if (!loading && !isMember && tab === 'work') setTab('asked') }, [loading, isMember, tab])
 
   const load = useCallback(async () => {
     if (!uid) return
