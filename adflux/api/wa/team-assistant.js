@@ -161,7 +161,11 @@ export default async function handler(req) {
   // ── Phase 372: non-sales roles (Work staff, operations, HR, accounts) get a role-shaped day, no Claude ──
   const ALT_ROLES = ['staff', 'operation_executive', 'operation_head', 'hr', 'accounts', 'office_staff', 'office_admin']
   if (ALT_ROLES.includes(user.role)) {
-    const L = [`Good morning ${firstName} 👋`, '']
+    // A greeting gets the day; any other message gets the same day plus an honest note (these roles have no free-text Q&A yet),
+    // so a question like "why was my work not sent?" is not answered with a bare "Good morning".
+    const L = greeting
+      ? [`Good morning ${firstName} 👋`, '']
+      : [`${firstName}, I can only show your day here (tasks and approvals). For anything else, please ask your head or open the app.`, '']
     try {
       if (user.role === 'staff') {
         const parts = await sbRows(`work_task_parts?assignee_id=eq.${uid}&status=neq.finished&due_date=lte.${istToday}&select=label,due_date,work_tasks(title)&order=due_date.asc&limit=20`)
