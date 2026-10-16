@@ -2350,6 +2350,10 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
   #s5map{position:absolute;inset:0;width:100%;height:100%;background:transparent;z-index:1;}
   #s5map .leaflet-container{background:transparent;font-family:var(--disp);}
   @media (hover:none) and (pointer:coarse){ #s5map, #s5map.leaflet-container{touch-action:pan-y !important;} }
+
+/* Phase 398: slide 5 is taller than a laptop window (833 px of content in a 700 px window) and was overflow:hidden, so the
+   bottom could not be reached. Let the slide scroll on every screen. */
+section.slide[data-i="5"]{ overflow-y:auto !important; overflow-x:hidden; -webkit-overflow-scrolling:touch; }
   /* OSM tiles are light; invert -> dark so they match the deck. (cartocdn dark
      was 503-throttling.) circleMarker dots live in the overlay pane, unaffected. */
   #s5map .leaflet-tile{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.95) saturate(.55);}
@@ -2610,7 +2614,11 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
       var cityBounds = L.latLngBounds(CITIES.map(function (c) { return [c.lat, c.lng]; }));
       function fitCities(){ try { map.invalidateSize(); map.fitBounds(cityBounds, { padding: [10, 10], maxZoom: 8 }); } catch (e) {} }
       fitCities();
-      [120, 400, 850].forEach(function (d) { setTimeout(fitCities, d); });
+      [120, 400, 850, 1400, 2200].forEach(function (d) { setTimeout(fitCities, d); });
+      /* Phase 398: the panel finishes its reveal animation AFTER the last timer above, so on a wide screen the map kept
+         the size it had mid-animation (tiles covered only part of the panel). Re-measure whenever the panel or window changes size. */
+      try { if (window.ResizeObserver) new ResizeObserver(function () { try { map.invalidateSize(); } catch (e) {} }).observe(mapEl); } catch (e) {}
+      window.addEventListener('resize', function () { try { map.invalidateSize(); } catch (e) {} });
     } catch (err) {
       inited = false;                  // allow a retry on next activation
       /* swallow — never crash the deck if Leaflet/tiles fail */
