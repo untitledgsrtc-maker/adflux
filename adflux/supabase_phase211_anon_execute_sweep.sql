@@ -86,6 +86,7 @@ BEGIN
                         -- §225 Batch 2b ghosted-inbound recovery: re-fires ai-reply for
                         -- dropped dispatches. REVOKED — only the cron reaches it.
                         'wa_ai_recovery_dispatch',
+                        'capi_dispatch', 'capi_queue_won',
                         -- Phase 345 client auto-merge internals: SECURITY DEFINER, REVOKED —
                         -- _client_fold deletes client rows, so a rep must never call it directly.
                         -- Only the trigger / sync_client_from_quote / admin_merge_clients reach them.
@@ -189,6 +190,7 @@ WHERE n.nspname = 'public'
                     'followup_cadence_candidates','followup_cadence_mark',
                     'followup_cadence_dispatch','wa_quality_watch_dispatch',
                     'wa_ai_recovery_dispatch',
+                    'capi_dispatch', 'capi_queue_won',
                     '_client_owner_for_key','_client_fold_row','_client_fold',
                     'ops_notify_outages','ops_morning_digest','ops_head_evening_push',
                     'work_user_rate','work_log','work_push','work_refresh_task','work__stop_running','work_autostop_all','work_run_recurring','work_return_postponed',
