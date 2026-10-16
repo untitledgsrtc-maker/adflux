@@ -62,7 +62,7 @@ export default function MyWorkV2() {
       supabase.from('work_time_entries').select('*').eq('user_id', uid).is('ended_at', null).maybeSingle(),
       supabase.from('work_time_entries').select('*').eq('user_id', uid).gte('started_at', t0).order('started_at'),
       supabase.from('work_task_parts')
-        .select('id,task_id,assignee_id,label,due_date,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status)')
+        .select('id,task_id,assignee_id,label,due_date,due_time,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status)')
         .eq('assignee_id', uid).or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -14))}`).limit(300),
       supabase.from('work_tasks')
         .select('id,title,project_id,due_date,status,created_at,parts:work_task_parts(id,assignee_id,label,status,due_date)')
@@ -113,7 +113,7 @@ export default function MyWorkV2() {
     postponedUntil: p.postponed_until, postponeCount: p.postpone_count || 0,
     postponedBy: [...(p.postponed_by_users || []).map((id) => nameOf(id)), p.postponed_by_client ? `${p.postponed_by_client} (client)` : ''].filter(Boolean).join(', '),
     id: p.id, taskId: p.task_id, finishedAt: p.finished_at, status: p.status, title: p.task?.title || 'Task', label: p.label,
-    client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, assigneeId: p.assignee_id,
+    client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, dueTime: p.due_time, assigneeId: p.assignee_id,
     assigneeName: nameOf(p.assignee_id), assigneePhoto: photoOf(p.assignee_id), finishedDay: p.finished_at ? new Date(p.finished_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : null, partsTotal: 1, partsDone: 0, seconds: p.seconds, cost: null,
   })), [parts, projName, nameOf, photoOf])
 
@@ -267,7 +267,7 @@ export default function MyWorkV2() {
       )}
 
       {postponing && (
-        <PostponeModal item={postponing} users={users} meId={uid} onClose={() => setPostponing(null)} onDone={() => { setPostponing(null); load() }} />
+        <PostponeModal item={postponing} users={users} projects={projects} meId={uid} onClose={() => setPostponing(null)} onDone={() => { setPostponing(null); load() }} />
       )}
 
       {newTask && (

@@ -16,6 +16,7 @@ const COLS = [
 ]
 
 // Due pill as in the owner's design: "On track, 18 Oct" / "Due today" / "Overdue, 12 Oct" / "Finished 12:40".
+const fmtHM = (t) => { const [h, m] = String(t).split(':'); const H = Number(h); return `${H % 12 || 12}:${m} ${H < 12 ? 'AM' : 'PM'}` }
 function duePill(it) {
   if (it.status === 'postponed') return { cls: 'warn', Icon: Clock, text: `Back ${fmtDateShort(it.postponedUntil || '').replace(/^\w+,\s*/, '')}` }
   if (it.status === 'finished') return { cls: 'ok', Icon: Check, text: it.finishedAt ? `Finished ${fmtTimeIST(it.finishedAt)}` : 'Finished' }
@@ -23,7 +24,7 @@ function duePill(it) {
   const t = istTodayISO()
   const short = fmtDateShort(it.due).replace(/^\w+,\s*/, '')
   if (it.due < t) return { cls: 'bad', Icon: AlertTriangle, text: `Overdue, ${short}` }
-  if (it.due === t) return { cls: 'warn', Icon: Clock, text: 'Due today' }
+  if (it.due === t) return { cls: 'warn', Icon: Clock, text: it.dueTime ? `Due today, ${fmtHM(it.dueTime)}` : 'Due today' }
   return { cls: 'ok', Icon: Check, text: `On track, ${short}` }
 }
 

@@ -8,7 +8,7 @@ import { toastError, toastSuccess } from '../v2/Toast'
 import { istTodayISO } from '../../utils/istDate'
 import { addDaysISO } from '../../utils/workUtils'
 
-export default function PostponeModal({ item, users, meId, onClose, onDone }) {
+export default function PostponeModal({ item, users, projects = [], meId, onClose, onDone }) {
   const today = istTodayISO()
   const [until, setUntil] = useState(addDaysISO(today, 1))
   const [picked, setPicked] = useState([])      // user ids
@@ -67,8 +67,9 @@ export default function PostponeModal({ item, users, meId, onClose, onDone }) {
           </div>
         </div>
 
-        <div className="wk-field"><label htmlFor="pp-client">Or a client asked (type the name)</label>
-          <input id="pp-client" className="wk-input" value={client} onChange={(e) => setClient(e.target.value)} maxLength={80} placeholder="For example: Anee Marcom" /></div>
+        <div className="wk-field"><label htmlFor="pp-client">Or a client asked (pick or type the name)</label>
+          <input id="pp-client" className="wk-input" value={client} onChange={(e) => setClient(e.target.value)} maxLength={80} list="pp-clients" placeholder="Start typing a client name" autoComplete="off" />
+          <datalist id="pp-clients">{projects.map((p) => <option key={p.id} value={p.name} />)}</datalist></div>
 
         <div className="wk-field"><label htmlFor="pp-date">Comes back on</label>
           <input id="pp-date" className="wk-input" type="date" value={until} min={addDaysISO(today, 1)} onChange={(e) => setUntil(e.target.value)} />

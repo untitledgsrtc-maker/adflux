@@ -1,7 +1,7 @@
-// Phase 365 - New task side panel: what, client, note, due date, people + their part,
-// checklist steps, repeat. Anyone signed in can ask anyone (owner decision).
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { X, Plus, Trash2, Loader2, Sparkles } from 'lucide-react'
+// Phase 365 / 404 - New task popup (same look as Postpone): what, tag people + their part, client, due date + optional time,
+// note, checklist steps, repeat. Anyone signed in can ask anyone (owner decision).
+import { useMemo, useRef, useState } from 'react'
+import { X, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toastError, toastSuccess } from '../v2/Toast'
 import { istTodayISO } from '../../utils/istDate'
@@ -14,7 +14,9 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
   const [newClient, setNewClient] = useState('')
   const [note, setNote] = useState('')
   const [due, setDue] = useState(addDaysISO(today, 1))
-  const [parts, setParts] = useState([{ assignee: meId || '', label: '', due: '' }])
+  const [partOf, setPartOf] = useState(meId ? { [meId]: '' } : {})   // assignee id -> their part label
+  const [q, setQ] = useState('')
+  const [dueTime, setDueTime] = useState('')
   const [steps, setSteps] = useState('')
   const [repeat, setRepeat] = useState('once')
   const [weekday, setWeekday] = useState(1)
@@ -22,49 +24,20 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
   const [busy, setBusy] = useState(false)
   const latch = useRef(false)
 
-  // Task suggestions from past work: recent tasks + who did them. Best-effort - modal works without it.
-  const [past, setPast] = useState([]) // [{ title, project_id, assignees:Set }]
-  useEffect(() => {
-    let live = true
-    ;(async () => {
-      try {
-        const [t, pt] = await Promise.all([
-          supabase.from('work_tasks').select('id, title, project_id').order('created_at', { ascending: false }).limit(600),
-          supabase.from('work_task_parts').select('task_id, assignee_id').order('created_at', { ascending: false }).limit(1800),
-        ])
-        if (t.error || pt.error || !live) return
-        const who = new Map()
-        for (const r of pt.data || []) { if (!who.has(r.task_id)) who.set(r.task_id, new Set()); who.get(r.task_id).add(r.assignee_id) }
-        setPast((t.data || []).map((r) => ({ title: String(r.title || '').trim(), project_id: r.project_id, assignees: who.get(r.id) || new Set() })).filter((r) => r.title))
-      } catch { /* no suggestions */ }
-    })()
-    return () => { live = false }
-  }, [])
-
-  const picked = parts.map((p) => p.assignee).filter(Boolean)
-  const suggestions = useMemo(() => {
-    const q = title.trim().toLowerCase()
-    const by = new Map()
-    for (const r of past) {
-      const key = r.title.toLowerCase()
-      if (q && (!key.includes(q) || key === q)) continue
-      let score = 1
-      if (picked.some((id) => r.assignees.has(id))) score += 4
-      if (project && r.project_id === project) score += 3
-      const cur = by.get(key)
-      if (cur) cur.score += score
-      else by.set(key, { title: r.title, score })
-    }
-    return [...by.values()].sort((a, b) => b.score - a.score).slice(0, 6)
-  }, [past, title, project, picked.join(',')])  // eslint-disable-line react-hooks/exhaustive-deps
-
-  const setPart = (i, k, v) => setParts((p) => p.map((x, j) => (j === i ? { ...x, [k]: v } : x)))
+  const picked = Object.keys(partOf)
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase()
+    return (users || []).filter((u) => !t || String(u.name || '').toLowerCase().includes(t)).slice(0, 40)
+  }, [users, q])
+  const toggle = (id) => setPartOf((m) => { const n = { ...m }; if (id in n) delete n[id]; else if (Object.keys(n).length < 12) n[id] = ''; return n })
+  const nameOf = (id) => users.find((u) => u.id === id)?.name || 'Someone'
 
   const save = async () => {
     if (latch.current) return
     if (!title.trim()) return toastError('', 'Give the task a name.')
-    const clean = parts.filter((p) => p.assignee)
+    const clean = picked.map((id) => ({ assignee: id, label: partOf[id] || '' }))
     if (!clean.length) return toastError('', 'Pick at least one person.')
+    if (dueTime && due === today && dueTime <= new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })) return toastError('', 'That time has already passed today.')
     if (repeat !== 'once' && clean.length !== 1) return toastError('', 'A repeating task is for one person.')
     latch.current = true; setBusy(true)
     try {
@@ -82,7 +55,8 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
       } else {
         const { error } = await supabase.rpc('work_create_task', {
           p_title: title.trim(), p_project: pid, p_note: note.trim() || null, p_due: due || null,
-          p_parts: clean.map((p) => ({ assignee: p.assignee, label: p.label.trim(), due: p.due || null })),
+          p_parts: clean.map((p) => ({ assignee: p.assignee, label: p.label.trim(), due: null })),
+          p_due_time: due && dueTime ? dueTime : null,
           p_steps: steps.split('\n').map((s) => s.trim()).filter(Boolean),
         })
         if (error) throw error
@@ -105,18 +79,7 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
         </div>
 
         <div className="wk-field"><label htmlFor="nt-title">What</label>
-          <input id="nt-title" className="wk-input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="e.g. Make 2 reels" />
-          {suggestions.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <div className="wk-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Sparkles size={14} aria-hidden="true" />
-                {picked.length || project ? 'Suggested from past work' : 'Common tasks'}
-              </div>
-              <div className="wk-chips">
-                {suggestions.map((sg) => <button key={sg.title} type="button" className="wk-chip" onClick={() => setTitle(sg.title.slice(0, 120))}>{sg.title}</button>)}
-              </div>
-            </div>
-          )}</div>
+          <input id="nt-title" className="wk-input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="e.g. Make 2 reels" /></div>
 
         <div className="wk-field"><label htmlFor="nt-client">Client (optional)</label>
           <select id="nt-client" className="wk-input" value={project} onChange={(e) => setProject(e.target.value)}>
@@ -126,39 +89,45 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
           {!project && <input className="wk-input" style={{ marginTop: 8 }} value={newClient} onChange={(e) => setNewClient(e.target.value)} placeholder="New client name" maxLength={80} />}
         </div>
 
-        <div className="wk-field"><label>People and their part</label>
-          {parts.map((p, i) => (
-            <div key={i} className="wk-part">
-              <select className="wk-input" value={p.assignee} onChange={(e) => setPart(i, 'assignee', e.target.value)} aria-label="Person">
-                <option value="">Pick a person</option>
-                {users.map((u) => <option key={u.id} value={u.id}>{u.name}{u.designation ? ` - ${u.designation}` : ''}</option>)}
-              </select>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 8, marginTop: 8 }}>
-                <input className="wk-input" value={p.label} onChange={(e) => setPart(i, 'label', e.target.value)} placeholder="Their part, e.g. Reel 1" maxLength={80} />
-                <input className="wk-input" type="date" value={p.due} onChange={(e) => setPart(i, 'due', e.target.value)} aria-label="Due date for this person" />
-              </div>
-              {parts.length > 1 && (
-                <button className="wk-btn o sm" style={{ marginTop: 8 }} onClick={() => setParts((x) => x.filter((_, j) => j !== i))}>
-                  <Trash2 size={14} aria-hidden="true" /> Remove
-                </button>
-              )}
+        <div className="wk-field"><label>Assign to (tag one or more people)</label>
+          {picked.length > 0 && (
+            <div className="wk-chips" style={{ marginBottom: 8 }}>
+              {picked.map((id) => <button key={id} type="button" className="wk-chip" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }} onClick={() => toggle(id)}>{nameOf(id)} <X size={12} aria-hidden="true" /></button>)}
             </div>
-          ))}
-          {parts.length < 12 && (
-            <button className="wk-btn o sm" style={{ marginTop: 10, borderStyle: 'dashed', color: 'var(--accent)' }}
-              onClick={() => setParts((x) => [...x, { assignee: '', label: '', due: '' }])}>
-              <Plus size={16} aria-hidden="true" /> Add another person
-            </button>
           )}
+          <input className="wk-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a name" />
+          <div style={{ maxHeight: 170, overflowY: 'auto', marginTop: 8, border: '1px solid var(--border)', borderRadius: 10 }}>
+            {list.map((u) => (
+              <button key={u.id} type="button" className="wk-row wk-hov" onClick={() => toggle(u.id)}
+                style={{ width: '100%', padding: '8px 12px', background: 'transparent', border: 0, color: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
+                <span>{u.name}{u.designation ? <span className="wk-sm"> - {u.designation}</span> : null}</span>
+                {picked.includes(u.id) && <span className="wk-pill ok">Tagged</span>}
+              </button>
+            ))}
+            {list.length === 0 && <div className="wk-sm" style={{ padding: 12 }}>No one found.</div>}
+          </div>
+          {picked.length > 1 && picked.map((id) => (
+            <input key={id} className="wk-input" style={{ marginTop: 8 }} value={partOf[id]} maxLength={80}
+              onChange={(e) => setPartOf((m) => ({ ...m, [id]: e.target.value }))} placeholder={`${nameOf(id)}'s part, e.g. Reel 1 (optional)`} />
+          ))}
         </div>
 
-        <div className="wk-field"><label htmlFor="nt-due">Due date (whole task)</label>
+        <div className="wk-field"><label htmlFor="nt-due">Due date</label>
           <input id="nt-due" className="wk-input" type="date" value={due} min={today} onChange={(e) => setDue(e.target.value)} />
           <div className="wk-chips">
             <button className="wk-chip" onClick={() => setDue(today)}>Today</button>
             <button className="wk-chip" onClick={() => setDue(addDaysISO(today, 1))}>Tomorrow</button>
             <button className="wk-chip" onClick={() => setDue(addDaysISO(today, 7))}>Next week</button>
           </div>
+        </div>
+
+        <div className="wk-field"><label htmlFor="nt-time">Due time (optional)</label>
+          <input id="nt-time" className="wk-input" type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} />
+          <div className="wk-chips">
+            {[['11:00', '11 AM'], ['14:00', '2 PM'], ['17:00', '5 PM'], ['19:00', '7 PM']].map(([v, l]) => <button key={v} type="button" className="wk-chip" onClick={() => setDueTime(v)}>{l}</button>)}
+            {dueTime && <button type="button" className="wk-chip" onClick={() => setDueTime('')}>Clear</button>}
+          </div>
+          {dueTime && <div className="wk-sm" style={{ marginTop: 6 }}>If it is not finished by then, the assignee gets an alert.</div>}
         </div>
 
         <div className="wk-field"><label htmlFor="nt-note">Note (optional)</label>

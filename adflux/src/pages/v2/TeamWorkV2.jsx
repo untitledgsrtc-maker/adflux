@@ -77,7 +77,7 @@ export default function TeamWorkV2() {
       supabase.from('work_time_entries').select('*').is('ended_at', null),
       supabase.from('work_time_entries').select('*').eq('status', 'pending').order('started_at', { ascending: false }).limit(100),
       supabase.from('work_task_parts')
-        .select('id,task_id,assignee_id,label,due_date,status,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,template_id,created_at)')
+        .select('id,task_id,assignee_id,label,due_date,due_time,status,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,template_id,created_at)')
         .or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -7))}`).limit(600),
       supabase.from('work_templates').select('id,title,project_id,assignee_id,repeat_kind,weekday,month_day,is_active,last_run_date').eq('is_active', true),
       supabase.rpc('work_hours_report', { p_from: from, p_to: to }),
@@ -157,7 +157,7 @@ export default function TeamWorkV2() {
         postponedUntil: p.postponed_until, postponeCount: p.postpone_count || 0,
         postponedBy: [...(p.postponed_by_users || []).map((id) => nameOf(id)), p.postponed_by_client ? `${p.postponed_by_client} (client)` : ''].filter(Boolean).join(', '),
         id: p.id, taskId: p.task_id, finishedAt: p.finished_at, status: p.status, title: p.task?.title || 'Task', label: p.label,
-        client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, assigneeId: p.assignee_id,
+        client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, dueTime: p.due_time, assigneeId: p.assignee_id,
         assigneeName: nameOf(p.assignee_id), assigneePhoto: users.find((u) => u.id === p.assignee_id)?.profile_image_url || null, partsTotal: total[p.task_id] || 1, partsDone: done[p.task_id] || 0,
         seconds: taskCostByTask[p.task_id]?.seconds ?? p.seconds, cost: taskCostByTask[p.task_id]?.cost ?? null,
       }))
@@ -403,7 +403,7 @@ export default function TeamWorkV2() {
       })()}
 
       {postponing && (
-        <PostponeModal item={postponing} users={users.filter((u) => u.is_active && u.role !== 'agency')} meId={uid} onClose={() => setPostponing(null)} onDone={() => { setPostponing(null); load() }} />
+        <PostponeModal item={postponing} projects={activeProjects} users={users.filter((u) => u.is_active && u.role !== 'agency')} meId={uid} onClose={() => setPostponing(null)} onDone={() => { setPostponing(null); load() }} />
       )}
 
       {newTask && (
