@@ -122,7 +122,7 @@ function lastSixMonths() {
 export default function TaPayoutsAdminV2({ embedded = false }) {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const isAdmin = ['admin', 'co_owner', 'accounts', 'hr'].includes(profile?.role) // Phase 182 accounts + 2026-08-03 HR (approve TA/DA)
+  const isAdmin = ['admin', 'co_owner', 'accounts', 'hr', 'office_admin'].includes(profile?.role) // Phase 182 accounts + 2026-08-03 HR (approve TA/DA)
   // Sales Head (manager P3) — approves her team's TA/DA via the gated
   // sales_head_* RPCs (her RLS denies the direct UPDATE). Page via RequireApprovals.
   const isSalesHead = profile?.is_sales_head === true

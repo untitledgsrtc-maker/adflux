@@ -148,7 +148,7 @@ export default function TeamDashboardV2() {
   // cards stay blank. Admin actions (push/reassign) are blocked by RLS + the
   // §97.A2 enqueue_push revoke even though the buttons render.
   const isPrivileged =
-    ['admin', 'co_owner', 'hr'].includes(profile?.role)
+    ['admin', 'co_owner', 'hr', 'office_admin'].includes(profile?.role)
     || profile?.team_role === 'sales_manager'
 
   // Phase 193 — a per-user viewer (e.g. a telecaller the owner grants

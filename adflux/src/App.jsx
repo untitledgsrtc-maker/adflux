@@ -30,6 +30,7 @@ const PendingApprovalsV2 = lazyWithRetry(() => import('./pages/v2/PendingApprova
 const QuoteApprovalsV2 = lazyWithRetry(() => import('./pages/v2/QuoteApprovalsV2'))
 const HRV2 = lazyWithRetry(() => import('./pages/v2/HRV2'))
 const HRHomeV2 = lazyWithRetry(() => import('./pages/v2/HRHomeV2'))
+const OfficeAdminHomeV2 = lazyWithRetry(() => import('./pages/v2/OfficeAdminHomeV2'))   // Phase 391
 const HRCandidatesV2 = lazyWithRetry(() => import('./pages/v2/HRCandidatesV2'))
 const HROnboardTemplatesV2 = lazyWithRetry(() => import('./pages/v2/HROnboardTemplatesV2'))
 const HROnboardingV2 = lazyWithRetry(() => import('./pages/v2/HROnboardingV2'))
@@ -176,6 +177,14 @@ function RequireHROrPrivileged({ children }) {
   return children
 }
 
+/* Phase 391 - Office admin home guard: office_admin or admin / co_owner. */
+function RequireOfficeAdmin({ children }) {
+  const { isPrivileged, profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (!isPrivileged && profile?.role !== 'office_admin') return <Navigate to="/quotes" replace />
+  return children
+}
+
 /* Phase 182 (2026-07-01) — Accounts login. The payroll / finance surface
    (People shell + salary / TA-DA / incentives / leaves) admits role='accounts'
    alongside admin + co_owner. Accounts can view + edit amounts + pay salary /
@@ -197,7 +206,7 @@ function RequireAccountsOrPrivileged({ children }) {
 function RequireBackOffice({ children }) {
   const { isPrivileged, profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  const ok = isPrivileged || ['accounts', 'hr'].includes(profile?.role)
+  const ok = isPrivileged || ['accounts', 'hr', 'office_admin'].includes(profile?.role)
   if (!ok) return <Navigate to="/quotes" replace />
   return children
 }
@@ -210,7 +219,7 @@ function RequireBackOffice({ children }) {
 function RequireApprovals({ children }) {
   const { isPrivileged, profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  const ok = isPrivileged || ['accounts', 'hr'].includes(profile?.role) || profile?.is_sales_head === true
+  const ok = isPrivileged || ['accounts', 'hr', 'office_admin'].includes(profile?.role) || profile?.is_sales_head === true
   if (!ok) return <Navigate to="/quotes" replace />
   return children
 }
@@ -252,7 +261,7 @@ function RequireTeamView({ children }) {
   // 2026-08-03: HR admitted for attendance/GPS (view only). HR has RLS on
   // gps_pings/work_sessions/users but NOT leads/quotes/payments, so the sales
   // cards on the dashboard return empty for HR — attendance shows, money doesn't.
-  const ok = isPrivileged || profile?.role === 'hr' || profile?.role === 'accounts' || profile?.can_view_team_dashboard
+  const ok = isPrivileged || profile?.role === 'hr' || profile?.role === 'accounts' || profile?.role === 'office_admin' || profile?.can_view_team_dashboard
   if (!ok) return <Navigate to="/" replace />
   return children
 }
@@ -387,6 +396,8 @@ function RootRedirect() {
   if (role === 'accounts')                        return <Navigate to="/people" replace />
   // Phase 365 — creative / office staff land on their Work page (was the sales dashboard).
   if (role === 'staff')                           return <Navigate to="/my-work" replace />
+  // Phase 391 - office admin lands on the office home.
+  if (role === 'office_admin')                    return <Navigate to="/office" replace />
   return <Navigate to="/dashboard" replace />
 }
 
@@ -568,6 +579,7 @@ export default function App() {
               admin route stays RequirePrivileged (admin+co_owner only). */}
           {/* Phase 280 — /hr is now the HR Home cockpit (HRHomeV2).
               The offer/invite list moved to /hr/offers. */}
+          <Route path="/office"                    element={<RequireOfficeAdmin><OfficeAdminHomeV2 /></RequireOfficeAdmin>} />
           <Route path="/hr"                        element={<RequireHROrPrivileged><HRHomeV2 /></RequireHROrPrivileged>} />
           <Route path="/hr/candidates"             element={<RequireHROrPrivileged><HRCandidatesV2 /></RequireHROrPrivileged>} />
           {/* Phase 282 — HR Onboard & train. /hr/onboarding/templates BEFORE

@@ -51,6 +51,8 @@ export default function DashboardV2() {
   if (profile?.role === 'operation_executive') return <Navigate to="/ops-home" replace />
   // Phase 365 — creative / office staff never see the sales dashboard.
   if (profile?.role === 'staff')               return <Navigate to="/my-work" replace />
+  // Phase 391 - office admin never sees the sales dashboard.
+  if (profile?.role === 'office_admin')        return <Navigate to="/office" replace />
 
   if (isPrivileged) return <AdminDashboardDesktop />
   // Phase 101.B — agency branch. Same /dashboard URL, role-aware

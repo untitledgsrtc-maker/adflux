@@ -36,7 +36,7 @@ const VALVE_AFTER_SEND_MS = 20000           // escape after they tried + it didn
 const VALVE_HARD_MS = 60000                 // ultimate escape (WhatsApp won't even open)
 const ERR_CAP = 4                           // give up fail-open after N consecutive RPC errors
 // Owner 2026-10-14: everyone says the morning hi (Work staff, operations, HR, accounts too). agency EXCLUDED (no lead queue).
-const FIELD_ROLES = ['sales', 'telecaller', 'staff', 'operation_executive', 'operation_head', 'hr', 'accounts']
+const FIELD_ROLES = ['sales', 'telecaller', 'staff', 'operation_executive', 'operation_head', 'hr', 'accounts', 'office_admin']
 
 export default function MorningGreetGate({ enabled = true }) {
   const profile = useAuthStore(s => s.profile)

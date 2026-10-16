@@ -159,7 +159,7 @@ export default async function handler(req) {
   }
 
   // ── Phase 372: non-sales roles (Work staff, operations, HR, accounts) get a role-shaped day, no Claude ──
-  const ALT_ROLES = ['staff', 'operation_executive', 'operation_head', 'hr', 'accounts', 'office_staff']
+  const ALT_ROLES = ['staff', 'operation_executive', 'operation_head', 'hr', 'accounts', 'office_staff', 'office_admin']
   if (ALT_ROLES.includes(user.role)) {
     const L = [`Good morning ${firstName} 👋`, '']
     try {

@@ -99,7 +99,7 @@ export default async function handler(req) {
     let what = 'follow-up'
     if (r.role === 'staff') { pending = await sbCount(`work_task_parts?assignee_id=eq.${uid}&status=neq.finished&due_date=lte.${istToday}`); what = 'task' }
     else if (r.role === 'operation_executive') { pending = await sbCount(`ops_tickets?assigned_to=eq.${uid}&status=in.(open,in_progress)`); what = 'open fault' }
-    else if (['operation_head', 'hr', 'accounts', 'office_staff'].includes(r.role)) { clear++; continue }
+    else if (['operation_head', 'hr', 'accounts', 'office_staff', 'office_admin'].includes(r.role)) { clear++; continue }
     else pending = await sbCount(`follow_ups?assigned_to=eq.${uid}&is_done=eq.false&follow_up_date=lte.${istToday}`)
     if (pending < 1) { clear++; continue }                       // nothing pending → no nudge
     // Open 24h window? = they messaged our number in the last 24h (team_assistant_requests).

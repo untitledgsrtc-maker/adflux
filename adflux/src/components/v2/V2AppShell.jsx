@@ -253,6 +253,28 @@ const HR_NAV = [
   { to: '/team-dashboard',    label: 'Attendance',     icon: MapPin },
 ]
 
+// Phase 391 (16 Oct 2026) - Office admin. People-ops + govt won-quote report / invoice submission.
+// No Finance, P&L, Master, salary sheet. Routes guarded by RequireBackOffice / RequireApprovals / RequireOfficeAdmin.
+const OFFICE_ADMIN_NAV = [
+  { to: '/office',            label: 'Office Home',    icon: LayoutDashboard },
+  { to: '/admin/leaves',      label: 'Leaves',         icon: CheckSquare },
+  { to: '/admin/ta-payouts',  label: 'TA Claims',      icon: Wallet },
+  { to: '/team',              label: 'Team',           icon: Users },
+  { to: '/team-dashboard',    label: 'Attendance',     icon: MapPin },
+  { to: '/team-work',         label: 'Team Work',      icon: Briefcase },
+  { to: '/quotes',            label: 'Quotes',         icon: FileText },
+  { to: '/clients',           label: 'Clients',        icon: Contact2 },
+]
+
+// Phase 391 - phone bottom nav for the office admin (5 items; the sidebar list above has 8).
+const MOBILE_NAV_OFFICE_ADMIN = [
+  { to: '/office',            label: 'Office',         icon: LayoutDashboard },
+  { to: '/admin/leaves',      label: 'Leaves',         icon: CheckSquare },
+  { to: '/admin/ta-payouts',  label: 'TA Claims',      icon: Wallet },
+  { to: '/team-work',         label: 'Team Work',      icon: Briefcase },
+  { to: '/quotes',            label: 'Quotes',         icon: FileText },
+]
+
 // Phase 182 (2026-07-01) — Accounts login. Payroll-only nav: the People
 // shell carries Team / Incentives / Salary / Leaves / TA Claims tabs, which
 // is the whole finance surface. Routes guarded by RequireAccountsOrPrivileged.
@@ -459,7 +481,7 @@ export function V2AppShell() {
     // Phase 230 — operation_head is a desk role; skip it too. The roving
     // operation_executive is NOT skipped → it's tracked like a field rep.
     if (role === 'telecaller' || role === 'agency' || role === 'accounts'
-        || role === 'operation_head' || role === 'staff') return
+        || role === 'operation_head' || role === 'staff' || role === 'office_admin') return   // Phase 391: desk role, no GPS / no TA rows
     startBackgroundGps(profile.id).catch((e) =>
       console.warn('[v2-shell] bg-gps start failed:', e?.message || e)
     )
@@ -596,10 +618,12 @@ export function V2AppShell() {
   const isAccounts   = profile?.role === 'accounts'   // Phase 182 — Accounts login
   const isOps        = profile?.role === 'operation_head' || profile?.role === 'operation_executive'  // Phase 230
   const isStaff      = profile?.role === 'staff'   // Phase 365 — creative / office staff
+  const isOfficeAdmin = profile?.role === 'office_admin'   // Phase 391
   const baseNav =
     isPrivileged   ? ADMIN_NAV :
     isManager      ? MANAGER_NAV :
     isHR           ? HR_NAV :
+    isOfficeAdmin  ? OFFICE_ADMIN_NAV :
     isAccounts     ? ACCOUNTS_NAV :
     isOps          ? (profile?.role === 'operation_head' ? OPS_HEAD_NAV : OPS_EXEC_NAV) :
     isStaff        ? STAFF_NAV :
@@ -614,6 +638,7 @@ export function V2AppShell() {
     isPrivileged   ? MOBILE_NAV_ADMIN :
     isManager      ? MOBILE_NAV_MANAGER :
     isHR           ? HR_NAV :
+    isOfficeAdmin  ? MOBILE_NAV_OFFICE_ADMIN :
     isAccounts     ? ACCOUNTS_NAV :
     isOps          ? (profile?.role === 'operation_head' ? MOBILE_NAV_OPS_HEAD : MOBILE_NAV_OPS_EXEC) :
     isStaff        ? STAFF_NAV :
@@ -702,6 +727,7 @@ export function V2AppShell() {
             <div className="v2d-brand-s">{
               isPrivileged ? 'Admin'
               : isHR ? 'HR'
+              : isOfficeAdmin ? 'Office admin'
               : isAccounts ? 'Accounts'
               : isTelecaller ? 'Telecaller'
               : isAgency ? 'Agency'
@@ -894,6 +920,7 @@ export function V2AppShell() {
               <div className="v2d-me-role">{
                 isPrivileged ? 'Admin'
                 : isHR ? 'HR'
+              : isOfficeAdmin ? 'Office admin'
                 : isAccounts ? 'Accounts'
                 : isTelecaller ? 'Telecaller'
                 : isAgency ? 'Agency'
@@ -915,17 +942,17 @@ export function V2AppShell() {
                   no Clients, no Score. Agency uses Home + Quotes +
                   Earnings + Offer (sidebar / bottom-nav already cover).
                   Other roles unchanged. */}
-              {!isAgency && !isOps && !isStaff && (
+              {!isAgency && !isOps && !isStaff && !isOfficeAdmin && (
                 <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/follow-ups') }}>
                   <ClockIcon size={18} /> <span>Follow-ups</span>
                 </button>
               )}
-              {!isOps && !isStaff && (
+              {!isOps && !isStaff && !isOfficeAdmin && (
                 <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/quotes') }}>
                   <FileText size={18} /> <span>Quotes</span>
                 </button>
               )}
-              {!isAgency && !isOps && !isStaff && (
+              {!isAgency && !isOps && !isStaff && !isOfficeAdmin && (
                 <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/clients') }}>
                   <Users size={18} /> <span>Clients</span>
                 </button>
@@ -951,7 +978,7 @@ export function V2AppShell() {
                     <FileText size={18} /> <span>My Offer</span>
                   </button>
                 </>
-              ) : (
+              ) : isOfficeAdmin ? null : (
                 <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/my-performance') }}>
                   <TrendingUp size={18} /> <span>Score</span>
                 </button>
@@ -997,6 +1024,7 @@ export function V2AppShell() {
             && !isAccounts /* Phase 182 — no rep incentive card for the finance role */
             && !isOps /* Ops redesign 2026-08-27 — no sales incentive card on ops pages */
             && !isStaff /* Phase 365 — no sales incentive card for creative / office staff */
+            && !isOfficeAdmin /* Phase 391 */
             && !location.pathname.startsWith('/quotes/')
             && location.pathname !== '/quotes/new' && (
             <div style={{ marginBottom: 0 }}>
@@ -1024,6 +1052,7 @@ export function V2AppShell() {
                   <div className="v2d-brand-s">{
               isPrivileged ? 'Admin'
               : isHR ? 'HR'
+              : isOfficeAdmin ? 'Office admin'
               : isAccounts ? 'Accounts'
               : isTelecaller ? 'Telecaller'
               : isAgency ? 'Agency'
@@ -1121,7 +1150,7 @@ export function V2AppShell() {
       {/* Promise-based confirm dialog viewport. */}
       <ConfirmDialogViewport />
       {/* Phase 372: sales + telecaller pages mount their own gate; every other role gets it here. */}
-      {['staff', 'operation_executive', 'operation_head', 'hr', 'accounts'].includes(profile?.role) && <MorningGreetGate />}
+      {['staff', 'operation_executive', 'operation_head', 'hr', 'accounts', 'office_admin'].includes(profile?.role) && <MorningGreetGate />}
       {/* Phase 384 - Windows app only: recording + idle question. Renders nothing in a browser or phone. */}
       {profile?.role === 'staff' && <WindowsAgentBridge />}
 

@@ -68,7 +68,7 @@ function fmtDate(iso) {
 export default function LeavesAdminV2({ embedded = false }) {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const isAdmin = ['admin', 'co_owner', 'accounts', 'hr'].includes(profile?.role) // Phase 182 accounts + 2026-08-03 HR (approve leaves)
+  const isAdmin = ['admin', 'co_owner', 'accounts', 'hr', 'office_admin'].includes(profile?.role) // Phase 182 accounts + 2026-08-03 HR (approve leaves)
   // Sales Head (manager P3) — approves her team's leaves. She's NOT admin/accounts/hr,
   // so her writes go through the gated approve_leave / reject_leave RPCs (below), not
   // the direct UPDATE (which her RLS would deny). Page access via RequireApprovals.
