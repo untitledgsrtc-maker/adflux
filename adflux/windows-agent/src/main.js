@@ -39,21 +39,29 @@ function runWidget() {
 
 // ---------------------------------------------------------------- idle question
 function runIdle() {
-  root.innerHTML = `<div class="wk" style="padding:16px"><div class="wk-card" style="border-color:var(--w-wat,#FBBF24)">
-    <div class="wk-eyb" id="i-top">No activity</div>
-    <div style="font-size:18px;margin:6px 0 12px" id="i-q">Still working?</div>
+  const card = (inner) => `<div class="wk" style="padding:16px"><div class="wk-card" style="border-color:var(--w-wat,#FBBF24)">${inner}</div></div>`
+  const askView = (p) => card(`<div class="wk-eyb">No activity for ${p.minutes || 5} min</div>
+    <div style="font-size:18px;margin:6px 0 12px">Still working on ${esc(p.client || 'your task')}?</div>
     <div style="display:grid;gap:8px">
       <button class="wk-btn y" data-d="still_working">Yes, still working</button>
       <button class="wk-btn o" data-d="break">It was a break</button>
       <button class="wk-btn o" data-d="stop">Stop timer</button>
     </div>
-    <div class="wk-sm" style="margin-top:10px" id="i-note"></div></div></div>`
-  root.querySelectorAll('[data-d]').forEach((b) => b.addEventListener('click', () => emit('agent:idle-answer', { decision: b.dataset.d })))
-  listen('agent:idle-ask', (e) => {
-    const p = e.payload || {}
-    document.getElementById('i-top').textContent = `No activity for ${p.minutes || 5} min`
-    document.getElementById('i-q').textContent = `Still working on ${p.client || 'your task'}?`
-    document.getElementById('i-note').textContent = `No answer in ${p.waitMin || 5} min: the timer stops at ${p.stopAt || 'when you went idle'}.`
-  })
+    <div class="wk-sm" style="margin-top:10px">No answer in ${p.waitMin || 5} min: the timer stops at ${esc(p.stopAt || 'when you went idle')}.</div>`)
+  const stoppedView = (p) => card(`<div class="wk-eyb" style="color:var(--w-dat,#F87171)">Your timer is stopped</div>
+    <div style="font-size:18px;margin:6px 0 4px">Stopped at ${esc(p.stopAt || '')}${p.auto ? ' because you were away' : ''}.</div>
+    <div class="wk-sm" style="margin-bottom:12px">${esc(p.client || '')}${p.label ? ' - ' + esc(p.label) : ''}. Time since then is not counted.</div>
+    <div style="display:grid;gap:8px">
+      <button class="wk-btn y" id="restart">Start the timer again</button>
+      <button class="wk-btn o" id="closeit">Not now</button>
+    </div>`)
+  const bind = () => {
+    root.querySelectorAll('[data-d]').forEach((b) => b.addEventListener('click', () => emit('agent:idle-answer', { decision: b.dataset.d })))
+    document.getElementById('restart')?.addEventListener('click', () => emit('agent:cmd', { type: 'restart' }))
+    document.getElementById('closeit')?.addEventListener('click', () => emit('agent:cmd', { type: 'close-idle' }))
+  }
+  root.innerHTML = askView({})
+  bind()
+  listen('agent:idle-ask', (e) => { root.innerHTML = askView(e.payload || {}); bind() })
+  listen('agent:idle-stopped', (e) => { root.innerHTML = stoppedView(e.payload || {}); bind() })
 }
-

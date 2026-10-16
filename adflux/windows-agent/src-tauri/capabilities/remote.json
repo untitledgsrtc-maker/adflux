@@ -21,6 +21,7 @@
     "allow-hide-window",
     "allow-set-tray-tooltip",
     "allow-autostart-enabled",
-    "allow-set-autostart"
+    "allow-set-autostart",
+    "allow-bring-to-front"
   ]
 }

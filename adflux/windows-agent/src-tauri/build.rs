@@ -8,6 +8,7 @@ fn main() {
             "take_screenshot",
             "device_name",
             "show_window",
+            "bring_to_front",
             "hide_window",
             "set_tray_tooltip",
             "autostart_enabled",

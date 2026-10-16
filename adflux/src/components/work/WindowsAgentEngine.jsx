@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { istTodayISO } from '../../utils/istDate'
 
-const VERSION = '0.2.2'
+const VERSION = '0.2.3'
 const QKEY = 'agent_slice_queue'
 const T = () => window.__TAURI_INTERNALS__
 const invoke = (cmd, args) => T().invoke(cmd, args)
@@ -29,11 +29,12 @@ export default function WindowsAgentEngine() {
   const [needConsent, setNeedConsent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [interval, setIntervalMin] = useState(10)
+  const [stopped, setStopped] = useState(null)   // 'timer stopped' notice with a restart button
   const [ask, setAsk] = useState(null)          // idle question also shown inside this page (backup for the small window)
   const [diag, setDiag] = useState(null)        // tiny status pill: idle seconds, recording, last error
   const S = useRef({
     device: 'Windows PC', config: null, running: null, projects: {}, buckets: new Map(),
-    lastShot: 0, asking: null, askTimer: null, suppress: false, runId: null, ticking: false, lastTickAt: 0, lastSampleAt: 0, lastErr: '', idleNow: 0, answer: null,
+    lastShot: 0, asking: null, askTimer: null, suppress: false, runId: null, ticking: false, lastTickAt: 0, lastSampleAt: 0, lastErr: '', idleNow: 0, answer: null, lastStopped: null,
   })
 
   useEffect(() => {
@@ -115,9 +116,18 @@ export default function WindowsAgentEngine() {
       clearTimeout(s.askTimer); s.asking = null; setAsk(null)
       invoke('hide_window', { label: 'idle' }).catch(() => {})
       const idleSecs = Math.round((Date.now() - new Date(a.began).getTime()) / 1000)
+      const run = s.running
       if (decision === 'still_working') s.suppress = true
       try { await supabase.rpc('work_agent_idle', { p_entry: a.entry, p_idle_began: a.began, p_decision: decision, p_idle_seconds: idleSecs }) } catch { /* may be stopped */ }
       await loadAll()
+      if ((decision === 'stop' || decision === 'auto_stopped') && run && !s.running) {
+        // tell the person, on top of everything, that the timer is stopped and let them start it again
+        s.lastStopped = { project: run.project_id, label: run.task_label, part: run.part_id }
+        const info = { stopAt: timeIST(a.began), auto: decision === 'auto_stopped', client: clientName(run.project_id), label: run.task_label }
+        setStopped(info)
+        await emit('agent:idle-stopped', info)
+        invoke('bring_to_front', { label: 'idle' }).catch(() => {})
+      }
       window.dispatchEvent(new Event('focus'))     // let the open page refresh its timer
     }
     async function maybeAskIdle(idle) {
@@ -130,7 +140,7 @@ export default function WindowsAgentEngine() {
       const info = { minutes: mins, waitMin: 5, client: clientName(s.running.project_id) || s.running.task_label, stopAt: timeIST(began.toISOString()) }
       setAsk(info)
       await emit('agent:idle-ask', info)
-      invoke('show_window', { label: 'idle' }).catch(() => {})
+      invoke('bring_to_front', { label: 'idle' }).catch(() => { invoke('show_window', { label: 'idle' }).catch(() => {}) })
       invoke('show_window', { label: 'main' }).catch(() => {})
       s.askTimer = setTimeout(() => answerIdle('auto_stopped'), 5 * 60000)
     }
@@ -157,10 +167,22 @@ export default function WindowsAgentEngine() {
       emit('agent:state', { running: true, secs, client: clientName(s.running.project_id), label: s.running.task_label, recording: recordOk() && Date.now() - s.lastSampleAt < 30000, err: s.lastErr })
     }
 
+    const restart = async () => {
+      const L = s.lastStopped
+      setStopped(null)
+      invoke('hide_window', { label: 'idle' }).catch(() => {})
+      if (!L) return
+      try { await supabase.rpc('work_clock_start', { p_project: L.project || null, p_label: L.label || null, p_part: L.part || null }) } catch { /* shown by the page */ }
+      await loadAll()
+      window.dispatchEvent(new Event('focus'))
+    }
+    s.restart = restart
     s.answer = answerIdle
     listen('agent:cmd', async (p) => {
       if (p?.type === 'stop') { await supabase.rpc('work_clock_stop', {}); await loadAll(); window.dispatchEvent(new Event('focus')) }
       if (p?.type === 'open') invoke('show_window', { label: 'main' }).catch(() => {})
+      if (p?.type === 'close-idle') { setStopped(null); invoke('hide_window', { label: 'idle' }).catch(() => {}) }
+      if (p?.type === 'restart') await restart()
     })
     listen('agent:idle-answer', (p) => answerIdle(p?.decision || 'still_working'))
 
@@ -204,6 +226,19 @@ export default function WindowsAgentEngine() {
       </span>
     </div>
   ) : null
+  const stoppedNotice = stopped ? (
+    <div className="wk" style={{ position: 'fixed', inset: 0, zIndex: 9001, background: 'rgba(7,11,22,.75)', display: 'grid', placeItems: 'center', padding: 16 }}>
+      <div className="wk-card" style={{ maxWidth: 440, width: '100%', borderColor: 'var(--w-dat, #F87171)' }} role="dialog" aria-label="Timer stopped">
+        <div className="wk-eyb" style={{ color: 'var(--w-dat, #F87171)' }}>Your timer is stopped</div>
+        <div style={{ fontSize: 18, margin: '6px 0 4px' }}>Stopped at {stopped.stopAt}{stopped.auto ? ' because you were away' : ''}.</div>
+        <div className="wk-sm" style={{ marginBottom: 12 }}>{stopped.client}{stopped.label ? ` - ${stopped.label}` : ''}. Time since then is not counted.</div>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <button className="wk-btn y" onClick={() => S.current.restart?.()}>Start the timer again</button>
+          <button className="wk-btn o" onClick={() => setStopped(null)}>Not now</button>
+        </div>
+      </div>
+    </div>
+  ) : null
   const question = ask ? (
     <div className="wk" style={{ position: 'fixed', inset: 0, zIndex: 9001, background: 'rgba(7,11,22,.75)', display: 'grid', placeItems: 'center', padding: 16 }}>
       <div className="wk-card" style={{ maxWidth: 440, width: '100%', borderColor: 'var(--w-wat, #FBBF24)' }} role="dialog" aria-label="Still working?">
@@ -219,7 +254,7 @@ export default function WindowsAgentEngine() {
     </div>
   ) : null
 
-  if (!needConsent) return <>{pill}{question}</>
+  if (!needConsent) return <>{pill}{question}{stoppedNotice}</>
   return (
     <div className="wk" style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(7,11,22,.7)', display: 'grid', placeItems: 'center', padding: 16 }}>
       <div className="wk-card" style={{ maxWidth: 520, width: '100%' }} role="dialog" aria-label="Before you start">

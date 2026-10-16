@@ -122,6 +122,20 @@ fn show_window(app: AppHandle, label: String) {
     }
 }
 
+// Bring a window to the very front (idle question / "timer stopped"): show, always on top, centre, focus,
+// and flash the taskbar so the person notices even if they are in another program.
+#[tauri::command]
+fn bring_to_front(app: AppHandle, label: String) {
+    if let Some(w) = app.get_webview_window(&label) {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_always_on_top(true);
+        let _ = w.center();
+        let _ = w.set_focus();
+        let _ = w.request_user_attention(Some(tauri::UserAttentionType::Critical));
+    }
+}
+
 #[tauri::command]
 fn hide_window(app: AppHandle, label: String) {
     if let Some(w) = app.get_webview_window(&label) {
@@ -169,6 +183,7 @@ fn main() {
             take_screenshot,
             device_name,
             show_window,
+            bring_to_front,
             hide_window,
             set_tray_tooltip,
             autostart_enabled,
