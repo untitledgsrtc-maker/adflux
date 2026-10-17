@@ -127,6 +127,20 @@ export default function MyWorkV2() {
     } catch (e) { toastError(e, 'That did not work.'); return false } finally { latch.current = false; setBusy(false) }
   }
 
+  // A typed timer becomes a real task card for herself (due today) and the timer moves onto it.
+  const createCardAndStart = async (project, label) => {
+    if (latch.current) return
+    try {
+      const { data: taskId, error } = await supabase.rpc('work_create_task', {
+        p_title: label, p_project: project, p_note: null, p_due: today, p_parts: [{ assignee: uid, label: '', due: null }], p_steps: [],
+      })
+      if (error) throw error
+      const { data: pr, error: e2 } = await supabase.from('work_task_parts').select('id').eq('task_id', taskId).eq('assignee_id', uid).maybeSingle()
+      if (e2 || !pr) throw e2 || new Error('task card not found')
+      await rpc('work_clock_start', { p_project: null, p_label: null, p_part: pr.id })   // also stops the typed timer
+    } catch (e) { toastError(e, 'Could not create the task.') }
+  }
+
   const addProject = async (name) => {
     const { data, error } = await supabase.rpc('work_add_project', { p_name: name, p_kind: 'client' })
     if (error) throw error
@@ -218,6 +232,7 @@ export default function MyWorkV2() {
               <div className="wk-c8" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 {running
                   ? <RunningCard running={running} secs={runSecs} projName={projName} busy={busy}
+                      onMakeTask={running.part_id ? null : () => createCardAndStart(running.project_id, running.task_label)}
                       onPause={() => rpc('work_clock_stop', {})}
                       onFinish={running.part_id ? () => rpc('work_finish_part', { p_part: running.part_id, p_note: null }, 'Finished.') : null} />
                   : <StartForm projects={projects} busy={busy} entries={entries}
@@ -225,18 +240,7 @@ export default function MyWorkV2() {
                       onStartCard={(id) => rpc('work_clock_start', { p_project: null, p_label: null, p_part: id })}
                       onResume={(en) => rpc('work_clock_start', { p_project: en.project_id, p_label: en.part_id ? null : en.task_label, p_part: en.part_id || null })}
                       onFinishCard={(partId) => rpc('work_finish_part', { p_part: partId, p_note: null }, 'Finished.')}
-                      onCreateAndStart={async (project, label) => {
-                        if (latch.current) return
-                        try {
-                          const { data: taskId, error } = await supabase.rpc('work_create_task', {
-                            p_title: label, p_project: project, p_note: null, p_due: today, p_parts: [{ assignee: uid, label: '', due: null }], p_steps: [],
-                          })
-                          if (error) throw error
-                          const { data: pr, error: e2 } = await supabase.from('work_task_parts').select('id').eq('task_id', taskId).eq('assignee_id', uid).maybeSingle()
-                          if (e2 || !pr) throw e2 || new Error('task card not found')
-                          await rpc('work_clock_start', { p_project: null, p_label: null, p_part: pr.id })
-                        } catch (e) { toastError(e, 'Could not create the task.') }
-                      }}
+                      onCreateAndStart={createCardAndStart}
                       onAddProject={addProject}
                       onStart={(project, label) => rpc('work_clock_start', { p_project: project, p_label: label, p_part: null })} />}
                 {istHour() >= 19 && <TodayStrip secs={todaySecs} firstIn={firstIn} />}
@@ -344,7 +348,7 @@ function TodayStrip({ secs, firstIn }) {
   )
 }
 
-function RunningCard({ running, secs, projName, busy, onPause, onFinish }) {
+function RunningCard({ running, secs, projName, busy, onPause, onFinish, onMakeTask }) {
   return (
     <div className="wk-hero">
       <div className="wk-row">
@@ -358,6 +362,7 @@ function RunningCard({ running, secs, projName, busy, onPause, onFinish }) {
         </div>
         <div className="wk-grp" style={{ flexWrap: 'nowrap' }}>
           <button className="wk-btn glass" disabled={busy} onClick={onPause}><Pause size={16} aria-hidden="true" /> Pause</button>
+          {onMakeTask && <button className="wk-btn glass" disabled={busy} onClick={onMakeTask}><Plus size={16} aria-hidden="true" /> Make this a task</button>}
           {onFinish && <button className="wk-btn y" disabled={busy} onClick={onFinish}><Check size={16} aria-hidden="true" /> Finish</button>}
         </div>
       </div>
