@@ -143,8 +143,9 @@ export default async function handler(req) {
 
   let retryable = false
   for (const lg of leadgens) {
+    let rawFd = null   // Phase 410: keep the form's field names/values on the audit row so a mapping miss can be read, not guessed
     const auditPatch = (status, lead_id, norm) => sb(`inbound_leads?provider=eq.meta_lead&external_event_id=eq.${lg.leadgen_id}`, {
-      method: 'PATCH', body: JSON.stringify({ status, dedupe_phone: norm || null, ...(lead_id ? { lead_id } : {}) }),
+      method: 'PATCH', body: JSON.stringify({ status, dedupe_phone: norm || null, ...(rawFd ? { raw_payload: rawFd } : {}), ...(lead_id ? { lead_id } : {}) }),
     })
     try {
       // Fetch the form fields FIRST — so a Graph failure does NOT consume the
@@ -161,6 +162,7 @@ export default async function handler(req) {
       })
       if (claim.status === 409) continue
 
+      rawFd = { field_data: gd.field_data || null, form_id: lg.form_id || null, ad_id: lg.ad_id || null }
       const f = mapFields(gd.field_data)
       const phone = cleanPhone(f.phone)
       const norm = digitsOnly(f.phone)
