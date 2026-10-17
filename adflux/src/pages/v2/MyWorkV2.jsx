@@ -137,7 +137,8 @@ export default function MyWorkV2() {
       if (error) throw error
       const { data: pr, error: e2 } = await supabase.from('work_task_parts').select('id').eq('task_id', taskId).eq('assignee_id', uid).maybeSingle()
       if (e2 || !pr) throw e2 || new Error('task card not found')
-      await rpc('work_clock_start', { p_project: null, p_label: null, p_part: pr.id })   // also stops the typed timer
+      const started = await rpc('work_clock_start', { p_project: null, p_label: null, p_part: pr.id })   // also stops the typed timer
+      if (started) toastSuccess('Task card created. It is under In process.')
     } catch (e) { toastError(e, 'Could not create the task.') }
   }
 
@@ -238,7 +239,12 @@ export default function MyWorkV2() {
                   : <StartForm projects={projects} busy={busy} entries={entries}
                       openCards={items.filter((i) => i.status === 'assigned' || i.status === 'in_process')}
                       onStartCard={(id) => rpc('work_clock_start', { p_project: null, p_label: null, p_part: id })}
-                      onResume={(en) => rpc('work_clock_start', { p_project: en.project_id, p_label: en.part_id ? null : en.task_label, p_part: en.part_id || null })}
+                      onResume={(en) => {
+                        if (en.part_id) return rpc('work_clock_start', { p_project: null, p_label: null, p_part: en.part_id })
+                        const t = String(en.task_label || '').trim().toLowerCase()
+                        const same = items.find((i) => (i.status === 'assigned' || i.status === 'in_process') && String(i.title || '').trim().toLowerCase() === t)
+                        return same ? rpc('work_clock_start', { p_project: null, p_label: null, p_part: same.id }) : createCardAndStart(en.project_id, en.task_label)
+                      }}
                       onFinishCard={(partId) => rpc('work_finish_part', { p_part: partId, p_note: null }, 'Finished.')}
                       onCreateAndStart={createCardAndStart}
                       onAddProject={addProject}
@@ -418,6 +424,9 @@ function StartForm({ projects, busy, entries, openCards, onStartCard, onResume, 
     if (!label.trim()) return toastError('', 'Type what you are doing.')
     try { localStorage.setItem('wk_last_project', pid) } catch { /* ignore */ }
     // If what was typed is really one of my task cards, offer the card: then Finish works and the head sees the task done.
+    const typed = label.trim().toLowerCase()
+    const same = (openCards || []).find((c) => String(c.title || '').trim().toLowerCase() === typed)
+    if (same) { await onStartCard(same.id); setLabel(''); return }   // exact same name: reuse that card, no question
     const card = matchCard(label, openCards)
     if (card) {
       const useCard = await confirmDialog({
@@ -427,14 +436,8 @@ function StartForm({ projects, busy, entries, openCards, onStartCard, onResume, 
       })
       if (useCard) { await onStartCard(card.id); setLabel(''); return }
     }
-    // Nothing matched: offer to make it a real task card so it shows on the board and Finish works.
-    const makeCard = await confirmDialog({
-      title: 'Create a task for this?',
-      message: `"${label.trim()}" is not on your list. Make it a task card so it shows under In process and you can Finish it?`,
-      confirmLabel: 'Create the task', cancelLabel: 'No, just track time',
-    })
-    if (makeCard) { await onCreateAndStart(pid, label.trim()); setLabel(''); return }
-    await onStart(pid, label.trim())
+    // Nothing matched: every new typed name becomes a real task card (due today) so it shows under In process and Finish works.
+    await onCreateAndStart(pid, label.trim())
     setLabel('')
   }
 
