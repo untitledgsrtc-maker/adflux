@@ -77,7 +77,7 @@ export default function TeamWorkV2() {
       supabase.from('work_time_entries').select('*').is('ended_at', null),
       supabase.from('work_time_entries').select('*').eq('status', 'pending').order('started_at', { ascending: false }).limit(100),
       supabase.from('work_task_parts')
-        .select('id,task_id,assignee_id,label,due_date,due_time,status,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,template_id,created_at)')
+        .select('id,task_id,assignee_id,label,due_date,status,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,template_id,created_at)')
         .or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -7))}`).limit(600),
       supabase.from('work_templates').select('id,title,project_id,assignee_id,repeat_kind,weekday,month_day,is_active,last_run_date').eq('is_active', true),
       supabase.rpc('work_hours_report', { p_from: from, p_to: to }),

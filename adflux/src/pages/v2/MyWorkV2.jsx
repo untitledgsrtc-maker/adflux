@@ -62,7 +62,7 @@ export default function MyWorkV2() {
       supabase.from('work_time_entries').select('*').eq('user_id', uid).is('ended_at', null).maybeSingle(),
       supabase.from('work_time_entries').select('*').eq('user_id', uid).gte('started_at', t0).order('started_at'),
       supabase.from('work_task_parts')
-        .select('id,task_id,assignee_id,label,due_date,due_time,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status)')
+        .select('id,task_id,assignee_id,label,due_date,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status)')
         .eq('assignee_id', uid).or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -14))}`).limit(300),
       supabase.from('work_tasks')
         .select('id,title,project_id,due_date,status,created_at,parts:work_task_parts(id,assignee_id,label,status,due_date)')
