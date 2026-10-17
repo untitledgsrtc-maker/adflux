@@ -16,7 +16,7 @@
 // flow is touched (§45-safe). It cannot be validated until a real form submit
 // flows through; test end-to-end when the token + subscription are live.
 //
-// ENV: CAMPAIGN_APP_SECRET (same Meta app as WhatsApp — HMAC), META_LEADS_VERIFY_TOKEN
+// ENV: CAMPAIGN_APP_SECRET (WhatsApp app — HMAC) and/or META_LEADS_APP_SECRET (Untitled Leads app), META_LEADS_VERIFY_TOKEN
 //      (webhook handshake), META_LEADS_TOKEN (Page/System-User token w/ leads_retrieval),
 //      SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.
 
@@ -66,22 +66,29 @@ function mapFields(fieldData) {
 }
 
 // HMAC-SHA256 verify (Edge Web Crypto), matching Meta's X-Hub-Signature-256.
-async function verifySig(rawBody, header) {
-  if (!APP_SECRET) return false
-  const sig = String(header || '')
-  if (!sig.startsWith('sha256=')) return false
+// Phase 408: form leads are signed by the "Untitled Leads" Meta app, whose secret differs from the WhatsApp app's
+// (CAMPAIGN_APP_SECRET). Either secret is accepted. Env: META_LEADS_APP_SECRET.
+const LEADS_APP_SECRET = process.env.META_LEADS_APP_SECRET
+async function hmacHex(secret, rawBody) {
   const key = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(APP_SECRET),
+    'raw', new TextEncoder().encode(secret),
     { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
   )
   const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody))
-  const hex = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, '0')).join('')
-  const expected = 'sha256=' + hex
-  // constant-time-ish compare
-  if (expected.length !== sig.length) return false
-  let diff = 0
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i)
-  return diff === 0
+  return 'sha256=' + [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+async function verifySig(rawBody, header) {
+  const sig = String(header || '')
+  if (!sig.startsWith('sha256=')) return false
+  for (const secret of [APP_SECRET, LEADS_APP_SECRET]) {
+    if (!secret) continue
+    const expected = await hmacHex(secret, rawBody)
+    if (expected.length !== sig.length) continue
+    let diff = 0   // constant-time-ish compare
+    for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i)
+    if (diff === 0) return true
+  }
+  return false
 }
 
 async function firstRow(path) {
