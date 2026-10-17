@@ -164,6 +164,12 @@ export default async function handler(req) {
 
       rawFd = { field_data: gd.field_data || null, form_id: lg.form_id || null, ad_id: lg.ad_id || null }
       const f = mapFields(gd.field_data)
+      // Phase 410: the form's other answers (business type, screens...) go into the lead notes so the telecaller sees them.
+      const MAPPED = /(full_?name|^name$|your_name|phone|mobile|contact_?number|whatsapp|email|city|town|location|company|business_name|firm|brand)/
+      const extra = (gd.field_data || [])
+        .filter((x) => !MAPPED.test(String(x?.name || '').toLowerCase()) && Array.isArray(x?.values) && String(x.values[0] || '').trim())
+        .map((x) => `${String(x.name).replace(/_/g, ' ').replace(/\?$/, '')}: ${String(x.values[0]).trim()}`.slice(0, 200))
+      const notes = extra.length ? `[Meta form] ${extra.join(' | ')}`.slice(0, 900) : null
       const phone = cleanPhone(f.phone)
       const norm = digitsOnly(f.phone)
 
@@ -198,6 +204,7 @@ export default async function handler(req) {
         assigned_to: owner,
         created_by: owner,
         campaign_id: camp?.id || null,
+        ...(notes ? { notes } : {}),
       }
       const ins = await sb('leads', {
         method: 'POST', headers: { Prefer: 'return=representation' },
