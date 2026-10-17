@@ -78,7 +78,7 @@ export default async function handler(req) {
     if (!quote) return j({ ok: false, error: 'quote_not_found' }, 404)
     if (quote.segment === 'GOVERNMENT') return j({ ok: false, error: 'govt_not_supported' }, 400)  // §4 — govt uses GovtProposalRenderer
 
-    const cities = (await (await sb(`quote_cities?quote_id=eq.${quote.id}&select=city_name,screens,offered_rate,campaign_total,duration_months&order=campaign_total.desc`)).json()) || []
+    const cities = (await (await sb(`quote_cities?quote_id=eq.${quote.id}&select=city_name,screens,offered_rate,campaign_total,duration_months,duration_days&order=campaign_total.desc`)).json()) || []
     if (!cities.length) return j({ ok: false, error: 'no_cities' }, 400)
 
     // ── §4 letterhead: the PRIVATE company row (hard-fail if missing) ──
@@ -145,7 +145,7 @@ export default async function handler(req) {
     T('City / Station (all screens)', cX, y + 2, 8.5, bold, rgb(1, 1, 1))
     TR('Screens', sX, y + 2, 8.5, bold, rgb(1, 1, 1))
     TR('Rate/screen/mo', rX, y + 2, 8.5, bold, rgb(1, 1, 1))
-    TR('Mo.', mX, y + 2, 8.5, bold, rgb(1, 1, 1))
+    TR(cities.some((c) => Number(c.duration_days) > 0) ? 'Dur.' : 'Mo.', mX, y + 2, 8.5, bold, rgb(1, 1, 1))
     TR('Amount', aX, y + 2, 8.5, bold, rgb(1, 1, 1))
     y -= 4
     let alt = false
@@ -157,7 +157,7 @@ export default async function handler(req) {
       T(c.city_name || '—', cX, y + 2, 9.5, font, navy)
       TR(c.screens || 0, sX, y + 2, 9.5, font, navy)
       TR(inr(c.offered_rate), rX, y + 2, 9.5, font, navy)
-      TR(cm, mX, y + 2, 9.5, font, navy)
+      TR(Number(c.duration_days) > 0 ? `${Math.round(Number(c.duration_days))}d` : cm, mX, y + 2, 9.5, font, navy)   // Phase 407: days quote shows 15d
       TR(inr(c.campaign_total), aX, y + 2, 9.5, bold, navy)
     }
     y -= 4; HR(y, line, 1)

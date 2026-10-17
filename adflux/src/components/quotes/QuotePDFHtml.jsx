@@ -20,6 +20,7 @@ import { createRoot } from 'react-dom/client'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { rupeesToWords } from '../../utils/numberToWords'
+import { quoteDurationLabel, durationShort, calcCampaignTotal } from '../../utils/quoteDuration'
 // Phase 34Z.27 — static imports for html2canvas + jspdf. The previous
 // version used `await import('html2canvas')` and `await import('jspdf')`
 // which Vite split into separate /assets/*.js chunks. Workbox's
@@ -314,13 +315,14 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
     slotSec:      Number(c.slot_seconds) || 10,
     slotsPerDay:  Number(c.slots_per_day) || 100,
     durationMo:   Number(c.duration_months) || Number(quote?.duration_months) || 1,
+    durLabel:     durationShort({ duration_days: c.duration_days, duration_months: Number(c.duration_months) || Number(quote?.duration_months) || 1 }),
     listedRate:   Number(c.listed_rate)  || 0,
     offeredRate:  Number(c.offered_rate) || 0,
-    campaignTotal: Number(c.campaign_total) || (Number(c.offered_rate || 0) * Number(c.screens || 0) * (Number(c.duration_months) || 1)),
+    campaignTotal: Number(c.campaign_total) || calcCampaignTotal(c.offered_rate, c.screens, Number(c.duration_months) || 1, c.duration_days),
   }))
   const totalScreens = lines.reduce((s, l) => s + l.screens, 0)
   const repName = quote?.sales_person_name || 'Sales Executive'
-  const campaignDurationLabel = `${quote?.duration_months || 1} Month${(quote?.duration_months || 1) !== 1 ? 's' : ''}`
+  const campaignDurationLabel = quoteDurationLabel(cities, quote?.duration_months)
 
   return (
     <div style={styles.page}>
@@ -506,7 +508,7 @@ export function QuotePDFHtmlDocument({ quote, cities = [], company }) {
                     }}>{l.grade || '—'}</span>
                   </td>
                   <td style={{ ...styles.td, ...styles.tdNum }}>{l.screens}</td>
-                  <td style={{ ...styles.td, ...styles.tdNum }}>{l.durationMo}mo</td>
+                  <td style={{ ...styles.td, ...styles.tdNum }}>{l.durLabel}</td>
                   <td style={{ ...styles.td, ...styles.tdNum }}>{l.slotSec}s</td>
                   <td style={{ ...styles.td, ...styles.tdNum }}>{l.slotsPerDay}</td>
                   <td style={{ ...styles.td, ...styles.tdNum, color: MUTED }}>
@@ -694,7 +696,7 @@ export function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLas
   const totalAmount  = Number(quote?.total_amount) || (subtotal + gstAmount)
   const inWords      = rupeesToWords(Math.round(totalAmount))
   const repName      = quote?.sales_person_name || 'Sales Executive'
-  const campaignDurationLabel = `${quote?.duration_months || 1} Month${(quote?.duration_months || 1) !== 1 ? 's' : ''}`
+  const campaignDurationLabel = quoteDurationLabel(allCities, quote?.duration_months)
 
   // Phase 81.3.5: position:relative so the title can sit absolutely
   // in the letterhead's top-left empty zone (owner directive on
@@ -734,9 +736,10 @@ export function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLas
       slotSec:      Number(c.slot_seconds) || 10,
       slotsPerDay:  Number(c.slots_per_day) || 100,
       durationMo:   Number(c.duration_months) || (Number(quote?.duration_months) || 1),
+      durLabel:     durationShort({ duration_days: c.duration_days, duration_months: Number(c.duration_months) || (Number(quote?.duration_months) || 1) }),
       listedRate:   Number(c.listed_rate) || 0,
       offeredRate:  Number(c.offered_rate) || 0,
-      campaignTotal: Number(c.campaign_total) || (Number(c.offered_rate || 0) * Number(c.screens || 0) * (Number(c.duration_months) || 1)),
+      campaignTotal: Number(c.campaign_total) || calcCampaignTotal(c.offered_rate, c.screens, Number(c.duration_months) || 1, c.duration_days),
     }
   })
 
@@ -950,7 +953,7 @@ export function QuotePage({ quote, company, cityChunk, allCities, isFirst, isLas
                   }}>{l.grade || '—'}</span>
                 </td>
                 <td style={{ ...tableTd, ...tdNum }}>{l.screens}</td>
-                <td style={{ ...tableTd, ...tdNum }}>{l.durationMo}mo</td>
+                <td style={{ ...tableTd, ...tdNum }}>{l.durLabel}</td>
                 <td style={{ ...tableTd, ...tdNum }}>{l.slotSec}s</td>
                 <td style={{ ...tableTd, ...tdNum }}>{l.slotsPerDay}</td>
                 <td style={{ ...tableTd, ...tdNum, color: MUTED }}>

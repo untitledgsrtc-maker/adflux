@@ -42,6 +42,7 @@ import { shareQuoteViaWhatsApp } from '../utils/shareQuoteWhatsApp'
 // existing blob-download path.
 import { WonPaymentModal } from '../components/payments/WonPaymentModal'
 import { toastError } from '../components/v2/Toast'
+import { quoteDurationLabel, durationShort } from '../utils/quoteDuration'
 import SendEmailModal from '../components/v2/SendEmailModal'
 import { confirmDialog } from '../components/v2/ConfirmDialog'
 import { STATUS_COLOR_VARS as STATUS_COLORS } from '../utils/constants'
@@ -892,7 +893,7 @@ export default function QuoteDetail() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 14, marginBottom: 16 }}>
               {[
-                { label: 'Duration', val: `${quote.duration_months} Month${quote.duration_months !== 1 ? 's' : ''}` },
+                { label: 'Duration', val: quoteDurationLabel(quote.quote_cities, quote.duration_months) },
                 { label: 'Type', val: quote.revenue_type === 'renewal' ? 'Renewal' : 'New Client' },
                 { label: 'Prepared By', val: quote.sales_person_name },
                 { label: 'Locations', val: `${cities.length} Cit${cities.length !== 1 ? 'ies' : 'y'}` },
@@ -931,7 +932,7 @@ export default function QuoteDetail() {
                           </span>
                         </td>
                         <td style={{ textAlign: 'center' }}>{c.screens}</td>
-                        <td style={{ textAlign: 'center' }}>{c.duration_months}mo</td>
+                        <td style={{ textAlign: 'center' }}>{durationShort(c)}</td>
                         {/* Slot metadata — pre-migration rows lack these
                             columns, so we fall back to the historical
                             defaults (10s, 100/day) rather than showing —. */}

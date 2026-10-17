@@ -69,7 +69,9 @@ export function WonPaymentModal({
       Number(quote.gsrtc_campaign_months) ||
       1
     const d = new Date(startISO)
-    d.setMonth(d.getMonth() + months)
+    const days = Number(quote.quote_cities?.[0]?.duration_days) || 0   // Phase 407: a days quote ends after N days
+    if (days > 0) d.setDate(d.getDate() + days)
+    else d.setMonth(d.getMonth() + months)
     return d.toISOString().split('T')[0]
   }
   const initialEnd = quote.campaign_end_date || computeEndFromStart(initialStart)
@@ -147,7 +149,9 @@ export function WonPaymentModal({
         1
       const start = new Date(v)
       const end = new Date(start)
-      end.setMonth(end.getMonth() + months)
+      const days = Number(quote.quote_cities?.[0]?.duration_days) || 0
+      if (days > 0) end.setDate(end.getDate() + days)
+      else end.setMonth(end.getMonth() + months)
       updated.campaign_end_date = end.toISOString().split('T')[0]
     }
     // Auto-tick "final payment" when the cumulative received covers the

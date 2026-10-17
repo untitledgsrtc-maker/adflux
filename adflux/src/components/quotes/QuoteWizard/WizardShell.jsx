@@ -178,6 +178,7 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
           },
           screens: qc.screens,
           duration_months: qc.duration_months || 1,
+          duration_days: qc.duration_days || null,
           listed_rate: qc.listed_rate,
           offered_rate: qc.offered_rate,
           override_reason: qc.override_reason || '',
@@ -278,6 +279,7 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
       override_reason: c.override_reason || null,
       campaign_total: c.campaign_total,
       duration_months: c.duration_months,
+      duration_days: c.duration_days || null,
       // Phase 212: snapshot the city's real monthly + daily impressions from
       // the Cities master onto the quote, so the PDF CPM reads
       // offer-price / real-impressions instead of a 5,200/screen guess.
@@ -540,6 +542,7 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
                           city: { id: r.city_id, name: r.city_name, grade: r.grade },
                           screens:           r.screens,
                           duration_months:   r.duration_months,
+                          duration_days:     r.duration_days || null,
                           impressions_month: Number(r.impressions_month || 0),
                           impressions_day:   Number(r.impressions_day || 0),
                           listed_rate:       Number(r.listed_rate || 0),

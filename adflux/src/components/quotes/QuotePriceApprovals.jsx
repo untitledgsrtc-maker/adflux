@@ -26,6 +26,7 @@ import { useAuthStore } from '../../store/authStore'
 import { confirmDialog } from '../v2/ConfirmDialog'
 import { toastError, toastSuccess } from '../v2/Toast'
 import { PRICE_FLOOR } from '../../utils/quotePriceGate'
+import { durationShort } from '../../utils/quoteDuration'
 
 function timeAgo(iso) {
   if (!iso) return ''
@@ -79,7 +80,7 @@ export default function QuotePriceApprovals({ title = 'Quote price approvals', h
         .limit(200),
       // pending requests are a handful at a time; 1000 is the PostgREST ceiling anyway
       supabase.from('quote_cities')
-        .select('quote_id, city_name, screens, offered_rate, duration_months')
+        .select('quote_id, city_name, screens, offered_rate, duration_months, duration_days')
         .in('quote_id', quoteIds)
         .limit(1000),
       userIds.length
@@ -282,7 +283,7 @@ export default function QuotePriceApprovals({ title = 'Quote price approvals', h
                           >
                             <span>{c.city_name}</span>
                             <span>
-                              {c.screens} screens x {formatCurrency(c.offered_rate)} x {c.duration_months} mo
+                              {c.screens} screens x {formatCurrency(c.offered_rate)} x {durationShort(c)}
                             </span>
                           </div>
                         )

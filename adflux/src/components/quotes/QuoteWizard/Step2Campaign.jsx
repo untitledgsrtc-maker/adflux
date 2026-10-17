@@ -4,6 +4,7 @@ import { confirmDialog } from '../../v2/ConfirmDialog'
 import { useCities } from '../../../hooks/useCities'
 import { useAuth } from '../../../hooks/useAuth'
 import { formatCurrency } from '../../../utils/formatters'
+import { calcCampaignTotal, monthsForDays, hasDays } from '../../../utils/quoteDuration'
 
 // Duration model:
 // Previously this was a fixed 1/3/6/12 dropdown with bulk-discount
@@ -19,11 +20,11 @@ const QUICK_DURATIONS = [1, 3, 6, 12]
 const MIN_MONTHS = 1
 const MAX_MONTHS = 12
 
-function calcTotal(offeredRate, screens, durationMonths) {
-  const m = Math.max(MIN_MONTHS, Math.min(MAX_MONTHS, Number(durationMonths) || 1))
-  const r = Number(offeredRate) || 0
-  const s = Math.max(1, Number(screens) || 1)
-  return Math.round(r * s * m)
+// Phase 407: a quote can be in DAYS (7, 15, any number up to 365). Rate stays per screen per MONTH; days bill as days/30.
+const QUICK_DAYS = [7, 15]
+const MAX_DAYS = 365
+function calcTotal(offeredRate, screens, durationMonths, durationDays) {
+  return calcCampaignTotal(offeredRate, screens, durationMonths, durationDays)
 }
 
 // Slot seconds (ad spot length). Pure metadata — NOT a price factor.
@@ -49,7 +50,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
   // Phase 331 — bulk edit: set the same offered rate / duration / slot seconds /
   // slots-per-day on EVERY city already in the quote. Empty box = leave unchanged.
   const [bulkOpen, setBulkOpen] = useState(false)
-  const [bulk, setBulk] = useState({ offered_rate: '', duration_months: '', slot_seconds: '', slots_per_day: '' })
+  const [bulk, setBulk] = useState({ offered_rate: '', duration_months: '', duration_days: '', slot_seconds: '', slots_per_day: '' })
   const [bulkNote, setBulkNote] = useState('')
   // Phase 331.1 — tick rows to bulk-edit only those; nothing ticked = all cities.
   const [picked, setPicked] = useState(() => new Set())
@@ -80,6 +81,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       city,
       screens: city.screens || 1,
       duration_months: 1,
+      duration_days: null,
       listed_rate: city.monthly_rate || 0,
       offered_rate: city.offer_rate || 0,
       override_reason: '',
@@ -121,13 +123,28 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       selectedCities.map(sc => {
         if (sc.city.id !== cityId) return sc
         const updated = { ...sc, [field]: value }
+        if (field === 'duration_months') updated.duration_days = null   // picking months leaves days mode
         // Only three fields feed campaign_total. Slot seconds and
         // slots_per_day are intentionally excluded — they are
         // metadata, not price inputs.
         if (field === 'offered_rate' || field === 'screens' || field === 'duration_months') {
-          updated.campaign_total = calcTotal(updated.offered_rate, updated.screens, updated.duration_months)
+          updated.campaign_total = calcTotal(updated.offered_rate, updated.screens, updated.duration_months, updated.duration_days)
         }
         return updated
+      })
+    )
+  }
+
+  // Phase 407: set the duration in DAYS on one city (blank / 0 = back to months). One onChange: both fields + the total.
+  function setDays(cityId, raw) {
+    const n = Math.max(0, Math.min(MAX_DAYS, Math.round(Number(raw) || 0)))
+    onChange(
+      selectedCities.map(sc => {
+        if (sc.city.id !== cityId) return sc
+        const u = { ...sc, duration_days: n > 0 ? n : null }
+        if (n > 0) u.duration_months = monthsForDays(n)
+        u.campaign_total = calcTotal(u.offered_rate, u.screens, u.duration_months, u.duration_days)
+        return u
       })
     )
   }
@@ -136,6 +153,8 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
   // empty strings don't poison the state. Using blur (not change) so
   // the user can clear the input while editing.
   function clampDuration(cityId, raw) {
+    // Phase 407: in days mode the months box is not the source of truth - tabbing through it must not turn 15 days into 1 month.
+    if (hasDays(selectedCities.find(sc => sc.city.id === cityId))) return
     let n = Number(raw)
     if (!Number.isFinite(n) || n < MIN_MONTHS) n = MIN_MONTHS
     if (n > MAX_MONTHS) n = MAX_MONTHS
@@ -165,7 +184,8 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
   async function applyBulk() {
     if (applyingRef.current) return
     const hasRate  = bulk.offered_rate !== ''
-    const hasDur   = bulk.duration_months !== ''
+    const hasDays  = bulk.duration_days !== ''
+    const hasDur   = bulk.duration_months !== '' || hasDays
     const hasSec   = bulk.slot_seconds !== ''
     const hasSlots = bulk.slots_per_day !== ''
     if (!hasRate && !hasDur && !hasSec && !hasSlots) {
@@ -173,8 +193,10 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       return
     }
     const rate = hasRate ? Math.max(0, Number(bulk.offered_rate)) : null
-    let dur = hasDur ? Math.round(Number(bulk.duration_months)) : null
-    if (dur !== null) dur = Math.max(MIN_MONTHS, Math.min(MAX_MONTHS, dur))
+    // Phase 407: days win over months when both are typed.
+    let days = hasDays ? Math.max(1, Math.min(MAX_DAYS, Math.round(Number(bulk.duration_days)))) : null
+    let dur = hasDays ? monthsForDays(days) : (hasDur ? Math.round(Number(bulk.duration_months)) : null)
+    if (!hasDays && dur !== null) dur = Math.max(MIN_MONTHS, Math.min(MAX_MONTHS, dur))
     const sec = hasSec ? Number(bulk.slot_seconds) : null
     // 0 / blank / junk -> the default 100, exactly like the per-row Slots/day box.
     const slots = hasSlots ? (Math.round(Number(bulk.slots_per_day)) || DEFAULT_SLOTS_PER_DAY) : null
@@ -182,7 +204,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
       setBulkNote('Slots/day must be 1 or more.')
       return
     }
-    if ([rate, dur, sec, slots].some(v => v !== null && !Number.isFinite(v))) {
+    if ([rate, dur, days, sec, slots].some(v => v !== null && !Number.isFinite(v))) {
       setBulkNote('One of the boxes is not a valid number.')
       return
     }
@@ -195,7 +217,8 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
     if (rate !== null || dur !== null || slots !== null) {
       const parts = []
       if (rate !== null) parts.push(`offered rate ${formatCurrency(rate)}`)
-      if (dur !== null) parts.push(`${dur} month${dur === 1 ? '' : 's'}`)
+      if (days !== null) parts.push(`${days} day${days === 1 ? '' : 's'}`)
+      else if (dur !== null) parts.push(`${dur} month${dur === 1 ? '' : 's'}`)
       if (slots !== null) parts.push(`${slots} slots/day`)
       const ok = await confirmDialog({
         title: `Change ${scopeWord} ${n === 1 ? 'city' : 'cities'}?`,
@@ -211,18 +234,18 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
         if (!bulkAll && !picked.has(sc.city.id)) return sc
         const u = { ...sc }
         if (rate !== null)  u.offered_rate = rate
-        if (dur !== null)   u.duration_months = dur
+        if (dur !== null)   { u.duration_months = dur; u.duration_days = days }   // months pick clears days
         if (sec !== null)   u.slot_seconds = sec
         if (slots !== null) {
           u.slots_per_day = slots
         }
         if (rate !== null || dur !== null) {
-          u.campaign_total = calcTotal(u.offered_rate, u.screens, u.duration_months)
+          u.campaign_total = calcTotal(u.offered_rate, u.screens, u.duration_months, u.duration_days)
         }
         return u
       })
     )
-    setBulk({ offered_rate: '', duration_months: '', slot_seconds: '', slots_per_day: '' })
+    setBulk({ offered_rate: '', duration_months: '', duration_days: '', slot_seconds: '', slots_per_day: '' })
     setError('')
     setBulkNote(`Done — applied to ${scopeWord} ${n === 1 ? 'city' : 'cities'}.`)
     } finally {
@@ -346,6 +369,18 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                           )
                         })}
                       </div>
+                      <input
+                        type="number"
+                        min={1}
+                        max={MAX_DAYS}
+                        step="1"
+                        className="ccr-input"
+                        style={{ marginTop: 6 }}
+                        placeholder="or days (e.g. 15)"
+                        aria-label="Bulk duration in days"
+                        value={bulk.duration_days}
+                        onChange={e => { setBulk(b => ({ ...b, duration_days: e.target.value })); setBulkNote('') }}
+                      />
                     </div>
 
                     <div className="ccr-field">
@@ -444,7 +479,8 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                       max={MAX_MONTHS}
                       step="1"
                       className="ccr-input"
-                      value={sc.duration_months}
+                      value={hasDays(sc) ? '' : sc.duration_months}
+                      placeholder={hasDays(sc) ? 'using days' : undefined}
                       onChange={e => updateEntry(sc.city.id, 'duration_months', e.target.value)}
                       onBlur={e => clampDuration(sc.city.id, e.target.value)}
                       title="Any value 1 to 12"
@@ -458,7 +494,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                       }}
                     >
                       {QUICK_DURATIONS.map(m => {
-                        const active = Number(sc.duration_months) === m
+                        const active = !hasDays(sc) && Number(sc.duration_months) === m
                         return (
                           <button
                             key={m}
@@ -485,7 +521,42 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                           </button>
                         )
                       })}
+                      {QUICK_DAYS.map(dn => {
+                        const active = Number(sc.duration_days) === dn
+                        return (
+                          <button
+                            key={`d${dn}`}
+                            type="button"
+                            onClick={() => setDays(sc.city.id, dn)}
+                            style={{
+                              fontSize: 10,
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              border: active ? '1px solid var(--v2-yellow, #FFE600)' : '1px solid rgba(255,255,255,.15)',
+                              background: active ? 'rgba(255,230,0,.15)' : 'transparent',
+                              color: active ? 'var(--v2-yellow, #FFE600)' : 'rgba(255,255,255,.6)',
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {dn}d
+                          </button>
+                        )
+                      })}
                     </div>
+                    <input
+                      type="number"
+                      min={1}
+                      max={MAX_DAYS}
+                      step="1"
+                      className="ccr-input"
+                      style={{ marginTop: 6 }}
+                      placeholder="or number of days"
+                      aria-label="Duration in days"
+                      value={sc.duration_days || ''}
+                      onChange={e => setDays(sc.city.id, e.target.value)}
+                      title="Any number of days, 1 to 365. The rate stays per screen per month."
+                    />
                   </div>
 
                   <div className="ccr-field">

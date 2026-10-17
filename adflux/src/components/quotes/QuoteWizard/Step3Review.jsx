@@ -2,6 +2,7 @@ import { ChevronLeft, Send, Save, Monitor, ShieldAlert } from 'lucide-react'
 import { formatCurrency } from '../../../utils/formatters'
 import { GST_RATE } from '../../../utils/constants'
 import { PRICE_FLOOR } from '../../../utils/quotePriceGate'
+import { durationWords } from '../../../utils/quoteDuration'
 
 export function Step3Review({
   quoteData,
@@ -78,7 +79,7 @@ export function Step3Review({
                     <div>
                       <p className="review-city-name">{sc.city.name}</p>
                       <p className="review-city-meta">
-                        {sc.screens} screen{sc.screens !== 1 ? 's' : ''} · {sc.duration_months} month{sc.duration_months !== 1 ? 's' : ''} · {slotSec}s · {slotsDay} slots/day
+                        {sc.screens} screen{sc.screens !== 1 ? 's' : ''} · {durationWords(sc)} · {slotSec}s · {slotsDay} slots/day
                       </p>
                     </div>
                   </div>

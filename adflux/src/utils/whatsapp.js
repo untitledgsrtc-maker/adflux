@@ -1,6 +1,7 @@
 import { formatCurrency } from './formatters'
 import { openExternalUrl } from './openExternal'
 import { phoneToWaJid } from './phone'
+import { quoteDurationLabel } from './quoteDuration'
 
 /**
  * Shorten a URL for WhatsApp.
@@ -172,7 +173,7 @@ export function buildWhatsAppMessage(quote, cities = [], opts = {}) {
   // older rows that don't have per-city duration stored.
   const duration = cities[0]?.duration_months || quote.duration_months
   if (duration) {
-    lines.push(`Duration: ${duration} month${duration !== 1 ? 's' : ''}`)
+    lines.push(`Duration: ${quoteDurationLabel(cities, duration).toLowerCase()}`)
   }
 
   // Only show campaign dates once they're locked in (won quotes).
