@@ -117,8 +117,12 @@ export default function WindowsAgentEngine() {
       invoke('hide_window', { label: 'idle' }).catch(() => {})
       const idleSecs = Math.round((Date.now() - new Date(a.began).getTime()) / 1000)
       const run = s.running
-      if (decision === 'still_working') s.suppress = true
-      try { await supabase.rpc('work_agent_idle', { p_entry: a.entry, p_idle_began: a.began, p_decision: decision, p_idle_seconds: idleSecs }) } catch { /* may be stopped */ }
+      // Phase 406: the minutes she was away are NOT counted by default. RESUME (and the old "It was a break" button)
+      // both send 'break'; only "I was working" ('worked') keeps the minutes. Old installers still send still_working.
+      const serverDecision = decision === 'worked' ? 'still_working' : (decision === 'still_working' ? 'break' : decision)
+      if (decision === 'still_working' || decision === 'worked' || decision === 'break') s.suppress = true
+      window.dispatchEvent(new CustomEvent('wk-idle-freeze', { detail: null }))
+      try { await supabase.rpc('work_agent_idle', { p_entry: a.entry, p_idle_began: a.began, p_decision: serverDecision, p_idle_seconds: idleSecs }) } catch { /* may be stopped */ }
       await loadAll()
       if ((decision === 'stop' || decision === 'auto_stopped') && run && !s.running) {
         // tell the person, on top of everything, that the timer is stopped and let them start it again
@@ -137,6 +141,7 @@ export default function WindowsAgentEngine() {
       if (s.asking || s.suppress || idle < mins * 60) return
       const began = new Date(Date.now() - idle * 1000)
       s.asking = { began: began.toISOString(), entry: s.running.id }
+      window.dispatchEvent(new CustomEvent('wk-idle-freeze', { detail: { began: began.toISOString() } }))
       const worked = Math.max(0, (began.getTime() - new Date(s.running.started_at).getTime()) / 1000 - (s.running.break_seconds || 0))
       const info = { minutes: mins, waitMin: 5, client: clientName(s.running.project_id) || s.running.task_label, label: s.running.task_label, worked, stopAt: timeIST(began.toISOString()) }
       setAsk(info)
@@ -170,8 +175,9 @@ export default function WindowsAgentEngine() {
     }
     function pushState() {
       if (!s.running) { emit('agent:state', { running: false }); invoke('set_tray_tooltip', { text: 'Untitled Work - not running' }).catch(() => {}); return }
-      const secs = (Date.now() - new Date(s.running.started_at).getTime()) / 1000 - (s.running.break_seconds || 0)
-      emit('agent:state', { running: true, secs, client: clientName(s.running.project_id), label: s.running.task_label, recording: recordOk() && Date.now() - s.lastSampleAt < 30000, err: s.lastErr })
+      const upTo = s.asking ? new Date(s.asking.began).getTime() : Date.now()   // frozen while the question is open
+      const secs = Math.max(0, (upTo - new Date(s.running.started_at).getTime()) / 1000 - (s.running.break_seconds || 0))
+      emit('agent:state', { running: true, paused: !!s.asking, secs, client: clientName(s.running.project_id), label: s.running.task_label, recording: recordOk() && Date.now() - s.lastSampleAt < 30000, err: s.lastErr })
     }
 
     const restart = async () => {
@@ -253,10 +259,10 @@ export default function WindowsAgentEngine() {
         <div style={{ fontSize: 18, margin: '6px 0 12px' }}>Still working on {ask.client || 'your task'}?</div>
         <div style={{ display: 'grid', gap: 8 }}>
           <button className="wk-btn y" onClick={() => S.current.answer?.('still_working')}>Resume - I am here</button>
-          <button className="wk-btn o" onClick={() => S.current.answer?.('break')}>It was a break</button>
+          <button className="wk-btn o" onClick={() => S.current.answer?.('worked')}>I was working (count these minutes)</button>
           <button className="wk-btn o" onClick={() => S.current.answer?.('stop')}>Stop timer</button>
         </div>
-        <div className="wk-sm" style={{ marginTop: 10 }}>No answer in {ask.waitMin} min: the timer stops at {ask.stopAt}.</div>
+        <div className="wk-sm" style={{ marginTop: 10 }}>The timer is paused. Resume does not count the minutes you were away. No answer in {ask.waitMin} min: the timer stops at {ask.stopAt}.</div>
       </div>
     </div>
   ) : null

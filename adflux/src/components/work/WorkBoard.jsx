@@ -28,7 +28,7 @@ function duePill(it) {
   return { cls: 'ok', Icon: Check, text: `On track, ${short}` }
 }
 
-export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, onPostpone, uid, showCost, actForAll, emptyText = 'Drop a task here' }) {
+export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, onPostpone, uid, runningPartId = null, showCost, actForAll, emptyText = 'Drop a task here' }) {
   const [drag, setDrag] = useState(null)
   const [over, setOver] = useState('')
   const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches)
@@ -137,6 +137,11 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
                       {mine && it.status === 'postponed' && (
                         <button className="wk-btn g sm" onClick={(e) => { e.stopPropagation(); onMove(it.id, 'assigned') }}>
                           Bring back
+                        </button>
+                      )}
+                      {mine && it.status === 'in_process' && onStart && it.assigneeId === uid && runningPartId !== it.id && (
+                        <button className="wk-btn y sm" onClick={(e) => { e.stopPropagation(); onStart(it) }}>
+                          <Play size={14} aria-hidden="true" /> Resume
                         </button>
                       )}
                       {mine && it.status === 'in_process' && onFinish && (

@@ -104,6 +104,12 @@ export default function MyWorkV2() {
     return () => { supabase.removeChannel(ch) }
   }, [uid])
   useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i) }, [])
+  const [idleFreeze, setIdleFreeze] = useState(null)
+  useEffect(() => {
+    const h = (e) => setIdleFreeze(e.detail?.began || null)
+    window.addEventListener('wk-idle-freeze', h)
+    return () => window.removeEventListener('wk-idle-freeze', h)
+  }, [])
 
   const projName = useMemo(() => { const m = new Map(projects.map((p) => [p.id, p.name])); return (id) => m.get(id) || '' }, [projects])
   const photoOf = useMemo(() => { const m = new Map(users.map((u) => [u.id, u.profile_image_url])); return (id) => m.get(id) || null }, [users])
@@ -153,7 +159,8 @@ export default function MyWorkV2() {
   const dayLate = boardItems.filter((i) => isOpen(i) && i.due && i.due < today).length
   const rangeLabel = isToday ? 'Today' : (rFrom === rTo ? fmtDateShort(rFrom) : `${fmtDateShort(rFrom)} - ${fmtDateShort(rTo)}`)
 
-  const runSecs = running ? (now - new Date(running.started_at).getTime()) / 1000 : 0
+  // Phase 406: the shown time skips minutes she was away (break_seconds) and stands still while the "Still working?" question is open.
+  const runSecs = running ? Math.max(0, ((idleFreeze ? new Date(idleFreeze).getTime() : now) - new Date(running.started_at).getTime()) / 1000 - (running.break_seconds || 0)) : 0
   const doneSecs = entries.filter((e) => e.ended_at && e.status === 'approved')
     .reduce((s, e) => s + (new Date(e.ended_at) - new Date(e.started_at)) / 1000, 0)
   const todaySecs = doneSecs + runSecs
@@ -216,6 +223,20 @@ export default function MyWorkV2() {
                   : <StartForm projects={projects} busy={busy} entries={entries}
                       openCards={items.filter((i) => i.status === 'assigned' || i.status === 'in_process')}
                       onStartCard={(id) => rpc('work_clock_start', { p_project: null, p_label: null, p_part: id })}
+                      onResume={(en) => rpc('work_clock_start', { p_project: en.project_id, p_label: en.part_id ? null : en.task_label, p_part: en.part_id || null })}
+                      onFinishCard={(partId) => rpc('work_finish_part', { p_part: partId, p_note: null }, 'Finished.')}
+                      onCreateAndStart={async (project, label) => {
+                        if (latch.current) return
+                        try {
+                          const { data: taskId, error } = await supabase.rpc('work_create_task', {
+                            p_title: label, p_project: project, p_note: null, p_due: today, p_parts: [{ assignee: uid, label: '', due: null }], p_steps: [],
+                          })
+                          if (error) throw error
+                          const { data: pr, error: e2 } = await supabase.from('work_task_parts').select('id').eq('task_id', taskId).eq('assignee_id', uid).maybeSingle()
+                          if (e2 || !pr) throw e2 || new Error('task card not found')
+                          await rpc('work_clock_start', { p_project: null, p_label: null, p_part: pr.id })
+                        } catch (e) { toastError(e, 'Could not create the task.') }
+                      }}
                       onAddProject={addProject}
                       onStart={(project, label) => rpc('work_clock_start', { p_project: project, p_label: label, p_part: null })} />}
                 {istHour() >= 19 && <TodayStrip secs={todaySecs} firstIn={firstIn} />}
@@ -274,7 +295,7 @@ export default function MyWorkV2() {
                     <button className={`wk-btn ${isToday ? 'y' : 'o'}`} onClick={() => { setViewFrom(null); setViewTo(null) }}>Today</button>
                   </div>
                 </div>
-                <WorkBoard items={boardItems} uid={uid} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} onPostpone={(it) => setPostponing(it)} />
+                <WorkBoard items={boardItems} uid={uid} runningPartId={running?.part_id || null} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} onPostpone={(it) => setPostponing(it)} />
                 <div className="wk-sm" style={{ marginTop: 10 }}>Drag your own task forward: Assigned to In process starts the clock, In process to Finished stops it. Or use Start / Finish.</div>
               </div>
             </div>
@@ -360,7 +381,7 @@ function matchCard(label, cards) {
   return best
 }
 
-function StartForm({ projects, busy, entries, openCards, onStartCard, onAddProject, onStart }) {
+function StartForm({ projects, busy, entries, openCards, onStartCard, onResume, onFinishCard, onCreateAndStart, onAddProject, onStart }) {
   const [project, setProject] = useState(() => { try { return localStorage.getItem('wk_last_project') || '' } catch { return '' } })
   const [label, setLabel] = useState('')
   const [newClient, setNewClient] = useState('')
@@ -401,12 +422,36 @@ function StartForm({ projects, busy, entries, openCards, onStartCard, onAddProje
       })
       if (useCard) { await onStartCard(card.id); setLabel(''); return }
     }
+    // Nothing matched: offer to make it a real task card so it shows on the board and Finish works.
+    const makeCard = await confirmDialog({
+      title: 'Create a task for this?',
+      message: `"${label.trim()}" is not on your list. Make it a task card so it shows under In process and you can Finish it?`,
+      confirmLabel: 'Create the task', cancelLabel: 'No, just track time',
+    })
+    if (makeCard) { await onCreateAndStart(pid, label.trim()); setLabel(''); return }
     await onStart(pid, label.trim())
     setLabel('')
   }
 
+  // Paused / stopped just now: one tap goes back to the same task (card or typed).
+  const lastEntry = (entries || []).filter((e) => e.ended_at && e.status === 'approved').sort((a, b) => new Date(a.ended_at) - new Date(b.ended_at)).slice(-1)[0]
+  const lastCard = lastEntry?.part_id ? (openCards || []).find((c) => c.id === lastEntry.part_id) : null
+  const canResume = !!lastEntry && (!lastEntry.part_id || !!lastCard)
+
   return (
     <div className="wk-hero">
+      {canResume && (
+        <div className="wk-row" style={{ flexWrap: 'wrap', gap: 12, padding: '12px 14px', margin: '10px 0 4px', borderRadius: 14, background: 'rgba(255,255,255,.08)' }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="wk-eyb">Paused at {fmtTimeIST(lastEntry.ended_at)}</div>
+            <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>{lastEntry.task_label}</div>
+          </div>
+          <div className="wk-grp" style={{ flexWrap: 'nowrap' }}>
+            <button className="wk-btn y" disabled={busy} onClick={() => onResume(lastEntry)}><Play size={16} aria-hidden="true" /> Resume</button>
+            {lastEntry.part_id && <button className="wk-btn glass" disabled={busy} onClick={() => onFinishCard(lastEntry.part_id)}><Check size={16} aria-hidden="true" /> Finish</button>}
+          </div>
+        </div>
+      )}
       <span className="wk-eyb">Not running · start work</span>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, alignItems: 'end', marginTop: 14 }}>
         <div className="wk-field" style={{ margin: 0 }}>
