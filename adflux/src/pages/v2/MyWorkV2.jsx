@@ -11,7 +11,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { istTodayISO } from '../../utils/istDate'
-import { toastError, toastSuccess } from '../../components/v2/Toast'
+import { toastError, toastSuccess, pushToast } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { openWhatsAppShare } from '../../utils/whatsappSummary'
 import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, istHour, dueState, initialsOf, clientColor } from '../../utils/workUtils'
@@ -83,6 +83,26 @@ export default function MyWorkV2() {
 
   useEffect(() => { load() }, [load])
   useAutoRefresh(load, { userId: uid, pollSeconds: 60 })
+  // Phase 405 - a task assigned to me (or changed) appears at once, with a message. No refresh needed.
+  const loadRef = useRef(load)
+  useEffect(() => { loadRef.current = load }, [load])
+  useEffect(() => {
+    if (!uid) return undefined
+    const ch = supabase.channel(`my-work-parts-${uid}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'work_task_parts', filter: `assignee_id=eq.${uid}` }, async (ev) => {
+        loadRef.current?.()
+        if (ev.eventType !== 'INSERT') return
+        let title = 'A new task'
+        try {
+          const { data } = await supabase.from('work_tasks').select('title').eq('id', ev.new?.task_id).maybeSingle()
+          if (data?.title) title = data.title
+        } catch { /* generic message */ }
+        pushToast(`New task for you: ${title}`, 'success')
+        try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('New task for you', { body: title }) } catch { /* not supported here */ }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [uid])
   useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i) }, [])
 
   const projName = useMemo(() => { const m = new Map(projects.map((p) => [p.id, p.name])); return (id) => m.get(id) || '' }, [projects])
