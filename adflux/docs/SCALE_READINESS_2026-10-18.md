@@ -17,3 +17,9 @@ Plain-words check against the "4 prompts so your app survives going viral" list.
 - Caching: static media under /deck /led /investor /email now cached 1 day (this change). Private data deliberately NOT cached.
 - Load test: not done. Needs a separate copy of the database first; never against the live one.
 - Automated tests: none. Next: tests for salary, score and TA functions on a copy.
+
+## Live read (18 Oct 2026, read-only)
+- Never-used indexes: gps_pings_user_time_idx on gps_pings (107 MB, written every few seconds), idx_lead_activities_created_by (5 MB), idx_webhook_log_provider_at (2.5 MB). Dropping is reversible but not done - owner decision.
+- Row-scan tables: leads (11k rows, 99k scans vs 20.8M index scans - fine), follow_ups (58k rows, 34k scans vs 1.45M index scans - fine).
+- Slowest repeated calls: one REST function call averaging 1.2 s (385 calls), team_all_leads (Sales Head team view) 1.1 s (93 calls). The other slow rows are Supabase internals.
+- pg_stat_statements here uses total_exec_time/calls (no mean_time column).
