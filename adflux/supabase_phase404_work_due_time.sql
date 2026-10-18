@@ -75,6 +75,8 @@ REVOKE EXECUTE ON FUNCTION public.work_alert_due_time() FROM PUBLIC, anon, authe
 
 SELECT cron.unschedule('work-alert-due-time') WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'work-alert-due-time');
 SELECT cron.schedule('work-alert-due-time', '*/5 * * * *', 'SELECT public.work_alert_due_time();');
+-- Phase 411 (2026-10-18): the page selects now read due_time, which needs this column grant (applied live; cost_amount stays hidden)
+GRANT SELECT (due_time) ON public.work_task_parts TO authenticated;
 NOTIFY pgrst, 'reload schema';
 -- VERIFY: SELECT (SELECT count(*) FROM information_schema.columns WHERE table_name='work_task_parts' AND column_name IN ('due_time','due_alerted_at')) AS cols,
 --                (SELECT count(*) FROM cron.job WHERE jobname='work-alert-due-time') AS cron;   -- 2 / 1
