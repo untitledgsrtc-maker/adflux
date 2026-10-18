@@ -21514,3 +21514,6 @@ Owner asked for a check against a "survive going viral" checklist. Result in `do
 
 ## 395 - Team list shows the job title for Work staff (18-10-2026)
 The "STAFF" chip on the Team list is the real role of the Work-module creative team (section 353: role `staff` on purpose, not the section 284 mis-seed). `TeamList.jsx` now shows `designation` instead when role is `staff` and one is set; other roles unchanged. If a chip still says STAFF, that person has no designation saved.
+
+## 396 - QR boards moved back to 98982 (18-10-2026)
+Owner decision: all leads on 98982 73686. All 22 hoarding boards repointed (`supabase_phase396_boards_to_98982.sql`; verified 22 on 98982, 0 on 95815). SUPERSEDES section 298's split. Printed QRs unchanged. 98982 was rated Low in Sept (sections 297/298): watch its quality in WhatsApp Manager; if it dips, spread boards back. Push flags (followup/cadence/welcome image) must stay as the section 328 restart left them.
