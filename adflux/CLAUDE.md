@@ -21508,3 +21508,6 @@ Owner asked for a check against a "survive going viral" checklist. Result in `do
 
 ## 393 - Dropped the unused 107 MB gps_pings index (18-10-2026)
 `gps_pings_user_time_idx` had zero reads; dropped via `supabase_phase393_drop_unused_gps_index.sql` (backup of its definition in `_bak_dropped_indexes_p393`, rebuild with that text). Remaining gps_pings indexes: pkey, `gps_pings_user_captured_uniq`, `idx_gps_pings_user_time` (a duplicate-purpose index already covers per-rep time lookups). The 2 small unused indexes (lead_activities created_by, webhook_log) were left. Note: live DB writes from the CLI need the owner's explicit go each time.
+
+## 394 - Inbox: filter by which of OUR WhatsApp numbers (18-10-2026)
+`CampaignInboxV2.jsx` (admin/co_owner only): a "All numbers / 95815 78261 (service) / 98982 73686 (marketing)" dropdown above the team filter. Filters threads by `whatsapp_account_id`; shown only when 2+ accounts are readable. Client-side, no SQL.

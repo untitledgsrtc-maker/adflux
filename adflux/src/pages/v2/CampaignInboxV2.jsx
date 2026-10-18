@@ -117,6 +117,8 @@ export default function CampaignInboxV2() {
   const [convSearch, setConvSearch] = useState('')
   const [convFilter, setConvFilter] = useState('all') // all | open | needs | reply
   const [convTeam, setConvTeam] = useState('all')     // Phase 259 — assigned_to filter (privileged only)
+  const [convNum, setConvNum] = useState('all')       // Phase 394 — which of OUR WhatsApp numbers (account id)
+  const [waNums, setWaNums] = useState([])            // our WhatsApp numbers, for that filter (privileged only)
   const [msgs, setMsgs] = useState([])
   const [msgLoading, setMsgLoading] = useState(false)
   const [draft, setDraft] = useState('')
@@ -328,6 +330,13 @@ export default function CampaignInboxV2() {
       .then(({ data }) => setTcs(data || []))
   }, [isPrivileged])
 
+  // Phase 394 — our own WhatsApp numbers (95815 78261 service, 98982 73686 marketing).
+  useEffect(() => {
+    if (!isPrivileged) return
+    supabase.from('whatsapp_accounts').select('id, display_number, purpose').order('purpose')
+      .then(({ data }) => setWaNums(data || []))
+  }, [isPrivileged])
+
   // Phase 323 (audit M1) — memoize the derived lists so they don't recompute on
   // every render (incl. every composer keystroke), which re-scanned up to 4,000
   // threads with per-thread date math each time.
@@ -355,6 +364,7 @@ export default function CampaignInboxV2() {
         if (convTeam === '__none__') { if (t.assigned_to) return false }
         else if (t.assigned_to !== convTeam) return false
       }
+      if (isPrivileged && convNum !== 'all' && t.whatsapp_account_id !== convNum) return false
       if (convFilter === 'open' && !isOpen) return false
       if (convFilter === 'needs' && isOpen) return false
       if (convFilter === 'reply' && !(t.last_message_direction === 'in' && isOpen)) return false
@@ -367,7 +377,7 @@ export default function CampaignInboxV2() {
       }
       return false
     })
-  }, [threads, isPrivileged, convTeam, convFilter, convSearch])
+  }, [threads, isPrivileged, convTeam, convNum, convFilter, convSearch])
 
   // Load the selected conversation's lead (powers the assigned/reassign pill +
   // Create quote). One small read per conversation-open; campaign admin page.
@@ -711,6 +721,33 @@ export default function CampaignInboxV2() {
                 )
               })}
             </div>
+
+            {/* Phase 394 — which of our WhatsApp numbers the chat came in on; privileged only */}
+            {isPrivileged && waNums.length > 1 && (
+              <select
+                value={convNum}
+                onChange={(e) => setConvNum(e.target.value)}
+                aria-label="Filter conversations by our WhatsApp number"
+                style={{
+                  width: '100%', boxSizing: 'border-box', marginTop: 8,
+                  padding: '8px 10px', fontSize: 12.5,
+                  background: 'var(--v2-bg-2)',
+                  color: convNum === 'all' ? 'var(--v2-ink-2, #6a7590)' : 'var(--v2-ink-0, #f5f7fb)',
+                  border: '1px solid ' + (convNum === 'all' ? 'var(--v2-line)' : 'var(--v2-yellow, #FFE600)'),
+                  borderRadius: 10, outline: 'none', cursor: 'pointer',
+                }}
+              >
+                <option value="all">All numbers</option>
+                {waNums.map((n) => {
+                  const d = String(n.display_number || '').replace(/\D/g, '').slice(-10)
+                  return (
+                    <option key={n.id} value={n.id}>
+                      {d.slice(0, 5)} {d.slice(5)} ({n.purpose === 'marketing' ? 'marketing' : 'service'})
+                    </option>
+                  )
+                })}
+              </select>
+            )}
 
             {/* Phase 259 — team (assigned telecaller) filter; privileged only */}
             {isPrivileged && tcs.length > 0 && (
