@@ -68,7 +68,8 @@ export default async function handler(req) {
   try { mode = String((await req.json())?.mode || '') } catch { /* no body = the normal pending-follow-up nudge */ }
 
   const reps = await sbRows(`users?whatsapp_number=not.is.null&is_active=eq.true&select=id,name,role`)
-  let sent = 0, closed = 0, clear = 0
+  let sent = 0, closed = 0, clear = 0, failed = 0
+  const errs = {}   // Meta error code -> count, returned so a failing nudge is visible in the cron response
 
   const sendText = async (pnid, to, text) => {
     const gr = await fetch(`${GRAPH}/${pnid}/messages`, {
@@ -76,7 +77,11 @@ export default async function handler(req) {
       headers: { Authorization: `Bearer ${WA_TOKEN}`, 'content-type': 'application/json' },
       body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: text } }),
     })
-    if (!gr.ok) throw new Error('graph_' + gr.status)
+    if (!gr.ok) {
+      let code = ''
+      try { const j = await gr.json(); code = String(j?.error?.code || '') + (j?.error?.error_subcode ? '/' + j.error.error_subcode : '') } catch { /* keep status only */ }
+      throw new Error('graph_' + gr.status + (code ? ':' + code : ''))
+    }
   }
 
   // Evening report reminder (Phase 371): only people with an open window who have NOT shared today's report.
@@ -95,9 +100,9 @@ export default async function handler(req) {
       const pnid = String(last?.phone_number_id || '')
       if (to.length < 10 || !/^\d+$/.test(pnid)) { closed++; return }
       const first = String(r.name || '').trim().split(/\s+/)[0] || 'there'
-      try { await sendText(pnid, to, `${first}, your evening report is not shared yet. Open the app and tap Share to send it.`); sent++ } catch { /* skip */ }
+      try { await sendText(pnid, to, `${first}, your evening report is not shared yet. Open the app and tap Share to send it.`); sent++ } catch (e) { failed++; errs[e.message] = (errs[e.message] || 0) + 1 }
     })
-    return ok({ mode, reps: reps.length, sent, window_closed: closed, already_shared_or_off: clear })
+    return ok({ mode, reps: reps.length, sent, failed, errors: errs, window_closed: closed, already_shared_or_off: clear })
   }
 
   await pool(reps, 8, async (r) => {
@@ -116,8 +121,8 @@ export default async function handler(req) {
     if (to.length < 10 || !/^\d+$/.test(pnid)) { closed++; return }   // window closed → skip (v1, no template)
     const first = String(r.name || '').trim().split(/\s+/)[0] || 'there'
     const text = `👋 ${first}, quick reminder — you have ${pending} ${what}${pending > 1 ? 's' : ''} ${what === 'open fault' ? 'waiting' : 'due or overdue today'}. Reply "hi" for your full plan.`
-    try { await sendText(pnid, to, text); sent++ } catch { /* skip this rep, continue */ }
+    try { await sendText(pnid, to, text); sent++ } catch (e) { failed++; errs[e.message] = (errs[e.message] || 0) + 1 }
   })
 
-  return ok({ reps: reps.length, sent, window_closed: closed, no_pending: clear })
+  return ok({ reps: reps.length, sent, failed, errors: errs, window_closed: closed, no_pending: clear })
 }
