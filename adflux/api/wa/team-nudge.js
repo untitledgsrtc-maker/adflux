@@ -58,8 +58,15 @@ export default async function handler(req) {
   // hours — belt-and-suspenders + skips Sunday, which the every-2h cron can't).
   const istNow = new Date(Date.now() + 5.5 * 3600 * 1000)
   const istHour = istNow.getUTCHours()
-  if (istNow.getUTCDay() === 0) return ok({ skipped: 'sunday' })
-  if (istHour < 9 || istHour >= 20) return ok({ skipped: 'off_hours', istHour })
+  // Phase 411 TEST: {"force":true,"only":"<first name>"} bypasses the Sunday/hours gate for EXACTLY ONE person
+  // (the real path otherwise: pending count + open 24h window + Meta send). Refused if the name matches 0 or 2+ people.
+  let body0 = {}
+  try { body0 = (await req.clone().json()) || {} } catch { /* normal cron call has no usable body */ }
+  const forced = body0.force === true && typeof body0.only === 'string' && body0.only.trim().length >= 3
+  if (!forced) {
+    if (istNow.getUTCDay() === 0) return ok({ skipped: 'sunday' })
+    if (istHour < 9 || istHour >= 20) return ok({ skipped: 'off_hours', istHour })
+  }
 
   const istToday = istNow.toISOString().slice(0, 10)
   const dayAgo   = new Date(Date.now() - 24 * 3600 * 1000).toISOString()
@@ -67,7 +74,12 @@ export default async function handler(req) {
   let mode = ''
   try { mode = String((await req.json())?.mode || '') } catch { /* no body = the normal pending-follow-up nudge */ }
 
-  const reps = await sbRows(`users?whatsapp_number=not.is.null&is_active=eq.true&select=id,name,role`)
+  let reps = await sbRows(`users?whatsapp_number=not.is.null&is_active=eq.true&select=id,name,role`)
+  if (forced) {
+    const q = body0.only.trim().toLowerCase()
+    reps = reps.filter((r) => String(r.name || '').toLowerCase().startsWith(q))
+    if (reps.length !== 1) return nope('force_needs_exactly_one_match:' + reps.length)
+  }
   let sent = 0, closed = 0, clear = 0, failed = 0
   const errs = {}   // Meta error code -> count, returned so a failing nudge is visible in the cron response
 
