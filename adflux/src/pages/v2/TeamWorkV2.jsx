@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { Plus, Loader2, Check, X, AlertTriangle, Clock, Users, Repeat, Moon, Pencil, GitMerge, Archive, ArchiveRestore, Building2, Calendar, Trash2 } from 'lucide-react'
 import '../../styles/work.css'
+import '../../styles/work-glass.css'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
@@ -187,7 +188,7 @@ export default function TeamWorkV2() {
   const firedToday = parts.filter((p) => p.task?.template_id && p.task?.created_at >= dayStartISO(today))
 
   return (
-    <div className="wk">
+    <div className="wk wk-glass">
       <div className="wk-head">
         <div>
           <div className="wk-eyebrow">{new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: '2-digit', month: 'short' })}</div>
@@ -223,7 +224,7 @@ export default function TeamWorkV2() {
 
       {!loading && !err && tab === 'overview' && (
         <>
-          <HeroSegs live action={<button className="wk-btn sm" style={{ background: '#fff', color: '#0f172a' }} onClick={() => setTab('timeline')}>Open timeline</button>} eyebrow={`Team · ${rangeLabel}`} segs={[
+          <HeroSegs live ring={{ pct: (openCount + finishedToday) > 0 ? Math.round((finishedToday / (openCount + finishedToday)) * 100) : 0, label: 'done today' }} action={<button className="wk-btn sm" style={{ background: '#fff', color: '#0f172a' }} onClick={() => setTab('timeline')}>Open timeline</button>} eyebrow={`Team · ${rangeLabel}`} segs={[
             ['Team hours', fmtDur(teamSecs), `${Object.keys(byPerson).length} ${Object.keys(byPerson).length === 1 ? 'person' : 'people'} tracked`],
             ['Working now', `${running.length} of ${memberIds.length}`, 'Live timers'],
             ['Open tasks', String(openCount), 'Assigned and in process'],
@@ -418,9 +419,9 @@ export default function TeamWorkV2() {
   )
 }
 
-function HeroSegs({ eyebrow, segs, live, action }) {
-  return (
-    <div className="wk-hero" style={{ marginBottom: 16 }}>
+function HeroSegs({ eyebrow, segs, live, action, ring }) {
+  const body = (
+    <>
       <span className="wk-row" style={{ alignItems: 'center' }}><span className="wk-grp">{live && <span className="wk-ldot" aria-hidden="true" />}<span className="wk-eyb">{eyebrow}</span></span>{action}</span>
       <div className="wk-hsegs" style={{ gridTemplateColumns: `repeat(${segs.length}, minmax(0, 1fr))` }}>
         {segs.map(([l, v, sub], i) => (
@@ -431,6 +432,19 @@ function HeroSegs({ eyebrow, segs, live, action }) {
           </div>
         ))}
       </div>
+    </>
+  )
+  return (
+    <div className="wk-hero" style={{ marginBottom: 16 }}>
+      {ring ? (
+        <div className="wkg-herow">
+          <div className="wkg-main">{body}</div>
+          <div className="wkg-ring" role="img" aria-label={`${ring.pct}% of tasks finished`} style={{ '--wkg-off': 238.8 * (1 - Math.max(0, Math.min(100, ring.pct)) / 100) }}>
+            <svg viewBox="0 0 92 92" aria-hidden="true"><circle className="tr" cx="46" cy="46" r="38" /><circle className="fg" cx="46" cy="46" r="38" /></svg>
+            <div className="mid"><b>{ring.pct}%</b><span>{ring.label}</span></div>
+          </div>
+        </div>
+      ) : body}
     </div>
   )
 }

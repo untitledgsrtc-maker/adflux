@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin Dashboard - Glass Motion Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens copied from src/styles/tokens.css (live values) */
+  :root{
+    --bg:#0f172a; --surface:#1e293b; --surface-2:#334155; --border:#334155;
+    --text:#f1f5f9; --text-muted:#94a3b8; --text-subtle:#64748b;
+    --accent:#FFE600; --accent-fg:#0f172a; --accent-soft:rgba(255,230,0,.14);
+    --success:#10B981; --warning:#F59E0B; --danger:#EF4444; --blue:#3B82F6;
+    --radius-sm:6px; --radius:10px; --radius-lg:14px; --radius-xl:20px;
+    --font-sans:'DM Sans',Inter,system-ui,sans-serif; --font-display:'Space Grotesk',sans-serif;
+    --spring:cubic-bezier(.34,1.45,.55,1); --ease:cubic-bezier(.22,.8,.24,1);
+    /* glass recipe: only used on big surfaces (sidebar, topbar, modal) */
+    --glass-bg:rgba(30,41,59,.55);
+    --glass-edge:inset 0 1px 1px rgba(255,255,255,.18), inset 0 -1px 1px rgba(255,255,255,.05);
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:var(--font-sans);background:var(--bg);color:var(--text);min-height:100vh;
+    background-image:radial-gradient(900px 500px at 15% -10%,rgba(255,230,0,.07),transparent 60%),
+                     radial-gradient(800px 500px at 100% 0%,rgba(59,130,246,.10),transparent 60%);
+    background-attachment:fixed}
+  .app{display:grid;grid-template-columns:240px 1fr;gap:16px;padding:14px;min-height:100vh}
+  .glass{background:var(--glass-bg);-webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);
+    box-shadow:var(--glass-edge),0 10px 30px -12px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.07)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05);transition:transform .35s var(--spring),border-color .2s ease}
+  .card:hover{transform:translateY(-3px);border-color:var(--surface-3,#475569)}
+  /* sidebar */
+  aside{border-radius:var(--radius-xl);padding:16px;position:sticky;top:14px;height:calc(100vh - 28px);display:flex;flex-direction:column;gap:4px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:17px;padding:4px 8px 14px}
+  .logo{width:30px;height:30px;border-radius:var(--radius);background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;font-weight:700}
+  .nav{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);color:var(--text-muted);font-size:14px;cursor:pointer;
+    transition:background .2s ease,color .2s ease,transform .3s var(--spring)}
+  .nav:hover{background:rgba(255,255,255,.06);color:var(--text);transform:translateX(3px)}
+  .nav.on{background:var(--accent-soft);color:var(--accent)}
+  .nav svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .nav .n{margin-left:auto;font-size:11px;background:rgba(255,255,255,.08);border-radius:999px;padding:2px 8px}
+  .me{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius);background:rgba(255,255,255,.04);font-size:13px}
+  .av{width:32px;height:32px;border-radius:999px;background:var(--surface-2);display:grid;place-items:center;font-weight:600;font-size:12px}
+  /* main */
+  main{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .top{border-radius:var(--radius-xl);padding:14px 20px;display:flex;align-items:center;gap:16px;position:sticky;top:14px;z-index:10}
+  h1{font-family:var(--font-display);font-size:26px;font-weight:700;letter-spacing:-.01em}
+  .sub{color:var(--text-muted);font-size:13px;margin-top:2px}
+  .grow{flex:1}
+  .btn{border:0;border-radius:var(--radius);padding:10px 16px;font:600 13px var(--font-sans);cursor:pointer;transition:transform .3s var(--spring),background .2s ease}
+  .btn:hover{transform:translateY(-2px) scale(1.03)} .btn:active{transform:scale(.97)}
+  .btn.p{background:var(--accent);color:var(--accent-fg)} .btn.p:hover{background:#F0D800}
+  .btn.g{background:rgba(255,255,255,.07);color:var(--text)}
+  .btn:focus-visible,.nav:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+  .c4{grid-column:span 4}.c5{grid-column:span 5}.c7{grid-column:span 7}.c8{grid-column:span 8}.c3{grid-column:span 3}
+  .lbl{font-size:12px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center}
+  .big{font-family:var(--font-display);font-weight:700;font-size:30px;margin-top:8px;letter-spacing:-.01em}
+  .delta{font-size:12px;margin-top:4px}.up{color:var(--success)}.dn{color:var(--danger)}
+  /* rings */
+  .rings{display:flex;align-items:center;gap:22px;margin-top:10px}
+  .rings svg{width:170px;height:170px;transform:rotate(-90deg)}
+  .rings circle{fill:none;stroke-width:13;stroke-linecap:round}
+  .rings .tr{stroke:rgba(255,255,255,.07)}
+  .rings .fg{stroke-dasharray:var(--c);stroke-dashoffset:var(--c);animation:draw 1.3s var(--ease) forwards}
+  @keyframes draw{to{stroke-dashoffset:var(--o)}}
+  .leg div{display:flex;gap:10px;align-items:center;margin-bottom:12px;font-size:13px;color:var(--text-muted)}
+  .leg i{width:4px;height:30px;border-radius:2px}
+  .leg b{display:block;font:700 18px var(--font-display);color:var(--text)}
+  /* bars */
+  .bars{display:flex;align-items:flex-end;gap:10px;height:150px;margin-top:14px}
+  .bars div{flex:1;border-radius:var(--radius-sm) var(--radius-sm) 4px 4px;background:var(--surface-2);transform-origin:bottom;animation:grow .9s var(--spring) both;position:relative}
+  .bars div.hi{background:var(--accent)}
+  .bars div:hover{filter:brightness(1.2)}
+  @keyframes grow{from{transform:scaleY(0)}}
+  .days{display:flex;gap:10px;font-size:11px;color:var(--text-subtle);margin-top:6px}.days span{flex:1;text-align:center}
+  /* list */
+  .row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px;transition:padding .25s var(--ease)}
+  .row:last-child{border:0}.row:hover{padding-left:6px}
+  .dot{width:8px;height:8px;border-radius:999px}
+  .chip{margin-left:auto;font-size:11px;border-radius:999px;padding:3px 10px;font-weight:600}
+  .ch-w{background:rgba(245,158,11,.14);color:var(--warning);border:1px solid rgba(245,158,11,.3)}
+  .ch-d{background:rgba(239,68,68,.12);color:var(--danger);border:1px solid rgba(239,68,68,.3)}
+  .ch-s{background:rgba(16,185,129,.12);color:var(--success);border:1px solid rgba(16,185,129,.3)}
+  /* modal (spring open) */
+  .scrim{position:fixed;inset:0;background:rgba(2,6,23,.55);display:grid;place-items:center;opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:200}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .modal{width:min(420px,92vw);border-radius:var(--radius-xl);padding:24px;transform:translateY(24px) scale(.92);opacity:0;transition:transform .5s var(--spring),opacity .25s ease}
+  .scrim.on .modal{transform:none;opacity:1}
+  .modal h2{font:700 20px var(--font-display);margin-bottom:6px}
+  .note{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);font-size:12px;color:var(--text-muted);background:rgba(15,23,42,.8);padding:8px 14px;border-radius:999px;border:1px solid var(--border);z-index:5}
+  @media(max-width:1000px){.app{grid-template-columns:1fr}aside{display:none}.c4,.c5,.c7,.c8,.c3{grid-column:span 12}.rings svg{width:140px;height:140px}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="glass">
+    <div class="brand"><span class="logo">U</span>Untitled OS</div>
+    <div class="nav on" tabindex="0"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</div>
+    <div class="nav" tabindex="0"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M17 11a3 3 0 100-6M21.5 20c0-2.6-1.6-4.6-4-5.4"/></svg>People<span class="n">5</span></div>
+    <div class="nav" tabindex="0"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg>Inbox<span class="n">12</span></div>
+    <div class="nav" tabindex="0"><svg viewBox="0 0 24 24"><path d="M3 20V8l9-5 9 5v12"/><path d="M9 20v-6h6v6"/></svg>Campaigns</div>
+    <div class="nav" tabindex="0"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Quotes</div>
+    <div class="nav" tabindex="0"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>Reports</div>
+    <div class="me"><span class="av">BS</span><div>Brijesh Solanki<div style="font-size:11px;color:var(--text-subtle)">Owner</div></div></div>
+  </aside>
+
+  <main>
+    <header class="top glass">
+      <div><h1>Good morning, Brijesh</h1><div class="sub">Sunday, 18 October · 6 leads need a call today</div></div>
+      <div class="grow"></div>
+      <button class="btn g">This month</button>
+      <button class="btn p" id="open">New quote</button>
+    </header>
+
+    <div class="grid">
+      <section class="card c5">
+        <div class="lbl">Today <span>Close your rings</span></div>
+        <div class="rings">
+          <svg viewBox="0 0 120 120">
+            <circle class="tr" cx="60" cy="60" r="52"/><circle class="fg" cx="60" cy="60" r="52" stroke="#FFE600" style="--c:326.7;--o:98"/>
+            <circle class="tr" cx="60" cy="60" r="36"/><circle class="fg" cx="60" cy="60" r="36" stroke="#10B981" style="--c:226.2;--o:68;animation-delay:.15s"/>
+            <circle class="tr" cx="60" cy="60" r="20"/><circle class="fg" cx="60" cy="60" r="20" stroke="#3B82F6" style="--c:125.7;--o:50;animation-delay:.3s"/>
+          </svg>
+          <div class="leg">
+            <div><i style="background:#FFE600"></i><span>Calls<b>35 / 50</b></span></div>
+            <div><i style="background:#10B981"></i><span>Meetings<b>7 / 10</b></span></div>
+            <div><i style="background:#3B82F6"></i><span>Quotes sent<b>3 / 5</b></span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card c7">
+        <div class="lbl">Revenue this week <span class="up">+12% vs last week</span></div>
+        <div class="big">12,40,000</div>
+        <div class="bars">
+          <div style="height:40%;animation-delay:.05s"></div><div style="height:62%;animation-delay:.1s"></div>
+          <div style="height:48%;animation-delay:.15s"></div><div class="hi" style="height:92%;animation-delay:.2s"></div>
+          <div style="height:70%;animation-delay:.25s"></div><div style="height:30%;animation-delay:.3s"></div>
+          <div style="height:18%;animation-delay:.35s"></div>
+        </div>
+        <div class="days"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+      </section>
+
+      <section class="card c3"><div class="lbl">New leads</div><div class="big">48</div><div class="delta up">+9 vs last week</div></section>
+      <section class="card c3"><div class="lbl">Quotes open</div><div class="big">21</div><div class="delta dn">-2 vs last week</div></section>
+      <section class="card c3"><div class="lbl">Won this month</div><div class="big">14</div><div class="delta up">+3 vs last month</div></section>
+      <section class="card c3"><div class="lbl">Connect rate</div><div class="big">34%</div><div class="delta up">above 30% target</div></section>
+
+      <section class="card c7">
+        <div class="lbl">Needs attention <span>Action queue</span></div>
+        <div style="margin-top:8px">
+          <div class="row"><span class="dot" style="background:var(--danger)"></span>Quote UA-2026-0596 awaiting incentive decision<span class="chip ch-d">Overdue</span></div>
+          <div class="row"><span class="dot" style="background:var(--warning)"></span>3 leaves pending approval<span class="chip ch-w">Today</span></div>
+          <div class="row"><span class="dot" style="background:var(--warning)"></span>Salary difference to pay by hand (2 people)<span class="chip ch-w">This week</span></div>
+          <div class="row"><span class="dot" style="background:var(--success)"></span>All 22 hoarding QR boards on 98982 73686<span class="chip ch-s">Done</span></div>
+        </div>
+      </section>
+
+      <section class="card c5">
+        <div class="lbl">Team right now <span>Live</span></div>
+        <div style="margin-top:8px">
+          <div class="row"><span class="av">RK</span>Renuka<span class="chip ch-s">In field</span></div>
+          <div class="row"><span class="av">DK</span>Diya<span class="chip ch-s">On call</span></div>
+          <div class="row"><span class="av">KS</span>Khushbu<span class="chip ch-w">In meeting</span></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"><div class="modal glass">
+  <h2>New quote</h2>
+  <p class="sub" style="margin-bottom:18px">Modal opens with the spring effect. Glass is used here, on the sidebar and on the top bar only. Cards stay solid so tables stay fast.</p>
+  <div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn g" id="close">Cancel</button><button class="btn p">Continue</button></div>
+</div></div>
+<div class="note">Mockup only. Hover cards and the sidebar, click New quote, refresh to replay the rings.</div>
+<script>
+  const s=document.getElementById('scrim');
+  document.getElementById('open').onclick=()=>s.classList.add('on');
+  document.getElementById('close').onclick=()=>s.classList.remove('on');
+  s.onclick=e=>{if(e.target===s)s.classList.remove('on')};
+  addEventListener('keydown',e=>{if(e.key==='Escape')s.classList.remove('on')});
+</script>
+</body>
+</html>

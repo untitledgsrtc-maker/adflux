@@ -1,0 +1,58 @@
+/* Team Work page only (/team-work) - glass + motion layer.
+   Scoped to .wk.wk-glass, imported ONLY by TeamWorkV2, so My Work / profile pages are untouched.
+   Glass is used on the filter strip and tab strip only; cards stay solid (fast on phones). */
+.wk-glass { --w-spring: cubic-bezier(.34, 1.45, .55, 1); --w-ease: cubic-bezier(.22, .8, .24, 1); }
+
+/* glass strips */
+.wk-glass .wk-tabs {
+  background: rgba(30, 41, 59, .55); border-color: rgba(255, 255, 255, .08);
+  -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .16), inset 0 -1px 1px rgba(255, 255, 255, .05), 0 10px 26px -14px rgba(0, 0, 0, .55);
+}
+.wk-glass .wk-tab { transition: background .2s ease, color .2s ease, transform .3s var(--w-spring); }
+.wk-glass .wk-tab:hover { transform: translateY(-1px); }
+.wk-glass .wk-tab.on { box-shadow: 0 6px 16px -6px rgba(255, 230, 0, .45); transform: scale(1.02); }
+:root[data-theme="day"] .wk-glass .wk-tabs, .wk-glass[data-theme="day"] .wk-tabs { background: rgba(255, 255, 255, .7); }
+
+/* hero: glass edge + slow light sweep */
+.wk-glass .wk-hero { box-shadow: inset 0 1px 1px rgba(255, 255, 255, .2), 0 16px 36px -18px rgba(0, 0, 0, .6); }
+.wk-glass .wk-hero::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 38%; left: -45%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .09), transparent); transform: skewX(-18deg);
+  animation: wkg-sweep 7s var(--w-ease) 1.2s infinite;
+}
+@keyframes wkg-sweep { 0% { left: -45%; } 45%, 100% { left: 125%; } }
+.wk-glass .wk-hero > * { position: relative; z-index: 1; }
+
+/* cards: staggered rise on tab entry + spring hover lift */
+.wk-glass .wk-card, .wk-glass .wk-hero { animation: wkg-rise .55s var(--w-ease) both; }
+.wk-glass .wk-grid > *:nth-child(2) .wk-card, .wk-glass .wk-card:nth-of-type(2) { animation-delay: .06s; }
+.wk-glass .wk-grid > *:nth-child(3) .wk-card, .wk-glass .wk-card:nth-of-type(3) { animation-delay: .12s; }
+.wk-glass .wk-grid > *:nth-child(4) .wk-card, .wk-glass .wk-card:nth-of-type(4) { animation-delay: .18s; }
+@keyframes wkg-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.wk-glass .wk-card { transition: transform .35s var(--w-spring), border-color .2s ease, box-shadow .25s ease; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05); }
+.wk-glass .wk-card:hover { transform: translateY(-3px); border-color: var(--w-bd2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 14px 30px -18px rgba(0, 0, 0, .6); }
+
+/* buttons: springy press */
+.wk-glass .wk-btn { transition: transform .3s var(--w-spring), background .2s ease, box-shadow .2s ease; }
+.wk-glass .wk-btn:hover { transform: translateY(-2px) scale(1.03); }
+.wk-glass .wk-btn:active { transform: scale(.97); }
+
+/* hero ring (finished vs open) */
+.wkg-ring { flex: none; width: 92px; height: 92px; position: relative; }
+.wkg-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.wkg-ring circle { fill: none; stroke-width: 9; stroke-linecap: round; }
+.wkg-ring .tr { stroke: rgba(255, 255, 255, .14); }
+.wkg-ring .fg { stroke: var(--accent); stroke-dasharray: 238.8; stroke-dashoffset: 238.8; animation: wkg-draw 1.3s var(--w-ease) .2s forwards; }
+@keyframes wkg-draw { to { stroke-dashoffset: var(--wkg-off, 238.8); } }
+.wkg-ring .mid { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.wkg-ring .mid b { font: 700 20px var(--font-display); color: #fff; line-height: 1; }
+.wkg-ring .mid span { font-size: 10px; color: rgba(255, 255, 255, .72); margin-top: 2px; }
+.wkg-herow { display: flex; align-items: center; gap: 18px; }
+.wkg-herow > .wkg-main { flex: 1; min-width: 0; }
+@media (max-width: 640px) { .wkg-ring { width: 72px; height: 72px; } .wkg-ring .mid b { font-size: 16px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .wk-glass *, .wk-glass *::before, .wk-glass *::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; }
+  .wkg-ring .fg { stroke-dashoffset: var(--wkg-off, 238.8); }
+}
