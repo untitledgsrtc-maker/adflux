@@ -21511,3 +21511,6 @@ Owner asked for a check against a "survive going viral" checklist. Result in `do
 
 ## 394 - Inbox: filter by which of OUR WhatsApp numbers (18-10-2026)
 `CampaignInboxV2.jsx` (admin/co_owner only): a "All numbers / 95815 78261 (service) / 98982 73686 (marketing)" dropdown above the team filter. Filters threads by `whatsapp_account_id`; shown only when 2+ accounts are readable. Client-side, no SQL.
+
+## 395 - Team list shows the job title for Work staff (18-10-2026)
+The "STAFF" chip on the Team list is the real role of the Work-module creative team (section 353: role `staff` on purpose, not the section 284 mis-seed). `TeamList.jsx` now shows `designation` instead when role is `staff` and one is set; other roles unchanged. If a chip still says STAFF, that person has no designation saved.
