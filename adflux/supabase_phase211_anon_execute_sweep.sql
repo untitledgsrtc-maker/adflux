@@ -123,6 +123,8 @@ BEGIN
                         -- deliberately NOT here: RLS policies call it as the caller.
                         'qpa_low_lines', 'qpa_uncovered_lines', 'qpa_uncovered_min',
                         'qpa_media_guard', 'qpa_supersede_on_close',
+                        -- Phase 421 finance task reminders (fires pushes + rolls dates; internal)
+                        'push_finance_task_reminders', 'finance_task_next',
                         --  * 3 TRIGGER functions: harmless, but kept locked so the live ACL does not drift. A trigger
                         --    function needs no EXECUTE grant to fire (PostgreSQL checks it only at CREATE TRIGGER time),
                         --    so locking them cannot stop the triggers.
@@ -202,6 +204,7 @@ WHERE n.nspname = 'public'
                     'qpa_quote_send_blocked',
                     'qpa_low_lines','qpa_uncovered_lines','qpa_uncovered_min',
                     'qpa_media_guard','qpa_supersede_on_close',
+                    'push_finance_task_reminders','finance_task_next',
                     'ops_depot_owner_change_move_tickets','clients_absorb_duplicate',
                     'clients_phone_change_guard')
 ORDER BY p.proname;

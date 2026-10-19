@@ -102,7 +102,7 @@ END $fn$;
 GRANT EXECUTE ON FUNCTION public.finance_reconcile_superseded_oneway(date,date) TO authenticated;
 
 
--- ==== part 2/2 · P6 — push_finance_task_reminders() + daily cron ======
+-- ==== part 2/2 · P6 — push_finance_task_reminders() + cron (Phase 421: needs supabase_phase421_finance_tasks_diya.sql columns + finance_task_next) ======
 -- For every active, not-done finance_task whose next_due has arrived, fire a
 -- push to each active admin + accounts user, then advance recurring tasks to
 -- their next occurrence (one-off tasks keep re-reminding once/day until done).
@@ -113,54 +113,58 @@ RETURNS int LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensio
 AS $$
 DECLARE
   v_today date := (now() AT TIME ZONE 'Asia/Kolkata')::date;
+  v_hour  int  := extract(hour FROM (now() AT TIME ZONE 'Asia/Kolkata'))::int;
   v_task  record;
   v_user  record;
   v_next  date;
   v_count int := 0;
 BEGIN
+  -- Phase 421: runs at 10:00 and 18:00 IST; a task fires in the run that matches its remind_hour.
+  -- Reminders go to the ACCOUNTS user only (Diya), not admin. A recurring task is never switched off by
+  -- the 'done' tick (only a one-off is); it simply rolls to its next date after firing.
   FOR v_task IN
-    SELECT id, title, frequency, next_due
+    SELECT id, title, frequency, next_due, weekday, day_of_month, shift_sunday
       FROM public.finance_tasks
      WHERE COALESCE(is_active, true) = true
-       AND COALESCE(status, 'open') <> 'done'
+       AND (frequency <> 'oneoff' OR COALESCE(status, 'open') <> 'done')
        AND next_due IS NOT NULL
        AND next_due <= v_today
+       AND COALESCE(remind_hour, 10) = v_hour
   LOOP
     FOR v_user IN
       SELECT id FROM public.users
-       WHERE role IN ('admin', 'accounts') AND COALESCE(is_active, true) = true
+       WHERE role = 'accounts' AND COALESCE(is_active, true) = true
     LOOP
       PERFORM public.enqueue_push(
         v_user.id,
         'Finance reminder: ' || v_task.title,
-        'Due today — open Finance → Tasks.',
+        'Due today - open Finance > Tasks.',
         '/finance?tab=tasks',
         'fin-task-' || v_task.id::text || '-' || to_char(v_today, 'YYYY-MM-DD')
       );
       v_count := v_count + 1;
     END LOOP;
 
-    IF v_task.frequency IN ('daily', 'weekly', 'monthly') THEN
+    IF v_task.frequency <> 'oneoff' THEN
       v_next := v_task.next_due;
-      WHILE v_next <= v_today LOOP
-        v_next := CASE v_task.frequency
-          WHEN 'daily'   THEN v_next + 1
-          WHEN 'weekly'  THEN v_next + 7
-          WHEN 'monthly' THEN (v_next + interval '1 month')::date
-        END;
+      WHILE v_next IS NOT NULL AND v_next <= v_today LOOP
+        v_next := public.finance_task_next(v_task.frequency, v_task.weekday, v_task.day_of_month, v_task.shift_sunday, v_next);
       END LOOP;
-      UPDATE public.finance_tasks SET next_due = v_next WHERE id = v_task.id;
+      IF v_next IS NOT NULL THEN
+        UPDATE public.finance_tasks SET next_due = v_next WHERE id = v_task.id;
+      END IF;
     END IF;
   END LOOP;
 
   RETURN v_count;
-END $$;
+END;
+$$;
 -- Cron-only: it MUTATES finance_tasks.next_due + fires push. The cron runs as the
 -- job owner (postgres, superuser → bypasses GRANT), so revoking from every client
 -- role stops a logged-in user from advancing reminders / spamming admins by hand.
 REVOKE EXECUTE ON FUNCTION public.push_finance_task_reminders() FROM PUBLIC, anon, authenticated;
 
--- 10:00 IST = 04:30 UTC (30 min after the 09:30 rep morning push). Re-run safe.
+-- 10:00 IST = 04:30 UTC and 18:00 IST = 12:30 UTC (Phase 421: two runs, a task picks its hour). Re-run safe.
 DO $$
 BEGIN
   PERFORM cron.unschedule('untitled-finance-task-reminders');
@@ -169,7 +173,7 @@ END $$;
 
 SELECT cron.schedule(
   'untitled-finance-task-reminders',
-  '30 4 * * *',
+  '30 4,12 * * *',
   $$ SELECT public.push_finance_task_reminders(); $$
 );
 

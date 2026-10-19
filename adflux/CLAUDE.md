@@ -21560,3 +21560,6 @@ UNDO: `UPDATE ops_tickets t SET status=b.status, resolved_at=b.resolved_at, note
 
 ## 420 - A screen can only be in process once (2026-10-19)
 OpsTicketsV2 and OpsLogV2 now check for an existing manual in_progress ticket on the screen before saving; screens already in process are skipped and the tech sees "This screen is already in process". Live check: 0 duplicates existed. Client guard only (no DB unique index yet).
+
+## 421 - Diya finance task list live (2026-10-19)
+`supabase_phase421_finance_tasks_diya.sql` (APPLIED, dry-run first): finance_tasks gets weekday, day_of_month (0 = last day), shift_sunday, remind_hour (10 or 18), and repeats every2days / quarterly / yearly; helper `finance_task_next` (internal). `push_finance_task_reminders()` (canonical in `supabase_finance_p5_p6.sql`) now runs at 10:00 and 18:00 IST, sends to the ACCOUNTS user only (Diya), and a recurring task is not switched off by the done tick. 25 tasks armed (9 old renamed + 16 new). Backup `_bak_finance_tasks_p421` (KEEP 30 days). My defaults owner can edit: TDS certificates 25th, profit report 5th, month-end close last day, quarterly TDS/advance tax from 15 Dec. UNDO: restore rows from the backup and delete the 16 new titles.

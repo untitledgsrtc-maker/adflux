@@ -641,6 +641,7 @@ function ReconcileTab() {
 }
 
 /* ── Tasks (add / delete / mark done) ── */
+const FREQ_LABEL = { daily: 'Daily', every2days: 'Every 2 days', weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly', oneoff: 'One-off' }
 function TasksTab() {
   const [tasks, setTasks] = useState([]); const [loading, setLoading] = useState(true)
   const [nt, setNt] = useState(''); const [nfreq, setNfreq] = useState('monthly'); const [nchan, setNchan] = useState('push'); const [ndue, setNdue] = useState('')
@@ -671,7 +672,7 @@ function TasksTab() {
         <CH>Add a task or reminder</CH>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input value={nt} onChange={e => setNt(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTask()} placeholder="Task (e.g. Pay electricity bill)" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 11px', color: 'var(--text)', fontSize: 13, minWidth: 240 }} />
-          <select value={nfreq} onChange={e => setNfreq(e.target.value)} style={selStyle}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="oneoff">One-off</option></select>
+          <select value={nfreq} onChange={e => setNfreq(e.target.value)} style={selStyle}><option value="daily">Daily</option><option value="every2days">Every 2 days</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option><option value="oneoff">One-off</option></select>
           <select value={nchan} onChange={e => setNchan(e.target.value)} style={selStyle}><option value="push">Push</option><option value="push_wa">Push + WhatsApp</option></select>
           <input type="date" value={ndue} onChange={e => setNdue(e.target.value)} style={{ ...selStyle, colorScheme: 'dark' }} />
           <button onClick={addTask} style={{ background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)', border: 'none', borderRadius: 999, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Add task</button>
@@ -683,13 +684,13 @@ function TasksTab() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead><tr><th style={thL}>Task</th><th style={thL}>Frequency</th><th style={thL}>Reminder</th><th style={thR}>Status</th><th style={thL}></th></tr></thead>
           <tbody>
-            {recurring.map(t => <tr key={t.id}><td style={tdL}>{t.title}{t.next_due ? <span style={{ color: 'var(--text-subtle)', fontSize: 11, marginLeft: 8 }}>next {fmtDate(t.next_due)}</span> : <span style={{ color: 'var(--warning)', fontSize: 11, marginLeft: 8 }}>set a date to arm</span>}</td><td style={tdL}>{t.frequency}</td>
+            {recurring.map(t => <tr key={t.id}><td style={tdL}>{t.title}{t.next_due ? <span style={{ color: 'var(--text-subtle)', fontSize: 11, marginLeft: 8 }}>next {fmtDate(t.next_due)}</span> : <span style={{ color: 'var(--warning)', fontSize: 11, marginLeft: 8 }}>set a date to arm</span>}</td><td style={tdL}>{FREQ_LABEL[t.frequency] || t.frequency}{t.remind_hour === 18 ? <span style={{ color: 'var(--text-subtle)', fontSize: 11, marginLeft: 6 }}>6 PM</span> : null}</td>
               <td style={tdL}><span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{t.reminder_channel === 'push_wa' ? 'Push + WA' : 'Push'}</span></td>
               <td style={tdR}><Pill t={t} /></td><td style={tdL}><DelBtn id={t.id} /></td></tr>)}
             {recurring.length === 0 && <tr><td colSpan={5} style={{ ...tdL, color: 'var(--text-subtle)' }}>No recurring tasks yet.</td></tr>}
           </tbody>
         </table>
-        <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 10 }}>Set a due date to arm a reminder — a push fires at 10 AM IST on the due date to admins + accounts, and recurring tasks roll to the next date automatically. (WhatsApp reminders come later.)</div>
+        <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 10 }}>Set a due date to arm a reminder — a push fires at 10 AM IST (or 6 PM where shown) on the due date to the accounts person, and recurring tasks roll to the next date automatically. (WhatsApp reminders come later.)</div>
       </Card>
 
       {oneoff.length > 0 && <Card><CH>One-off</CH>{oneoff.map(t => <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.06))' }}><div style={{ flex: 1, fontSize: 13.5, textDecoration: t.status === 'done' ? 'line-through' : 'none', color: t.status === 'done' ? 'var(--text-subtle)' : 'var(--text)' }}>{t.title}{t.next_due ? <span style={{ color: 'var(--text-subtle)', fontSize: 11, marginLeft: 8 }}>{fmtDate(t.next_due)}</span> : ''}</div><Pill t={t} /><DelBtn id={t.id} /></div>)}</Card>}
