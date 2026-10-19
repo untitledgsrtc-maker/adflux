@@ -120,7 +120,32 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, pr
 
               const streak = calculateStreak(allMd, target)
               const eligible = isIncrementEligible(streak)
+              const hasTarget = user.role === 'sales' || user.role === 'telecaller'   // work team / ops / HR / office carry no sales target
 
+              if (!hasTarget) {
+                // No sales target / incentive for this role: name, salary and Edit only.
+                return (
+                  <tr key={p.id}>
+                    <td>
+                      <div className="staff-name-cell">
+                        <div className="staff-avatar"><UserAvatar name={user.name} url={user.profile_image_url} userId={user.id} style={{ width: '100%', height: '100%' }} /></div>
+                        <div>
+                          <div className="staff-name">{user.name || '—'}</div>
+                          <div className="staff-email">{user.email || ''}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{salary ? formatCurrency(salary) : <span style={{ color: 'var(--text-muted)' }}>Not set</span>}</td>
+                    <td colSpan={4} style={{ color: 'var(--text-muted)', fontSize: 12 }}>No sales target for this role</td>
+                    <td>
+                      <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => onEdit(p)} title="Edit salary">
+                        <Pencil size={13} style={{ marginRight: 4 }} />
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                )
+              }
               return (
                 <tr
                   key={p.id}

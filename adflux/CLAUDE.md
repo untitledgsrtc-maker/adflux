@@ -21539,3 +21539,6 @@ Owner decision: no head rating; the work team (role `staff`) variable depends on
 ## 415 - Due date required + on-time score shown (2026-10-19)
 - `supabase_phase415_work_due_required.sql` (APPLIED): `work_create_task` refuses a task without a due date; the New task form marks Due date required for a one-off task (repeating tasks make their own dates).
 - `OnTimeScoreCard.jsx`: staff see "On-time score - this month" on My Work (% , tasks on time / late, variable so far vs the full amount, a plain band message; "Too early" under 3 counted tasks). Team Work -> People gets an "On time" column for admin. Both read `monthly_score` (self-or-admin gate), display only. Limits 85 / 60 / min 3 live in `OnTimeScoreCard.jsx` and must match `monthly_score.sql`.
+
+## 416 - People -> Incentives: role filter, no sales target for the work team (2026-10-19)
+`IncentiveDashboard` table has a "Show" filter: Sales & telecaller (default) | Work team | Operations | HR / accounts / office | Everyone. Only sales + telecaller carry a sales target / incentive, so the summary cards and the What-If Simulator use just them; other roles show name, salary and Edit with "No sales target for this role" (salary stays editable). Display only. `StaffTable.jsx` `hasTarget`.

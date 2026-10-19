@@ -35,6 +35,7 @@ export function IncentiveDashboard() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
   const [activeTab, setActiveTab]   = useState('staff')
+  const [group, setGroup]           = useState('sales')
   const [editProfile, setEditProfile] = useState(null)
   const [loading, setLoading]       = useState(true)
   // Per-staff aggregates from the get_team_leaderboard RPC for the
@@ -84,9 +85,21 @@ export function IncentiveDashboard() {
   // slab/streak grid. Phase 101.A1 already set is_active=false on
   // existing agency staff_incentive_profiles; this filter is the
   // belt-and-braces guard for any historical row that slips through.
-  const salesProfiles = profiles.filter(p =>
+  const allProfiles = profiles.filter(p =>
     p.users?.is_active && p.users?.role !== 'agency'
   )
+  // Only sales + telecaller carry a sales target / incentive. The summary cards + simulator use just them;
+  // the table below follows the role filter (so HR can still reach everyone to edit a salary).
+  const INCENTIVE_ROLES = ['sales', 'telecaller']
+  const GROUPS = {
+    sales:  { label: 'Sales & telecaller', has: (r) => INCENTIVE_ROLES.includes(r) },
+    work:   { label: 'Work team',          has: (r) => r === 'staff' },
+    ops:    { label: 'Operations',         has: (r) => r === 'operation_executive' || r === 'operation_head' },
+    office: { label: 'HR / accounts / office', has: (r) => ['hr', 'accounts', 'office_admin', 'office_staff'].includes(r) },
+    all:    { label: 'Everyone',           has: () => true },
+  }
+  const salesProfiles = allProfiles.filter(p => INCENTIVE_ROLES.includes(p.users?.role))
+  const tableProfiles = allProfiles.filter(p => GROUPS[group].has(p.users?.role))
 
   // Summary for selected month
   const monthData = monthlySales.filter(m => m.month_year === selectedMonth)
@@ -212,8 +225,22 @@ export function IncentiveDashboard() {
       {loading ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
       ) : activeTab === 'staff' ? (
+        <>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '0 0 12px' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Show</span>
+          {Object.entries(GROUPS).map(([k, g]) => {
+            const n = allProfiles.filter(p => g.has(p.users?.role)).length
+            return (
+              <button key={k} type="button" className={`btn ${group === k ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ padding: '5px 12px', fontSize: 12, borderRadius: 999 }} onClick={() => setGroup(k)}>
+                {g.label} <span style={{ opacity: 0.7, marginLeft: 4 }}>{n}</span>
+              </button>
+            )
+          })}
+          {group !== 'sales' && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>These roles have no sales target - only their salary can be edited here.</span>}
+        </div>
         <StaffTable
-          profiles={salesProfiles}
+          profiles={tableProfiles}
           settings={settings}
           monthlySales={monthlySales}
           selectedMonth={selectedMonth}
@@ -224,6 +251,7 @@ export function IncentiveDashboard() {
             setEditProfile({ ...p, _member: { ...m, staff_incentive_profiles: [p] } })
           }}
         />
+        </>
       ) : activeTab === 'simulator' ? (
         <WhatIfSimulator profiles={salesProfiles} settings={settings} />
       ) : (
