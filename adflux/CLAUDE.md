@@ -21622,3 +21622,5 @@ Note (433 follow-up): the leaderboard avatars in SalesDashboard / SalesDashboard
 Every place that shows a person MUST use `src/components/common/UserAvatar.jsx` (photo if any, else initials; always a true circle). Never hand-build `<img src={profile_image_url} ...>` or an initials circle - a bare img with width/height 100% inside a grid/flex box stretches into an oval (Phase 433). Pass the look through className/size/style. Exceptions: map markers (canvas) and `LeadAvatar` (6-colour initials design).
 
 Note (432 follow-up): tasks with no client (Diya finance, HR, office) show one neutral grey bar in the calendar instead of a hashed colour.
+
+Note (435): public/led/index.html (the /led landing page) now says 300 LED screens (was 264) in the description, og tag, lede, hero counter, aria-label and the STATIONS - LIVE header. Other places still say 264 (public/investor, leadEmailDraft.js, CreateQuoteV2 hint) - owner only asked for /led.
