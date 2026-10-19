@@ -21572,3 +21572,6 @@ OpsTicketsV2 and OpsLogV2 now check for an existing manual in_progress ticket on
 
 ## 423b - Vendor follow-ups for the 2 running Auto Hood campaigns (2026-10-19)
 `supabase_phase423b_running_vendor_followups.sql` (APPLIED, dry-run first): daily 11 AM / 3 PM / 6 PM vendor follow-up for Dixita on both campaigns, from 19 Oct until the campaign END date (1 Nov). The rule in `work_make_govt_tasks` now only builds vendor follow-ups while the campaign start date is still in the future, so a later date edit never switches these hand-added ones off. First tasks appear at 7 AM on the next working day (the repeating-task run).
+
+## 424 - Any active person can add a NEW client when assigning a task (2026-10-19)
+`supabase_phase424_work_add_client_anyone.sql` (APPLIED, dry-run per role): `work_add_project` now allows every active user except agency (was Work members + sales + telecaller, so a co-owner / ops head got "not on the timeclock" when typing a new client like "CollabKeep"). Same people who can already create a task. Role check done live: admin, co_owner, sales, telecaller, hr, accounts, office_admin, operation_head, operation_executive, staff can all create a task for someone and read their own tasks; agency is blocked by design. Khushbu Parmar (khushbu261510, active) is in work_members; her old account (parmarkhushbhu2620) is inactive.
