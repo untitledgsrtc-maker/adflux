@@ -137,7 +137,7 @@ BEGIN
 
   IF v_auto THEN
     -- vendor follow-up, 3 times a day, from now until the campaign start date
-    IF q.campaign_start_date IS NOT NULL THEN
+    IF q.campaign_start_date IS NOT NULL AND q.campaign_start_date >= v_today THEN   -- (running campaigns: Phase 423b adds theirs by hand, never touched here)
       v_start := GREATEST(v_today, COALESCE(q.won_at::date, v_today));
       PERFORM public.work__govt_tpl(q.id, 'vendor_1', 'Vendor work follow-up (11 AM) - ' || v_label, 'daily', NULL, TIME '11:00', v_start, q.campaign_start_date, v_to, v_creator, v_proj);
       PERFORM public.work__govt_tpl(q.id, 'vendor_2', 'Vendor work follow-up (3 PM) - '  || v_label, 'daily', NULL, TIME '15:00', v_start, q.campaign_start_date, v_to, v_creator, v_proj);

@@ -21569,3 +21569,6 @@ OpsTicketsV2 and OpsLogV2 now check for an existing manual in_progress ticket on
 
 ## 423 - First-day steps for the 3 running government campaigns (2026-10-19)
 `supabase_phase423_govt_running_firststeps.sql` (APPLIED once, dry-run first): created for Dixita the steps that Phase 422 skipped for campaigns already running - design x3, quantity approval x2, vendor assignment x2, report making x2 (no due date) - all due 19 Oct. Not part of the ongoing rule; new wins still follow section 422.
+
+## 423b - Vendor follow-ups for the 2 running Auto Hood campaigns (2026-10-19)
+`supabase_phase423b_running_vendor_followups.sql` (APPLIED, dry-run first): daily 11 AM / 3 PM / 6 PM vendor follow-up for Dixita on both campaigns, from 19 Oct until the campaign END date (1 Nov). The rule in `work_make_govt_tasks` now only builds vendor follow-ups while the campaign start date is still in the future, so a later date edit never switches these hand-added ones off. First tasks appear at 7 AM on the next working day (the repeating-task run).
