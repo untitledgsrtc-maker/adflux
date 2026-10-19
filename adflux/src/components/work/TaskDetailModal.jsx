@@ -1,9 +1,10 @@
 // Phase 365 - one task: parts, checklist, comments, task log, due date. Opens from the board
 // and from "Asked by me". Everything it writes goes through the work_* functions.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Check, Loader2, Send, Play, Undo2 } from 'lucide-react'
+import { X, Check, Loader2, Send, Play, Undo2, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { toastError } from '../v2/Toast'
+import { toastError, toastSuccess } from '../v2/Toast'
+import { confirmDialog } from '../v2/ConfirmDialog'
 import UserAvatar from '../common/UserAvatar'
 import RejectModal from './RejectModal'
 import { fmtDur, fmtDateShort, dueState, STATUS_LABEL, initialsOf } from '../../utils/workUtils'
@@ -56,6 +57,19 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
   const rpc = async (name, args) => { const { error } = await supabase.rpc(name, args); if (error) throw error }
 
   const task = data?.task
+  // Phase 418 - the creator (before anyone starts it and before its due date) or a head / admin can delete. The server decides and says why not.
+  const deleteTask = async () => {
+    if (latch.current || !task) return
+    const ok = await confirmDialog({ title: 'Delete this task?', message: `"${task.title}" will be removed for everyone on it and they will be told. A copy is kept so an admin can bring it back.`, confirmLabel: 'Delete', danger: true })
+    if (!ok) return
+    latch.current = true; setBusy(true)
+    try {
+      const { error } = await supabase.rpc('work_delete_task', { p_task: task.id })
+      if (error) throw error
+      toastSuccess('Task deleted.')
+      onChanged?.(); onClose?.()
+    } catch (e) { toastError(e, 'Could not delete the task.') } finally { latch.current = false; setBusy(false) }
+  }
   const canEdit = task && (isHead || task.created_by === uid)
   const dayName = (iso) => new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })
 
@@ -67,7 +81,14 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
             <div className="wk-sm">{task ? (projectName(task.project_id) || 'No client') : ''}</div>
             <div className="wk-title" style={{ fontSize: 22 }}>{task?.title || 'Task'}</div>
           </div>
-          <button className="wk-btn o sm" onClick={onClose} aria-label="Close"><X size={16} aria-hidden="true" /> Close</button>
+          <span className="wk-grp" style={{ gap: 8 }}>
+            {task && (isHead || task.created_by === uid) && (
+              <button className="wk-btn o sm" disabled={busy} onClick={deleteTask} aria-label="Delete task" style={{ color: 'var(--danger)' }}>
+                <Trash2 size={16} aria-hidden="true" /> Delete task
+              </button>
+            )}
+            <button className="wk-btn o sm" onClick={onClose} aria-label="Close"><X size={16} aria-hidden="true" /> Close</button>
+          </span>
         </div>
 
         {err && <div className="wk-err" style={{ marginTop: 12 }} role="alert"><span>{err}</span><button className="wk-btn sm g" onClick={load}>Retry</button></div>}
