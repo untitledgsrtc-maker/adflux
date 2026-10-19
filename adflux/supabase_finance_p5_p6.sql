@@ -122,6 +122,8 @@ BEGIN
   -- Phase 421: runs at 10:00 and 18:00 IST; a task fires in the run that matches its remind_hour.
   -- Reminders go to the ACCOUNTS user only (Diya), not admin. A recurring task is never switched off by
   -- the 'done' tick (only a one-off is); it simply rolls to its next date after firing.
+  -- Phase 431: Sunday / holiday -> nothing fires; due tasks (next_due <= today) fire on the next working day.
+  IF public.is_off_day(v_today) THEN RETURN 0; END IF;
   FOR v_task IN
     SELECT id, title, frequency, next_due, weekday, day_of_month, shift_sunday, remind_hour
       FROM public.finance_tasks

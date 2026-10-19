@@ -21598,3 +21598,7 @@ Owner said yes. `supabase_phase428_deactivate_blocks_signin.sql` (applied): trig
 ## 430 · Auto-reload on stale page file after a deploy (19-10-2026)
 
 Dhara saw "Failed to fetch dynamically imported module .../TelecallerV2-xxxx.js": her phone held the old version after a deploy removed that file. ErrorBoundary now reloads once (60s guard in sessionStorage) on that error, and main.jsx does the same on Vite's `vite:preloadError`. Manual fix for anyone already stuck: tap Reload.
+
+## 431 · Fixed tasks on a Sunday/holiday fire the next working day (19-10-2026)
+
+`supabase_phase431_holiday_next_day.sql` (applied). Work weekly templates now catch up (fire on the first working day on/after their weekday, once per week, never before start_date); monthly/quarterly/yearly already did (426); daily still skips the off day. `push_finance_task_reminders()` returns early on an off day so due Finance tasks fire the next working day at their own hour. Uses `is_off_day()` (Sundays + holidays table).
