@@ -26,6 +26,7 @@
 --      50–75 → (avg/100) × cap.
 --    • avg + working_days from daily_performance WHERE is_excluded = false.
 --    • monthly_salary from staff_incentive_profiles; business from monthly_sales_data.
+--    • Phase 414 - role 'staff' (work team): variable = tasks finished on time (work_ontime_stats): >=85% full, <60% zero, linear between, <3 counted tasks -> full.
 --    • _assert_self_or_admin(p_user_id) gate. STABLE SECURITY DEFINER + pg_temp.
 --
 -- PROVENANCE: Phase 184 (2026-07-02) CHANGE — added Rule 1 (3×-business full
@@ -60,6 +61,8 @@ DECLARE
   v_var_earned numeric;
   v_role    text;
   v_business numeric := 0;
+  v_wc int := 0;          -- Phase 414: work team counted tasks
+  v_won int := 0;         -- Phase 414: work team on-time tasks
 BEGIN
   PERFORM public._assert_self_or_admin(p_user_id);
 
@@ -93,7 +96,22 @@ BEGIN
   v_base    := v_salary * 0.70;
   v_var_cap := v_salary * 0.30;
 
-  IF v_role IN ('sales','telecaller') AND v_salary > 0 AND v_business >= v_salary * 3 THEN
+  IF v_role = 'staff' THEN
+    -- Phase 414 (owner 2026-10-19): the WORK TEAM's variable = tasks finished ON TIME (work_ontime_stats).
+    -- >= 85% on time -> full cap; < 60% -> 0; in between linear. Fewer than 3 counted tasks -> full cap
+    -- (not enough to judge). avg_score_pct / working_days report on-time % / counted tasks.
+    SELECT s.counted, s.on_time INTO v_wc, v_won FROM public.work_ontime_stats(p_user_id, p_month_start) s;
+    v_days := COALESCE(v_wc, 0);
+    IF v_days < 3 THEN
+      v_avg := 100; v_var_earned := v_var_cap;
+    ELSE
+      v_avg := (v_won::numeric / v_days) * 100;
+      IF    v_avg >= 85 THEN v_var_earned := v_var_cap;
+      ELSIF v_avg <  60 THEN v_var_earned := 0;
+      ELSE  v_var_earned := v_var_cap * (v_avg - 60) / 25;
+      END IF;
+    END IF;
+  ELSIF v_role IN ('sales','telecaller') AND v_salary > 0 AND v_business >= v_salary * 3 THEN
     -- Rule 1 (Phase 184): 3x-business override — full variable, score ignored (sales/TC only).
     v_var_earned := v_var_cap;
   ELSIF v_days = 0 THEN
@@ -130,6 +148,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%v_business >= v_salary * 3%' AS rule1_3x_override,
 --   pg_get_functiondef(p.oid) LIKE '%v_avg > 75%'                 AS rule3_above75_full,
 --   pg_get_functiondef(p.oid) LIKE '%v_avg < 50%'                 AS sub50_zero_variable,
+--   pg_get_functiondef(p.oid) LIKE '%work_ontime_stats%'          AS work_staff_ontime,
 --   pg_get_functiondef(p.oid) LIKE '%daily_performance%'          AS reads_daily_perf,
 --   pg_get_functiondef(p.oid) LIKE '%staff_incentive_profiles%'   AS reads_salary_profile
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
