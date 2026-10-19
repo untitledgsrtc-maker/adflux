@@ -26,6 +26,14 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     .catch(() => { /* dev mode / plugin disabled — ignore */ })
 }
 
+// Phase 430 - stale page file after a deploy: reload once (Vite fires this when a lazy page fails to load).
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (e) => {
+    e.preventDefault()
+    import('./components/v2/ErrorBoundary').then(({ reloadOnceForStaleChunk }) => reloadOnceForStaleChunk({ message: 'dynamically imported module' })).catch(() => window.location.reload())
+  })
+}
+
 // Bootstrap auth listener a single time, before render.
 initAuth()
 

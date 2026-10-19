@@ -21594,3 +21594,7 @@ Owner said yes. `supabase_phase428_deactivate_blocks_signin.sql` (applied): trig
 ## 429 · Finance reminders mirror into Diya's Work list (19-10-2026)
 
 `supabase_phase429_finance_mirror_work.sql` (applied): `finance_mirror_to_work(title, due, hour)` is called from `push_finance_task_reminders()` each time a finance task fires; creates a silent Work task for the accounts user (due_time = remind hour), deduped per title/day and not repeated while an earlier one is open. Finance push unchanged. Canonical function in supabase_finance_p5_p6.sql updated to match. Today the 5 daily tasks were seeded; everything else arrives on its date (first fires 20-10-2026).
+
+## 430 · Auto-reload on stale page file after a deploy (19-10-2026)
+
+Dhara saw "Failed to fetch dynamically imported module .../TelecallerV2-xxxx.js": her phone held the old version after a deploy removed that file. ErrorBoundary now reloads once (60s guard in sessionStorage) on that error, and main.jsx does the same on Vite's `vite:preloadError`. Manual fix for anyone already stuck: tap Reload.

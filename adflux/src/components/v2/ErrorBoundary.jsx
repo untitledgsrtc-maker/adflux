@@ -11,6 +11,20 @@
 
 import { Component } from 'react'
 
+// Phase 430 - a new deploy removes the old page files; a phone still on the old version then fails to load a page
+// ("Failed to fetch dynamically imported module"). Reload once automatically to pick up the new version.
+export function reloadOnceForStaleChunk(err) {
+  const m = String(err?.message || err || '')
+  if (!/dynamically imported module|Importing a module script failed|Loading chunk|error loading dynamically/i.test(m)) return false
+  try {
+    const last = Number(sessionStorage.getItem('stale_chunk_reload') || 0)
+    if (Date.now() - last < 60000) return false
+    sessionStorage.setItem('stale_chunk_reload', String(Date.now()))
+  } catch { /* storage blocked: still try once */ }
+  window.location.reload()
+  return true
+}
+
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
@@ -22,6 +36,7 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
+    if (reloadOnceForStaleChunk(error)) return
     this.setState({ info })
     // eslint-disable-next-line no-console
     console.error('[ErrorBoundary]', this.props.label || '', error, info)
