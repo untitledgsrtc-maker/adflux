@@ -21602,3 +21602,7 @@ Dhara saw "Failed to fetch dynamically imported module .../TelecallerV2-xxxx.js"
 ## 431 · Fixed tasks on a Sunday/holiday fire the next working day (19-10-2026)
 
 `supabase_phase431_holiday_next_day.sql` (applied). Work weekly templates now catch up (fire on the first working day on/after their weekday, once per week, never before start_date); monthly/quarterly/yearly already did (426); daily still skips the off day. `push_finance_task_reminders()` returns early on an off day so due Finance tasks fire the next working day at their own hour. Uses `is_off_day()` (Sundays + holidays table).
+
+## 432 · Work calendar (19-10-2026)
+
+New `src/components/work/WorkCalendar.jsx` as a Calendar tab in My Work: month grid (Mon first), tasks on their due date, holidays + Sundays marked, side panel for the picked day (click a task to open the normal task box), phone view shows dots instead of titles. Everyone sees own tasks; heads/admin get a Mine/Everyone switch. Read only; styles `.wkc-*` in work.css. Design inspired by a template screenshot, no template code used.

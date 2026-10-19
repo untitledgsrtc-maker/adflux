@@ -20,6 +20,7 @@ import NewTaskModal from '../../components/work/NewTaskModal'
 import PostponeModal from '../../components/work/PostponeModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
 import OnTimeScoreCard from '../../components/work/OnTimeScoreCard'
+import WorkCalendar from '../../components/work/WorkCalendar'
 
 export default function MyWorkV2() {
   const { profile } = useAuth()
@@ -195,6 +196,7 @@ export default function MyWorkV2() {
     isMember && ['work', 'My work'],
     ['asked', 'Asked by me', asked.length],
     isMember && ['hours', 'My hours'],
+    ['calendar', 'Calendar'],
   ].filter(Boolean)
 
   return (
@@ -313,6 +315,7 @@ export default function MyWorkV2() {
             </div>
           )}
 
+          {tab === 'calendar' && <WorkCalendar uid={uid} isHead={isHead} nameOf={nameOf} onOpen={setOpenTask} />}
           {tab === 'asked' && <AskedTab asked={asked} nameOf={nameOf} projName={projName} onOpen={setOpenTask} onNew={() => setNewTask(true)} />}
           {tab === 'hours' && isMember && <HoursTab uid={uid} entries={entries} projects={projects} projName={projName} onAddManual={(a) => rpc('work_add_manual_time', a, 'Sent for approval.')} onAddProject={addProject} />}
           {!isMember && tab !== 'asked' && <div className="wk-empty">You can ask for work and follow it here.</div>}
