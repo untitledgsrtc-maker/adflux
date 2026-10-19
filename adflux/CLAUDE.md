@@ -21542,3 +21542,7 @@ Owner decision: no head rating; the work team (role `staff`) variable depends on
 
 ## 416 - People -> Incentives: role filter, no sales target for the work team (2026-10-19)
 `IncentiveDashboard` table has a "Show" filter: Sales & telecaller (default) | Work team | Operations | HR / accounts / office | Everyone. Only sales + telecaller carry a sales target / incentive, so the summary cards and the What-If Simulator use just them; other roles show name, salary and Edit with "No sales target for this role" (salary stays editable). Display only. `StaffTable.jsx` `hasTarget`.
+
+## 417 - Every role can open its assigned Work tasks; ops sees the faults assigned to them (2026-10-19)
+- `V2AppShell.jsx`: "My Work" (/my-work) added to ADMIN, MANAGER, HR, OFFICE_ADMIN, ACCOUNTS, OPS_HEAD and OPS_EXEC navs plus the ops phone drawer (guardian PASS). Sales / telecaller keep "Ask for work", staff keep "My Work", agency cannot be given tasks.
+- `OpsTicketsV2.jsx` (executives only): an "Assigned to you" block at the top of the Open tab lists their open / in-process tickets from the system or the head (auto offline, camera off, live photo asked), tap opens /ops-fix/<station>. Before this, 29 auto tickets assigned to the ops executives were invisible (the page listed only manual tickets).

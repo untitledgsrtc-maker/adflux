@@ -7,7 +7,7 @@
 // call_logs (ops_ticket_id) + ops_my_uptime_pay. Gujarati-first (§231). Built on
 // the same lead-* classes + global tokens as OpsAdminV2 so it matches the cockpit.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Loader2, MapPin, Phone, ChevronRight, Camera, Check, Wrench, Clock, Plus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -60,6 +60,8 @@ export default function OpsTicketsV2() {
   const [contactsByDepot, setContactsByDepot] = useState({})
   const [screens, setScreens] = useState([])
   const [proc, setProc] = useState([])
+  const [assignedTk, setAssignedTk] = useState([])   // Phase 417: faults the system / head gave this tech (auto offline, camera, photo asked)
+  const navigate = useNavigate()
   const [fixed, setFixed] = useState([])
   const [callsByTicket, setCallsByTicket] = useState({})
   const [stats, setStats] = useState(null)
@@ -107,6 +109,13 @@ export default function OpsTicketsV2() {
         .eq('source', 'manual').eq('status', 'resolved').order('resolved_at', { ascending: false }).limit(isHead ? 60 : 30)
       if (!isHead) { pQ = pQ.eq('assigned_to', uid); fQ = fQ.eq('assigned_to', uid) }
 
+      if (!isHead) {
+        supabase.from('ops_tickets')
+          .select('id, source, status, created_at, depot_id, depot:ops_depots!ops_tickets_depot_id_fkey(name)')
+          .eq('assigned_to', uid).in('status', ['open', 'in_progress']).in('source', ['auto_offline', 'auto_camera', 'sales_request'])
+          .order('created_at', { ascending: true }).limit(60)
+          .then(({ data }) => setAssignedTk(data || []))
+      } else setAssignedTk([])
       const [scr, it, ct, pRes, fRes] = await Promise.all([
         supabase.from('ops_screens').select('id, name, status, depot_id, last_response_at').in('depot_id', depotIds).eq('is_active', true).eq('status', nowOn ? 'offline' : 'online'),
         supabase.from('ops_issue_types').select('id, issue_en, issue_gu, solution_en, solution_gu, display_order').eq('is_active', true).order('display_order'),
@@ -334,7 +343,26 @@ export default function OpsTicketsV2() {
   function OpenTab() {
     // F4: one worst-first fault list (no grouped/individual toggle — the double
     // scroll is gone). Off-hours + no timer faults = the "all quiet" good state.
-    if (!cityScreens.length) return empty(t(onHours ? 'no_open' : 'all_quiet', lang))
+    const assignedBlock = assignedTk.length > 0 && (
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t('assigned_to_you', lang)} <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-display)' }}>{assignedTk.length}</span></div>
+        <div style={gridWrap}>{assignedTk.map(a => {
+          const kind = a.source === 'auto_camera' ? t('kind_camera', lang) : a.source === 'sales_request' ? t('kind_photo', lang) : t('kind_offline', lang)
+          const days = Math.max(0, Math.floor((Date.now() - new Date(a.created_at).getTime()) / 86400000))
+          return (
+            <button key={a.id} type="button" className="lead-card" onClick={() => a.depot_id && navigate(`/ops-fix/${a.depot_id}`)}
+              style={{ padding: 14, textAlign: 'left', cursor: 'pointer', color: 'inherit', font: 'inherit', width: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>{a.depot?.name || depotName(a.depot_id)}</span>
+                {chip(a.status === 'in_progress' ? t('tab_proc', lang) : kind, a.status === 'in_progress' ? 'amber' : 'danger')}
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>{kind}{days > 0 ? ` · ${days}d` : ''}</div>
+            </button>
+          )
+        })}</div>
+      </div>
+    )
+    if (!cityScreens.length) return <>{assignedBlock}{empty(t(onHours ? 'no_open' : 'all_quiet', lang))}</>
 
     // group by station, then rank stations worst-first (severity, then age)
     const byDepot = {}; cityScreens.forEach(s => { (byDepot[s.depot_id] = byDepot[s.depot_id] || []).push(s) })
@@ -346,7 +374,7 @@ export default function OpsTicketsV2() {
 
     const SEV = { 2: 'var(--danger)', 1: 'var(--warning)', 0: 'var(--text-subtle, var(--text-muted))' }
     return (
-      <div style={gridWrap}>{rows.map(r => {
+      <>{assignedBlock}<div style={gridWrap}>{rows.map(r => {
         const ids = r.list.map(s => s.id)
         const one = r.list.length === 1
         const typeLabel = onHours ? t('signal_lost', lang) : t('timer_fault', lang)
@@ -366,7 +394,7 @@ export default function OpsTicketsV2() {
             <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           </button>
         )
-      })}</div>
+      })}</div></>
     )
   }
 

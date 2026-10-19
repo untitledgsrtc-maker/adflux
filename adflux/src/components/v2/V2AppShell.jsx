@@ -118,6 +118,7 @@ const ADMIN_NAV = [
   { to: '/ops-admin',         label: 'Operations',     icon: Tv },
   // Phase 365 — creative team timeclock + tasks (head view).
   { to: '/team-work',         label: 'Team Work',      icon: Briefcase },
+  { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
 ]
 
 const SALES_NAV = [
@@ -237,6 +238,7 @@ const MANAGER_NAV = [
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
   { to: '/calls',             label: 'My Calls',       icon: Phone },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
+  { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
 ]
 
 // Phase 109 (1 Jun 2026) — HR login. Minimal nav: the offer/roster
@@ -253,6 +255,7 @@ const HR_NAV = [
   { to: '/admin/ta-payouts',  label: 'TA Claims',      icon: Wallet },
   { to: '/team',              label: 'Team',           icon: Users },
   { to: '/team-dashboard',    label: 'Attendance',     icon: MapPin },
+  { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
 ]
 
 // Phase 391 (16 Oct 2026) - Office admin. People-ops + govt won-quote report / invoice submission.
@@ -266,6 +269,7 @@ const OFFICE_ADMIN_NAV = [
   { to: '/team-work',         label: 'Team Work',      icon: Briefcase },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
+  { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
 ]
 
 // Phase 391 - phone bottom nav for the office admin (5 items; the sidebar list above has 8).
@@ -283,6 +287,7 @@ const MOBILE_NAV_OFFICE_ADMIN = [
 const ACCOUNTS_NAV = [
   { to: '/people',            label: 'Payroll',        icon: Wallet },
   { to: '/finance',           label: 'Finance',        icon: IndianRupee },
+  { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
 ]
 
 // Phase 230 (2026-08-25) — Operations module. Head → the desk console
@@ -298,6 +303,7 @@ const OPS_HEAD_NAV = [
   { to: '/ops-performance',   label: 'My Performance', icon: TrendingUp },
   { to: '/calls',             label: 'My Calls',       icon: Phone },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
+  { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
 ]
 // Phase 251.2 — ONE operations home (owner: "wire one professional dashboard").
 // The home (/ops-home) folds Tickets / Down-now / Log-issue / Check-in; those
@@ -307,6 +313,7 @@ const OPS_EXEC_NAV = [
   { to: '/ops-performance',   label: 'My Performance', icon: TrendingUp },
   { to: '/calls',             label: 'My Calls',       icon: Phone },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
+  { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
 ]
 // Phase 251.3 — ops MOBILE bottom nav = operational only (owner: no personal
 // trio in the bottom bar). The trio lives on the desktop sidebar + the ⋯ drawer.
@@ -961,6 +968,9 @@ export function V2AppShell() {
               )}
               {isOps ? (
                 <>
+                  <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/my-work') }}>
+                    <Briefcase size={18} /> <span>My Work</span>
+                  </button>
                   <button className="more-drawer-link" onClick={() => { setMoreOpen(false); navigate('/ops-performance') }}>
                     <TrendingUp size={18} /> <span>My Performance</span>
                   </button>
