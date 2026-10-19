@@ -16,7 +16,7 @@ const EVENT_TEXT = {
   unpostponed: 'brought this task back',
   returned: 'task came back on its date',
   created: 'created the task', started: 'started', paused: 'paused', finished: 'finished their part',
-  reopened: 'reopened a part', moved: 'moved a part', reassigned: 'reassigned a part',
+  reopened: 'reopened a part', moved: 'moved a part', reassigned: 'reassigned a part', removed: 'removed a person',
   due_changed: 'changed a due date', commented: 'added a comment',
 }
 

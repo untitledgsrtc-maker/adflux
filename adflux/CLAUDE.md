@@ -21586,3 +21586,7 @@ OpsTicketsV2 and OpsLogV2 now check for an existing manual in_progress ticket on
 ## 427 · Remove one person from a Work task (19-10-2026)
 
 `supabase_phase427_work_remove_person.sql` (applied): `work_remove_part(p_part)` - head/admin or creator, not for finished parts, cannot remove the last person; they get a push. TaskDetailModal shows "Remove from task" on each unfinished person when the task has 2+ people.
+
+## 428 · Deactivating a person blocks sign-in (19-10-2026)
+
+Owner said yes. `supabase_phase428_deactivate_blocks_signin.sql` (applied): trigger `trg_users_block_signin` sets auth.users.banned_until=infinity when users.is_active goes false, clears it on re-activation; 10 already-inactive people backfilled. Closes the gap noted in 426. Section 211 lists updated.
