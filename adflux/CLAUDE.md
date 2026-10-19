@@ -21520,3 +21520,10 @@ Owner decision: all leads on 98982 73686. All 22 hoarding boards repointed (`sup
 
 ## 397 - Team Work page: glass + motion layer (2026-10-18)
 `/team-work` only (owner: "this only"). New `src/styles/work-glass.css`, imported ONLY by `TeamWorkV2.jsx` and scoped to `.wk.wk-glass`, so My Work / profile pages are untouched. Glass blur on the tab strip only (cards stay solid for phone speed); hero gets a glass edge + slow light sweep; cards rise in staggered and lift on hover with a spring; buttons spring; Overview hero gets an animated "done today" ring (`HeroSegs` optional `ring` prop = finished today / (open + finished)). `prefers-reduced-motion` freezes everything. Display only: no SQL, no APK, no data or handler change. Mockup reference: `_design_reference/dashboard_glass_mockup.html`. Not verified on the live logged-in page (needs a staff/admin login) - owner to eyeball /team-work after deploy.
+
+## 413 - Work: reject a task with a reason (2026-10-19)
+
+Two ways, one box (`RejectModal.jsx`, opened from the task detail): a person DECLINES a task given to them (stays Assigned, red note,
+creator told), or a head / the task creator SENDS BACK finished work (back to Assigned, time + cost cleared, person told). Reason required
+(3+ chars). New `work_task_parts.reject_*` columns, `work_reject_part(p_part, p_reason)` RPC, trigger `work_clear_reject` clears the note on
+reassign or re-finish. No new status. SQL: `supabase_phase413_work_reject.sql` (owner runs it in Supabase Studio). Not shown on the board card yet.

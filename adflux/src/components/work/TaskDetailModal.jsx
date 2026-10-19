@@ -1,13 +1,16 @@
 // Phase 365 - one task: parts, checklist, comments, task log, due date. Opens from the board
 // and from "Asked by me". Everything it writes goes through the work_* functions.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Check, Loader2, Send, Play } from 'lucide-react'
+import { X, Check, Loader2, Send, Play, Undo2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toastError } from '../v2/Toast'
 import UserAvatar from '../common/UserAvatar'
+import RejectModal from './RejectModal'
 import { fmtDur, fmtDateShort, dueState, STATUS_LABEL, initialsOf } from '../../utils/workUtils'
 
 const EVENT_TEXT = {
+  declined: 'declined this task',
+  sent_back: 'sent finished work back',
   postponed: 'postponed this task',
   unpostponed: 'brought this task back',
   returned: 'task came back on its date',
@@ -23,13 +26,14 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
   const [step, setStep] = useState('')
   const [busy, setBusy] = useState(false)
   const [people, setPeople] = useState([])
+  const [rej, setRej] = useState(null)   // { part, kind }
   const latch = useRef(false)
 
   const load = useCallback(async () => {
     setErr('')
     const [t, p, s, c, l] = await Promise.all([
       supabase.from('work_tasks').select('id,title,project_id,note,created_by,due_date,status,template_id,finished_at,created_at').eq('id', taskId).maybeSingle(),
-      supabase.from('work_task_parts').select('id,task_id,assignee_id,label,due_date,status,started_at,finished_at,finish_note,seconds,created_at,postponed_until,postponed_by_users,postponed_by_client,postpone_count').eq('task_id', taskId).order('created_at'),
+      supabase.from('work_task_parts').select('id,task_id,assignee_id,label,due_date,status,started_at,finished_at,finish_note,seconds,created_at,postponed_until,postponed_by_users,postponed_by_client,postpone_count,reject_kind,reject_reason,rejected_by,rejected_at').eq('task_id', taskId).order('created_at'),
       supabase.from('work_task_steps').select('*').eq('task_id', taskId).order('position'),
       supabase.from('work_task_comments').select('*').eq('task_id', taskId).order('created_at'),
       supabase.from('work_task_log').select('*').eq('task_id', taskId).order('created_at', { ascending: false }).limit(60),
@@ -95,6 +99,11 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                     {p.label || 'Their part'}{p.due_date ? ` - due ${fmtDateShort(p.due_date)}` : ''}{p.seconds != null ? ` - ${fmtDur(p.seconds)}` : ''}
                   </div>
                   {p.finish_note && <div className="wk-sm">Note: {p.finish_note}</div>}
+                  {p.reject_reason && p.status !== 'finished' && (
+                    <div className="wk-sm" style={{ color: 'var(--danger)', marginTop: 4 }}>
+                      {p.reject_kind === 'declined' ? 'Declined' : 'Sent back'} by {nameOf(p.rejected_by)}: {p.reject_reason}
+                    </div>
+                  )}
                   {p.status === 'postponed' && (
                     <div className="wk-sm" style={{ color: 'var(--w-wat, #FBBF24)' }}>
                       Postponed until {p.postponed_until ? fmtDateShort(p.postponed_until) : ''} - asked by {[...(p.postponed_by_users || []).map((id) => nameOf(id)), p.postponed_by_client ? `${p.postponed_by_client} (client)` : ''].filter(Boolean).join(', ') || 'someone'}
@@ -107,6 +116,11 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                       <option value="">Give to someone else…</option>
                       {people.filter((u) => u.id !== p.assignee_id).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
+                  )}
+                  {((p.status !== 'finished' && p.status !== 'postponed' && (p.assignee_id === uid || isHead)) || (p.status === 'finished' && (isHead || task.created_by === uid))) && (
+                    <button className="wk-btn o sm" style={{ marginTop: 8 }} disabled={busy} onClick={() => setRej({ part: p.id, kind: p.status === 'finished' ? 'sent_back' : 'declined', who: nameOf(p.assignee_id) })}>
+                      <Undo2 size={14} aria-hidden="true" /> {p.status === 'finished' ? 'Reject and send back' : 'Reject task'}
+                    </button>
                   )}
                 </div>
               ))}
@@ -174,6 +188,7 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
           </>
         )}
       </div>
+      {rej && <RejectModal part={rej.part} kind={rej.kind} who={rej.who} title={task?.title} onClose={() => setRej(null)} onDone={() => { setRej(null); load(); onChanged?.() }} />}
     </div>
   )
 }
