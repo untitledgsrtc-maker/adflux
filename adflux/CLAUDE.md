@@ -21616,3 +21616,7 @@ Bug: photos in small overlapped avatar stacks (Team Work > Hours & cost, "People
 Note (432 follow-up): calendar events are colour-coded - left bar + tint = the client colour (clientColor, same as the rest of Work), red = late, green faded/struck = finished, amber = holiday cell; legend above the grid; side-panel items carry the same bar and the client name.
 
 Note (433 follow-up): the leaderboard avatars in SalesDashboard / SalesDashboardDesktop / AdminDashboardDesktop now use UserAvatar (photo if any, else initials; same classes). sales-module-guardian: PASS (17-10 audit of this diff, no contract touched).
+
+## 434 · Avatar rule (19-10-2026)
+
+Every place that shows a person MUST use `src/components/common/UserAvatar.jsx` (photo if any, else initials; always a true circle). Never hand-build `<img src={profile_image_url} ...>` or an initials circle - a bare img with width/height 100% inside a grid/flex box stretches into an oval (Phase 433). Pass the look through className/size/style. Exceptions: map markers (canvas) and `LeadAvatar` (6-colour initials design).
