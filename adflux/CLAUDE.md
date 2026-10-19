@@ -21606,3 +21606,5 @@ Dhara saw "Failed to fetch dynamically imported module .../TelecallerV2-xxxx.js"
 ## 432 · Work calendar (19-10-2026)
 
 New `src/components/work/WorkCalendar.jsx` as a Calendar tab in My Work: month grid (Mon first), tasks on their due date, holidays + Sundays marked, side panel for the picked day (click a task to open the normal task box), phone view shows dots instead of titles. Everyone sees own tasks; heads/admin get a Mine/Everyone switch. Read only; styles `.wkc-*` in work.css. Design inspired by a template screenshot, no template code used.
+
+Note (432 follow-up): Calendar tab also added to Team Work (admin/heads) with Everyone as the default view; WorkCalendar takes `defaultScope`.

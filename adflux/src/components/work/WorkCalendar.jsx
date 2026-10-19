@@ -12,11 +12,11 @@ const pad = (n) => String(n).padStart(2, '0')
 const ymd = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`
 const fmtTime = (t) => { if (!t) return ''; const [h, m] = t.split(':').map(Number); return `${h % 12 || 12}:${pad(m)} ${h >= 12 ? 'PM' : 'AM'}` }
 
-export default function WorkCalendar({ uid, isHead, nameOf, onOpen }) {
+export default function WorkCalendar({ uid, isHead, nameOf, onOpen, defaultScope = 'mine' }) {
   const today = istTodayISO()
   const [cur, setCur] = useState(() => ({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) - 1 }))
   const [sel, setSel] = useState(today)
-  const [scope, setScope] = useState('mine')
+  const [scope, setScope] = useState(defaultScope)
   const [parts, setParts] = useState([])
   const [holidays, setHolidays] = useState({})
   const [loading, setLoading] = useState(true)

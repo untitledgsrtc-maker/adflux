@@ -13,6 +13,7 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { istTodayISO } from '../../utils/istDate'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, dueState, initialsOf, clientColor, istHour } from '../../utils/workUtils'
+import WorkCalendar from '../../components/work/WorkCalendar'
 import ActivityTab from '../../components/work/ActivityTab'
 import WorkBoard from '../../components/work/WorkBoard'
 import UserAvatar from '../../components/common/UserAvatar'
@@ -21,7 +22,7 @@ import PostponeModal from '../../components/work/PostponeModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
 
 const TABS = [['overview', 'Overview'], ['tasks', 'Tasks'], ['people', 'People'], ['clients', 'Clients'],
-  ['timeline', 'Timeline'], ['hours', 'Hours & cost'], ['activity', 'Activity'], ['approvals', 'Approvals']]
+  ['timeline', 'Timeline'], ['calendar', 'Calendar'], ['hours', 'Hours & cost'], ['activity', 'Activity'], ['approvals', 'Approvals']]
 const RANGES = [['today', 'Today'], ['yesterday', 'Yesterday'], ['7', 'Past 7 days'], ['30', 'Past 30 days'], ['custom', 'Pick a date']]
 
 export default function TeamWorkV2() {
@@ -320,6 +321,8 @@ export default function TeamWorkV2() {
           </div>
         </>
       )}
+
+      {!loading && !err && tab === 'calendar' && <WorkCalendar uid={uid} isHead defaultScope="all" nameOf={nameOf} onOpen={setOpenTask} />}
 
       {!loading && !err && tab === 'tasks' && (
         <>
