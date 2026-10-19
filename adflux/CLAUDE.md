@@ -21549,3 +21549,11 @@ Owner decision: no head rating; the work team (role `staff`) variable depends on
 
 ## 418 - Delete a Work task, kept in an archive (2026-10-19, LIVE)
 `supabase_phase418_work_delete_task.sql`: `work_delete_task(task)` copies the task (parts, steps, comments, log) into `work_deleted_tasks` (admin read only) then removes the live rows, so every board, report, on-time score and nudge stops seeing it without change; hours already logged stay. Who: the creator or a head / admin; a creator who is not a head only while nobody has started it, no time is logged and no due date has passed (else "ask a head"). A running timer on it is stopped, the assignees are told. `work_restore_task(archive id)` (admin only) brings it back. Dry-run + live checks (10 cases) passed. UI: "Delete task" button in `TaskDetailModal` header, shown to the creator / heads, with a confirm. Restore from SQL: `SELECT work_restore_task('<archive id>')`; list: `SELECT id, title, deleted_at FROM work_deleted_tasks ORDER BY deleted_at DESC`.
+
+## 419 - Ops: easy steps, stale tickets cleared, photo requests routed, live "screens off now" (2026-10-19)
+Owner: make the ops screens easy for technicians. `supabase_phase419_ops_cleanup.sql` (APPLIED LIVE, dry-run first): (A) plain Gujarati + English fix steps filled for all 10 issue types (only where blank);
+(B) 6 auto tickets whose station was fine again cancelled (backup `_bak_ops_tickets_p419`, KEEP 30 days); (C) the 2 office test screens with no station switched off (`is_active=false`);
+(D) the 2 unassigned live-photo requests given to the station technician - UA-2026-0608 split into one request per station, the original cancelled. Verified: 0 unassigned photo requests, 0 screens without a station.
+App: `OpsTicketsV2` "Assigned to you" block shows "N screens off right now" per station, or "All screens working now" with a Mark fixed button (`ops_ticket_start` then `ops_ticket_resolve`; the database still refuses while a screen is offline).
+UNDO: `UPDATE ops_tickets t SET status=b.status, resolved_at=b.resolved_at, notes=b.notes, updated_at=b.updated_at FROM _bak_ops_tickets_p419 b WHERE b.id=t.id AND b.why IN ('stale','photo_original');` and `UPDATE ops_screens SET is_active=true WHERE id IN ('6f30c3cd-09a3-429c-89e3-3efed0c9ad3f','ab9bbaae-afb2-4b3b-b396-b3fdc341805c');`
+

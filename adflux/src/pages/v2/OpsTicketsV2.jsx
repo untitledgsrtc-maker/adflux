@@ -61,6 +61,7 @@ export default function OpsTicketsV2() {
   const [screens, setScreens] = useState([])
   const [proc, setProc] = useState([])
   const [assignedTk, setAssignedTk] = useState([])   // Phase 417: faults the system / head gave this tech (auto offline, camera, photo asked)
+  const [offByDepot, setOffByDepot] = useState({})   // live count of screens offline right now, per station (Phase 419)
   const navigate = useNavigate()
   const [fixed, setFixed] = useState([])
   const [callsByTicket, setCallsByTicket] = useState({})
@@ -115,6 +116,8 @@ export default function OpsTicketsV2() {
           .eq('assigned_to', uid).in('status', ['open', 'in_progress']).in('source', ['auto_offline', 'auto_camera', 'sales_request'])
           .order('created_at', { ascending: true }).limit(60)
           .then(({ data }) => setAssignedTk(data || []))
+        supabase.from('ops_screens').select('depot_id').in('depot_id', depotIds).eq('is_active', true).eq('status', 'offline')
+          .then(({ data }) => { const m = {}; (data || []).forEach(r => { m[r.depot_id] = (m[r.depot_id] || 0) + 1 }); setOffByDepot(m) })
       } else setAssignedTk([])
       const [scr, it, ct, pRes, fRes] = await Promise.all([
         supabase.from('ops_screens').select('id, name, status, depot_id, last_response_at').in('depot_id', depotIds).eq('is_active', true).eq('status', nowOn ? 'offline' : 'online'),
@@ -265,6 +268,22 @@ export default function OpsTicketsV2() {
     } finally { setBusy(false) }
   }
 
+  // Phase 419: close an auto fault (offline / camera) from the "Assigned to you" block.
+  // The database refuses while a screen at the station is still offline - show that in plain words.
+  async function markAutoFixed(a) {
+    if (busy) return
+    setBusy(true)
+    try {
+      if (a.status === 'open') {
+        const { error: e1 } = await supabase.rpc('ops_ticket_start', { p_ticket: a.id })
+        if (e1) { toastError(e1, t('save_failed', lang)); return }
+      }
+      const { error } = await supabase.rpc('ops_ticket_resolve', { p_ticket: a.id, p_cause: null, p_notes: null })
+      if (error) { toastError(error, t('cannot_close_off', lang)); return }
+      toastSuccess(t('fixed_word', lang)); await load()
+    } finally { setBusy(false) }
+  }
+
   // undo: send a ticket back to Open (its screen reappears in the Open tab).
   async function reopen(ticket) {
     if (busy) return
@@ -357,6 +376,16 @@ export default function OpsTicketsV2() {
                 {chip(a.status === 'in_progress' ? t('tab_proc', lang) : kind, a.status === 'in_progress' ? 'amber' : 'danger')}
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>{kind}{days > 0 ? ` · ${days}d` : ''}</div>
+              {a.source !== 'sales_request' && (() => {
+                const off = offByDepot[a.depot_id] || 0
+                return off > 0
+                  ? <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: 'var(--danger)' }}>{off} {t('screens_off_now', lang)}</div>
+                  : <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>{t('all_working_now', lang)}</span>
+                      <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); markAutoFixed(a) }}
+                        style={{ background: 'var(--success)', color: '#fff', borderRadius: 999, padding: '8px 14px', fontSize: 13, fontWeight: 700, minHeight: 36, display: 'inline-flex', alignItems: 'center' }}>{t('mark_fixed', lang)}</span>
+                    </div>
+              })()}
             </button>
           )
         })}</div>
