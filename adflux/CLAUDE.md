@@ -21590,3 +21590,7 @@ OpsTicketsV2 and OpsLogV2 now check for an existing manual in_progress ticket on
 ## 428 · Deactivating a person blocks sign-in (19-10-2026)
 
 Owner said yes. `supabase_phase428_deactivate_blocks_signin.sql` (applied): trigger `trg_users_block_signin` sets auth.users.banned_until=infinity when users.is_active goes false, clears it on re-activation; 10 already-inactive people backfilled. Closes the gap noted in 426. Section 211 lists updated.
+
+## 429 · Finance reminders mirror into Diya's Work list (19-10-2026)
+
+`supabase_phase429_finance_mirror_work.sql` (applied): `finance_mirror_to_work(title, due, hour)` is called from `push_finance_task_reminders()` each time a finance task fires; creates a silent Work task for the accounts user (due_time = remind hour), deduped per title/day and not repeated while an earlier one is open. Finance push unchanged. Canonical function in supabase_finance_p5_p6.sql updated to match. Today the 5 daily tasks were seeded; everything else arrives on its date (first fires 20-10-2026).

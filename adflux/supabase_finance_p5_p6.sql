@@ -123,7 +123,7 @@ BEGIN
   -- Reminders go to the ACCOUNTS user only (Diya), not admin. A recurring task is never switched off by
   -- the 'done' tick (only a one-off is); it simply rolls to its next date after firing.
   FOR v_task IN
-    SELECT id, title, frequency, next_due, weekday, day_of_month, shift_sunday
+    SELECT id, title, frequency, next_due, weekday, day_of_month, shift_sunday, remind_hour
       FROM public.finance_tasks
      WHERE COALESCE(is_active, true) = true
        AND (frequency <> 'oneoff' OR COALESCE(status, 'open') <> 'done')
@@ -144,6 +144,9 @@ BEGIN
       );
       v_count := v_count + 1;
     END LOOP;
+
+    -- Phase 429: the same task also appears in Diya's Work list (visible in Team Work), silent - no second push.
+    PERFORM public.finance_mirror_to_work(v_task.title, v_today, COALESCE(v_task.remind_hour, 10));
 
     IF v_task.frequency <> 'oneoff' THEN
       v_next := v_task.next_due;
