@@ -53,7 +53,7 @@ export default function WorkCalendar({ uid, isHead, nameOf, onOpen, defaultScope
 
   // colour = the client (same colour the client has everywhere in Work); late = red bar, finished = faded green tick
   const clientOf = (p) => projects[p.task?.project_id] || ''
-  const colOf = (p) => clientColor(clientOf(p) || p.task?.title)
+  const colOf = (p) => (clientOf(p) ? clientColor(clientOf(p)) : 'var(--text-subtle)')   // no client (office / finance / HR tasks) = one neutral grey
   const isLate = (p) => p.status !== 'finished' && p.due_date < today
   const evStyle = (p) => { const c = isLate(p) ? 'var(--w-dat)' : colOf(p); return { '--c': c } }
   const go = (n) => setCur((c) => { const t = c.m + n; return { y: c.y + Math.floor(t / 12), m: ((t % 12) + 12) % 12 } })
@@ -85,7 +85,7 @@ export default function WorkCalendar({ uid, isHead, nameOf, onOpen, defaultScope
       {err && <div className="wk-err" role="alert" style={{ marginBottom: 14 }}><span>{err}</span><button className="wk-btn o sm" onClick={load}>Retry</button></div>}
 
       <div className="wk-grp wk-sm" style={{ marginBottom: 10, gap: 14 }}>
-        <span>Bar colour = client</span>
+        <span>Bar colour = client (grey = no client)</span>
         <span><span className="wk-dot" style={{ background: 'var(--w-dat)', width: 8, height: 8, marginRight: 6 }} />Late</span>
         <span><span className="wk-dot" style={{ background: 'var(--w-okt)', width: 8, height: 8, marginRight: 6 }} />Done</span>
         <span><span className="wk-dot" style={{ background: 'var(--w-wat)', width: 8, height: 8, marginRight: 6 }} />Holiday</span>
