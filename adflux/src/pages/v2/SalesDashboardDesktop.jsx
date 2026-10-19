@@ -21,6 +21,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { fetchTeamLeaderboard } from '../../utils/teamLeaderboard'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
+import UserAvatar from '../../components/common/UserAvatar'
 import { initials, formatCompact, todayISO } from '../../utils/formatters'
 import { thisMonth } from '../../utils/period'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
@@ -746,7 +747,7 @@ function LbRow({ rank, row, isYou, total }) {
   return (
     <div className={`v2d-lb-row ${isYou ? 'v2d-lb-row--you' : ''}`} style={{ alignItems: 'center' }}>
       <div className={`v2d-lb-rank ${rankCls}`}>{rank}</div>
-      <div className="v2d-lb-avatar">{initials(row.name)}</div>
+      <UserAvatar className="v2d-lb-avatar" name={row.name} userId={row.id} />
       <div className="v2d-lb-name">
         {row.name}{isYou && <span className="v2d-lb-you">· you</span>}
         <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 2 }}>

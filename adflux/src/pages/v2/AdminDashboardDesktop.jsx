@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import UserAvatar from '../../components/common/UserAvatar'
 import { fetchTeamLeaderboard } from '../../utils/teamLeaderboard'
 import { calculateIncentive } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
@@ -1608,7 +1609,7 @@ function LeaderboardPanel({ rows, max, period }) {
             return (
               <div key={r.id} className="v2d-lb-row" style={{ alignItems: 'center' }}>
                 <div className={`v2d-lb-rank ${rankCls}`}>{medals[i] || i + 1}</div>
-                <div className="v2d-lb-avatar">{initials(r.name)}</div>
+                <UserAvatar className="v2d-lb-avatar" name={r.name} userId={r.id} />
                 {/* Phase 31E — owner reported (9 May 2026) leaderboard
                     names truncating to "Test...", "Brijesh...". The
                     1fr name column gets squeezed when Outstanding

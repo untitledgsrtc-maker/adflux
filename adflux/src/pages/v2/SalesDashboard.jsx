@@ -24,6 +24,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { fetchTeamLeaderboard } from '../../utils/teamLeaderboard'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
+import UserAvatar from '../../components/common/UserAvatar'
 import { thisMonthISO, initials, todayISO } from '../../utils/formatters'
 // Phase 31O — V2AppShell mounts ProposedIncentiveCard now; this file
 // no longer needs the import.
@@ -611,7 +612,7 @@ function Row({ rank, row, isYou }) {
   return (
     <div className={`v2-lb-row ${isYou ? 'v2-lb-row--you' : ''}`}>
       <div className={`v2-lb-rank ${rankCls}`}>{rank}</div>
-      <div className="v2-lb-avatar">{initials(row.name)}</div>
+      <UserAvatar className="v2-lb-avatar" name={row.name} userId={row.id} />
       <div className="v2-lb-name">
         {row.name}{isYou && <span className="v2-lb-you">· you</span>}
         <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 1 }}>
