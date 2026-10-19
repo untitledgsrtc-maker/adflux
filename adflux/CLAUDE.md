@@ -21527,3 +21527,11 @@ Two ways, one box (`RejectModal.jsx`, opened from the task detail): a person DEC
 creator told), or a head / the task creator SENDS BACK finished work (back to Assigned, time + cost cleared, person told). Reason required
 (3+ chars). New `work_task_parts.reject_*` columns, `work_reject_part(p_part, p_reason)` RPC, trigger `work_clear_reject` clears the note on
 reassign or re-finish. No new status. SQL: `supabase_phase413_work_reject.sql` (owner runs it in Supabase Studio). Not shown on the board card yet.
+
+## 414 - Work team variable pay = tasks finished on time (2026-10-19, LIVE, MONEY)
+
+Owner decision: no head rating; the work team (role `staff`) variable depends only on on-time tasks, applied to October at once.
+- `db/functions/work_ontime_stats.sql` (internal, REVOKEd from client roles): tasks due in the month whose due date has passed (or sent back and not redone); excludes postponed, declined, approved full-day leave days, no-due-date tasks. On time = finished by the due day (before the due time if set).
+- `db/functions/monthly_score.sql`, role `staff` branch: on-time >= 85% full 30%, < 60% zero, linear between; fewer than 3 counted tasks -> full (owner set the minimum to 3). Tripwire `work_staff_ontime`. Sales / telecaller / ops paths unchanged.
+- Live Oct 2026: Safika 71.4% variable 6,000 -> 2,743 (net 16,076); Renuka 66.7% 6,000 -> 1,600 (net 15,600); Akshar, Khushbu, Piyush, Dikshita have 0 tasks so stay full until they are given tasks with due dates.
+- Open: the New task form does not yet require a due date; staff cannot yet see their own on-time score on My Work / Team Work.
