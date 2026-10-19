@@ -807,9 +807,7 @@ function HoursTab({ report, cost, canCost, projName, nameOf, taskTitles, taskCli
                       {(taskPeople[t.task_id] || []).length > 0 ? (
                         <span className="wk-grp" style={{ justifyContent: 'flex-end', flexWrap: 'nowrap', gap: 0 }}>
                           {(taskPeople[t.task_id] || []).slice(0, 3).map((id, i) => { const u = (users || []).find((x) => x.id === id) || {}; return (
-                            <span key={id} className="wk-av" title={nameOf(id)} style={{ width: 28, height: 28, fontSize: 10, marginLeft: i ? -8 : 0, border: '2px solid var(--surface)' }}>
-                              {u.profile_image_url ? <img src={u.profile_image_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initialsOf(nameOf(id))}
-                            </span>) })}
+                            <UserAvatar key={id} className="wk-av" name={nameOf(id)} url={u.profile_image_url} userId={id} size={28} style={{ marginLeft: i ? -8 : 0, border: '2px solid var(--surface)' }} />) })}
                         </span>
                       ) : <span className="wk-num">{t.people}</span>}
                     </td>

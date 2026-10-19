@@ -11,7 +11,8 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { istTodayISO } from '../../utils/istDate'
 import ProfilePicUploader from '../../components/profile/ProfilePicUploader'
-import { fmtDur, fmtTimeIST, initialsOf, addDaysISO } from '../../utils/workUtils'
+import UserAvatar from '../../components/common/UserAvatar'
+import { fmtDur, fmtTimeIST, addDaysISO } from '../../utils/workUtils'
 
 const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const istParts = (iso) => {
@@ -180,9 +181,7 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
           <div className="wk-c4">
             <div className="wk-card" style={{ textAlign: 'center' }}>
               {own ? <ProfilePicUploader /> : (
-                person.profile_image_url
-                  ? <img src={person.profile_image_url} alt="" style={{ width: 96, height: 96, borderRadius: '50%', objectFit: 'cover' }} />
-                  : <div className="wk-av" style={{ width: 96, height: 96, fontSize: 32, margin: '0 auto' }}>{initialsOf(person.name)}</div>
+                <UserAvatar className="wk-av" name={person.name} url={person.profile_image_url} size={96} style={{ margin: '0 auto', fontSize: 32 }} />
               )}
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, marginTop: 12 }}>{person.name}</div>
               <div className="wk-mu">{person.designation || 'Team member'}</div>

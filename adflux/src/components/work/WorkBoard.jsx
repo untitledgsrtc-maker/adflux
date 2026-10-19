@@ -126,9 +126,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
                       </div>
                     )}
                     <div className="wk-row" style={{ marginTop: 12 }}>
-                      {it.assigneePhoto
-                        ? <img className="wk-av" src={it.assigneePhoto} alt={it.assigneeName} title={it.assigneeName} style={{ objectFit: 'cover' }} />
-                        : <UserAvatar className="wk-av" name={it.assigneeName} userId={it.assigneeId} />}
+                      <UserAvatar className="wk-av" name={it.assigneeName} url={it.assigneePhoto} userId={it.assigneeId} />
                       {mine && it.status === 'assigned' && onStart && (
                         <button className="wk-btn g sm" onClick={(e) => { e.stopPropagation(); onStart(it) }}>
                           <Play size={14} aria-hidden="true" /> Start

@@ -882,3 +882,6 @@ tbody tr:hover td { background: var(--surface-2); }
   .stat-grid { grid-template-columns: 1fr 1fr; }
   /* .db-kpi-grid mobile layout owned by dashboard.css */
 }
+
+/* Phase 433 - default look for <UserAvatar> when the caller gives no class: same yellow-on-dark chip the Work module uses. */
+.ua-default { width: 30px; height: 30px; background: var(--accent-soft); color: var(--accent); font-family: var(--font-display); font-size: 12px; font-weight: 600; }

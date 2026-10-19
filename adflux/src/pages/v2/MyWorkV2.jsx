@@ -20,6 +20,7 @@ import NewTaskModal from '../../components/work/NewTaskModal'
 import PostponeModal from '../../components/work/PostponeModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
 import OnTimeScoreCard from '../../components/work/OnTimeScoreCard'
+import UserAvatar from '../../components/common/UserAvatar'
 import WorkCalendar from '../../components/work/WorkCalendar'
 
 export default function MyWorkV2() {
@@ -599,7 +600,7 @@ function AskedTab({ asked, nameOf, projName, onOpen, onNew }) {
                       const [tone, lbl] = PART_PILL[p.status] || ['', p.status]
                       return (
                         <div key={p.id} className="wk-grp" style={{ flexWrap: 'nowrap' }}>
-                          <span className="wk-av" style={{ width: 26, height: 26, fontSize: 11 }}>{nameOf(p.assignee_id).slice(0, 2).toUpperCase()}</span>
+                          <UserAvatar className="wk-av" name={nameOf(p.assignee_id)} url={photoOf(p.assignee_id)} size={26} />
                           <span style={{ flex: 1 }}>{nameOf(p.assignee_id).split(' ')[0]}{p.label && <span className="wk-mu"> · {p.label}</span>}</span>
                           <span className={`wk-pill ${tone}`}>{lbl}</span>
                         </div>
