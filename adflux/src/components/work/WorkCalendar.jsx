@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2, CalendarOff } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { istTodayISO } from '../../utils/istDate'
-import { addDaysISO, fmtDateShort, STATUS_LABEL } from '../../utils/workUtils'
+import { fmtDateShort, STATUS_LABEL, clientColor } from '../../utils/workUtils'
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const pad = (n) => String(n).padStart(2, '0')
@@ -19,6 +19,7 @@ export default function WorkCalendar({ uid, isHead, nameOf, onOpen, defaultScope
   const [scope, setScope] = useState(defaultScope)
   const [parts, setParts] = useState([])
   const [holidays, setHolidays] = useState({})
+  const [projects, setProjects] = useState({})
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
 
@@ -31,14 +32,15 @@ export default function WorkCalendar({ uid, isHead, nameOf, onOpen, defaultScope
     if (!uid) return
     setLoading(true); setErr('')
     let q = supabase.from('work_task_parts')
-      .select('id,task_id,assignee_id,due_date,due_time,status,task:work_tasks(id,title)')
+      .select('id,task_id,assignee_id,due_date,due_time,status,task:work_tasks(id,title,project_id)')
       .gte('due_date', first).lte('due_date', last).order('due_time', { nullsFirst: false }).limit(1500)
     if (scope === 'mine' || !isHead) q = q.eq('assignee_id', uid)
-    const [p, h] = await Promise.all([q, supabase.from('holidays').select('holiday_date,name').eq('is_active', true).gte('holiday_date', first).lte('holiday_date', last)])
-    const e = [p, h].find((r) => r.error)
+    const [p, h, pj] = await Promise.all([q, supabase.from('holidays').select('holiday_date,name').eq('is_active', true).gte('holiday_date', first).lte('holiday_date', last), supabase.from('work_projects').select('id,name')])
+    const e = [p, h, pj].find((r) => r.error)
     if (e) { setErr(e.error.message || 'Could not load the calendar.'); setLoading(false); return }
     setParts(p.data || [])
     setHolidays(Object.fromEntries((h.data || []).map((r) => [r.holiday_date, r.name])))
+    setProjects(Object.fromEntries((pj.data || []).map((x) => [x.id, x.name])))
     setLoading(false)
   }, [uid, first, last, scope, isHead])
   useEffect(() => { load() }, [load])
@@ -49,6 +51,11 @@ export default function WorkCalendar({ uid, isHead, nameOf, onOpen, defaultScope
     return m
   }, [parts])
 
+  // colour = the client (same colour the client has everywhere in Work); late = red bar, finished = faded green tick
+  const clientOf = (p) => projects[p.task?.project_id] || ''
+  const colOf = (p) => clientColor(clientOf(p) || p.task?.title)
+  const isLate = (p) => p.status !== 'finished' && p.due_date < today
+  const evStyle = (p) => { const c = isLate(p) ? 'var(--w-dat)' : colOf(p); return { '--c': c } }
   const go = (n) => setCur((c) => { const t = c.m + n; return { y: c.y + Math.floor(t / 12), m: ((t % 12) + 12) % 12 } })
   const title = new Date(Date.UTC(cur.y, cur.m, 1)).toLocaleDateString('en-IN', { timeZone: 'UTC', month: 'long', year: 'numeric' })
   const dayParts = byDay[sel] || []
@@ -77,6 +84,13 @@ export default function WorkCalendar({ uid, isHead, nameOf, onOpen, defaultScope
 
       {err && <div className="wk-err" role="alert" style={{ marginBottom: 14 }}><span>{err}</span><button className="wk-btn o sm" onClick={load}>Retry</button></div>}
 
+      <div className="wk-grp wk-sm" style={{ marginBottom: 10, gap: 14 }}>
+        <span>Bar colour = client</span>
+        <span><span className="wk-dot" style={{ background: 'var(--w-dat)', width: 8, height: 8, marginRight: 6 }} />Late</span>
+        <span><span className="wk-dot" style={{ background: 'var(--w-okt)', width: 8, height: 8, marginRight: 6 }} />Done</span>
+        <span><span className="wk-dot" style={{ background: 'var(--w-wat)', width: 8, height: 8, marginRight: 6 }} />Holiday</span>
+      </div>
+
       <div className="wkc-wrap">
         <div className="wk-card wkc-grid-card" aria-busy={loading}>
           <div className="wkc-grid" role="grid" aria-label={title}>
@@ -93,7 +107,7 @@ export default function WorkCalendar({ uid, isHead, nameOf, onOpen, defaultScope
                   <span className="wkc-num">{Number(d.slice(8))}</span>
                   {hol && <span className="wkc-hol" title={hol}>{hol}</span>}
                   {list.slice(0, 2).map((p) => (
-                    <span key={p.id} className={`wkc-ev${p.status === 'finished' ? ' done' : ''}`}>{p.task?.title || 'Task'}</span>
+                    <span key={p.id} className={`wkc-ev${p.status === 'finished' ? ' done' : ''}`} style={evStyle(p)}>{p.task?.title || 'Task'}</span>
                   ))}
                   {list.length > 2 && <span className="wkc-more">+{list.length - 2} more</span>}
                   {list.length > 0 && <span className={`wkc-dot${open ? '' : ' ok'}`} aria-hidden="true" />}
@@ -112,10 +126,11 @@ export default function WorkCalendar({ uid, isHead, nameOf, onOpen, defaultScope
           )}
           {dayParts.length === 0 && <div className="wk-empty">No tasks on this day.</div>}
           {dayParts.map((p) => (
-            <button key={p.id} className="wkc-item" onClick={() => onOpen?.(p.task_id)}>
+            <button key={p.id} className="wkc-item" style={evStyle(p)} onClick={() => onOpen?.(p.task_id)}>
               <span className="wkc-it-t">{p.task?.title || 'Task'}</span>
+              {clientOf(p) && <span className="wk-sm"><span className="wk-dot" style={{ background: colOf(p), width: 8, height: 8, marginRight: 6 }} />{clientOf(p)}</span>}
               <span className="wk-sm">
-                {p.due_time ? `${fmtTime(p.due_time)} - ` : ''}{scope === 'all' && isHead ? `${nameOf(p.assignee_id)} - ` : ''}{STATUS_LABEL[p.status] || p.status}
+                {p.due_time ? `${fmtTime(p.due_time)} - ` : ''}{scope === 'all' && isHead ? `${nameOf(p.assignee_id)} - ` : ''}{isLate(p) ? 'Late' : (STATUS_LABEL[p.status] || p.status)}
               </span>
             </button>
           ))}
