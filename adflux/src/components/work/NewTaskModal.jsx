@@ -38,6 +38,7 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
     const clean = picked.map((id) => ({ assignee: id, label: partOf[id] || '' }))
     if (!clean.length) return toastError('', 'Pick at least one person.')
     if (dueTime && due === today && dueTime <= new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })) return toastError('', 'That time has already passed today.')
+    if (repeat === 'once' && !due) return toastError('', 'Pick a due date. A task cannot be created without one.')
     if (repeat !== 'once' && clean.length !== 1) return toastError('', 'A repeating task is for one person.')
     latch.current = true; setBusy(true)
     try {
@@ -54,7 +55,7 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
         toastSuccess('Repeating task saved - it starts at 7 AM on working days.')
       } else {
         const { error } = await supabase.rpc('work_create_task', {
-          p_title: title.trim(), p_project: pid, p_note: note.trim() || null, p_due: due || null,
+          p_title: title.trim(), p_project: pid, p_note: note.trim() || null, p_due: due,
           p_parts: clean.map((p) => ({ assignee: p.assignee, label: p.label.trim(), due: null })),
           p_due_time: due && dueTime ? dueTime : null,
           p_steps: steps.split('\n').map((s) => s.trim()).filter(Boolean),
@@ -112,8 +113,8 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
           ))}
         </div>
 
-        <div className="wk-field"><label htmlFor="nt-due">Due date</label>
-          <input id="nt-due" className="wk-input" type="date" value={due} min={today} onChange={(e) => setDue(e.target.value)} />
+        <div className="wk-field"><label htmlFor="nt-due">Due date *</label>
+          <input id="nt-due" className="wk-input" type="date" value={due} min={today} required onChange={(e) => setDue(e.target.value)} />
           <div className="wk-chips">
             <button className="wk-chip" onClick={() => setDue(today)}>Today</button>
             <button className="wk-chip" onClick={() => setDue(addDaysISO(today, 1))}>Tomorrow</button>

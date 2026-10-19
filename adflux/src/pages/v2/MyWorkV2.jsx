@@ -19,6 +19,7 @@ import WorkBoard from '../../components/work/WorkBoard'
 import NewTaskModal from '../../components/work/NewTaskModal'
 import PostponeModal from '../../components/work/PostponeModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
+import OnTimeScoreCard from '../../components/work/OnTimeScoreCard'
 
 export default function MyWorkV2() {
   const { profile } = useAuth()
@@ -257,6 +258,7 @@ export default function MyWorkV2() {
                     ? <EveningCard hour={istHour()} entries={entries} items={items} secs={todaySecs} name={profile?.name}
                         projName={projName} shared={shared} uid={uid} today={today} firstIn={firstIn} onShared={load} />
                     : <TodayStrip secs={todaySecs} firstIn={firstIn} />}
+                  {profile?.role === 'staff' && <OnTimeScoreCard userId={uid} />}
                   <div className="wk-card flush">
                     <div className="wk-list">
                       {[['/work-profile', User, 'My profile'], ['/my-offer', CalendarX, 'Leave request'], ['/my-performance', FileText, 'Salary slips']].map(([to, Ic, label]) => (

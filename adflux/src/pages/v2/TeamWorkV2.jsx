@@ -1,6 +1,7 @@
 // src/pages/v2/TeamWorkV2.jsx - Phase 365. The head / admin view of the Work module:
 // Overview, Tasks board, People (live timers + who is on the timeclock), Clients, Timeline,
 // Hours & cost (cost = admin + accounts only), Approvals (added-later time).
+import { OnTimeCell } from '../../components/work/OnTimeScoreCard'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { Plus, Loader2, Check, X, AlertTriangle, Clock, Users, Repeat, Moon, Pencil, GitMerge, Archive, ArchiveRestore, Building2, Calendar, Trash2 } from 'lucide-react'
@@ -475,7 +476,7 @@ function PeopleTab({ members, users, nameOf, runBy, byPerson, projName, now, isA
         )}
         <div style={{ overflowX: 'auto' }}>
           <table className="wk-table" style={{ minWidth: 640 }}>
-            <thead><tr><th>Person</th><th>Running now</th><th style={{ textAlign: 'right' }}>Hours</th><th>Head</th>{isAdmin && <th />}</tr></thead>
+            <thead><tr><th>Person</th><th>Running now</th><th style={{ textAlign: 'right' }}>Hours</th>{isAdmin && <th>On time</th>}<th>Head</th>{isAdmin && <th />}</tr></thead>
             <tbody>
               {members.map((m) => {
                 const r = runBy[m.user_id]
@@ -494,6 +495,7 @@ function PeopleTab({ members, users, nameOf, runBy, byPerson, projName, now, isA
                       ? <><span className="wk-pill ok" style={{ marginRight: 8 }}>Running</span><span className="wk-dot" style={{ background: clientColor(projName(r.project_id)), width: 8, height: 8, marginRight: 6 }} />{projName(r.project_id) || 'No client'} · {r.task_label} · <span className="wk-num">{fmtClock((now - new Date(r.started_at)) / 1000)}</span></>
                       : 'Not clocked in'}</td>
                     <td className="wk-num" style={{ textAlign: 'right' }}>{fmtDur(byPerson[m.user_id]?.seconds || 0)}</td>
+                    {isAdmin && <td>{u.role === 'staff' ? <OnTimeCell userId={m.user_id} /> : <span className="wk-sm">-</span>}</td>}
                     <td>{isAdmin ? (
                       <span className="wk-grp" style={{ flexWrap: 'nowrap', gap: 8 }}>
                         <button type="button" role="switch" aria-checked={m.is_head} aria-label={`Head: ${nm}`} disabled={busy}

@@ -1,0 +1,47 @@
+-- Phase 415 (owner 2026-10-19): a task cannot be created without a due date (the work team's variable pay counts tasks by due date).
+-- Only work_create_task changes (one extra check). Recurring tasks are created by work_run_recurring with their own date.
+CREATE OR REPLACE FUNCTION public.work_create_task(p_title text, p_project uuid, p_note text, p_due date, p_parts jsonb, p_steps text[] DEFAULT NULL::text[], p_due_time time DEFAULT NULL)
+ RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE v_uid uuid := auth.uid(); v_task uuid; v_part jsonb; v_assignee uuid; v_i int := 0; v_s text; v_name text;
+BEGIN
+  IF v_uid IS NULL OR NOT public.work_is_active_user() THEN RAISE EXCEPTION 'login required' USING ERRCODE='42501'; END IF;
+  IF NULLIF(btrim(p_title), '') IS NULL THEN RAISE EXCEPTION 'task needs a name'; END IF;
+  IF p_due IS NULL THEN RAISE EXCEPTION 'a task needs a due date'; END IF;
+  IF p_parts IS NULL OR jsonb_typeof(p_parts) <> 'array' OR jsonb_array_length(p_parts) = 0 THEN
+    RAISE EXCEPTION 'pick at least one person';
+  END IF;
+  IF jsonb_array_length(p_parts) > 12 THEN RAISE EXCEPTION 'too many people on one task'; END IF;
+  INSERT INTO public.work_tasks (title, project_id, note, created_by, due_date)
+  VALUES (left(btrim(p_title), 120), p_project, NULLIF(btrim(p_note), ''), v_uid, p_due)
+  RETURNING id INTO v_task;
+  SELECT name INTO v_name FROM public.users WHERE id = v_uid;
+  FOR v_part IN SELECT * FROM jsonb_array_elements(p_parts) LOOP
+    v_assignee := NULLIF(v_part->>'assignee', '')::uuid;
+    IF v_assignee IS NULL OR NOT EXISTS (SELECT 1 FROM public.users u WHERE u.id = v_assignee AND u.is_active) THEN
+      RAISE EXCEPTION 'unknown or inactive person';
+    END IF;
+    INSERT INTO public.work_task_parts (task_id, assignee_id, label, due_date, due_time)
+    VALUES (v_task, v_assignee, NULLIF(left(btrim(COALESCE(v_part->>'label','')), 80), ''),
+            COALESCE(NULLIF(v_part->>'due','')::date, p_due), p_due_time);
+    INSERT INTO public.work_members (user_id, added_by) VALUES (v_assignee, v_uid) ON CONFLICT (user_id) DO NOTHING;
+    IF v_assignee <> v_uid THEN
+      PERFORM public.work_push(v_assignee, 'New task for you', COALESCE(v_name,'Someone') || ': ' || left(btrim(p_title), 80),
+                               '/my-work', 'work-task-' || v_task::text);
+    END IF;
+  END LOOP;
+  IF p_steps IS NOT NULL THEN
+    FOREACH v_s IN ARRAY p_steps LOOP
+      IF NULLIF(btrim(v_s), '') IS NOT NULL THEN
+        v_i := v_i + 1;
+        INSERT INTO public.work_task_steps (task_id, label, position) VALUES (v_task, left(btrim(v_s), 120), v_i);
+      END IF;
+    END LOOP;
+  END IF;
+  PERFORM public.work_log(v_task, NULL, 'created', jsonb_build_object('parts', jsonb_array_length(p_parts)));
+  RETURN v_task;
+END;
+$function$;
+REVOKE EXECUTE ON FUNCTION public.work_create_task(text, uuid, text, date, jsonb, text[], time) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.work_create_task(text, uuid, text, date, jsonb, text[], time) TO authenticated;
+NOTIFY pgrst, 'reload schema';
