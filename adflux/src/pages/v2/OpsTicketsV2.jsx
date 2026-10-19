@@ -205,6 +205,11 @@ export default function OpsTicketsV2() {
     if (!issueId || (issueId === 'other' && !cause)) { toastError(new Error(''), t('pick_issue', lang)); return }
     savingRef.current = true; setBusy(true)
     try {
+      // one screen = one open job: skip screens that already have a manual ticket in process
+      const { data: dup } = await supabase.from('ops_tickets').select('screen_id').eq('source', 'manual').eq('status', 'in_progress').in('screen_id', sheet.screenIds)
+      const busyIds = new Set((dup || []).map(r => r.screen_id))
+      const screenIds = sheet.screenIds.filter(id => !busyIds.has(id))
+      if (!screenIds.length) { toastError(new Error(''), t('already_in_proc', lang)); return }
       let photo_path = null
       if (photoFile) {
         const ext = (photoFile.name.split('.').pop() || 'jpg').toLowerCase()
@@ -214,7 +219,7 @@ export default function OpsTicketsV2() {
         photo_path = key
       }
       const preset = issueId !== 'other' ? issueTypes.find(x => x.id === issueId) : null
-      const rows = sheet.screenIds.map(sid => ({
+      const rows = screenIds.map(sid => ({
         type: 'fault', source: 'manual', status: 'in_progress',
         depot_id: sheet.depotId, screen_id: sid,
         created_by: uid, assigned_to: uid,   // exec INSERT policy needs created_by=auth.uid(); read/update need assigned_to=auth.uid()

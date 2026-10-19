@@ -174,6 +174,7 @@ export const STR = {
   kind_photo:      { gu: 'લાઇવ ફોટો માંગ્યો',                en: 'Live photo asked' },
   screens_off_now: { gu: 'સ્ક્રીન હમણાં બંધ છે',             en: 'screens off right now' },
   cannot_close_off: { gu: 'હજી સ્ક્રીન બંધ છે — હમણાં બંધ કરી શકાતું નથી', en: 'Screens are still offline - cannot close yet' },
+  already_in_proc: { gu: 'આ સ્ક્રીન પહેલેથી ચાલુ કામમાં છે', en: 'This screen is already in process' },
   all_working_now: { gu: 'બધી સ્ક્રીન ચાલુ છે',               en: 'All screens working now' },
   no_proc:         { gu: 'કંઈ ચાલુ નથી',               en: 'Nothing in process' },
   no_fixed:        { gu: 'હજુ કંઈ સુધાર્યું નથી',       en: 'Nothing fixed yet' },

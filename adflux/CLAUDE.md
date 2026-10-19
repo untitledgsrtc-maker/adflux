@@ -21557,3 +21557,6 @@ Owner: make the ops screens easy for technicians. `supabase_phase419_ops_cleanup
 App: `OpsTicketsV2` "Assigned to you" block shows "N screens off right now" per station, or "All screens working now" with a Mark fixed button (`ops_ticket_start` then `ops_ticket_resolve`; the database still refuses while a screen is offline).
 UNDO: `UPDATE ops_tickets t SET status=b.status, resolved_at=b.resolved_at, notes=b.notes, updated_at=b.updated_at FROM _bak_ops_tickets_p419 b WHERE b.id=t.id AND b.why IN ('stale','photo_original');` and `UPDATE ops_screens SET is_active=true WHERE id IN ('6f30c3cd-09a3-429c-89e3-3efed0c9ad3f','ab9bbaae-afb2-4b3b-b396-b3fdc341805c');`
 
+
+## 420 - A screen can only be in process once (2026-10-19)
+OpsTicketsV2 and OpsLogV2 now check for an existing manual in_progress ticket on the screen before saving; screens already in process are skipped and the tech sees "This screen is already in process". Live check: 0 duplicates existed. Client guard only (no DB unique index yet).

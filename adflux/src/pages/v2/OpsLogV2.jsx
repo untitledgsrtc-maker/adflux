@@ -134,7 +134,12 @@ export default function OpsLogV2() {
     savingRef.current = true; setBusy(true)
     try {
       // "All screens" (whole station) → one ticket per active screen at the depot.
-      const targetScreens = screenId === '__all__' ? shownScreens.map(s => s.id) : [screenId]
+      const wanted = screenId === '__all__' ? shownScreens.map(s => s.id) : [screenId]
+      // one screen = one open job: skip screens that already have a manual ticket in process
+      const { data: dup } = await supabase.from('ops_tickets').select('screen_id').eq('source', 'manual').eq('status', 'in_progress').in('screen_id', wanted)
+      const busyIds = new Set((dup || []).map(r => r.screen_id))
+      const targetScreens = wanted.filter(id => !busyIds.has(id))
+      if (!targetScreens.length) { toastError(new Error(''), t('already_in_proc', lang)); return }
       let photo_path = null
       if (photoFile) {
         const ext = (photoFile.name.split('.').pop() || 'jpg').toLowerCase()
