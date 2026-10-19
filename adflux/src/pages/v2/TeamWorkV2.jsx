@@ -385,7 +385,7 @@ export default function TeamWorkV2() {
                   {pending.map((e) => (
                     <div key={e.id} className="wk-row" style={{ padding: '14px 20px', gap: 16, flexWrap: 'wrap' }}>
                       <span className="wk-grp" style={{ flexWrap: 'nowrap', minWidth: 190, gap: 12 }}>
-                        <span className="wk-av" style={{ width: 36, height: 36 }}>{users_(e.user_id)?.profile_image_url ? <img src={users_(e.user_id).profile_image_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initialsOf(nameOf(e.user_id))}</span>
+                        <UserAvatar className="wk-av" name={nameOf(e.user_id)} url={users_(e.user_id)?.profile_image_url} size={36} />
                         <span><div style={{ fontWeight: 500 }}>{nameOf(e.user_id)}</div><div className="wk-sm wk-num">{fmtDateShort(e.started_at.slice(0, 10))} · {fmtTimeIST(e.started_at)}-{fmtTimeIST(e.ended_at)}</div></span>
                       </span>
                       <span className="wk-sm" style={{ minWidth: 130 }}><span className="wk-dot" style={{ background: clientColor(projName(e.project_id)), width: 8, height: 8, marginRight: 6 }} />{projName(e.project_id) || 'No client'}</span>
@@ -487,7 +487,7 @@ function PeopleTab({ members, users, nameOf, runBy, byPerson, projName, now, isA
                   <tr key={m.user_id}>
                     <td>
                       <span className="wk-grp" style={{ flexWrap: 'nowrap', gap: 12 }}>
-                        <span className="wk-av" style={{ width: 36, height: 36 }}>{u.profile_image_url ? <img src={u.profile_image_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : initialsOf(nm)}</span>
+                        <UserAvatar className="wk-av" name={nm} url={u.profile_image_url} size={36} />
                         <span><Link to={`/work-profile?user=${m.user_id}`} style={{ color: 'inherit', fontWeight: 500 }}>{pretty}</Link>{u.designation && <div className="wk-sm">{u.designation}</div>}</span>
                       </span>
                     </td>
