@@ -1,7 +1,7 @@
 // Phase 365 - one task: parts, checklist, comments, task log, due date. Opens from the board
 // and from "Asked by me". Everything it writes goes through the work_* functions.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Check, Loader2, Send, Play, Undo2, Trash2 } from 'lucide-react'
+import { X, Check, Loader2, Send, Play, Undo2, Trash2, UserMinus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toastError, toastSuccess } from '../v2/Toast'
 import { confirmDialog } from '../v2/ConfirmDialog'
@@ -137,6 +137,12 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                       <option value="">Give to someone else…</option>
                       {people.filter((u) => u.id !== p.assignee_id).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
+                  )}
+                  {p.status !== 'finished' && (data?.parts || []).length > 1 && (isHead || task.created_by === uid) && (
+                    <button className="wk-btn o sm" style={{ marginTop: 8, marginLeft: 8 }} disabled={busy}
+                      onClick={async () => { const ok = await confirmDialog({ title: `Remove ${nameOf(p.assignee_id)} from this task?`, message: 'They will be told. The others stay on the task.', confirmLabel: 'Remove', danger: true }); if (ok) run(() => rpc('work_remove_part', { p_part: p.id })) }}>
+                      <UserMinus size={14} aria-hidden="true" /> Remove from task
+                    </button>
                   )}
                   {((p.status !== 'finished' && p.status !== 'postponed' && (p.assignee_id === uid || isHead)) || (p.status === 'finished' && (isHead || task.created_by === uid))) && (
                     <button className="wk-btn o sm" style={{ marginTop: 8 }} disabled={busy} onClick={() => setRej({ part: p.id, kind: p.status === 'finished' ? 'sent_back' : 'declined', who: nameOf(p.assignee_id) })}>

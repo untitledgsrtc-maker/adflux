@@ -21582,3 +21582,7 @@ OpsTicketsV2 and OpsLogV2 now check for an existing manual in_progress ticket on
 ## 426 · HR (Riya) task system (19-10-2026)
 
 `supabase_phase426_hr_tasks.sql` (applied). Riya gets 25 repeating Work templates (6 daily incl. 10:30 check-in and 19:00 evening-report chase, 9 Monday incl. thank-you meeting + report, 6 monthly, 2 quarterly, 2 yearly). `work_run_recurring` now supports `quarterly`/`yearly` (CHECK widened) and monthly/quarterly/yearly use catch-up logic (fires on the first working day on/after month_day, once per month). Daily 07:10 IST cron `hr-special-days` -> `hr_special_day_tasks()` makes birthday / work-anniversary tasks from `hr_offers.dob/joining_date` via `converted_user_id`. Trigger `trg_hr_hire_tasks` (hr_candidates stage -> hired) creates 14 "Hire: <name> - ..." tasks for Riya + a bank-details task for Diya (settings `hr_tasks_assignee`, `hire_bank_assignee`). Trigger `trg_hr_exit_tasks` (users.is_active true -> false, non-agency) creates 6 "Exit: <name> - ..." tasks. Assumptions: probation 90 days; exit starts at deactivation. Open: deactivating does NOT block sign-in (security gap, needs owner yes). Section 211 lists updated.
+
+## 427 · Remove one person from a Work task (19-10-2026)
+
+`supabase_phase427_work_remove_person.sql` (applied): `work_remove_part(p_part)` - head/admin or creator, not for finished parts, cannot remove the last person; they get a push. TaskDetailModal shows "Remove from task" on each unfinished person when the task has 2+ people.
