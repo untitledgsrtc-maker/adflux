@@ -22,6 +22,7 @@ import TaskDetailModal from '../../components/work/TaskDetailModal'
 import OnTimeScoreCard from '../../components/work/OnTimeScoreCard'
 import UserAvatar from '../../components/common/UserAvatar'
 import WorkCalendar from '../../components/work/WorkCalendar'
+import DateField from '../../components/work/DateField'
 
 export default function MyWorkV2() {
   const { profile } = useAuth()
@@ -108,7 +109,7 @@ export default function MyWorkV2() {
           if (data?.title) title = data.title
         } catch { /* generic message */ }
         pushToast(`New task for you: ${title}`, 'success')
-        try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('New task for you', { body: title }) } catch { /* not supported here */ }
+        try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('New task for you', { body: title, tag: `wk-part-${ev.new?.id}` }) } catch { /* not supported here */ }
       })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
@@ -296,6 +297,9 @@ export default function MyWorkV2() {
                     ? <EveningCard hour={istHour()} entries={entries} items={items} secs={todaySecs} name={profile?.name}
                         projName={projName} shared={shared} uid={uid} today={today} firstIn={firstIn} onShared={load} />
                     : <TodayStrip secs={todaySecs} firstIn={firstIn} />}
+                </div>
+              </div>
+              <div className="wk-c12 wk-trio">
                   {profile?.role === 'staff' && <OnTimeScoreCard userId={uid} />}
                   <div className="wk-card flush">
                     <div className="wk-list">
@@ -323,7 +327,6 @@ export default function MyWorkV2() {
                       </div>
                     </div>
                   )}
-                </div>
               </div>
               <div className="wk-c12">
                 <div className="wk-row" style={{ flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
@@ -337,10 +340,10 @@ export default function MyWorkV2() {
                   </div>
                   <div className="wk-grp">
                     <span className="wk-sm">From</span>
-                    <input className="wk-input" type="date" style={{ width: 150 }} value={rFrom} aria-label="From date"
+                    <DateField className="wk-input" style={{ width: 150 }} value={rFrom} aria-label="From date"
                       onChange={(e) => { const v = e.target.value; if (!v) { setViewFrom(null); setViewTo(null) } else { setViewFrom(v); if (!viewTo || viewTo < v) setViewTo(v) } }} />
                     <span className="wk-sm">To</span>
-                    <input className="wk-input" type="date" style={{ width: 150 }} value={rTo} min={rFrom} aria-label="To date"
+                    <DateField className="wk-input" style={{ width: 150 }} value={rTo} min={rFrom} aria-label="To date"
                       onChange={(e) => { const v = e.target.value; if (v) { setViewFrom(viewFrom || rFrom); setViewTo(v) } }} />
                     <button className={`wk-btn ${isToday ? 'y' : 'o'}`} onClick={() => { setViewFrom(null); setViewTo(null) }}>Today</button>
                   </div>
@@ -717,7 +720,7 @@ function HoursTab({ uid, entries: todayEntries, projects, projName, onAddManual,
           <div className="wk-tabs" style={{ margin: 0 }}>
             {HRANGES.map(([k, l]) => <button key={k} className={`wk-tab${range === k ? ' on' : ''}`} onClick={() => setRange(k)}>{l}</button>)}
           </div>
-          {range === 'custom' && <input type="date" className="wk-input" style={{ width: 170 }} value={custom} max={today} onChange={(e) => setCustom(e.target.value)} aria-label="Pick a date" />}
+          {range === 'custom' && <DateField className="wk-input" style={{ width: 170 }} value={custom} max={today} onChange={(e) => setCustom(e.target.value)} aria-label="Pick a date" />}
         </div>
         <div className="wk-hero">
           <span className="wk-eyb">Tracked · {rangeText}</span>
@@ -778,7 +781,7 @@ function HoursTab({ uid, entries: todayEntries, projects, projName, onAddManual,
               <div className="wk-field" style={{ margin: 0 }}><label>What</label>
                 <input className="wk-input" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder="What you worked on" /></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr', gap: 8 }}>
-                <div className="wk-field" style={{ margin: 0 }}><label>Day</label><input className="wk-input" type="date" value={day} max={today} min={addDaysISO(today, -7)} onChange={(e) => setDay(e.target.value)} /></div>
+                <div className="wk-field" style={{ margin: 0 }}><label>Day</label><DateField className="wk-input" value={day} max={today} min={addDaysISO(today, -7)} onChange={(e) => setDay(e.target.value)} /></div>
                 <div className="wk-field" style={{ margin: 0 }}><label>Start</label><input className="wk-input" type="time" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
                 <div className="wk-field" style={{ margin: 0 }}><label>End</label><input className="wk-input" type="time" value={to} onChange={(e) => setTo(e.target.value)} /></div>
               </div>

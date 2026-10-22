@@ -8,6 +8,7 @@ import { confirmDialog } from '../v2/ConfirmDialog'
 import UserAvatar from '../common/UserAvatar'
 import RejectModal from './RejectModal'
 import { fmtDur, fmtDateShort, dueState, STATUS_LABEL, initialsOf } from '../../utils/workUtils'
+import DateField from './DateField'
 
 const EVENT_TEXT = {
   declined: 'declined this task',
@@ -104,7 +105,7 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
               )}
               {task.due_date && <span className="wk-pill">Due {fmtDateShort(task.due_date)}</span>}
               {canEdit && (
-                <input type="date" className="wk-input" style={{ width: 170, minHeight: 40 }} value={task.due_date || ''} aria-label="Change due date"
+                <DateField className="wk-input" style={{ width: 170, minHeight: 40 }} value={task.due_date || ''} aria-label="Change due date"
                   onChange={(e) => run(() => rpc('work_set_due', { p_task: task.id, p_part: null, p_due: e.target.value || null }))} />
               )}
               {canEdit && task.status !== 'finished' && (
@@ -128,7 +129,7 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                     {p.label || 'Their part'}{p.due_date ? ` - due ${fmtDateShort(p.due_date)}` : ''}{p.seconds != null ? ` - ${fmtDur(p.seconds)}` : ''}
                   </div>
                   {p.assignee_id === uid && !canEdit && p.status !== 'finished' && p.status !== 'postponed' && (
-                    <input type="date" className="wk-input" style={{ width: 170, minHeight: 40, marginTop: 8 }} value={p.due_date || task.due_date || ''} aria-label="Change my due date"
+                    <DateField className="wk-input" style={{ width: 170, minHeight: 40, marginTop: 8 }} value={p.due_date || task.due_date || ''} aria-label="Change my due date"
                       onChange={(e) => run(() => rpc('work_set_due', { p_task: task.id, p_part: p.id, p_due: e.target.value || null }))} />
                   )}
                   {p.assignee_id === uid && !canEdit && p.status !== 'finished' && p.status !== 'postponed' && (

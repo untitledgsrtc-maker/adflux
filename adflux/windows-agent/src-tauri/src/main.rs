@@ -239,6 +239,16 @@ fn bring_to_front(app: AppHandle, label: String) {
         let _ = w.center();
         let _ = w.set_focus();
         let _ = w.request_user_attention(Some(tauri::UserAttentionType::Critical));
+        // Phase 458: the MAIN window must not stay on top of every other program for ever (people could not click
+        // anything else once it had been brought forward). Pop it up, then let go after a moment. The small idle
+        // window keeps its normal always-on-top behaviour.
+        if label == "main" {
+            let w2 = w.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(1500));
+                let _ = w2.set_always_on_top(false);
+            });
+        }
     }
 }
 

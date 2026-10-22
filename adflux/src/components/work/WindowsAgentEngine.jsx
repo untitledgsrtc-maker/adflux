@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { istTodayISO } from '../../utils/istDate'
 
-const VERSION = '0.2.4'
+const VERSION = '0.2.7'
 const QKEY = 'agent_slice_queue'
 const T = () => window.__TAURI_INTERNALS__
 const invoke = (cmd, args) => T().invoke(cmd, args)
@@ -263,6 +263,24 @@ export default function WindowsAgentEngine() {
     }, 2000)
     const timers = [diagTimer, setInterval(tick, 5000), setInterval(pushState, 1000), setInterval(loadAll, 15000), setInterval(() => uploadQueue().catch(() => {}), 30000)]
     return () => { alive = false; timers.forEach(clearInterval) }
+  }, [uid])
+
+  // Phase 458: a task given to you shows a Windows notification on ANY page of the app (before, only My Work did, and
+  // only if the browser had been allowed to notify - which it never asked for). Same tag as the My Work one so you get ONE.
+  useEffect(() => {
+    if (!uid) return undefined
+    try { if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission().catch(() => {}) } catch { /* ignore */ }
+    const ch = supabase.channel(`agent-new-task-${uid}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'work_task_parts', filter: `assignee_id=eq.${uid}` }, async (ev) => {
+        let title = 'A new task'
+        try {
+          const { data } = await supabase.from('work_tasks').select('title').eq('id', ev.new?.task_id).maybeSingle()
+          if (data?.title) title = data.title
+        } catch { /* generic */ }
+        try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('New task for you', { body: title, tag: `wk-part-${ev.new?.id}` }) } catch { /* ignore */ }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
   }, [uid])
 
   const accept = async () => {

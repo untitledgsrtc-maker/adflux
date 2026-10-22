@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { toastError, toastSuccess } from '../v2/Toast'
 import { istTodayISO } from '../../utils/istDate'
 import { addDaysISO } from '../../utils/workUtils'
+import DateField from './DateField'
 
 export default function PostponeModal({ item, users, projects = [], meId, onClose, onDone }) {
   const today = istTodayISO()
@@ -72,7 +73,7 @@ export default function PostponeModal({ item, users, projects = [], meId, onClos
           <datalist id="pp-clients">{projects.map((p) => <option key={p.id} value={p.name} />)}</datalist></div>
 
         <div className="wk-field"><label htmlFor="pp-date">Comes back on</label>
-          <input id="pp-date" className="wk-input" type="date" value={until} min={addDaysISO(today, 1)} onChange={(e) => setUntil(e.target.value)} />
+          <DateField id="pp-date" className="wk-input" value={until} min={addDaysISO(today, 1)} onChange={(e) => setUntil(e.target.value)} />
           <div className="wk-chips">
             <button className="wk-chip" onClick={() => setUntil(addDaysISO(today, 1))}>Tomorrow</button>
             <button className="wk-chip" onClick={() => setUntil(addDaysISO(today, 3))}>In 3 days</button>

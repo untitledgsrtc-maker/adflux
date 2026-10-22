@@ -9,6 +9,7 @@ import { toastError, toastSuccess } from '../v2/Toast'
 import { istTodayISO } from '../../utils/istDate'
 import { fmtDur, fmtTimeIST, dayStartISO, addDaysISO, clientColor } from '../../utils/workUtils'
 import UserAvatar from '../common/UserAvatar'
+import DateField from './DateField'
 
 const PALETTE = ['#60A5FA', '#A78BFA', '#34D399', '#F59E0B', '#F472B6', '#22D3EE', '#FB923C', '#84CC16']
 const progColor = (name) => { let h = 0; for (const c of String(name || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PALETTE[h % PALETTE.length] }
@@ -128,7 +129,7 @@ export default function ActivityTab({ users, memberIds, nameOf, projName, canSet
             <button className={`wk-tab${day === today ? ' on' : ''}`} onClick={() => setDay(today)}>Today</button>
             <button className={`wk-tab${day === addDaysISO(today, -1) ? ' on' : ''}`} onClick={() => setDay(addDaysISO(today, -1))}>Yesterday</button>
           </div>
-          <input type="date" className="wk-input" style={{ width: 170 }} value={day} max={today} onChange={(e) => setDay(e.target.value || today)} aria-label="Pick a date" />
+          <DateField className="wk-input" style={{ width: 170 }} value={day} max={today} onChange={(e) => setDay(e.target.value || today)} aria-label="Pick a date" />
         </div>
       </div>
 

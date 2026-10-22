@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { toastError, toastSuccess } from '../v2/Toast'
 import { istTodayISO } from '../../utils/istDate'
 import { addDaysISO } from '../../utils/workUtils'
+import DateField from './DateField'
 
 export default function NewTaskModal({ projects, users, meId, onClose, onCreated, onAddProject }) {
   const today = istTodayISO()
@@ -116,7 +117,7 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
         </div>
 
         <div className="wk-field"><label htmlFor="nt-due">Due date *</label>
-          <input id="nt-due" className="wk-input" type="date" value={due} min={today} required onChange={(e) => setDue(e.target.value)} />
+          <DateField id="nt-due" className="wk-input" value={due} min={today} required onChange={(e) => setDue(e.target.value)} />
           <div className="wk-chips">
             <button className="wk-chip" onClick={() => setDue(today)}>Today</button>
             <button className="wk-chip" onClick={() => setDue(addDaysISO(today, 1))}>Tomorrow</button>

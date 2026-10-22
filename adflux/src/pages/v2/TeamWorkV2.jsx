@@ -20,6 +20,7 @@ import UserAvatar from '../../components/common/UserAvatar'
 import NewTaskModal from '../../components/work/NewTaskModal'
 import PostponeModal from '../../components/work/PostponeModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
+import DateField from '../../components/work/DateField'
 
 const TABS = [['overview', 'Overview'], ['tasks', 'Tasks'], ['people', 'People'], ['clients', 'Clients'],
   ['timeline', 'Timeline'], ['calendar', 'Calendar'], ['hours', 'Hours & cost'], ['activity', 'Activity'], ['approvals', 'Approvals']]
@@ -214,7 +215,7 @@ export default function TeamWorkV2() {
             {RANGES.filter(([k]) => k !== 'custom').map(([k, l]) => <button key={k} className={`wk-tab${range === k ? ' on' : ''}`} onClick={() => setRange(k)}>{l}</button>)}
           </div>
           <button className={`wk-btn ${range === 'custom' ? 'y' : 'o'}`} onClick={() => setRange('custom')}><Calendar size={16} aria-hidden="true" /> Pick a date</button>
-          {range === 'custom' && <input type="date" className="wk-input" style={{ width: 170 }} value={custom} max={today} onChange={(e) => setCustom(e.target.value)} aria-label="Pick a date" />}
+          {range === 'custom' && <DateField className="wk-input" style={{ width: 170 }} value={custom} max={today} onChange={(e) => setCustom(e.target.value)} aria-label="Pick a date" />}
         </div>
       )}
 
