@@ -119,6 +119,10 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                   <div className="wk-sm" style={{ marginTop: 4 }}>
                     {p.label || 'Their part'}{p.due_date ? ` - due ${fmtDateShort(p.due_date)}` : ''}{p.seconds != null ? ` - ${fmtDur(p.seconds)}` : ''}
                   </div>
+                  {p.assignee_id === uid && !canEdit && p.status !== 'finished' && p.status !== 'postponed' && (
+                    <input type="date" className="wk-input" style={{ width: 170, minHeight: 40, marginTop: 8 }} value={p.due_date || task.due_date || ''} aria-label="Change my due date"
+                      onChange={(e) => run(() => rpc('work_set_due', { p_task: task.id, p_part: p.id, p_due: e.target.value || null }))} />
+                  )}
                   {p.finish_note && <div className="wk-sm">Note: {p.finish_note}</div>}
                   {p.reject_reason && p.status !== 'finished' && (
                     <div className="wk-sm" style={{ color: 'var(--danger)', marginTop: 4 }}>

@@ -29,6 +29,7 @@ export default function WindowsAgentEngine() {
   const [needConsent, setNeedConsent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [interval, setIntervalMin] = useState(10)
+  const [claim, setClaim] = useState(null)   // 'I was working' request after the timer stopped: null | { text, busy, msg }
   const [stopped, setStopped] = useState(null)   // 'timer stopped' notice with a restart button
   const [ask, setAsk] = useState(null)          // idle question also shown inside this page (backup for the small window)
   const [reasonOpen, setReasonOpen] = useState(false)   // Phase 443: typed reason for "I was working"
@@ -74,7 +75,7 @@ export default function WindowsAgentEngine() {
             if (last?.auto_stopped && last.ended_at && !s.asking && !s.stoppedShown?.[last.id]) {
               s.stoppedShown = { ...(s.stoppedShown || {}), [last.id]: true }
               s.lastStopped = { project: last.project_id, label: last.task_label, part: last.part_id }
-              const info = { stopAt: timeIST(last.ended_at), auto: true, client: clientName(last.project_id), label: last.task_label }
+              const info = { stopIso: last.ended_at, stopAt: timeIST(last.ended_at), auto: true, client: clientName(last.project_id), label: last.task_label }
               setStopped(info)
               await emit('agent:idle-stopped', info)
               invoke('bring_to_front', { label: 'idle' }).catch(() => {})
@@ -163,7 +164,7 @@ export default function WindowsAgentEngine() {
       if ((decision === 'stop' || decision === 'auto_stopped') && run && !s.running) {
         // tell the person, on top of everything, that the timer is stopped and let them start it again
         s.lastStopped = { project: run.project_id, label: run.task_label, part: run.part_id }
-        const info = { stopAt: timeIST(a.began), auto: decision === 'auto_stopped', client: clientName(run.project_id), label: run.task_label }
+        const info = { stopIso: new Date(a.began).toISOString(), stopAt: timeIST(a.began), auto: decision === 'auto_stopped', client: clientName(run.project_id), label: run.task_label }
         setStopped(info)
         await emit('agent:idle-stopped', info)
         invoke('bring_to_front', { label: 'idle' }).catch(() => {})
@@ -289,7 +290,23 @@ export default function WindowsAgentEngine() {
         <div className="wk-sm" style={{ marginBottom: 12 }}>{stopped.client}{stopped.label ? ` - ${stopped.label}` : ''}. Time since then is not counted.</div>
         <div style={{ display: 'grid', gap: 8 }}>
           <button className="wk-btn y" onClick={() => S.current.restart?.()}>Start the timer again</button>
-          <button className="wk-btn o" onClick={() => setStopped(null)}>Not now</button>
+          {stopped.stopIso && !claim && <button className="wk-btn o" onClick={() => setClaim({ text: '', busy: false, msg: '' })}>I was still working - ask for these minutes</button>}
+          {claim && (
+            <div style={{ display: 'grid', gap: 8 }}>
+              <textarea className="wk-input" rows={3} placeholder="What were you doing? (10 letters or more)" value={claim.text} onChange={(e) => setClaim({ ...claim, text: e.target.value })} aria-label="Reason" />
+              {claim.msg && <div className="wk-sm" style={{ color: 'var(--w-dat, #F87171)' }}>{claim.msg}</div>}
+              <button className="wk-btn y" disabled={claim.busy || claim.text.trim().length < 10} onClick={async () => {
+                setClaim({ ...claim, busy: true, msg: '' })
+                try {
+                  const L = S.current.lastStopped || {}
+                  const { error } = await supabase.rpc('work_add_manual_time', { p_project: L.project || null, p_label: L.label || null, p_start: stopped.stopIso, p_end: new Date().toISOString(), p_note: 'Said working after the timer stopped: ' + claim.text.trim() })
+                  if (error) throw error
+                  setClaim(null); setStopped(null); invoke('hide_window', { label: 'idle' }).catch(() => {})
+                } catch (e) { setClaim((c) => ({ ...c, busy: false, msg: (e && e.message) || 'Could not send. Try again.' })) }
+              }}>Send request to my head</button>
+            </div>
+          )}
+          <button className="wk-btn o" onClick={() => { setClaim(null); setStopped(null) }}>Not now</button>
         </div>
       </div>
     </div>
