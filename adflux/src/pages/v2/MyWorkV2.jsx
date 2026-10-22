@@ -65,7 +65,7 @@ export default function MyWorkV2() {
       supabase.from('work_time_entries').select('*').eq('user_id', uid).is('ended_at', null).maybeSingle(),
       supabase.from('work_time_entries').select('*').eq('user_id', uid).gte('started_at', t0).order('started_at'),
       supabase.from('work_task_parts')
-        .select('id,task_id,assignee_id,label,due_date,due_time,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status)')
+        .select('id,task_id,assignee_id,label,due_date,due_time,created_at,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status)')
         .eq('assignee_id', uid).or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -14))}`).limit(300),
       supabase.from('work_tasks')
         .select('id,title,project_id,due_date,status,created_at,parts:work_task_parts(id,assignee_id,label,status,due_date)')
@@ -157,6 +157,7 @@ export default function MyWorkV2() {
     postponedUntil: p.postponed_until, postponeCount: p.postpone_count || 0,
     postponedBy: [...(p.postponed_by_users || []).map((id) => nameOf(id)), p.postponed_by_client ? `${p.postponed_by_client} (client)` : ''].filter(Boolean).join(', '),
     id: p.id, taskId: p.task_id, finishedAt: p.finished_at, status: p.status, title: p.task?.title || 'Task', label: p.label,
+    createdDay: p.created_at ? new Date(p.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : null,
     client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, dueTime: p.due_time, assigneeId: p.assignee_id,
     assigneeName: nameOf(p.assignee_id), assigneePhoto: photoOf(p.assignee_id), finishedDay: p.finished_at ? new Date(p.finished_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : null, partsTotal: 1, partsDone: 0, seconds: p.seconds, cost: null,
   })), [parts, projName, nameOf, photoOf])
@@ -166,16 +167,18 @@ export default function MyWorkV2() {
   const isToday = !viewFrom
   const rFrom = viewFrom || today
   const rTo = (viewTo && viewTo >= rFrom) ? viewTo : rFrom
+  const showNow = (i) => !i.due || i.due <= addDaysISO(today, 2) || (i.createdDay && i.createdDay >= addDaysISO(today, -1))
   const boardItems = items.filter((i) => {
     if (i.status === 'postponed') return true   // the Postponed column always shows what is waiting
     if (i.status === 'finished') return isToday ? i.finishedDay === today : (i.finishedDay >= rFrom && i.finishedDay <= rTo)
-    if (isToday) return !i.due || i.due <= today
+    // Phase 437: today's board = no date / due today or earlier / due within 2 days / given to me in the last 2 days (so a task assigned today for the 24th shows at once)
+    if (isToday) return showNow(i)
     return i.due && i.due >= rFrom && i.due <= rTo
   })
   const isOpen = (i) => i.status !== 'finished' && i.status !== 'postponed'
   const dayOpen = boardItems.filter(isOpen).length
   // Phase 436: tasks given to me for a LATER date are not on today's board - say so, with one tap to see them
-  const laterCount = isToday ? items.filter((i) => isOpen(i) && i.due && i.due > today).length : 0
+  const laterCount = isToday ? items.filter((i) => isOpen(i) && !showNow(i)).length : 0
   const dayLate = boardItems.filter((i) => isOpen(i) && i.due && i.due < today).length
   const rangeLabel = isToday ? 'Today' : (rFrom === rTo ? fmtDateShort(rFrom) : `${fmtDateShort(rFrom)} - ${fmtDateShort(rTo)}`)
 
