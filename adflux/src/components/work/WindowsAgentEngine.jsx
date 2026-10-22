@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { istTodayISO } from '../../utils/istDate'
 
-const VERSION = '0.2.7'
+const VERSION = '0.2.8'
 const QKEY = 'agent_slice_queue'
 const T = () => window.__TAURI_INTERNALS__
 const invoke = (cmd, args) => T().invoke(cmd, args)
@@ -142,7 +142,8 @@ export default function WindowsAgentEngine() {
       }
       if (decision === 'worked') {
         const { error } = await supabase.rpc('work_agent_idle', { p_entry: a.entry, p_idle_began: a.began, p_decision: 'still_working', p_idle_seconds: Math.round((Date.now() - new Date(a.began).getTime()) / 1000), p_note: note })
-        if (error) { setReasonErr(error.message || 'Could not send. Try again.'); return }
+        if (error) { setReasonErr(error.message || 'Could not send. Try again.'); await emit('agent:idle-error', { message: error.message || 'Could not send. Try again.' }); return }
+        invoke('hide_window', { label: 'idle' }).catch(() => {})
         clearTimeout(s.askTimer); s.asking = null; setAsk(null); setReasonOpen(false); setReasonText(''); s.suppress = true
         window.dispatchEvent(new CustomEvent('wk-idle-freeze', { detail: null }))
         await loadAll()

@@ -57,13 +57,37 @@ function runIdle() {
       <button class="wk-btn y" id="restart">Start the timer again</button>
       <button class="wk-btn o" id="closeit">Not now</button>
     </div>`)
+  let last = {}
+  // Phase 460: "I was working" is answered RIGHT HERE (type the reason in this window) instead of sending the person to the
+  // main window, which could stay hidden behind other programs so the button looked dead.
+  const reasonView = (p, err) => card(`<div class="wk-eyb">Away since ${esc(p.stopAt || '')}</div>
+    <div style="font-size:16px;margin:4px 0 6px">What were you doing?</div>
+    <div class="wk-sm" style="margin-bottom:8px">Your reason goes to admin / HR. These minutes count only if they approve.</div>
+    <textarea id="why" class="wk-input" maxlength="300" style="height:78px;padding:8px" placeholder="For example: checking the printed file with the client"></textarea>
+    <div class="wk-sm" id="whyerr" style="color:var(--w-dat,#F87171);min-height:16px;margin-top:4px">${esc(err || '')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px">
+      <button class="wk-btn o" id="whyback" style="justify-content:center">Back</button>
+      <button class="wk-btn y" id="whysend" style="justify-content:center">Send for approval</button>
+    </div>`)
   const bind = () => {
-    root.querySelectorAll('[data-d]').forEach((b) => b.addEventListener('click', () => emit('agent:idle-answer', { decision: b.dataset.d })))
+    root.querySelectorAll('[data-d]').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.d === 'worked') { root.innerHTML = reasonView(last); bind(); document.getElementById('why')?.focus(); return }
+      emit('agent:idle-answer', { decision: b.dataset.d })
+    }))
+    document.getElementById('whyback')?.addEventListener('click', () => { root.innerHTML = askView(last); bind() })
+    document.getElementById('whysend')?.addEventListener('click', () => {
+      const t = (document.getElementById('why')?.value || '').trim()
+      const er = document.getElementById('whyerr')
+      if (t.length < 10) { if (er) er.textContent = 'Write at least 10 letters.'; return }
+      if (er) er.textContent = 'Sending...'
+      emit('agent:idle-answer', { decision: 'worked', note: t })
+    })
     document.getElementById('restart')?.addEventListener('click', () => emit('agent:cmd', { type: 'restart' }))
     document.getElementById('closeit')?.addEventListener('click', () => emit('agent:cmd', { type: 'close-idle' }))
   }
   root.innerHTML = askView({})
   bind()
-  listen('agent:idle-ask', (e) => { root.innerHTML = askView(e.payload || {}); bind() })
+  listen('agent:idle-ask', (e) => { last = e.payload || {}; root.innerHTML = askView(last); bind() })
+  listen('agent:idle-error', (e) => { root.innerHTML = reasonView(last, (e.payload || {}).message || 'Could not send. Try again.'); bind() })
   listen('agent:idle-stopped', (e) => { root.innerHTML = stoppedView(e.payload || {}); bind() })
 }
