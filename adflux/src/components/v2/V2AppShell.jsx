@@ -256,6 +256,7 @@ const HR_NAV = [
   { to: '/team',              label: 'Team',           icon: Users },
   { to: '/team-dashboard',    label: 'Attendance',     icon: MapPin },
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
+  { to: '/work-profile',      label: 'My profile',     icon: UserCircle2 },   // Phase 452 - hours, calendar and tasks page for people with no Work-staff menu
 ]
 
 // Phase 391 (16 Oct 2026) - Office admin. People-ops + govt won-quote report / invoice submission.
@@ -270,6 +271,7 @@ const OFFICE_ADMIN_NAV = [
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
+  { to: '/work-profile',      label: 'My profile',     icon: UserCircle2 },   // Phase 452 - hours, calendar and tasks page for people with no Work-staff menu
 ]
 
 // Phase 391 - phone bottom nav for the office admin (5 items; the sidebar list above has 8).
@@ -288,6 +290,7 @@ const ACCOUNTS_NAV = [
   { to: '/people',            label: 'Payroll',        icon: Wallet },
   { to: '/finance',           label: 'Finance',        icon: IndianRupee },
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
+  { to: '/work-profile',      label: 'My profile',     icon: UserCircle2 },   // Phase 452 - hours, calendar and tasks page for people with no Work-staff menu
 ]
 
 // Phase 230 (2026-08-25) — Operations module. Head → the desk console
@@ -304,6 +307,7 @@ const OPS_HEAD_NAV = [
   { to: '/calls',             label: 'My Calls',       icon: Phone },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
+  { to: '/work-profile',      label: 'My profile',     icon: UserCircle2 },   // Phase 452 - hours, calendar and tasks page for people with no Work-staff menu
 ]
 // Phase 251.2 — ONE operations home (owner: "wire one professional dashboard").
 // The home (/ops-home) folds Tickets / Down-now / Log-issue / Check-in; those
@@ -314,6 +318,7 @@ const OPS_EXEC_NAV = [
   { to: '/calls',             label: 'My Calls',       icon: Phone },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
+  { to: '/work-profile',      label: 'My profile',     icon: UserCircle2 },   // Phase 452 - hours, calendar and tasks page for people with no Work-staff menu
 ]
 // Phase 251.3 — ops MOBILE bottom nav = operational only (owner: no personal
 // trio in the bottom bar). The trio lives on the desktop sidebar + the ⋯ drawer.

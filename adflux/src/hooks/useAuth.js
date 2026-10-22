@@ -34,6 +34,12 @@ export function initAuth() {
       store.setUser(session.user)
       store.fetchProfile(session.user.id).finally(() => {
         useAuthStore.setState({ loading: false })
+        // A profile that did not load (expired token, bad network) shows the wrong menu:
+        // try again quickly a few times before waiting for the 4-minute keeper.
+        ;[3000, 8000, 20000].forEach((ms) => setTimeout(() => {
+          const s = useAuthStore.getState()
+          if (!s.profile && s.user) s.fetchProfile(s.user.id)
+        }, ms))
       })
     } else {
       useAuthStore.setState({ loading: false })

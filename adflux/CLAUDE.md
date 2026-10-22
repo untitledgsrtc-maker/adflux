@@ -21680,3 +21680,6 @@ Lunch is 1 PM. `supabase_phase450_lunch_reminder.sql` (applied): `work_lunch_rem
 
 ## 451 · Expired login in a long-open app (23-10-2026)
 Diya's Windows app showed "JWT expired" on My Work and another PC showed a sales menu with no name (profile never loaded). The page had been open long enough for the token to expire (PC asleep / tray). `useAuth.js initAuth` now has a session keeper: on window focus, tab visible, network back and every 4 min it calls `getSession()` (swaps an expired token for a fresh one) and re-fetches the profile if it is missing. Quick manual fix for anyone stuck: Retry, or Log out and in.
+
+## 452 · My profile in every menu + faster profile retry (23-10-2026)
+"My profile" (/work-profile: hours, calendar, tasks) was only in the Work-staff menu, so Diya (accounts), Dixita (office admin / ops head), HR and ops people could not open it. Added to HR_NAV, OFFICE_ADMIN_NAV, ACCOUNTS_NAV, OPS_HEAD_NAV, OPS_EXEC_NAV (sales, telecaller, agency menus untouched; guardian PASS). `useAuth` retries the profile load at 3 / 8 / 20 s after start when it failed (Diya's screen showed "User / SALES" because the profile never loaded). Her DB role and policies were fine (accounts, ids match, users_read_all). A login on an old app copy still needs Log out + in and one full reopen.
