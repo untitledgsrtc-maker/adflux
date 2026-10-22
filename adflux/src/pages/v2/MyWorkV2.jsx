@@ -334,6 +334,8 @@ export default function MyWorkV2() {
         </>
       )}
 
+      <div className="wk-sm" style={{ marginTop: 16, opacity: 0.6, textAlign: 'right' }}>Version {typeof __APP_BUILD__ === 'string' ? __APP_BUILD__ : 'dev'}</div>
+
       {postponing && (
         <PostponeModal item={postponing} users={users} projects={projects} meId={uid} onClose={() => setPostponing(null)} onDone={() => { setPostponing(null); load() }} />
       )}

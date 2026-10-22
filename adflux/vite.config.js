@@ -11,6 +11,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 // `injectManifest` strategy — keeps the Phase 33R/W push handlers
 // intact while gaining offline shell.
 export default defineConfig({
+  // Phase 441 - which build is this screen running (shown small on My Work): Vercel commit if present, else build time
+  define: { __APP_BUILD__: JSON.stringify((process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || new Date().toISOString().slice(5, 16).replace('T', ' ')) },
   plugins: [
     react(),
     VitePWA({
