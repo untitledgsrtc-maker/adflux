@@ -22,8 +22,27 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   // virtual module) doesn't choke. The runtime check above + the
   // try/catch belt-and-braces it.
   import('virtual:pwa-register')
-    .then(({ registerSW }) => registerSW({ immediate: true }))
+    .then(({ registerSW }) => registerSW({
+      immediate: true,
+      // Phase 439 - a window that stays open all day (the Windows app, a pinned tab) never looked for a new version, so it kept
+      // running yesterday's code. Look every 10 minutes; the new worker takes over by itself (sw.js skipWaiting + claim).
+      onRegisteredSW(_url, reg) { if (reg) setInterval(() => { reg.update().catch(() => {}) }, 10 * 60 * 1000) },
+    }))
     .catch(() => { /* dev mode / plugin disabled — ignore */ })
+
+  // Phase 439 - when a NEW worker takes over an open page, reload it - but only once the person has been still for 20 s and is not
+  // typing in a box (a running timer / task lives on the server, so a reload loses nothing).
+  let hadController = !!navigator.serviceWorker.controller
+  let lastActive = Date.now()
+  ;['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach((ev) => window.addEventListener(ev, () => { lastActive = Date.now() }, { passive: true }))
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) { hadController = true; return }   // first install, not an update
+    const t = setInterval(() => {
+      const el = document.activeElement
+      const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+      if (Date.now() - lastActive > 20000 && !typing) { clearInterval(t); window.location.reload() }
+    }, 5000)
+  })
 }
 
 // Phase 430 - stale page file after a deploy: reload once (Vite fires this when a lazy page fails to load).

@@ -21637,3 +21637,7 @@ Note (436 follow-up, Phase 437): My Work default board now also shows tasks due 
 ## 438 · Activity tracking ON for everyone (22-10-2026)
 
 Owner: "all rule will be same like Safika". `supabase_phase438_tracking_everyone.sql` (applied) enabled `work_tracking_people` for every active non-admin Work member (was Safika only). Recording stays gated by (a) running timer, (b) each person accepting the first-launch notice on their PC (`work_agent_devices.consent_at`). Per-person off-switch: Team Work > Activity. Admin (owner) not tracked.
+
+## 439 · Open windows pick up new versions (22-10-2026)
+
+Safika (Windows app) did not see the Phase 437 board fix hours after deploy although the live site had it (verified live in Chrome with a temp task, deleted): an open window never re-checked for a new version. `main.jsx`: `registerSW` now calls `reg.update()` every 10 min, and on `controllerchange` (a NEW worker took over) the page reloads once the person has been still for 20 s and is not typing. First install does not reload. Needs one manual reopen of each PC to get this watcher itself.
