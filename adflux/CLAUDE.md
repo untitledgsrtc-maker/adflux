@@ -21725,3 +21725,6 @@ Owner asked why Riya shows working after leaving, and Dixita Gohel / Piyush show
 
 ## 467 · "Still working?" for browser/phone timers (23-10-2026)
 `supabase_phase467_work_still_working.sql` (applied): `work_time_entries.last_confirmed_at`, `work_confirm_working()` (own running entry), cron `work-stop-unconfirmed` every 10 min -> `work_stop_unconfirmed_timers()` stops a running entry with NO PC activity slices when 3 h passed since its start or last confirmation, at that 3 h mark (note "Stopped: no answer to still working"). My Work shows a yellow bar after 2.5 h on web/phone (not in the Windows app, which has its own idle question): Yes, still working / Stop timer. Caps a forgotten timer (Riya's case) to ~3 h. Function in the 211 re-lock lists. Not built: counting an active PC as working when no timer runs.
+
+## 468 · Team Work Clients cards no longer clip their footer (23-10-2026)
+Live check of /team-work (all tabs, no console errors): on Clients the 4-across cards (min 290 px) clipped the footer hours / cost / open count. `.wk-pg` min card width raised to 340 px (fewer across, footer fits). CSS only.

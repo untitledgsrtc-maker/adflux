@@ -253,7 +253,7 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 .wkc-item { border-left: 4px solid var(--c); }
 
 /* Clients as project cards */
-.wk-pg { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr)); gap: 16px; padding: 18px 20px; }
+.wk-pg { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 16px; padding: 18px 20px; }
 .wk-pc { min-width: 0; overflow: hidden; background: var(--w-card); border: 1px solid var(--w-bd); border-radius: 18px; padding: 16px; display: grid; gap: 14px; transition: transform .15s, border-color .15s; }
 .wk-pc:hover { transform: translateY(-2px); border-color: var(--accent); }
 .wk-pc-top { display: flex; gap: 12px; align-items: flex-start; }
