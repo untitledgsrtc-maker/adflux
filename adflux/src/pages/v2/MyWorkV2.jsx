@@ -66,7 +66,7 @@ export default function MyWorkV2() {
       supabase.from('work_time_entries').select('*').eq('user_id', uid).is('ended_at', null).maybeSingle(),
       supabase.from('work_time_entries').select('*').eq('user_id', uid).gte('started_at', t0).order('started_at'),
       supabase.from('work_task_parts')
-        .select('id,task_id,assignee_id,label,due_date,due_time,created_at,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status)')
+        .select('id,task_id,assignee_id,label,due_date,due_time,created_at,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status,is_auto)')
         .eq('assignee_id', uid).or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -14))}`).limit(300),
       supabase.from('work_tasks')
         .select('id,title,project_id,due_date,status,created_at,parts:work_task_parts(id,assignee_id,label,status,due_date)')
@@ -180,7 +180,8 @@ export default function MyWorkV2() {
   const isToday = !viewFrom
   const rFrom = viewFrom || today
   const rTo = (viewTo && viewTo >= rFrom) ? viewTo : rFrom
-  const showNow = (i) => !i.due || i.due <= addDaysISO(today, 2) || (i.createdDay && i.createdDay >= addDaysISO(today, -1))
+  // Phase 448: made by hand = always on the board; made by the system (repeating / from a quote / HR / finance) = only when due within 2 days
+  const showNow = (i) => !i.due || i.due <= addDaysISO(today, 2) || !i.p?.task?.is_auto
   const boardItems = items.filter((i) => {
     if (i.status === 'postponed') return true   // the Postponed column always shows what is waiting
     if (i.status === 'finished') return isToday ? i.finishedDay === today : (i.finishedDay >= rFrom && i.finishedDay <= rTo)

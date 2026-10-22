@@ -21663,3 +21663,7 @@ Diya (Windows app) started a task and the clock stayed 00:00:00. Web timer verif
 ## 446-447 · Why Diya's timer / idle fixes never reached her (22-10-2026)
 
 Root cause found: `V2AppShell` mounted `WindowsAgentBridge` (idle question + tracking + widget) for role **staff only**, so accounts (Diya), hr (Riya), office_admin (Dixita) PCs never ran it - no work_agent_devices row, no idle events, no "Recording" pill. Phase 447 widens it to every role except admin / co_owner / agency (Tauri-only, no-op on phone/APK/browser; guardian PASS). Phase 446: `work_server_time()` + My Work shows elapsed time against the SERVER clock (PC clock drift can no longer hold the timer at 00:00:00), and refreshes on window focus / visibility. Telecaller/sales on the Windows program also get the engine now (guardian note P3; remove from the list in V2AppShell if unwanted).
+
+## 448 · Hand-made tasks always show; system-made only near due (22-10-2026)
+
+Owner idea. `supabase_phase448_work_is_auto.sql` (applied): `work_tasks.is_auto` (true for repeating, from-a-quote, HR / finance rule tasks; set by trigger for template / quote tasks and by `work__plain_task` + `finance_mirror_to_work`; backfilled). My Work + Team Work boards: a task made by hand shows in Assigned at once whatever its due date; a system-made task shows only when due within 2 days (otherwise behind the "later date" bar / "Show later tasks"). Replaces the Phase 437/442 "created in the last 2 days" rule. Trigger: Safika saw the 12-month end-date report (due 21 Oct 2027) for UA-2026-0560 in Assigned.
