@@ -120,7 +120,7 @@ export default function WorkCalendar({ uid, isHead, nameOf, onOpen, defaultScope
 
         <div className="wk-card wkc-side">
           <div className="wk-eyb">{new Date(`${sel}T00:00:00Z`).toLocaleDateString('en-IN', { timeZone: 'UTC', weekday: 'long' })}</div>
-          <h3 style={{ margin: '2px 0 12px', fontSize: 20 }}>{new Date(`${sel}T00:00:00Z`).toLocaleDateString('en-IN', { timeZone: 'UTC', day: 'numeric', month: 'long' })}</h3>
+          <h3 style={{ margin: '2px 0 12px', fontSize: 20 }}>{new Date(`${sel}T00:00:00Z`).toLocaleDateString('en-GB', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' })}</h3>
           {(holidays[sel] || isSunday(sel)) && (
             <div className="wkc-offnote"><CalendarOff size={14} aria-hidden="true" /> {holidays[sel] ? `Holiday: ${holidays[sel]}` : 'Sunday'} - repeating tasks wait for the next working day</div>
           )}

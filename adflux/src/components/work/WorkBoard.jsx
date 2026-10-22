@@ -54,7 +54,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
       )}
       <div className="wk-board">
         {COLS.filter((c) => !phone || c.key === col).map((c) => {
-          const rows = items.filter((i) => i.status === c.key)
+          const rows = items.filter((i) => i.status === c.key).sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0))
           return (
             <div
               key={c.key}
@@ -82,7 +82,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
                 return (
                   <div
                     key={it.id}
-                    className={`wk-tk${drag?.id === it.id ? ' drag' : ''}${it.status === 'finished' ? ' done' : ''}${dp.cls === 'bad' && it.status !== 'finished' ? ' late' : ''}`}
+                    className={`wk-tk${drag?.id === it.id ? ' drag' : ''}${it.status === 'finished' ? ' done' : ''}${dp.cls === 'bad' && it.status !== 'finished' ? ' late' : ''}${it.urgent && it.status !== 'finished' ? ' urgent' : ''}`}
                     draggable
                     tabIndex={0}
                     onDragStart={(e) => { setDrag(it); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', it.id) }}

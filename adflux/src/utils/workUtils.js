@@ -25,7 +25,7 @@ export const fmtTimeIST = (iso) => {
 export const fmtDateShort = (ymd) => {
   if (!ymd) return ''
   const d = new Date(`${ymd}T00:00:00Z`)
-  return d.toLocaleDateString('en-IN', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: 'short' })
+  return d.toLocaleDateString('en-GB', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 export const istHour = () => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: false }).format(new Date()))
 export const initialsOf = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()

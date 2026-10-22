@@ -33,7 +33,7 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
   const load = useCallback(async () => {
     setErr('')
     const [t, p, s, c, l] = await Promise.all([
-      supabase.from('work_tasks').select('id,title,project_id,note,created_by,due_date,status,template_id,finished_at,created_at').eq('id', taskId).maybeSingle(),
+      supabase.from('work_tasks').select('id,title,project_id,note,created_by,due_date,status,template_id,finished_at,created_at,is_urgent').eq('id', taskId).maybeSingle(),
       supabase.from('work_task_parts').select('id,task_id,assignee_id,label,due_date,status,started_at,finished_at,finish_note,seconds,created_at,postponed_until,postponed_by_users,postponed_by_client,postpone_count,reject_kind,reject_reason,rejected_by,rejected_at').eq('task_id', taskId).order('created_at'),
       supabase.from('work_task_steps').select('*').eq('task_id', taskId).order('position'),
       supabase.from('work_task_comments').select('*').eq('task_id', taskId).order('created_at'),
@@ -71,7 +71,7 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
     } catch (e) { toastError(e, 'Could not delete the task.') } finally { latch.current = false; setBusy(false) }
   }
   const canEdit = task && (isHead || task.created_by === uid)
-  const dayName = (iso) => new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })
+  const dayName = (iso) => new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
 
   return (
     <div className="wk-modal-back" onClick={onClose}>
@@ -98,6 +98,10 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
           <>
             <div className="wk-row" style={{ marginTop: 10, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
               <span className={`wk-pill ${task.status === 'finished' ? 'ok' : dueState(task.due_date, task.status).cls}`}>{STATUS_LABEL[task.status]}</span>
+              {task.is_urgent && <span className="wk-pill bad">Urgent</span>}
+              {canEdit && task.status !== 'finished' && (
+                <button className="wk-btn o sm" disabled={busy} onClick={() => run(() => rpc('work_set_urgent', { p_task: task.id, p_urgent: !task.is_urgent }))}>{task.is_urgent ? 'Not urgent' : 'Mark urgent'}</button>
+              )}
               {task.due_date && <span className="wk-pill">Due {fmtDateShort(task.due_date)}</span>}
               {canEdit && (
                 <input type="date" className="wk-input" style={{ width: 170, minHeight: 40 }} value={task.due_date || ''} aria-label="Change due date"

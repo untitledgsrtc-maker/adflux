@@ -140,7 +140,7 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
   const COLOR = { ok: 'var(--success)', late: 'var(--warning)', half: 'var(--warning)', leave: 'var(--danger)', absent: 'var(--danger)', off: 'var(--text-muted)', future: 'var(--text-muted)' }
 
   if (!uid) return null
-  const joined = person?.created_at ? new Date(person.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
+  const joined = person?.created_at ? new Date(person.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'
   const kpi = (label, value, sub, tone) => (
     <div className="wk-card" key={label}>
       <div className="wk-eyb">{label}</div>

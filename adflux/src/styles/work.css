@@ -275,3 +275,11 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 .wk-pc-mid > div { min-width: 0; }
 .wk-pc-foot .wk-num { white-space: nowrap; }
 .wk-board, .wk-grid > * { min-width: 0; }
+
+/* Urgent tasks: first in the column, red */
+.wk-tk.urgent { border-color: var(--danger); background: var(--danger-soft); box-shadow: inset 3px 0 0 var(--danger); }
+.wk-urg { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--w-bd); background: var(--surface-2); color: inherit; cursor: pointer; font: inherit; text-align: left; }
+.wk-urg .wk-sm { margin-left: auto; }
+.wk-urg-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted); flex: none; }
+.wk-urg.on { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); font-weight: 600; }
+.wk-urg.on .wk-urg-dot { background: var(--danger); }

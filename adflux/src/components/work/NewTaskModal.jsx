@@ -21,6 +21,7 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
   const [repeat, setRepeat] = useState('once')
   const [weekday, setWeekday] = useState(1)
   const [monthDay, setMonthDay] = useState(1)
+  const [urgent, setUrgent] = useState(false)
   const [busy, setBusy] = useState(false)
   const latch = useRef(false)
 
@@ -59,6 +60,7 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
           p_parts: clean.map((p) => ({ assignee: p.assignee, label: p.label.trim(), due: null })),
           p_due_time: due && dueTime ? dueTime : null,
           p_steps: steps.split('\n').map((s) => s.trim()).filter(Boolean),
+          p_urgent: urgent,
         })
         if (error) throw error
         toastSuccess('Task assigned.')
@@ -122,6 +124,13 @@ export default function NewTaskModal({ projects, users, meId, onClose, onCreated
           </div>
         </div>
 
+        {repeat === 'once' && (
+          <div className="wk-field">
+            <button type="button" role="switch" aria-checked={urgent} className={`wk-urg${urgent ? ' on' : ''}`} onClick={() => setUrgent((v) => !v)}>
+              <span className="wk-urg-dot" aria-hidden="true" /> Urgent <span className="wk-sm">{urgent ? 'shows first, in red' : 'tap if it must be done first'}</span>
+            </button>
+          </div>
+        )}
         <div className="wk-field"><label htmlFor="nt-time">Due time (optional)</label>
           <input id="nt-time" className="wk-input" type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} />
           <div className="wk-chips">

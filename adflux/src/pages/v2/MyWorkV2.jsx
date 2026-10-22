@@ -66,7 +66,7 @@ export default function MyWorkV2() {
       supabase.from('work_time_entries').select('*').eq('user_id', uid).is('ended_at', null).maybeSingle(),
       supabase.from('work_time_entries').select('*').eq('user_id', uid).gte('started_at', t0).order('started_at'),
       supabase.from('work_task_parts')
-        .select('id,task_id,assignee_id,label,due_date,due_time,created_at,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status,is_auto)')
+        .select('id,task_id,assignee_id,label,due_date,due_time,created_at,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status,is_auto,is_urgent)')
         .eq('assignee_id', uid).or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -14))}`).limit(300),
       supabase.from('work_tasks')
         .select('id,title,project_id,due_date,status,created_at,parts:work_task_parts(id,assignee_id,label,status,due_date)')
@@ -171,7 +171,7 @@ export default function MyWorkV2() {
     postponedBy: [...(p.postponed_by_users || []).map((id) => nameOf(id)), p.postponed_by_client ? `${p.postponed_by_client} (client)` : ''].filter(Boolean).join(', '),
     id: p.id, taskId: p.task_id, finishedAt: p.finished_at, status: p.status, title: p.task?.title || 'Task', label: p.label,
     createdDay: p.created_at ? new Date(p.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : null,
-    client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, dueTime: p.due_time, assigneeId: p.assignee_id,
+    urgent: !!p.task?.is_urgent, client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, dueTime: p.due_time, assigneeId: p.assignee_id,
     assigneeName: nameOf(p.assignee_id), assigneePhoto: photoOf(p.assignee_id), finishedDay: p.finished_at ? new Date(p.finished_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : null, partsTotal: 1, partsDone: 0, seconds: p.seconds, cost: null,
   })), [parts, projName, nameOf, photoOf])
 
@@ -217,7 +217,7 @@ export default function MyWorkV2() {
 
   if (!uid) return null
 
-  const dateLine = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: '2-digit', month: 'short' })
+  const dateLine = new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
   const openAll = items.filter(isOpen).length
   const showTabs = [
     isMember && ['work', 'My work'],
@@ -560,7 +560,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         total += s; byProj.set(e.project_id, (byProj.get(e.project_id) || 0) + s)
       })
       const last = rows.filter((e) => e.ended_at).slice(-1)[0]
-      const dateLbl = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+      const dateLbl = new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })
       const proj = [...byProj.entries()].sort((x, y) => y[1] - x[1])
       const lines = [
         '🟡 UNTITLED · DAY SUMMARY',
