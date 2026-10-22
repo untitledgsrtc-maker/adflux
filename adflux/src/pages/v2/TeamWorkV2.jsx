@@ -16,6 +16,7 @@ import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, dueState, initialsOf, clientColor, istHour } from '../../utils/workUtils'
 import WorkCalendar from '../../components/work/WorkCalendar'
 import ActivityTab from '../../components/work/ActivityTab'
+import InsightsTab from '../../components/work/InsightsTab'
 import WorkBoard from '../../components/work/WorkBoard'
 import UserAvatar from '../../components/common/UserAvatar'
 import NewTaskModal from '../../components/work/NewTaskModal'
@@ -24,7 +25,7 @@ import TaskDetailModal from '../../components/work/TaskDetailModal'
 import DateField from '../../components/work/DateField'
 
 const TABS = [['overview', 'Overview'], ['tasks', 'Tasks'], ['people', 'People'], ['clients', 'Clients'],
-  ['timeline', 'Timeline'], ['calendar', 'Calendar'], ['hours', 'Hours & cost'], ['activity', 'Activity'], ['approvals', 'Approvals']]
+  ['timeline', 'Timeline'], ['calendar', 'Calendar'], ['hours', 'Hours & cost'], ['activity', 'Activity'], ['insights', 'Insights'], ['approvals', 'Approvals']]
 const RANGES = [['today', 'Today'], ['yesterday', 'Yesterday'], ['7', 'Past 7 days'], ['30', 'Past 30 days'], ['custom', 'Pick a date']]
 
 export default function TeamWorkV2() {
@@ -209,7 +210,7 @@ export default function TeamWorkV2() {
         </div>
       </div>
 
-      {(
+      {tab !== 'insights' && (
         <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', marginBottom: 14 }}>
           <span className="wk-eyb">Filters</span>
           <div className="wk-tabs" style={{ margin: 0 }}>
@@ -221,7 +222,7 @@ export default function TeamWorkV2() {
       )}
 
       <div className="wk-tabs" role="tablist" style={{ width: '100%', display: 'flex', overflowX: 'auto' }}>
-        {TABS.map(([k, l]) => (
+        {TABS.filter(([k]) => k !== 'insights' || isAdmin).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} className={`wk-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
             {l}{k === 'approvals' && pending.length > 0 && <span className="wk-cnt">{pending.length}</span>}
           </button>
@@ -390,6 +391,10 @@ export default function TeamWorkV2() {
 
       {!loading && !err && tab === 'activity' && (
         <ActivityTab users={users} memberIds={memberIds} nameOf={nameOf} projName={projName} canSettings={['admin', 'co_owner'].includes(role)} />
+      )}
+
+      {!loading && !err && tab === 'insights' && isAdmin && (
+        <InsightsTab nameOf={nameOf} projName={projName} />
       )}
 
       {!loading && !err && tab === 'approvals' && (() => {

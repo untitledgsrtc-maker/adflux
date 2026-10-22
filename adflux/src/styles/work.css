@@ -308,3 +308,32 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 
 /* Phase 458: the cards under the timer sit in one row (no empty gap beside a tall right column) */
 .wk-trio { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; align-items: start; }
+
+/* Phase 469 - Team Work Insights (admin only) */
+.wk-in { display: grid; gap: 16px; }
+.wk-in-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.wk-in-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; }
+.wk-in-seg button { border: 0; background: transparent; border-radius: 999px; padding: 6px 14px; min-height: 32px; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+.wk-in-seg button.on { background: var(--accent); color: var(--accent-fg); }
+.wk-in-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.wk-in-k { background: var(--w-card, var(--surface)); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; opacity: 0; transform: translateY(8px); animation: wkinrise .5s forwards; }
+.wk-in-k small { display: block; font-size: 12px; color: var(--text-muted); }
+.wk-in-k b { font-family: var(--font-display); font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.wk-in-k i { font-style: normal; font-size: 12px; margin-left: 8px; }
+.wk-in-k i.ok { color: var(--success); } .wk-in-k i.bad { color: var(--danger); }
+.wk-in-two { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; }
+.wk-in-card { background: var(--w-card, var(--surface)); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; opacity: 0; animation: wkinrise .5s .3s forwards; }
+.wk-in-card h3 { font-size: 15px; margin: 0 0 2px; } .wk-in-card p { font-size: 12.5px; color: var(--text-muted); margin: 0 0 10px; }
+.wk-in-lg { display: flex; gap: 14px; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+.wk-in-lg span { display: flex; align-items: center; gap: 5px; } .wk-in-lg em { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.wk-in-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: wkindraw 1.3s .1s forwards; }
+.wk-in-dot { transform-box: fill-box; transform-origin: center; animation: wkinpop .4s 1.3s both; }
+.wk-in-w { display: grid; grid-template-columns: 130px minmax(0, 1fr) 190px; align-items: center; gap: 12px; font-size: 13px; }
+.wk-in-tr { height: 8px; border-radius: 99px; background: var(--surface-3); position: relative; overflow: hidden; }
+.wk-in-tr u { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; transition: width 1.1s cubic-bezier(.2, .8, .2, 1); }
+.wk-in-tr .cap { position: absolute; top: -2px; bottom: -2px; left: 80%; width: 2px; background: var(--text-muted); }
+@keyframes wkinrise { to { opacity: 1; transform: none; } }
+@keyframes wkindraw { to { stroke-dashoffset: 0; } }
+@keyframes wkinpop { from { transform: scale(0); } to { transform: scale(1); } }
+@media (max-width: 720px) { .wk-in-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .wk-in-two { grid-template-columns: 1fr; } .wk-in-w { grid-template-columns: 100px minmax(0, 1fr); } .wk-in-w > span:last-child { grid-column: 1 / -1; text-align: left !important; } }
+@media (prefers-reduced-motion: reduce) { .wk-in-k, .wk-in-card { animation-duration: .01s !important; } .wk-in-line, .wk-in-dot { animation-duration: .01s !important; } .wk-in-tr u { transition-duration: .01s !important; } }
