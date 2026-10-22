@@ -125,7 +125,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
                         <b className="wk-num">Rs {Number(it.cost).toLocaleString('en-IN')}</b>
                       </div>
                     )}
-                    <div className="wk-row" style={{ marginTop: 12 }}>
+                    <div className="wk-row" style={{ marginTop: 12, flexWrap: 'wrap', gap: 8 }}>
                       <UserAvatar className="wk-av" name={it.assigneeName} url={it.assigneePhoto} userId={it.assigneeId} />
                       {mine && it.status === 'assigned' && onStart && (
                         <button className="wk-btn g sm" onClick={(e) => { e.stopPropagation(); onStart(it) }}>
