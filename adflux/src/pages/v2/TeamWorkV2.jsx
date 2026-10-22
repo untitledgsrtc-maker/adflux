@@ -238,7 +238,8 @@ export default function TeamWorkV2() {
             ['Finished today', String(finishedToday), 'Since 00:00'],
           ]} />
           <div className="wk-grid" style={{ gap: 24 }}>
-            <div className="wk-c8">
+            <div className="wk-c8" style={{ display: 'grid', gap: 24, alignContent: 'start' }}>
+            <div>
               <div className="wk-card flush">
                 <div className="wk-ch"><h3><span className="wk-tile" style={{ background: 'rgba(239,68,68,.14)', color: 'var(--danger)' }}><AlertTriangle size={16} aria-hidden="true" /></span>Needs you</h3></div>
                 {needs.length === 0 ? (
@@ -260,7 +261,26 @@ export default function TeamWorkV2() {
                 )}
               </div>
             </div>
-            <div className="wk-c4">
+            <div>
+              <div className="wk-card flush">
+                <div className="wk-ch"><div><h3><span className="wk-tile"><Repeat size={16} aria-hidden="true" /></span>Fired this morning</h3><div className="wk-csub">Repeating tasks</div></div></div>
+                {firedToday.length === 0 ? (
+                  <div className="wk-empty"><b>No repeating tasks today</b>None set, or a Sunday / holiday.</div>
+                ) : (
+                  <div className="wk-list">
+                    {firedToday.map((p) => (
+                      <div key={p.id} className="wk-row" style={{ padding: '14px 20px' }}>
+                        <div><div style={{ fontWeight: 500 }}>{p.task?.title}</div><div className="wk-sm">{projName(p.task?.project_id) || 'No client'}</div></div>
+                        <UserAvatar className="wk-av" name={nameOf(p.assignee_id)} url={photoOf(p.assignee_id)} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            </div>
+            <div className="wk-c4" style={{ display: 'grid', gap: 24, alignContent: 'start' }}>
+            <div>
               <div className="wk-card flush">
                 <div className="wk-ch"><h3><span className="wk-tile" style={{ background: 'rgba(59,130,246,.14)', color: 'var(--info, #60a5fa)' }}><Users size={16} aria-hidden="true" /></span>Who is working</h3></div>
                 {running.length === 0 ? (
@@ -290,24 +310,7 @@ export default function TeamWorkV2() {
                 )}
               </div>
             </div>
-            <div className="wk-c6">
-              <div className="wk-card flush">
-                <div className="wk-ch"><div><h3><span className="wk-tile"><Repeat size={16} aria-hidden="true" /></span>Fired this morning</h3><div className="wk-csub">Repeating tasks</div></div></div>
-                {firedToday.length === 0 ? (
-                  <div className="wk-empty"><b>No repeating tasks today</b>None set, or a Sunday / holiday.</div>
-                ) : (
-                  <div className="wk-list">
-                    {firedToday.map((p) => (
-                      <div key={p.id} className="wk-row" style={{ padding: '14px 20px' }}>
-                        <div><div style={{ fontWeight: 500 }}>{p.task?.title}</div><div className="wk-sm">{projName(p.task?.project_id) || 'No client'}</div></div>
-                        <UserAvatar className="wk-av" name={nameOf(p.assignee_id)} url={photoOf(p.assignee_id)} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="wk-c6">
+            <div>
               <div className="wk-card flush">
                 <div className="wk-ch"><div><h3><span className="wk-tile"><Moon size={16} aria-hidden="true" /></span>Evening report</h3><div className="wk-csub">{istHour() >= 19 ? 'After 7 PM' : 'Opens at 7 PM'}</div></div></div>
                 <div style={{ padding: 18, display: 'grid', gap: 16 }}>
@@ -322,7 +325,8 @@ export default function TeamWorkV2() {
                   ))}
                 </div>
               </div>
-            </div>
+              </div>
+          </div>
           </div>
         </>
       )}
