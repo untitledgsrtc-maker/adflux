@@ -546,7 +546,17 @@ function StartForm({ projects, busy, entries, openCards, onStartCard, onResume, 
 function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, today, firstIn, onShared }) {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
-  if (hour < 19) return null
+  const evening = hour >= 19
+  // Phase 464: people work after 7 PM. Keep the numbers fresh while this card is open (every 45 s and when the window is used again),
+  // so what gets shared is the LATEST work, not what the page loaded at 7:00.
+  useEffect(() => {
+    if (!evening || !onShared) return undefined
+    const t = setInterval(() => onShared(), 45000)
+    const f = () => onShared()
+    window.addEventListener('focus', f)
+    return () => { clearInterval(t); window.removeEventListener('focus', f) }
+  }, [evening, onShared])
+  if (!evening) return null
   const finished = items.filter((i) => i.status === 'finished' && i.finishedDay === today).length   // finished TODAY only
   const proc = items.filter((i) => i.status === 'in_process').length
   const late = items.filter((i) => i.status !== 'finished' && i.status !== 'postponed' && dueState(i.due, i.status).cls === 'bad').length
@@ -563,6 +573,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         const s = Math.max(0, ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0))
         total += s; byProj.set(e.project_id, (byProj.get(e.project_id) || 0) + s)
       })
+      const running = rows.some((e) => !e.ended_at)
       const last = rows.filter((e) => e.ended_at).slice(-1)[0]
       const dateLbl = new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })
       const proj = [...byProj.entries()].sort((x, y) => y[1] - x[1])
@@ -578,7 +589,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         '',
         '⏱ *TIME*',
         `• Clock in:  ${rows[0] ? fmtTimeIST(rows[0].started_at) : '-'}`,
-        `• Clock out: ${last ? fmtTimeIST(last.ended_at) : '-'}`,
+        `• Clock out: ${running ? `${fmtTimeIST(new Date().toISOString())} (timer still running)` : (last ? fmtTimeIST(last.ended_at) : '-')}`,
         `• Hours:     ${fmtDur(total)}`,
         '',
         '📊 *BY CLIENT*',
@@ -601,6 +612,13 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         <div className="wk-rep">
           <div className="wk-row"><span className="wk-mu">Hours</span><span className="wk-num">{fmtDur(secs)}</span></div>
           <div className="wk-row"><span className="wk-mu">Clock-in</span><span className="wk-num">{firstIn ? fmtTimeIST(firstIn) : '-'}</span></div>
+          <div className="wk-row"><span className="wk-mu">Clock-out</span><span className="wk-num">{(() => {
+            const ap = (entries || []).filter((e) => e.status === 'approved')
+            if (!ap.length) return '-'
+            if (ap.some((e) => !e.ended_at)) return 'still working'
+            const l = ap.filter((e) => e.ended_at).slice(-1)[0]
+            return l ? fmtTimeIST(l.ended_at) : '-'
+          })()}</span></div>
           <div className="wk-row"><span className="wk-mu">Finished</span><span className="wk-num">{finished}</span></div>
           <div className="wk-row"><span className="wk-mu">In process</span><span className="wk-num">{proc}</span></div>
           <div className="wk-row"><span className="wk-mu">Late</span><span className="wk-num" style={{ color: late ? 'var(--danger)' : undefined }}>{late}</span></div>
