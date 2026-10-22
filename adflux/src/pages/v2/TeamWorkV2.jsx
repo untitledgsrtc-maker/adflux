@@ -44,6 +44,7 @@ export default function TeamWorkV2() {
   const [projects, setProjects] = useState([])
   const [running, setRunning] = useState([])
   const [pending, setPending] = useState([])
+  const [claims, setClaims] = useState([])
   const [parts, setParts] = useState([])
   const [templates, setTemplates] = useState([])
   const [report, setReport] = useState(null)
@@ -87,6 +88,8 @@ export default function TeamWorkV2() {
       canCost ? supabase.rpc('work_cost_report', { p_from: from, p_to: to }) : Promise.resolve({ data: null }),
       canCost ? supabase.rpc('work_cost_report', { p_from: addDaysISO(today, -92), p_to: today }) : Promise.resolve({ data: null }),
       supabase.from('work_report_shares').select('user_id,shared_at').eq('work_date', today),
+      // Phase 444: idle "I was working" claims in the last 7 days (per person), to spot repeat claimers
+      supabase.from('work_time_entries').select('user_id,status').like('note', 'Said working while idle%').gte('created_at', dayStartISO(addDaysISO(today, -7))),
     ])
     const e = q.slice(0, 8).find((r) => r.error)
     if (e) { setErr(e.error.message || 'Could not load.'); setLoading(false); return }
@@ -94,7 +97,7 @@ export default function TeamWorkV2() {
     if (!rep || !rep.by_person) { setIsHead(false); setLoading(false); return }   // not a head
     setIsHead(true)
     setMembers(q[0].data || []); setUsers(q[1].data || []); setProjects(q[2].data || [])
-    setRunning(q[3].data || []); setPending(q[4].data || []); setParts(q[5].data || [])
+    setRunning(q[3].data || []); setPending(q[4].data || []); setClaims(q[11]?.data || []); setParts(q[5].data || [])
     setTemplates(q[6].data || []); setReport(rep); setCost(q[8].data)
     const m = {}; (q[9].data?.by_task || []).forEach((t) => { m[t.task_id] = t }); setCostMap(m)
     setShares(q[10].data || [])
@@ -396,7 +399,11 @@ export default function TeamWorkV2() {
                       </span>
                       <span className="wk-sm" style={{ minWidth: 130 }}><span className="wk-dot" style={{ background: clientColor(projName(e.project_id)), width: 8, height: 8, marginRight: 6 }} />{projName(e.project_id) || 'No client'}</span>
                       <span className="wk-num" style={{ minWidth: 70 }}>{fmtDur(secs(e))}</span>
-                      <span className="wk-sm" style={{ flex: 1, minWidth: 160 }}>{e.note || e.task_label}</span>
+                      <span className="wk-sm" style={{ flex: 1, minWidth: 160 }}>
+                        {e.note || e.task_label}
+                        {(() => { const n = claims.filter((c) => c.user_id === e.user_id).length; const d = claims.filter((c) => c.user_id === e.user_id && c.status === 'declined').length
+                          return String(e.note || '').startsWith('Said working while idle') && n >= 3 ? <div style={{ color: 'var(--w-wat, #FBBF24)', marginTop: 4 }}>{n} idle claims in 7 days{d ? ` (${d} declined)` : ''}</div> : null })()}
+                      </span>
                       <span style={{ whiteSpace: 'nowrap', display: 'flex', gap: 8 }}>
                         <button className="wk-btn o sm" disabled={busy} onClick={() => rpc('work_decide_time', { p_entry: e.id, p_approve: false }, 'Declined.')}><X size={14} aria-hidden="true" /> Decline</button>
                         <button className="wk-btn y sm" disabled={busy} onClick={() => rpc('work_decide_time', { p_entry: e.id, p_approve: true }, 'Approved.')}><Check size={14} aria-hidden="true" /> Approve</button>
