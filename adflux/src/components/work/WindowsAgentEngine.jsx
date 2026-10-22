@@ -280,6 +280,10 @@ export default function WindowsAgentEngine() {
         } catch { /* generic */ }
         try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('New task for you', { body: title, tag: `wk-part-${ev.new?.id}` }) } catch { /* ignore */ }
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'work_reminders', filter: `user_id=eq.${uid}` }, (ev) => {
+        const k = ev.new?.kind
+        try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification(k === 'morning' ? 'Say good morning' : 'Send your evening report', { body: k === 'morning' ? 'Please say hi on WhatsApp to start your day.' : 'Please open My Work and share your evening report.', tag: `wk-rem-${k}` }) } catch { /* ignore */ }
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'work_task_parts' }, async (ev) => {
         // someone declined a task I created -> tell me on this PC
         const n = ev.new || {}

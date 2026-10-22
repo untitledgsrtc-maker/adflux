@@ -33,6 +33,7 @@ import NotificationPanel from './NotificationPanel'
 import ProposedIncentiveCard from '../incentives/ProposedIncentiveCard'
 import SalesTourOverlay from '../training/SalesTourOverlay'
 import MorningGreetGate from '../work/MorningGreetGate'
+import ReminderBanner from '../work/ReminderBanner'
 import WindowsAgentBridge from '../work/WindowsAgentBridge'
 import { ToastViewport, pushToast } from './Toast'
 import AppUpdateBanner from './AppUpdateBanner'
@@ -1168,6 +1169,7 @@ export function V2AppShell() {
       <ConfirmDialogViewport />
       {/* Phase 372: sales + telecaller pages mount their own gate; every other role gets it here. */}
       {['staff', 'operation_executive', 'operation_head', 'hr', 'accounts', 'office_admin'].includes(profile?.role) && <MorningGreetGate />}
+      {profile?.role && !['admin', 'co_owner', 'agency'].includes(profile.role) && <ReminderBanner />}
       {/* Phase 384 - Windows app only: recording + idle question. Renders nothing in a browser or phone. */}
       {/* Phase 447 - was staff only, so accounts / HR / office admin PCs never ran the idle question or tracking. Everyone except the owner side + agencies. */}
       {profile?.role && !['admin', 'co_owner', 'agency'].includes(profile.role) && <WindowsAgentBridge />}

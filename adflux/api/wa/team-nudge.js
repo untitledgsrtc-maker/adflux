@@ -63,7 +63,8 @@ export default async function handler(req) {
   let body0 = {}
   try { body0 = (await req.clone().json()) || {} } catch { /* normal cron call has no usable body */ }
   const forced = body0.force === true && typeof body0.only === 'string' && body0.only.trim().length >= 3
-  if (!forced) {
+  const manual = body0.mode === 'manual'   // Phase 462: sent by hand from the Daily check-in card - no hour / Sunday gate
+  if (!forced && !manual) {
     if (istNow.getUTCDay() === 0) return ok({ skipped: 'sunday' })
     if (istHour < 9 || istHour >= 20) return ok({ skipped: 'off_hours', istHour })
   }
@@ -80,6 +81,10 @@ export default async function handler(req) {
     reps = reps.filter((r) => String(r.name || '').toLowerCase().startsWith(q))
     if (reps.length !== 1) return nope('force_needs_exactly_one_match:' + reps.length)
   }
+  if (manual) {
+    const ids = (Array.isArray(body0.users) ? body0.users : []).map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 60)
+    reps = reps.filter((r) => ids.includes(r.id) && !['admin', 'co_owner', 'agency'].includes(r.role))
+  }
   let sent = 0, closed = 0, clear = 0, failed = 0
   const errs = {}   // Meta error code -> count, returned so a failing nudge is visible in the cron response
 
@@ -94,6 +99,21 @@ export default async function handler(req) {
       try { const j = await gr.json(); code = String(j?.error?.code || '') + (j?.error?.error_subcode ? '/' + j.error.error_subcode : '') } catch { /* keep status only */ }
       throw new Error('graph_' + gr.status + (code ? ':' + code : ''))
     }
+  }
+
+  // Manual reminder (Phase 462): the person is told by WhatsApp only if their 24h window is open (they messaged the 95 number in the last day).
+  if (manual) {
+    const kind = body0.kind === 'morning' ? 'morning' : 'evening'
+    await pool(reps, 8, async (r) => {
+      const last = (await sbRows(`team_assistant_requests?user_id=eq.${r.id}&created_at=gte.${dayAgo}&select=phone_number_id,wa_from&order=created_at.desc&limit=1`))?.[0]
+      const to = String(last?.wa_from || '').replace(/\D/g, '')
+      const pnid = String(last?.phone_number_id || '')
+      if (to.length < 10 || !/^\d+$/.test(pnid)) { closed++; return }
+      const first = String(r.name || '').trim().split(/\s+/)[0] || 'there'
+      const text = kind === 'morning' ? `Good morning ${first}! Please say hi here to start your day.` : `${first}, please send your evening report. Open the app and tap Share.`
+      try { await sendText(pnid, to, text); sent++ } catch (e) { failed++; errs[e.message] = (errs[e.message] || 0) + 1 }
+    })
+    return ok({ mode: 'manual', kind, reps: reps.length, sent, failed, errors: errs, window_closed: closed })
   }
 
   // Evening report reminder (Phase 371): only people with an open window who have NOT shared today's report.

@@ -7,12 +7,17 @@ import '../../styles/work.css'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { istHour } from '../../utils/workUtils'
+import { pushToast } from '../v2/Toast'
 
 const first = (n) => String(n || '').trim().split(/\s+/)[0]
 
-function Line({ label, done, total, missing, closed, note }) {
+function Line({ label, done, total, missing, closed, note, canSend, kind, onSend }) {
   const [all, setAll] = useState(false)
-  const shown = all ? missing : missing.slice(0, 5)
+  const [sel, setSel] = useState([])
+  const [busy, setBusy] = useState(false)
+  const toggle = (id) => setSel((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]))
+  const send = async (ids) => { setBusy(true); const ok = await onSend(kind, ids); setBusy(false); if (ok) setSel([]) }
+  const shown = all || canSend && sel.length ? missing : missing.slice(0, 5)
   const pct = total ? Math.round(done / total * 100) : 0
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '130px 90px 1fr', gap: 12, alignItems: 'center', padding: '10px 16px' }}>
@@ -27,9 +32,17 @@ function Line({ label, done, total, missing, closed, note }) {
               : (
                 <div className="wk-grp" style={{ gap: 6 }}>
                   <span className="wk-sm">Not yet:</span>
-                  {shown.map((n) => <span key={n.id} className="wk-pill warn">{first(n.name)}</span>)}
+                  {shown.map((n) => canSend
+                    ? <button key={n.id} type="button" className={`wk-pill ${sel.includes(n.id) ? 'ok' : 'warn'}`} style={{ cursor: 'pointer', border: 0 }} aria-pressed={sel.includes(n.id)} onClick={() => toggle(n.id)}>{sel.includes(n.id) ? '\u2713 ' : ''}{first(n.name)}</button>
+                    : <span key={n.id} className="wk-pill warn">{first(n.name)}</span>)}
                   {!all && missing.length > 5 && <button className="wk-btn g sm" onClick={() => setAll(true)}>+{missing.length - 5} more</button>}
                   {all && missing.length > 5 && <button className="wk-btn g sm" onClick={() => setAll(false)}>Less</button>}
+                  {canSend && (
+                    <span className="wk-grp" style={{ gap: 6, marginLeft: 'auto' }}>
+                      {sel.length > 0 && <button className="wk-btn y sm" disabled={busy} onClick={() => send(sel)}>Remind {sel.length} selected</button>}
+                      <button className="wk-btn o sm" disabled={busy} onClick={() => send(missing.map((m) => m.id))}>Remind all not yet ({missing.length})</button>
+                    </span>
+                  )}
                 </div>
               )}
           </>
@@ -58,7 +71,15 @@ export default function DailyCheckinCard() {
   if (err) return <div className="wk" style={{ padding: 0 }}><div className="wk-err" role="alert"><span>{err}</span><button className="wk-btn g sm" onClick={load}>Retry</button></div></div>
   if (!rows.length) return null
 
-  const eveningOpen = istHour() >= 19
+  const canSend = ['admin', 'co_owner', 'hr'].includes(role)
+  const eveningOpen = istHour() >= 19 || canSend
+  const sendReminder = async (kind, ids) => {
+    if (!ids.length) return
+    const { data, error } = await supabase.rpc('work_send_reminder', { p_users: ids, p_kind: kind })
+    if (error) { pushToast(error.message || 'Could not send.', 'error'); return false }
+    pushToast(`Reminder sent to ${data} ${data === 1 ? 'person' : 'people'}. They see it when they open the app.`, 'success')
+    return true
+  }
   return (
     <div className="wk" style={{ padding: 0 }}>
       <div className="wk-card flush">
@@ -66,9 +87,9 @@ export default function DailyCheckinCard() {
           <h3 style={{ fontSize: 16 }}>Daily check-in</h3>
           {['admin', 'co_owner'].includes(role) && <Link to="/team-work" className="wk-btn o sm">Team work</Link>}
         </div>
-        <Line label="Morning hi" done={rows.filter((r) => r.said_hi).length} total={rows.length} missing={rows.filter((r) => !r.said_hi)} />
+        <Line label="Morning hi" done={rows.filter((r) => r.said_hi).length} total={rows.length} missing={rows.filter((r) => !r.said_hi)} canSend={canSend} kind="morning" onSend={sendReminder} />
         <Line label="Evening report" done={rows.filter((r) => r.shared).length} total={rows.length} missing={rows.filter((r) => !r.shared)}
-          closed={!eveningOpen} note="Opens at 7 PM" />
+          closed={!eveningOpen} note="Opens at 7 PM" canSend={canSend} kind="evening" onSend={sendReminder} />
       </div>
     </div>
   )

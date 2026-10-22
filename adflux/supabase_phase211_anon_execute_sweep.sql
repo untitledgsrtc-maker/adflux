@@ -98,7 +98,7 @@ BEGIN
                         -- ops_ticket_resolved_push is the 5th: the resolved-ticket trigger function.
                         'ops_notify_outages', 'ops_morning_digest', 'ops_head_evening_push',
                         -- Phase 365 work module internals (supabase_phase365_work_timeclock.sql)
-                        'work_user_rate', 'work_log', 'work_push', 'work_refresh_task', 'work__stop_running',
+                        'work_user_rate', 'work_log', 'work_push', 'work_refresh_task', 'work__stop_running', 'work__reminder_wa',
                         'work_autostop_all', 'work_stop_quiet_pc_timers', 'work_alert_due_time', 'work_run_recurring', 'work_return_postponed','work_is_tracked','work_purge_activity', 'work_is_tracked', 'work_purge_activity',
                         'ops_ticket_assignment_push', 'ops_ticket_resolved_push',
                         'ops_tech_day_block',
@@ -197,7 +197,7 @@ WHERE n.nspname = 'public'
                     'capi_dispatch', 'capi_queue_won',
                     '_client_owner_for_key','_client_fold_row','_client_fold',
                     'ops_notify_outages','ops_morning_digest','ops_head_evening_push',
-                    'work_user_rate','work_log','work_push','work_refresh_task','work__stop_running','work_autostop_all', 'work_stop_quiet_pc_timers', 'work_alert_due_time','work_run_recurring','work_return_postponed',
+                    'work_user_rate','work_log','work_push','work_refresh_task','work__stop_running','work__reminder_wa','work_autostop_all', 'work_stop_quiet_pc_timers', 'work_alert_due_time','work_run_recurring','work_return_postponed',
                     'ops_ticket_assignment_push','ops_ticket_resolved_push','ops_tech_day_block',
                     'ops_aiadflux_sync_dispatch','ops_ticket_wa_dispatch',
                     'earned_incentive_for','recompute_daily_new_leads',
