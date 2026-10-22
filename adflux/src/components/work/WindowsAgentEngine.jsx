@@ -155,9 +155,13 @@ export default function WindowsAgentEngine() {
       }
       window.dispatchEvent(new Event('focus'))     // let the open page refresh its timer
     }
-    async function maybeAskIdle(idle) {
+    async function maybeAskIdle(rawIdle) {
       const mins = Number(s.config?.idle_minutes || 0)
       if (!mins || !s.running) return
+      // Phase 445: idle that began BEFORE this timer started is not idle time of this timer. Without this cap, starting a timer after a long
+      // gap with no (real) keyboard/mouse input made "idle" already >= 5 min: the question opened at once and froze the clock at 00:00:00.
+      const sinceStart = Math.max(0, (Date.now() - new Date(s.running.started_at).getTime()) / 1000)
+      const idle = Math.min(rawIdle, sinceStart)
       if (idle < 60) s.suppress = false
       if (s.asking || s.suppress || idle < mins * 60) return
       const began = new Date(Date.now() - idle * 1000)
