@@ -35,13 +35,11 @@ BEGIN
     RAISE EXCEPTION 'only the person who created this task, or a head, can delete it' USING ERRCODE='42501';
   END IF;
   IF NOT v_head THEN
-    IF EXISTS (SELECT 1 FROM public.work_task_parts p WHERE p.task_id = p_task AND (p.status <> 'assigned' OR p.started_at IS NOT NULL OR p.finished_at IS NOT NULL))
+    -- Phase 457: the creator may delete unless work really happened (time logged / started / finished).
+    -- A late due date, or a part that was declined / postponed, no longer blocks.
+    IF EXISTS (SELECT 1 FROM public.work_task_parts p WHERE p.task_id = p_task AND (p.started_at IS NOT NULL OR p.finished_at IS NOT NULL OR p.status = 'finished'))
        OR EXISTS (SELECT 1 FROM public.work_time_entries e WHERE e.task_id = p_task) THEN
       RAISE EXCEPTION 'someone has already worked on this task - ask a head to delete it';
-    END IF;
-    IF (v_task.due_date IS NOT NULL AND v_task.due_date < v_today)
-       OR EXISTS (SELECT 1 FROM public.work_task_parts p WHERE p.task_id = p_task AND p.due_date IS NOT NULL AND p.due_date < v_today) THEN
-      RAISE EXCEPTION 'the due date has passed - ask a head to delete it';
     END IF;
   END IF;
   -- stop a timer that is running on one of its parts (head deleting live work)

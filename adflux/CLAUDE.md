@@ -21695,3 +21695,6 @@ Team Work > People is a grid of person cards (photo + status dot, name, designat
 
 ## 456 · Windows app look: sidebar stays put, timer card normal size (23-10-2026)
 From the owner's video of Sapna's app: (1) the sidebar scrolled away with the page - `.v2d-app` had `overflow-x:hidden`, which makes it a scroll container and kills `position:sticky`; now `overflow-x: clip` (same cut-off, no scroll container). (2) My Work timer card stretched to the right column's height (a huge empty green box) - removed the Phase 356.12 grow rule, `.wk-grid{align-items:start}`. CSS only. Rule: never put `overflow-x:hidden` on an ancestor of a sticky element; use `clip`.
+
+## 457 · Task due TIME editable; creator can delete unless work happened (23-10-2026)
+`supabase_phase457_work_time_edit.sql` (applied): `work_set_due_time(task, part, time)` (same people as work_set_due; resets the due alert). Task box shows a time box beside the date (head/creator for the whole task, assignee for own part). `work_delete_task` (phase418 file edited in place): a creator who is not a head is now blocked only if time was logged or a part started/finished - a past due date or a declined/postponed part no longer blocks.

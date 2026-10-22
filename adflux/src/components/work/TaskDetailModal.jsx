@@ -34,7 +34,7 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
     setErr('')
     const [t, p, s, c, l] = await Promise.all([
       supabase.from('work_tasks').select('id,title,project_id,note,created_by,due_date,status,template_id,finished_at,created_at,is_urgent').eq('id', taskId).maybeSingle(),
-      supabase.from('work_task_parts').select('id,task_id,assignee_id,label,due_date,status,started_at,finished_at,finish_note,seconds,created_at,postponed_until,postponed_by_users,postponed_by_client,postpone_count,reject_kind,reject_reason,rejected_by,rejected_at').eq('task_id', taskId).order('created_at'),
+      supabase.from('work_task_parts').select('id,task_id,assignee_id,label,due_date,due_time,status,started_at,finished_at,finish_note,seconds,created_at,postponed_until,postponed_by_users,postponed_by_client,postpone_count,reject_kind,reject_reason,rejected_by,rejected_at').eq('task_id', taskId).order('created_at'),
       supabase.from('work_task_steps').select('*').eq('task_id', taskId).order('position'),
       supabase.from('work_task_comments').select('*').eq('task_id', taskId).order('created_at'),
       supabase.from('work_task_log').select('*').eq('task_id', taskId).order('created_at', { ascending: false }).limit(60),
@@ -107,6 +107,10 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                 <input type="date" className="wk-input" style={{ width: 170, minHeight: 40 }} value={task.due_date || ''} aria-label="Change due date"
                   onChange={(e) => run(() => rpc('work_set_due', { p_task: task.id, p_part: null, p_due: e.target.value || null }))} />
               )}
+              {canEdit && task.status !== 'finished' && (
+                <input type="time" className="wk-input" style={{ width: 130, minHeight: 40 }} value={((data.parts.find((x) => x.status !== 'finished') || {}).due_time || '').slice(0, 5)} aria-label="Change due time"
+                  onChange={(e) => run(() => rpc('work_set_due_time', { p_task: task.id, p_part: null, p_time: e.target.value || null }))} />
+              )}
             </div>
             {task.note && <div className="wk-card" style={{ marginTop: 12 }}><div className="wk-sm">Note</div><div>{task.note}</div></div>}
 
@@ -126,6 +130,10 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                   {p.assignee_id === uid && !canEdit && p.status !== 'finished' && p.status !== 'postponed' && (
                     <input type="date" className="wk-input" style={{ width: 170, minHeight: 40, marginTop: 8 }} value={p.due_date || task.due_date || ''} aria-label="Change my due date"
                       onChange={(e) => run(() => rpc('work_set_due', { p_task: task.id, p_part: p.id, p_due: e.target.value || null }))} />
+                  )}
+                  {p.assignee_id === uid && !canEdit && p.status !== 'finished' && p.status !== 'postponed' && (
+                    <input type="time" className="wk-input" style={{ width: 130, minHeight: 40, marginTop: 8, marginLeft: 8 }} value={(p.due_time || '').slice(0, 5)} aria-label="Change my due time"
+                      onChange={(e) => run(() => rpc('work_set_due_time', { p_task: task.id, p_part: p.id, p_time: e.target.value || null }))} />
                   )}
                   {p.finish_note && <div className="wk-sm">Note: {p.finish_note}</div>}
                   {p.reject_reason && p.status !== 'finished' && (
