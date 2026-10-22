@@ -263,6 +263,15 @@ export default function MyWorkV2() {
           {tab === 'work' && isMember && (
             <div className="wk-grid">
               <div className="wk-c8" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                {running && !window.__TAURI_INTERNALS__ && (now + skew) - Math.max(new Date(running.started_at).getTime(), running.last_confirmed_at ? new Date(running.last_confirmed_at).getTime() : 0) > 2.5 * 3600 * 1000 && (
+                  <div className="wk-card" role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '12px 16px', borderColor: 'var(--w-wat, #FBBF24)' }}>
+                    <span>Still working? Your timer has run a long time with no check. It stops by itself if you do not answer.</span>
+                    <span className="wk-grp">
+                      <button className="wk-btn y sm" disabled={busy} onClick={() => rpc('work_confirm_working', {})}>Yes, still working</button>
+                      <button className="wk-btn o sm" disabled={busy} onClick={() => rpc('work_clock_stop', {})}>Stop timer</button>
+                    </span>
+                  </div>
+                )}
                 {showLunch && (
                   <div className="wk-card" role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '12px 16px', borderColor: 'var(--w-wat, #FBBF24)' }}>
                     <span>Lunch is at 1 PM. Going for lunch? Pause your timer before you leave.</span>
