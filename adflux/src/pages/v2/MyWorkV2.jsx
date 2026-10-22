@@ -174,6 +174,8 @@ export default function MyWorkV2() {
   })
   const isOpen = (i) => i.status !== 'finished' && i.status !== 'postponed'
   const dayOpen = boardItems.filter(isOpen).length
+  // Phase 436: tasks given to me for a LATER date are not on today's board - say so, with one tap to see them
+  const laterCount = isToday ? items.filter((i) => isOpen(i) && i.due && i.due > today).length : 0
   const dayLate = boardItems.filter((i) => isOpen(i) && i.due && i.due < today).length
   const rangeLabel = isToday ? 'Today' : (rFrom === rTo ? fmtDateShort(rFrom) : `${fmtDateShort(rFrom)} - ${fmtDateShort(rTo)}`)
 
@@ -310,6 +312,12 @@ export default function MyWorkV2() {
                     <button className={`wk-btn ${isToday ? 'y' : 'o'}`} onClick={() => { setViewFrom(null); setViewTo(null) }}>Today</button>
                   </div>
                 </div>
+                {laterCount > 0 && (
+                  <div className="wk-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '12px 16px', marginBottom: 14, borderColor: 'var(--accent)' }}>
+                    <span><b className="wk-num">{laterCount}</b> {laterCount === 1 ? 'task is' : 'tasks are'} given to you for a later date.</span>
+                    <button className="wk-btn y sm" onClick={() => { setViewFrom(today); setViewTo(addDaysISO(today, 90)) }}>Show upcoming</button>
+                  </div>
+                )}
                 <WorkBoard items={boardItems} uid={uid} runningPartId={running?.part_id || null} onMove={onMove} onOpen={setOpenTask} onStart={onStart} onFinish={onFinish} onPostpone={(it) => setPostponing(it)} />
                 <div className="wk-sm" style={{ marginTop: 10 }}>Drag your own task forward: Assigned to In process starts the clock, In process to Finished stops it. Or use Start / Finish.</div>
               </div>
@@ -317,7 +325,7 @@ export default function MyWorkV2() {
           )}
 
           {tab === 'calendar' && <WorkCalendar uid={uid} isHead={isHead} nameOf={nameOf} onOpen={setOpenTask} />}
-          {tab === 'asked' && <AskedTab asked={asked} nameOf={nameOf} projName={projName} onOpen={setOpenTask} onNew={() => setNewTask(true)} />}
+          {tab === 'asked' && <AskedTab asked={asked} nameOf={nameOf} photoOf={photoOf} projName={projName} onOpen={setOpenTask} onNew={() => setNewTask(true)} />}
           {tab === 'hours' && isMember && <HoursTab uid={uid} entries={entries} projects={projects} projName={projName} onAddManual={(a) => rpc('work_add_manual_time', a, 'Sent for approval.')} onAddProject={addProject} />}
           {!isMember && tab !== 'asked' && <div className="wk-empty">You can ask for work and follow it here.</div>}
         </>
@@ -569,7 +577,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
 
 const PART_PILL = { assigned: ['', 'Assigned'], in_process: ['in', 'In process'], finished: ['ok', 'Finished'], postponed: ['warn', 'Postponed'] }
 
-function AskedTab({ asked, nameOf, projName, onOpen, onNew }) {
+function AskedTab({ asked, nameOf, photoOf, projName, onOpen, onNew }) {
   const waiting = asked.reduce((n, t) => n + t.parts.filter((p) => p.status !== 'finished').length, 0)
   return (
     <div style={{ display: 'grid', gap: 20 }}>

@@ -21624,3 +21624,10 @@ Every place that shows a person MUST use `src/components/common/UserAvatar.jsx` 
 Note (432 follow-up): tasks with no client (Diya finance, HR, office) show one neutral grey bar in the calendar instead of a hashed colour.
 
 Note (435): public/led/index.html (the /led landing page) now says 300 LED screens (was 264) in the description, og tag, lede, hero counter, aria-label and the STATIONS - LIVE header. Other places still say 264 (public/investor, leadEmailDraft.js, CreateQuoteV2 hint) - owner only asked for /led.
+
+## 436 · Team feedback batch (22-10-2026)
+
+1. **Asked by me crashed** (Dhara): my Phase 433 avatar change used `photoOf` inside `AskedTab` where it was not in scope -> ReferenceError. Now passed as a prop. (Lesson: after swapping markup into a child component, check every variable it uses is in that component.)
+2. **Tasks with no client could not start** ("pick a client first") - hit Riya (25), Diya (7), Khushbu (1) office tasks created by my rules. `work_clock_start` now falls back to internal client "Untitled Internal" for a task with no client. Client "Collabkeep" added (Khushbu asked).
+3. **"Still working?" idle question only ran for tracked people** (only Safika is switched on in work_tracking_people, so Akshar / Piyush / Dikshita never got it and timers ran while away). Engine (`WindowsAgentEngine.tick`) now asks for everyone with a running timer; `work_agent_idle` no longer needs tracking. Programs / window titles / screenshots still tracked-only. `supabase_phase436_work_nocient_idle.sql` applied.
+4. **Tasks assigned for a later date were invisible to the assignee** (default board = today + overdue). My Work now shows a "N tasks are given to you for a later date - Show upcoming" bar (range today..+90d).

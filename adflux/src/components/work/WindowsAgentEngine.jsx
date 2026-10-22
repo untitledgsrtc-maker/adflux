@@ -168,8 +168,10 @@ export default function WindowsAgentEngine() {
           sample(win, idle)
           await flushBuckets(false)
           await maybeScreenshot()
-          await maybeAskIdle(idle)
         }
+        // Phase 436: the "Still working?" question is for EVERYONE with a running timer (it needs only the idle seconds);
+        // programs / window titles / screenshots above stay for tracked people only.
+        await maybeAskIdle(idle)
         s.lastTickAt = Date.now()
       } catch (e) { s.lastErr = String(e?.message || e) } finally { s.ticking = false }
     }
