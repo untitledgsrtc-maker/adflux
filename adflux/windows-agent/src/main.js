@@ -49,7 +49,7 @@ function runIdle() {
       <button class="wk-btn y" data-d="still_working" style="justify-content:center;min-height:48px">RESUME</button>
       <button class="wk-btn" data-d="stop" style="justify-content:center;min-height:48px;background:var(--danger,#EF4444);border-color:var(--danger,#EF4444);color:#fff">STOP</button>
     </div>
-    <button class="wk-btn o" data-d="worked" style="width:100%;justify-content:center;margin-top:10px">I was working (count these minutes)</button>`)
+    <button class="wk-btn o" data-d="worked" style="width:100%;justify-content:center;margin-top:10px">I was working (write the reason)</button>`)
   const stoppedView = (p) => card(`<div class="wk-eyb" style="color:var(--w-dat,#F87171)">Your timer is stopped</div>
     <div style="font-size:18px;margin:6px 0 4px">Stopped at ${esc(p.stopAt || '')}${p.auto ? ' because you were away' : ''}.</div>
     <div class="wk-sm" style="margin-bottom:12px">${esc(p.client || '')}${p.label ? ' - ' + esc(p.label) : ''}. Time since then is not counted.</div>

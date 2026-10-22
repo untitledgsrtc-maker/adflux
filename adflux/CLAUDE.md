@@ -21649,3 +21649,7 @@ Note (439 follow-up, Phase 440): when a new version takes over an open window a 
 vite.config.js defines `__APP_BUILD__` (Vercel commit sha, first 7, else build time); My Work shows a small "Version xxxxxxx" bottom-right so a screenshot tells us which build a person is running (used to diagnose Safika not seeing the Phase 437 board change).
 
 Note (437 follow-up, Phase 442): Team Work > Tasks board uses the same rule as My Work - work due within 2 days of the chosen range, or given in the last 2 days, shows without pressing "Show later tasks"; older far-dated work stays behind that button.
+
+## 443 · "I was working" needs a typed reason + approval (22-10-2026)
+
+Owner: people were claiming idle minutes. `supabase_phase443_idle_claim_approval.sql` (applied): `work_agent_idle(..., p_note)` - decision still_working now REQUIRES a reason (>=10 letters), holds the away minutes back like a break, and creates a PENDING `work_time_entries` row (source added_later, note "Said working while idle: ...") in Team Work > Approvals, pushing admins + heads; answered once per idle_began (no double request). Riya (HR) made a Work head so she can approve. Web engine (`WindowsAgentEngine`) shows a reason box (min 10 letters) in the main window when the small idle window sends "worked". The small window text lives in the installer (`windows-agent/src/main.js`, label changed to "I was working (write the reason)") - shows only after the next installer release; until then it still says "(count these minutes)" but behaves correctly. Hours have no pay effect.

@@ -31,6 +31,9 @@ export default function WindowsAgentEngine() {
   const [interval, setIntervalMin] = useState(10)
   const [stopped, setStopped] = useState(null)   // 'timer stopped' notice with a restart button
   const [ask, setAsk] = useState(null)          // idle question also shown inside this page (backup for the small window)
+  const [reasonOpen, setReasonOpen] = useState(false)   // Phase 443: typed reason for "I was working"
+  const [reasonText, setReasonText] = useState('')
+  const [reasonErr, setReasonErr] = useState('')
   const [diag, setDiag] = useState(null)        // tiny status pill: idle seconds, recording, last error
   const S = useRef({
     device: 'Windows PC', config: null, running: null, projects: {}, buckets: new Map(),
@@ -110,9 +113,27 @@ export default function WindowsAgentEngine() {
         if (up.error) throw up.error
       } catch { /* a screenshot taken offline is dropped */ }
     }
-    async function answerIdle(decision) {
+    async function answerIdle(decision, note) {
       const a = s.asking
       if (!a) return
+      // Phase 443: "I was working" does NOT count by itself - ask for a typed reason first; it then goes to admin / a head for approval.
+      if (decision === 'worked' && !note) {
+        setReasonErr(''); setReasonOpen(true)
+        invoke('hide_window', { label: 'idle' }).catch(() => {})
+        invoke('show_window', { label: 'main' }).catch(() => {})
+        invoke('bring_to_front', { label: 'main' }).catch(() => {})
+        return
+      }
+      if (decision === 'worked') {
+        const { error } = await supabase.rpc('work_agent_idle', { p_entry: a.entry, p_idle_began: a.began, p_decision: 'still_working', p_idle_seconds: Math.round((Date.now() - new Date(a.began).getTime()) / 1000), p_note: note })
+        if (error) { setReasonErr(error.message || 'Could not send. Try again.'); return }
+        clearTimeout(s.askTimer); s.asking = null; setAsk(null); setReasonOpen(false); setReasonText(''); s.suppress = true
+        window.dispatchEvent(new CustomEvent('wk-idle-freeze', { detail: null }))
+        await loadAll()
+        window.dispatchEvent(new Event('focus'))
+        return
+      }
+      setReasonOpen(false)
       clearTimeout(s.askTimer); s.asking = null; setAsk(null)
       invoke('hide_window', { label: 'idle' }).catch(() => {})
       const idleSecs = Math.round((Date.now() - new Date(a.began).getTime()) / 1000)
@@ -199,7 +220,7 @@ export default function WindowsAgentEngine() {
       if (p?.type === 'close-idle') { setStopped(null); invoke('hide_window', { label: 'idle' }).catch(() => {}) }
       if (p?.type === 'restart') await restart()
     })
-    listen('agent:idle-answer', (p) => answerIdle(p?.decision || 'still_working'))
+    listen('agent:idle-answer', (p) => answerIdle(p?.decision || 'still_working', p?.note))
 
     ;(async () => {
       try { s.device = await invoke('device_name') } catch { /* keep default */ }
@@ -254,6 +275,23 @@ export default function WindowsAgentEngine() {
       </div>
     </div>
   ) : null
+  const reasonBox = reasonOpen && ask ? (
+    <div className="wk" style={{ position: 'fixed', inset: 0, zIndex: 9002, background: 'rgba(7,11,22,.8)', display: 'grid', placeItems: 'center', padding: 16 }}>
+      <div className="wk-card" style={{ maxWidth: 460, width: '100%', borderColor: 'var(--w-wat, #FBBF24)' }} role="dialog" aria-label="Why were you away?">
+        <div className="wk-eyb">Away since {ask.stopAt}</div>
+        <div style={{ fontSize: 18, margin: '6px 0 8px' }}>What were you doing?</div>
+        <div className="wk-sm" style={{ marginBottom: 10 }}>These minutes are not counted yet. Your reason goes to admin / HR, and the minutes count only if they approve.</div>
+        <textarea className="wk-input" style={{ height: 96, padding: 10 }} value={reasonText} maxLength={300} autoFocus aria-label="Reason"
+          placeholder="For example: checking the printed file with the client" onChange={(e) => { setReasonText(e.target.value); setReasonErr('') }} />
+        {reasonErr && <div className="wk-sm" style={{ color: 'var(--w-dat, #F87171)', marginTop: 6 }} role="alert">{reasonErr}</div>}
+        <div className="wk-row" style={{ marginTop: 12 }}>
+          <button className="wk-btn o" onClick={() => { setReasonOpen(false); setReasonErr('') }}>Back</button>
+          <button className="wk-btn y" disabled={reasonText.trim().length < 10} onClick={() => S.current.answer?.('worked', reasonText.trim())}>Send for approval</button>
+        </div>
+        {reasonText.trim().length < 10 && <div className="wk-sm" style={{ marginTop: 6 }}>Write at least 10 letters.</div>}
+      </div>
+    </div>
+  ) : null
   const question = ask ? (
     <div className="wk" style={{ position: 'fixed', inset: 0, zIndex: 9001, background: 'rgba(7,11,22,.75)', display: 'grid', placeItems: 'center', padding: 16 }}>
       <div className="wk-card" style={{ maxWidth: 440, width: '100%', borderColor: 'var(--w-wat, #FBBF24)' }} role="dialog" aria-label="Still working?">
@@ -261,7 +299,7 @@ export default function WindowsAgentEngine() {
         <div style={{ fontSize: 18, margin: '6px 0 12px' }}>Still working on {ask.client || 'your task'}?</div>
         <div style={{ display: 'grid', gap: 8 }}>
           <button className="wk-btn y" onClick={() => S.current.answer?.('still_working')}>Resume - I am here</button>
-          <button className="wk-btn o" onClick={() => S.current.answer?.('worked')}>I was working (count these minutes)</button>
+          <button className="wk-btn o" onClick={() => S.current.answer?.('worked')}>I was working (write the reason)</button>
           <button className="wk-btn o" onClick={() => S.current.answer?.('stop')}>Stop timer</button>
         </div>
         <div className="wk-sm" style={{ marginTop: 10 }}>The timer is paused. Resume does not count the minutes you were away. No answer in {ask.waitMin} min: the timer stops at {ask.stopAt}.</div>
@@ -269,7 +307,7 @@ export default function WindowsAgentEngine() {
     </div>
   ) : null
 
-  if (!needConsent) return <>{pill}{question}{stoppedNotice}</>
+  if (!needConsent) return <>{pill}{question}{reasonBox}{stoppedNotice}</>
   return (
     <div className="wk" style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(7,11,22,.7)', display: 'grid', placeItems: 'center', padding: 16 }}>
       <div className="wk-card" style={{ maxWidth: 520, width: '100%' }} role="dialog" aria-label="Before you start">
