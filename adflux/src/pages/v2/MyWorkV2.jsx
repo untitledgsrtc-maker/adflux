@@ -204,6 +204,13 @@ export default function MyWorkV2() {
   const firstIn = entries.find((e) => e.status === 'approved')?.started_at
   const lateCount = items.filter((i) => isOpen(i) && dueState(i.due, i.status).cls === 'bad').length
 
+  // Phase 450: lunch is 1 PM - from 12:55 to 1:30 PM a running timer gets a "pause before you go" bar (once a day it can be dismissed)
+  const istNowMin = (() => { const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(now)); return Number(p[0].value) * 60 + Number(p[2].value) })()
+  const lunchKey = `lunch_dismissed_${today}`
+  let lunchHidden = false
+  try { lunchHidden = !!localStorage.getItem(lunchKey) } catch { /* storage blocked */ }
+  const [lunchGone, setLunchGone] = useState(false)
+  const showLunch = !!running && istNowMin >= 12 * 60 + 55 && istNowMin <= 13 * 60 + 30 && !lunchHidden && !lunchGone
   const onStart = (it) => rpc('work_clock_start', { p_project: null, p_label: null, p_part: it.id })
   const onFinish = (it) => rpc('work_finish_part', { p_part: it.id, p_note: null }, 'Finished. The person who asked is told.')
   const onMove = (id, to) => rpc('work_move_part', { p_part: id, p_to: to })
@@ -254,6 +261,15 @@ export default function MyWorkV2() {
           {tab === 'work' && isMember && (
             <div className="wk-grid">
               <div className="wk-c8" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                {showLunch && (
+                  <div className="wk-card" role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '12px 16px', borderColor: 'var(--w-wat, #FBBF24)' }}>
+                    <span>Lunch is at 1 PM. Going for lunch? Pause your timer before you leave.</span>
+                    <span className="wk-grp">
+                      <button className="wk-btn y sm" disabled={busy} onClick={() => rpc('work_clock_stop', {})}>Pause now</button>
+                      <button className="wk-btn o sm" onClick={() => { try { localStorage.setItem(lunchKey, '1') } catch { /* ignore */ } setLunchGone(true) }}>I am working</button>
+                    </span>
+                  </div>
+                )}
                 {running
                   ? <RunningCard running={running} secs={runSecs} projName={projName} busy={busy}
                       onMakeTask={running.part_id ? null : () => createCardAndStart(running.project_id, running.task_label)}

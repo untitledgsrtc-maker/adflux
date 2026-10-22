@@ -21673,3 +21673,7 @@ Note (448 follow-up, 448b): **work_tasks has COLUMN-LEVEL select grants.** Addin
 ## 449 · Say it when the server stops a timer (22-10-2026)
 
 Piyush showed "Not clocked in" with 8h20m: his timer was stopped by the Phase 392 sweep `work-stop-quiet-pc` (every 10 min; no PC activity data for 20 min -> stopped at the last slice, note "Stopped: PC went quiet"); his last slice was 12:39, nothing after. Since Phase 438 (tracking on for all) this sweep applies to every Work member using the Windows app. Engine now shows the "Your timer is stopped - Start the timer again" notice when it sees its running timer vanish with auto_stopped=true (`WindowsAgentEngine.loadAll`). Cause of the silence itself (PC asleep / locked / app closed / offline) is the person's PC, not a bug.
+
+## 450 · Lunch reminder (22-10-2026)
+
+Lunch is 1 PM. `supabase_phase450_lunch_reminder.sql` (applied): `work_lunch_reminder()` + cron `work-lunch-reminder` 12:55 IST Mon-Sat (skips holidays) pushes everyone with a running Work timer "Pause your timer before you leave". My Work shows a bar 12:55-1:30 PM with Pause now / I am working (dismiss for the day, localStorage). Added to the 211 re-lock lists.
