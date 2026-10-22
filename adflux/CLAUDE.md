@@ -21633,3 +21633,7 @@ Note (435): public/led/index.html (the /led landing page) now says 300 LED scree
 4. **Tasks assigned for a later date were invisible to the assignee** (default board = today + overdue). My Work now shows a "N tasks are given to you for a later date - Show upcoming" bar (range today..+90d).
 
 Note (436 follow-up, Phase 437): My Work default board now also shows tasks due within 2 days and tasks given to me in the last 2 days (so a task assigned today for the 24th shows at once); only farther-dated older ones stay behind the "later date" bar.
+
+## 438 · Activity tracking ON for everyone (22-10-2026)
+
+Owner: "all rule will be same like Safika". `supabase_phase438_tracking_everyone.sql` (applied) enabled `work_tracking_people` for every active non-admin Work member (was Safika only). Recording stays gated by (a) running timer, (b) each person accepting the first-launch notice on their PC (`work_agent_devices.consent_at`). Per-person off-switch: Team Work > Activity. Admin (owner) not tracked.
