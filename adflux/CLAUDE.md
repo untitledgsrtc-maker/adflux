@@ -21689,3 +21689,6 @@ Diya's Windows app showed "JWT expired" on My Work and another PC showed a sales
 
 ## 454 · Urgent tasks + dd/mm/yyyy in Work (23-10-2026)
 `supabase_phase454_work_urgent.sql` (applied): `work_tasks.is_urgent` (column grant added), `work_create_task(..., p_urgent boolean DEFAULT false)` (old 7-arg version dropped), `work_set_urgent(task, bool)` for creator / heads. New Task has an Urgent switch (one-off tasks); urgent cards sort first in every column of My Work + Team Work boards and are red (`.wk-tk.urgent`), the task box shows an Urgent pill and a Mark urgent / Not urgent button, the push says "URGENT task for you". Repeating tasks cannot be urgent. All Work pages show dates as dd/mm/yyyy: `fmtDateShort` in workUtils now returns dd/mm/yyyy (28 users) and the other hand-written date strings use en-GB numeric. Month names in the calendar / profile titles stay as words.
+
+## 455 · People as cards, no inner board scroll (23-10-2026)
+Team Work > People is a grid of person cards (photo + status dot, name, designation, role tag, running task + live clock, hours bar, open tasks, on-time score, Head switch, Profile, remove; All / Working now / Not clocked in filter). The board columns no longer scroll inside themselves (removed the 76vh cap from Phase before): the four columns stretch to the same height and the page scrolls normally.
