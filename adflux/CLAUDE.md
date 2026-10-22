@@ -21707,3 +21707,6 @@ Owner video + list. (1) `DateField.jsx` replaces every Work `<input type="date">
 
 ## 460 · "I was working" now answered inside the small idle window (Windows 0.2.8, 23-10-2026)
 The button sent people to the MAIN window to type the reason; that window could stay hidden behind other programs so the button looked dead. The small "Still working?" window now has its own reason box (min 10 letters, Back / Send for approval, shows errors) and sends decision `worked` + note to the engine (`agent:idle-answer`); engine emits `agent:idle-error` on failure and hides the small window on success. Old installers still use the main-window box. Window height 350 -> 390. Needs the 0.2.8 installer.
+
+## 461 · Tripwire for the Windows app (23-10-2026)
+`scripts/check-windows-agent.mjs` runs in `npm run build` and fails on: a Rust command the website calls that is missing from build.rs / capabilities/remote.json / generate_handler!; an event with no listener (or listener with no emitter); a window label not in tauri.conf.json; windows with different additionalBrowserArgs; a small-window button the engine does not handle; "I was working" not sending a note. Reads/parses problems only warn. Rule: when adding a Rust command or a small-window button, this check must stay green.
