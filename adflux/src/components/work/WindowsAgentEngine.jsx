@@ -279,6 +279,17 @@ export default function WindowsAgentEngine() {
         } catch { /* generic */ }
         try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('New task for you', { body: title, tag: `wk-part-${ev.new?.id}` }) } catch { /* ignore */ }
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'work_task_parts' }, async (ev) => {
+        // someone declined a task I created -> tell me on this PC
+        const n = ev.new || {}
+        if (n.reject_kind !== 'declined' || !n.rejected_at || Date.now() - new Date(n.rejected_at).getTime() > 30000) return
+        try {
+          const { data } = await supabase.from('work_tasks').select('title,created_by').eq('id', n.task_id).maybeSingle()
+          if (data?.created_by !== uid) return
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('Task declined', { body: `${data.title}: ${n.reject_reason || ''}`, tag: `wk-dec-${n.id}` })
+          window.dispatchEvent(new Event('focus'))
+        } catch { /* ignore */ }
+      })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [uid])

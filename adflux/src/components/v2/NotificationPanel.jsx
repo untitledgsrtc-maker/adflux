@@ -27,8 +27,8 @@ import { istTodayISO } from '../../utils/istDate'
 // Phase 103.F.1 — `message` = an admin push saved to admin_messages
 // (the rep can re-read it). Brand-yellow tint so it stands out as a
 // direct message from the office vs the system alerts.
-const KIND_ICON  = { message: MessageSquare, approval: CheckSquare, followup: Calendar, sla: AlertTriangle, dueAction: Clock, workNew: CheckSquare, workLate: AlertTriangle }
-const KIND_TINT  = { message: '#FFE600', approval: '#FBBF24', followup: '#60A5FA', sla: '#F87171', dueAction: '#C084FC', workNew: '#60A5FA', workLate: '#F87171' }
+const KIND_ICON  = { message: MessageSquare, approval: CheckSquare, followup: Calendar, sla: AlertTriangle, dueAction: Clock, workNew: CheckSquare, workLate: AlertTriangle, workDeclined: AlertTriangle }
+const KIND_TINT  = { message: '#FFE600', approval: '#FBBF24', followup: '#60A5FA', sla: '#F87171', dueAction: '#C084FC', workNew: '#60A5FA', workLate: '#F87171', workDeclined: '#F87171' }
 
 // Phase 93.8c (25 May 2026) — bell items are recomputed live from
 // source tables every open. No `notifications` table to mark-read
@@ -295,13 +295,27 @@ export default function NotificationPanel() {
               to: '/my-work', ts: r.created_at })
           }
         })
+        // Phase 459: someone declined a task I created - show it (the push only reaches phones, inside push hours)
+        const { data: dec } = await supabase.from('work_task_parts')
+          .select('id, reject_reason, rejected_at, assignee_id, task:work_tasks!inner(title, created_by)')
+          .eq('reject_kind', 'declined').eq('status', 'assigned')
+          .eq('task.created_by', profile.id)
+          .gte('rejected_at', new Date(Date.now() - 7 * 86400000).toISOString())
+          .order('rejected_at', { ascending: false }).limit(10)
+        if ((dec || []).length) {
+          const ids = [...new Set(dec.map(d => d.assignee_id))]
+          const { data: us } = await supabase.from('users').select('id,name').in('id', ids)
+          const nm = Object.fromEntries((us || []).map(u => [u.id, (u.name || 'Someone').split(' ')[0]]))
+          dec.forEach(d => list.push({ kind: 'workDeclined', id: `dec:${d.id}:${d.rejected_at}`, title: `${nm[d.assignee_id] || 'Someone'} declined: ${d.task?.title || 'task'}`,
+            sub: d.reject_reason || 'No reason written', to: '/my-work?tab=asked', ts: d.rejected_at }))
+        }
       } catch (e) {
         console.warn('[NotificationPanel] work tasks failed:', e?.message)
       }
     }
     // Sort: admin messages first (direct from the office), then SLA
     // (red), approvals, follow-ups, due actions.
-    const order = { message: 0, workLate: 1, sla: 1, approval: 2, workNew: 2, followup: 3, dueAction: 4 }
+    const order = { message: 0, workDeclined: 0, workLate: 1, sla: 1, approval: 2, workNew: 2, followup: 3, dueAction: 4 }
     list.sort((a, b) => order[a.kind] - order[b.kind])
     setItems(list)
   }

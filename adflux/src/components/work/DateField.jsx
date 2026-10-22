@@ -15,9 +15,9 @@ export default function DateField({ value, onChange, className = '', style, min,
   const text = show(value)
   const open = () => { try { ref.current?.showPicker?.() } catch { /* older engines: the native input still opens on its own icon */ } }
   return (
-    <span style={{ position: 'relative', display: 'inline-block', ...(style || {}) }}>
+    <span style={{ position: 'relative', display: style?.width ? 'inline-block' : 'block', ...(style || {}) }}>
       <span className={className} aria-hidden="true"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', height: '100%', minHeight: style?.minHeight, boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }}>
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', minHeight: style?.minHeight, boxSizing: 'border-box', fontVariantNumeric: 'tabular-nums' }}>
         <span style={{ opacity: text ? 1 : 0.55 }}>{text || 'dd/mm/yyyy'}</span>
         <CalendarDays size={16} style={{ flexShrink: 0, opacity: 0.7 }} />
       </span>

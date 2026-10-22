@@ -3,7 +3,7 @@
 // for, my hours (+ add forgotten time), evening report after 7 PM. Writes only through
 // the work_* database functions. Hours have NO pay effect.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { Play, Pause, Check, Plus, Send, Clock, Users, User, CalendarX, FileText, Moon, ChevronRight } from 'lucide-react'
 import '../../styles/work.css'
@@ -27,7 +27,8 @@ import DateField from '../../components/work/DateField'
 export default function MyWorkV2() {
   const { profile } = useAuth()
   const uid = profile?.id
-  const [tab, setTab] = useState('work')
+  const [sp] = useSearchParams()
+  const [tab, setTab] = useState(['asked', 'hours', 'calendar'].includes(sp.get('tab')) ? sp.get('tab') : 'work')
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [member, setMember] = useState(null)       // my work_members row or null
@@ -70,7 +71,7 @@ export default function MyWorkV2() {
         .select('id,task_id,assignee_id,label,due_date,due_time,created_at,status,started_at,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,status,is_auto,is_urgent)')
         .eq('assignee_id', uid).or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -14))}`).limit(300),
       supabase.from('work_tasks')
-        .select('id,title,project_id,due_date,status,created_at,parts:work_task_parts(id,assignee_id,label,status,due_date)')
+        .select('id,title,project_id,due_date,status,created_at,parts:work_task_parts(id,assignee_id,label,status,due_date,reject_kind,reject_reason)')
         .eq('created_by', uid).order('created_at', { ascending: false }).limit(60),
       supabase.from('work_report_shares').select('shared_at').eq('user_id', uid).eq('work_date', today).maybeSingle(),
     ])
@@ -645,10 +646,17 @@ function AskedTab({ asked, nameOf, photoOf, projName, onOpen, onNew }) {
                     {t.parts.map((p) => {
                       const [tone, lbl] = PART_PILL[p.status] || ['', p.status]
                       return (
-                        <div key={p.id} className="wk-grp" style={{ flexWrap: 'nowrap' }}>
+                        <div key={p.id}>
+                        <div className="wk-grp" style={{ flexWrap: 'nowrap' }}>
                           <UserAvatar className="wk-av" name={nameOf(p.assignee_id)} url={photoOf(p.assignee_id)} size={26} />
                           <span style={{ flex: 1 }}>{nameOf(p.assignee_id).split(' ')[0]}{p.label && <span className="wk-mu"> · {p.label}</span>}</span>
-                          <span className={`wk-pill ${tone}`}>{lbl}</span>
+                          {p.reject_kind === 'declined' && p.status === 'assigned'
+                            ? <span className="wk-pill bad">Declined</span>
+                            : <span className={`wk-pill ${tone}`}>{lbl}</span>}
+                        </div>
+                        {p.reject_kind === 'declined' && p.status === 'assigned' && p.reject_reason && (
+                          <div className="wk-sm" style={{ color: 'var(--danger)', marginTop: 4 }}>{nameOf(p.assignee_id).split(' ')[0]} declined: {p.reject_reason}</div>
+                        )}
                         </div>
                       )
                     })}
