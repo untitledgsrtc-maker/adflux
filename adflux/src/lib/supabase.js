@@ -24,7 +24,31 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Auth → JWT settings → Refresh token expiry. Default is 604800
 // seconds (7 days). Set to 31536000 (1 year) so reps don't get
 // kicked out after a quiet weekend.
+// Phase 465: "JWT expired" self-repair. The SDK decides whether the token is still good from THIS computer's clock. A PC whose clock is
+// a few minutes behind (or a window that was asleep / throttled) keeps sending an expired token, and every page shows "JWT expired"
+// until a manual Retry (Diya, repeatedly). If the server answers 401 "JWT expired" we refresh the session once and re-send the request.
+let refreshing = null
+const refreshOnce = () => {
+  if (!refreshing) refreshing = supabase.auth.refreshSession().then((r) => r?.data?.session?.access_token || null, () => null).finally(() => { setTimeout(() => { refreshing = null }, 2000) })
+  return refreshing
+}
+const fetchWithRepair = async (input, init) => {
+  const res = await fetch(input, init)
+  try {
+    const url = typeof input === 'string' ? input : input?.url || ''
+    if (res.status !== 401 || url.includes('/auth/v1/') || !url.includes('/rest/v1/') && !url.includes('/storage/v1/') && !url.includes('/functions/v1/')) return res
+    const body = await res.clone().text()
+    if (!/JWT expired/i.test(body)) return res
+    const token = await refreshOnce()
+    if (!token) return res
+    const headers = new Headers(init?.headers || (typeof input !== 'string' ? input?.headers : undefined) || {})
+    headers.set('Authorization', `Bearer ${token}`)
+    return await fetch(input, { ...(init || {}), headers })
+  } catch { return res }
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: { fetch: fetchWithRepair },
   auth: {
     persistSession:    true,
     autoRefreshToken:  true,
