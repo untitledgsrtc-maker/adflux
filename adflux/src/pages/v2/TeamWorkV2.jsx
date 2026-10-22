@@ -12,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { istTodayISO } from '../../utils/istDate'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
+import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, dueState, initialsOf, clientColor, istHour } from '../../utils/workUtils'
 import WorkCalendar from '../../components/work/WorkCalendar'
 import ActivityTab from '../../components/work/ActivityTab'
@@ -299,7 +300,14 @@ export default function TeamWorkV2() {
                             </div>
                           </span>
                         </span>
-                        <span className="wk-num">{fmtClock((now - new Date(r.started_at)) / 1000)}</span>
+                        <span className="wk-grp" style={{ flexWrap: 'nowrap', gap: 10 }}>
+                          <span style={{ textAlign: 'right' }}>
+                            <span className="wk-num">{fmtClock((now - new Date(r.started_at)) / 1000)}</span>
+                            <div className="wk-sm">since {fmtTimeIST(r.started_at)}</div>
+                          </span>
+                          <button type="button" className="wk-btn g sm" disabled={busy} title="Stop this timer (for example a forgotten timer)"
+                            onClick={async () => { if (await confirmDialog({ title: 'Stop this timer?', message: nameOf(r.user_id).split(' ')[0] + "'s running timer will stop now. They get a notice and can start it again.", confirmLabel: 'Stop timer', danger: true })) rpc('work_stop_person_timer', { p_user: r.user_id }, 'Timer stopped.') }}>Stop</button>
+                        </span>
                       </div>
                     ))}
                   </div>
