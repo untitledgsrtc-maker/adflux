@@ -65,7 +65,22 @@ export default function WindowsAgentEngine() {
         const was = s.runId
         s.runId = s.running?.id || null
         if (s.runId && !was) { s.lastShot = Date.now(); invoke('show_window', { label: 'widget' }).catch(() => {}) }
-        if (!s.runId && was) { invoke('hide_window', { label: 'widget' }).catch(() => {}); flushBuckets(true) }
+        if (!s.runId && was) {
+          invoke('hide_window', { label: 'widget' }).catch(() => {}); flushBuckets(true)
+          // Phase 449: the SERVER can stop a timer too ("PC went quiet" - no activity for 20 min). Say so, with a restart button,
+          // instead of leaving the person to find out later that the clock is off.
+          try {
+            const { data: last } = await supabase.from('work_time_entries').select('id,ended_at,auto_stopped,project_id,task_label,part_id').eq('id', was).maybeSingle()
+            if (last?.auto_stopped && last.ended_at && !s.asking && !s.stoppedShown?.[last.id]) {
+              s.stoppedShown = { ...(s.stoppedShown || {}), [last.id]: true }
+              s.lastStopped = { project: last.project_id, label: last.task_label, part: last.part_id }
+              const info = { stopAt: timeIST(last.ended_at), auto: true, client: clientName(last.project_id), label: last.task_label }
+              setStopped(info)
+              await emit('agent:idle-stopped', info)
+              invoke('bring_to_front', { label: 'idle' }).catch(() => {})
+            }
+          } catch { /* best effort */ }
+        }
       } catch { /* offline: keep last state */ }
     }
 
