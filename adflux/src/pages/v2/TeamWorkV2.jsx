@@ -238,7 +238,7 @@ export default function TeamWorkV2() {
             ['Finished today', String(finishedToday), 'Since 00:00'],
           ]} />
           <div className="wk-grid" style={{ gap: 24 }}>
-            <div className="wk-c8" style={{ display: 'grid', gap: 24, alignContent: 'start' }}>
+            <div className="wk-c8" style={{ display: 'grid', gap: 24, alignContent: 'start', gridTemplateColumns: 'minmax(0, 1fr)', minWidth: 0 }}>
             <div>
               <div className="wk-card flush">
                 <div className="wk-ch"><h3><span className="wk-tile" style={{ background: 'rgba(239,68,68,.14)', color: 'var(--danger)' }}><AlertTriangle size={16} aria-hidden="true" /></span>Needs you</h3></div>
@@ -279,7 +279,7 @@ export default function TeamWorkV2() {
               </div>
             </div>
             </div>
-            <div className="wk-c4" style={{ display: 'grid', gap: 24, alignContent: 'start' }}>
+            <div className="wk-c4" style={{ display: 'grid', gap: 24, alignContent: 'start', gridTemplateColumns: 'minmax(0, 1fr)', minWidth: 0 }}>
             <div>
               <div className="wk-card flush">
                 <div className="wk-ch"><h3><span className="wk-tile" style={{ background: 'rgba(59,130,246,.14)', color: 'var(--info, #60a5fa)' }}><Users size={16} aria-hidden="true" /></span>Who is working</h3></div>
