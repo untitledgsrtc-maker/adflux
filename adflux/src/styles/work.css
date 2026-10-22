@@ -195,8 +195,9 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 .wk .spin, .wk-modal .spin { animation: wkspin 1s linear infinite; }
 @keyframes wkspin { to { transform: rotate(360deg); } }
 
-/* the hero grows to fill its column so there is no empty hole beside a taller card */
-.wk-c8 > .wk-hero, .wk-c8 > .wk-run { flex: 1 1 auto; }
+/* keep the timer card its natural height; it used to stretch to the right
+   column and became a huge empty green box on wide windows */
+.wk-grid { align-items: start; }
 
 /* Phase 368.14 - hero segment labels uppercase like the design */
 .wk-hseg > .wk-hs:first-child { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }

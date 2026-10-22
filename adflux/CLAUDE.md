@@ -21692,3 +21692,6 @@ Diya's Windows app showed "JWT expired" on My Work and another PC showed a sales
 
 ## 455 · People as cards, no inner board scroll (23-10-2026)
 Team Work > People is a grid of person cards (photo + status dot, name, designation, role tag, running task + live clock, hours bar, open tasks, on-time score, Head switch, Profile, remove; All / Working now / Not clocked in filter). The board columns no longer scroll inside themselves (removed the 76vh cap from Phase before): the four columns stretch to the same height and the page scrolls normally.
+
+## 456 · Windows app look: sidebar stays put, timer card normal size (23-10-2026)
+From the owner's video of Sapna's app: (1) the sidebar scrolled away with the page - `.v2d-app` had `overflow-x:hidden`, which makes it a scroll container and kills `position:sticky`; now `overflow-x: clip` (same cut-off, no scroll container). (2) My Work timer card stretched to the right column's height (a huge empty green box) - removed the Phase 356.12 grow rule, `.wk-grid{align-items:start}`. CSS only. Rule: never put `overflow-x:hidden` on an ancestor of a sticky element; use `clip`.

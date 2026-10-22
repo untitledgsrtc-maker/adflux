@@ -732,6 +732,10 @@
      parent itself didn't, so wide children could still escape on some
      browsers. Belt-and-braces: clip at the shell. */
   overflow-x: hidden;
+  /* clip (not hidden) keeps the same cut-off but does NOT make this box a
+     scroll container, so the sticky sidebar below stays pinned while the
+     page scrolls (Windows app / WebView2 showed it scrolling away). */
+  overflow-x: clip;
   max-width: 100vw;
 }
 
