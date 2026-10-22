@@ -37,6 +37,21 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   ;['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach((ev) => window.addEventListener(ev, () => { lastActive = Date.now() }, { passive: true }))
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController) { hadController = true; return }   // first install, not an update
+    // Phase 440 - tell the person: a banner with a Refresh button (the automatic reload below stays as the fallback)
+    if (!document.getElementById('new-version-banner')) {
+      const bar = document.createElement('div')
+      bar.id = 'new-version-banner'
+      bar.setAttribute('role', 'status')
+      bar.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:9999;display:flex;align-items:center;gap:12px;max-width:92vw;padding:12px 16px;background:var(--surface,#1e293b);color:var(--text,#f1f5f9);border:1px solid var(--accent,#FFE600);border-radius:14px;box-shadow:0 14px 28px rgba(0,0,0,.5);font:14px var(--font-sans,system-ui)'
+      const msg = document.createElement('span')
+      msg.textContent = 'A new version is ready.'
+      const btn = document.createElement('button')
+      btn.textContent = 'Refresh now'
+      btn.style.cssText = 'min-height:36px;padding:0 16px;border:0;border-radius:999px;background:var(--accent,#FFE600);color:var(--accent-fg,#0f172a);font:600 13px var(--font-sans,system-ui);cursor:pointer'
+      btn.addEventListener('click', () => window.location.reload())
+      bar.append(msg, btn)
+      document.body.appendChild(bar)
+    }
     const t = setInterval(() => {
       const el = document.activeElement
       const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)

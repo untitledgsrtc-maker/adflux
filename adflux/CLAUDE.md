@@ -21641,3 +21641,5 @@ Owner: "all rule will be same like Safika". `supabase_phase438_tracking_everyone
 ## 439 · Open windows pick up new versions (22-10-2026)
 
 Safika (Windows app) did not see the Phase 437 board fix hours after deploy although the live site had it (verified live in Chrome with a temp task, deleted): an open window never re-checked for a new version. `main.jsx`: `registerSW` now calls `reg.update()` every 10 min, and on `controllerchange` (a NEW worker took over) the page reloads once the person has been still for 20 s and is not typing. First install does not reload. Needs one manual reopen of each PC to get this watcher itself.
+
+Note (439 follow-up, Phase 440): when a new version takes over an open window a yellow-bordered banner "A new version is ready. [Refresh now]" appears (bottom centre, z-index 9999 = Toast tier); the idle auto-reload stays as the fallback. Owner idea.
