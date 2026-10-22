@@ -900,7 +900,8 @@ export default async function handler(req, res) {
             event_id: st.id || null,
             signature_ok: true,
             http_status: 200,
-            note: `status ${clip(st.status)} ${last4(st.recipient_id)}`,
+            // Phase 463: keep Meta's failure reason (code + title) so a message that Meta accepted but could not deliver is explainable.
+            note: `status ${clip(st.status)} ${last4(st.recipient_id)}` + (st.status === 'failed' && st.errors && st.errors[0] ? ` ${clip(st.errors[0].code)} ${clip(st.errors[0].title || st.errors[0].message)}` : ''),
           })
         }
       }
