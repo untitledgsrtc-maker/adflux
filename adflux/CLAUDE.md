@@ -21659,3 +21659,7 @@ Note (443 follow-up, Phase 444): Team Work > Approvals shows an amber "N idle cl
 ## 445 · Timer frozen at 00:00:00 after a long idle gap (22-10-2026)
 
 Diya (Windows app) started a task and the clock stayed 00:00:00. Web timer verified ticking (Chrome, my own account). Likely cause (not proven on her PC): `maybeAskIdle` used raw hook idle seconds, so a timer started after >=5 min of no real input asked "Still working?" at once and `wk-idle-freeze` with `began` BEFORE `started_at` made the shown time max(0, negative) = 0. Fix: idle is capped to the time since the timer started (`WindowsAgentEngine.maybeAskIdle`). Needs the PC to reopen / auto-update.
+
+## 446-447 · Why Diya's timer / idle fixes never reached her (22-10-2026)
+
+Root cause found: `V2AppShell` mounted `WindowsAgentBridge` (idle question + tracking + widget) for role **staff only**, so accounts (Diya), hr (Riya), office_admin (Dixita) PCs never ran it - no work_agent_devices row, no idle events, no "Recording" pill. Phase 447 widens it to every role except admin / co_owner / agency (Tauri-only, no-op on phone/APK/browser; guardian PASS). Phase 446: `work_server_time()` + My Work shows elapsed time against the SERVER clock (PC clock drift can no longer hold the timer at 00:00:00), and refreshes on window focus / visibility. Telecaller/sales on the Windows program also get the engine now (guardian note P3; remove from the list in V2AppShell if unwanted).

@@ -42,6 +42,7 @@ export default function MyWorkV2() {
   const [asked, setAsked] = useState([])
   const [shared, setShared] = useState(null)
   const [now, setNow] = useState(Date.now())
+  const [skew, setSkew] = useState(0)   // Phase 446: server clock minus this PC's clock (ms)
   const [newTask, setNewTask] = useState(false)
   const [openTask, setOpenTask] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -78,6 +79,12 @@ export default function MyWorkV2() {
     setRunning(run.data || null); setEntries(en.data || []); setParts(pa.data || [])
     setAsked(ak.data || []); setShared(sh.data || null)
     setLoading(false)
+    // Phase 446: how far this PC's clock is from the server's (half the round trip allowed for)
+    try {
+      const t0 = Date.now()
+      const { data: srv } = await supabase.rpc('work_server_time')
+      if (srv) setSkew(Date.parse(srv) - (t0 + (Date.now() - t0) / 2))
+    } catch { /* keep the last value */ }
     // tasks someone postponed and tagged ME as the one who asked (read only, best effort)
     supabase.from('work_task_parts').select('id,assignee_id,postponed_until,postponed_by_client,task:work_tasks(title)')
       .eq('status', 'postponed').contains('postponed_by_users', [uid]).limit(30)
@@ -106,7 +113,13 @@ export default function MyWorkV2() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [uid])
-  useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i) }, [])
+  useEffect(() => {
+    const tick = () => setNow(Date.now())
+    const i = setInterval(tick, 1000)
+    // a hidden / minimised window can pause its timers: catch up the moment it is seen again
+    document.addEventListener('visibilitychange', tick); window.addEventListener('focus', tick)
+    return () => { clearInterval(i); document.removeEventListener('visibilitychange', tick); window.removeEventListener('focus', tick) }
+  }, [])
   const [idleFreeze, setIdleFreeze] = useState(null)
   useEffect(() => {
     const h = (e) => setIdleFreeze(e.detail?.began || null)
@@ -183,7 +196,7 @@ export default function MyWorkV2() {
   const rangeLabel = isToday ? 'Today' : (rFrom === rTo ? fmtDateShort(rFrom) : `${fmtDateShort(rFrom)} - ${fmtDateShort(rTo)}`)
 
   // Phase 406: the shown time skips minutes she was away (break_seconds) and stands still while the "Still working?" question is open.
-  const runSecs = running ? Math.max(0, ((idleFreeze ? new Date(idleFreeze).getTime() : now) - new Date(running.started_at).getTime()) / 1000 - (running.break_seconds || 0)) : 0
+  const runSecs = running ? Math.max(0, ((idleFreeze ? new Date(idleFreeze).getTime() : now + skew) - new Date(running.started_at).getTime()) / 1000 - (running.break_seconds || 0)) : 0
   const doneSecs = entries.filter((e) => e.ended_at && e.status === 'approved')
     .reduce((s, e) => s + (new Date(e.ended_at) - new Date(e.started_at)) / 1000, 0)
   const todaySecs = doneSecs + runSecs
