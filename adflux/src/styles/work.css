@@ -250,3 +250,24 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 
 @media (max-width: 900px) { .wkc-ev { display: none; } }
 .wkc-item { border-left: 4px solid var(--c); }
+
+/* Clients as project cards */
+.wk-pg { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; padding: 18px 20px; }
+.wk-pc { background: var(--w-card); border: 1px solid var(--w-bd); border-radius: 18px; padding: 16px; display: grid; gap: 14px; transition: transform .15s, border-color .15s; }
+.wk-pc:hover { transform: translateY(-2px); border-color: var(--accent); }
+.wk-pc-top { display: flex; gap: 12px; align-items: flex-start; }
+.wk-pc-ic { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; font-weight: 700; color: #fff; flex: none; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.wk-pc-name { display: block; font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-pc-chip { display: inline-block; margin-top: 4px; font-size: 11.5px; padding: 2px 9px; border-radius: 999px; background: var(--surface-3); color: var(--text-muted); }
+.wk-pc-chip.ok { background: var(--success-soft); color: var(--success); }
+.wk-pc-chip.bad { background: var(--danger-soft); color: var(--danger); }
+.wk-pc-act { display: flex; gap: 4px; flex: none; }
+.wk-pc-mid { display: flex; gap: 14px; align-items: center; background: var(--surface-2); border-radius: 14px; padding: 12px; }
+.wk-pc-k { font-size: 11.5px; color: var(--text-muted); }
+.wk-pc-v { font-size: 14.5px; font-weight: 600; }
+.wk-pc-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--text-muted); }
+.wk-pc-av { display: flex; margin-right: auto; }
+.wk-pc-av .wk-av { margin-left: -8px; border: 2px solid var(--w-card); }
+.wk-pc-av .wk-av:first-child { margin-left: 0; }
+.wk-pc-av i { font-style: normal; font-size: 12px; align-self: center; margin-left: 6px; }
+@media (prefers-reduced-motion: reduce) { .wk-pc { transition: none; } }
