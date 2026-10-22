@@ -80,7 +80,7 @@ export default function TeamWorkV2() {
       supabase.from('work_time_entries').select('*').is('ended_at', null),
       supabase.from('work_time_entries').select('*').eq('status', 'pending').order('started_at', { ascending: false }).limit(100),
       supabase.from('work_task_parts')
-        .select('id,task_id,assignee_id,label,due_date,due_time,status,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,template_id,created_at)')
+        .select('id,task_id,assignee_id,label,due_date,due_time,created_at,status,finished_at,seconds,postponed_until,postponed_by_users,postponed_by_client,postpone_count,task:work_tasks(id,title,project_id,created_by,due_date,template_id,created_at)')
         .or(`status.neq.finished,finished_at.gte.${dayStartISO(addDaysISO(today, -7))}`).limit(600),
       supabase.from('work_templates').select('id,title,project_id,assignee_id,repeat_kind,weekday,month_day,is_active,last_run_date').eq('is_active', true),
       supabase.rpc('work_hours_report', { p_from: from, p_to: to }),
@@ -145,6 +145,8 @@ export default function TeamWorkV2() {
     // Board follows the date filter: open work due on/before the range end (overdue included) or already
     // in process; finished work only if it finished inside the range. Later-dated open work is opt-in.
     const f0 = Date.parse(dayStartISO(from)), f1 = Date.parse(dayStartISO(addDaysISO(to, 1)))
+    const newFrom = dayStartISO(addDaysISO(today, -1))
+    const isNewPart = (p) => !!p.created_at && p.created_at >= newFrom
     const inRange = (p) => {
       if (p.status === 'finished') {
         const ft = p.finished_at ? Date.parse(p.finished_at) : NaN
@@ -152,7 +154,8 @@ export default function TeamWorkV2() {
       }
       if (p.status === 'postponed') return true   // the Postponed column always shows what is waiting
       const d = p.due_date || p.task?.due_date
-      return showLater || p.status === 'in_process' || !d || d <= to
+      // Phase 442: also show work due within 2 days of the range and anything given in the last 2 days (so a task assigned today for the 29th shows at once)
+      return showLater || p.status === 'in_process' || !d || d <= addDaysISO(to, 2) || isNewPart(p)
     }
     return parts
       .filter((p) => inRange(p) && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient))
@@ -165,7 +168,7 @@ export default function TeamWorkV2() {
         seconds: taskCostByTask[p.task_id]?.seconds ?? p.seconds, cost: taskCostByTask[p.task_id]?.cost ?? null,
       }))
   }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask, users, from, to, showLater])
-  const laterCount = useMemo(() => showLater ? 0 : parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed' && p.status !== 'in_process' && (p.due_date || p.task?.due_date) > to && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient)).length, [parts, to, showLater, fPerson, fClient])
+  const laterCount = useMemo(() => showLater ? 0 : parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed' && p.status !== 'in_process' && (p.due_date || p.task?.due_date) > addDaysISO(to, 2) && !(p.created_at && p.created_at >= dayStartISO(addDaysISO(today, -1))) && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient)).length, [parts, to, today, showLater, fPerson, fClient])
 
   if (authLoading || !uid) return null
   if (isHead === false) return <Navigate to="/my-work" replace />

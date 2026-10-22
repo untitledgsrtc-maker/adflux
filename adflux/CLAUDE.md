@@ -21647,3 +21647,5 @@ Note (439 follow-up, Phase 440): when a new version takes over an open window a 
 ## 441 · Version label (22-10-2026)
 
 vite.config.js defines `__APP_BUILD__` (Vercel commit sha, first 7, else build time); My Work shows a small "Version xxxxxxx" bottom-right so a screenshot tells us which build a person is running (used to diagnose Safika not seeing the Phase 437 board change).
+
+Note (437 follow-up, Phase 442): Team Work > Tasks board uses the same rule as My Work - work due within 2 days of the chosen range, or given in the last 2 days, shows without pressing "Show later tasks"; older far-dated work stays behind that button.
