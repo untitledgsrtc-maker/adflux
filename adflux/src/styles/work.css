@@ -113,8 +113,8 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 .wk-cnt { min-width: 24px; text-align: center; padding: 0 8px; border-radius: 999px; background: var(--w-raised); font-size: 12px; line-height: 22px; }
 
 /* board */
-.wk-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 4px; align-items: start; }
-.wk-col { background: var(--w-card); border: 1px solid var(--w-bd); border-radius: 16px; padding: 14px; min-height: 200px; transition: border-color .15s, background-color .15s; }
+.wk-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 4px; align-items: stretch; }
+.wk-col { background: var(--w-card); border: 1px solid var(--w-bd); border-radius: 16px; padding: 14px; min-height: 360px; max-height: 76vh; overflow-y: auto; scrollbar-width: thin; transition: border-color .15s, background-color .15s; }
 .wk-col.over { border-color: var(--accent); background: var(--w-yt); }
 .wk-col.over.fin { border-color: var(--success); background: var(--success-soft); }
 .wk-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
@@ -180,6 +180,7 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
   .wk-grid { gap: 16px; }
   .wk-c8, .wk-c4, .wk-c6, .wk-c3 { grid-column: span 12; }
   .wk-board { grid-template-columns: 1fr; }
+  .wk-col { max-height: none; min-height: 0; }
   .wk-timer { font-size: 52px; }
   .wk-title { font-size: 24px; }
   .wk-hrow { grid-template-columns: 1fr 70px; }
