@@ -54,6 +54,25 @@ export function initAuth() {
       useAuthStore.setState({ loading: false })
     }
   })
+
+  // 3. Session keeper — an app left open (Windows app in the tray, PC asleep,
+  //    phone in a pocket) can wake up with an expired token: pages then say
+  //    "JWT expired" and a half-loaded profile shows the wrong (sales) menu.
+  //    On wake / focus / reconnect and every 4 min: getSession() swaps an
+  //    expired token for a fresh one, and a missing profile is re-fetched.
+  const keep = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      const s = useAuthStore.getState()
+      if (!s.profile) { s.setUser(session.user); await s.fetchProfile(session.user.id) }
+    } catch { /* offline: try again next time */ }
+  }
+  const onVisible = () => { if (document.visibilityState === 'visible') keep() }
+  document.addEventListener('visibilitychange', onVisible)
+  window.addEventListener('focus', keep)
+  window.addEventListener('online', keep)
+  setInterval(keep, 4 * 60 * 1000)
 }
 
 // -----------------------------------------------------------------------------

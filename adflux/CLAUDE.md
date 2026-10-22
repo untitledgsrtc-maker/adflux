@@ -21677,3 +21677,6 @@ Piyush showed "Not clocked in" with 8h20m: his timer was stopped by the Phase 39
 ## 450 · Lunch reminder (22-10-2026)
 
 Lunch is 1 PM. `supabase_phase450_lunch_reminder.sql` (applied): `work_lunch_reminder()` + cron `work-lunch-reminder` 12:55 IST Mon-Sat (skips holidays) pushes everyone with a running Work timer "Pause your timer before you leave". My Work shows a bar 12:55-1:30 PM with Pause now / I am working (dismiss for the day, localStorage). Added to the 211 re-lock lists.
+
+## 451 · Expired login in a long-open app (23-10-2026)
+Diya's Windows app showed "JWT expired" on My Work and another PC showed a sales menu with no name (profile never loaded). The page had been open long enough for the token to expire (PC asleep / tray). `useAuth.js initAuth` now has a session keeper: on window focus, tab visible, network back and every 4 min it calls `getSession()` (swaps an expired token for a fresh one) and re-fetches the profile if it is missing. Quick manual fix for anyone stuck: Retry, or Log out and in.
