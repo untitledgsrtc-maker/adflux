@@ -187,7 +187,13 @@ export default function TeamWorkV2() {
   })
   const openCount = parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed').length
   const lateParts = parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed' && dueState(p.due_date || p.task?.due_date, p.status).cls === 'bad')
-  const finishedToday = parts.filter((p) => p.status === 'finished' && p.finished_at && p.finished_at >= dayStartISO(today)).length
+  // Phase 485: the Finished tile and the ring follow the date filter (they were always "since 00:00 today", so Today and Yesterday showed the same 43%)
+  const isTodayRange = from === today && to === today
+  const rangeLabelHero = from === to ? fmtDateShort(from) : `${fmtDateShort(from)} to ${fmtDateShort(to)}`
+  const fr0 = Date.parse(dayStartISO(from)), fr1 = Date.parse(dayStartISO(addDaysISO(to, 1)))
+  const finishedToday = parts.filter((p) => { if (p.status !== 'finished' || !p.finished_at) return false; const t = Date.parse(p.finished_at); return t >= fr0 && t < fr1 }).length
+  // still open and due on/before the end of the range (or no due date): what was left to do for that range. Today keeps the old "all open now".
+  const openForRing = isTodayRange ? openCount : parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed' && (!(p.due_date || p.task?.due_date) || (p.due_date || p.task?.due_date) <= to)).length
   const teamSecs = (report?.by_person || []).reduce((s, p) => s + Number(p.seconds || 0), 0)
   const memberIds = members.map((m) => m.user_id)
   const sharedSet = new Set(shares.map((s) => s.user_id))
@@ -234,11 +240,11 @@ export default function TeamWorkV2() {
 
       {!loading && !err && tab === 'overview' && (
         <>
-          <HeroSegs live ring={{ pct: (openCount + finishedToday) > 0 ? Math.round((finishedToday / (openCount + finishedToday)) * 100) : 0, label: 'done today' }} action={<button className="wk-btn sm" style={{ background: '#fff', color: '#0f172a' }} onClick={() => setTab('timeline')}>Open timeline</button>} eyebrow={`Team · ${rangeLabel}`} segs={[
+          <HeroSegs live ring={{ pct: (openForRing + finishedToday) > 0 ? Math.round((finishedToday / (openForRing + finishedToday)) * 100) : 0, label: isTodayRange ? 'done today' : 'done in range' }} action={<button className="wk-btn sm" style={{ background: '#fff', color: '#0f172a' }} onClick={() => setTab('timeline')}>Open timeline</button>} eyebrow={`Team · ${rangeLabel}`} segs={[
             ['Team hours', fmtDur(teamSecs), `${Object.keys(byPerson).length} ${Object.keys(byPerson).length === 1 ? 'person' : 'people'} tracked`],
             ['Working now', `${running.length} of ${memberIds.length}`, 'Live timers'],
             ['Open tasks', String(openCount), 'Assigned and in process'],
-            ['Finished today', String(finishedToday), 'Since 00:00'],
+            [isTodayRange ? 'Finished today' : 'Finished', String(finishedToday), isTodayRange ? 'Since 00:00' : rangeLabelHero],
           ]} />
           <div className="wk-grid" style={{ gap: 24 }}>
             <div className="wk-c8" style={{ display: 'grid', gap: 24, alignContent: 'start', gridTemplateColumns: 'minmax(0, 1fr)', minWidth: 0 }}>
