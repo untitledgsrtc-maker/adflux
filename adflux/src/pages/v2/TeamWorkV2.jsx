@@ -151,7 +151,7 @@ export default function TeamWorkV2() {
     // Board follows the date filter: open work due on/before the range end (overdue included) or already
     // in process; finished work only if it finished inside the range. Later-dated open work is opt-in.
     const f0 = Date.parse(dayStartISO(from)), f1 = Date.parse(dayStartISO(addDaysISO(to, 1)))
-    const isNewPart = (p) => !p.task?.is_auto   // Phase 448: made by hand = always shown; system-made = only near its due date
+    const isNewPart = (p) => !p.task?.is_auto && (p.created_at ? new Date(p.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === today : false) // Phase 479: hand-made = shown if given today   // Phase 448: made by hand = always shown; system-made = only near its due date
     const inRange = (p) => {
       if (p.status === 'finished') {
         const ft = p.finished_at ? Date.parse(p.finished_at) : NaN
@@ -172,8 +172,8 @@ export default function TeamWorkV2() {
         assigneeName: nameOf(p.assignee_id), assigneePhoto: users.find((u) => u.id === p.assignee_id)?.profile_image_url || null, partsTotal: total[p.task_id] || 1, partsDone: done[p.task_id] || 0,
         seconds: taskCostByTask[p.task_id]?.seconds ?? p.seconds, cost: taskCostByTask[p.task_id]?.cost ?? null,
       }))
-  }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask, users, from, to, showLater])
-  const laterCount = useMemo(() => showLater ? 0 : parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed' && p.status !== 'in_process' && (p.due_date || p.task?.due_date) > addDaysISO(to, 2) && !!p.task?.is_auto && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient)).length, [parts, to, today, showLater, fPerson, fClient])
+  }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask, users, from, to, showLater, today])
+  const laterCount = useMemo(() => showLater ? 0 : parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed' && p.status !== 'in_process' && (p.due_date || p.task?.due_date) > addDaysISO(to, 2) && !(!p.task?.is_auto && p.created_at && new Date(p.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === today) && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient)).length, [parts, to, today, showLater, fPerson, fClient])
 
   if (authLoading || !uid) return null
   if (isHead === false) return <Navigate to="/my-work" replace />

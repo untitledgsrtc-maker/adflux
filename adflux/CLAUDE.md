@@ -21771,3 +21771,7 @@ Owner: the Phase 390 move to 30 days was for the Work team only; sales and telec
 ## 478 · Check-in after 11:30 deducts half a day for sales + telecaller (23-10-2026)
 
 `_compute_monthly_salary_base` (canonical file, applied live) counts `work_sessions.check_in_status='half_day'` days in the month for roles sales/telecaller, 0.5 day each, skipping days that already have an approved leave; added to unpaid leave days (same daily rate, 26). New return key `late_half_days`. It is computed live, so it also covers earlier October half-days (Dhara 5 + 7 Oct = 1.0 day, deduction 2654 total with her 2 leave days). Work team and others unaffected. Open: the Salary tab / slip show it inside "unpaid leave days" without a separate line.
+
+## 479 · Today's board: hand-made tasks only if given today (23-10-2026)
+
+Owner: "show today's tasks only; a task I create by hand today with a due date 2-3 days away should show in today's assigned; right now too many, we solved it before". Cause: Phase 448 made EVERY hand-made task show always (any age, any due date), so old hand-made far-dated tasks flooded the board. Now (My Work `showNow`, Team Work `isNewPart` + `laterCount`): a task shows on the default board if no due date, or due within 2 days, or hand-made AND created today (IST). Older hand-made far-dated tasks sit behind the "later date" bar. System-made (`is_auto`) rule unchanged. Frontend only, no SQL.

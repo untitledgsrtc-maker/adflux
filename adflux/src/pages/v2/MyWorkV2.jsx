@@ -182,8 +182,8 @@ export default function MyWorkV2() {
   const isToday = !viewFrom
   const rFrom = viewFrom || today
   const rTo = (viewTo && viewTo >= rFrom) ? viewTo : rFrom
-  // Phase 448: made by hand = always on the board; made by the system (repeating / from a quote / HR / finance) = only when due within 2 days
-  const showNow = (i) => !i.due || i.due <= addDaysISO(today, 2) || !i.p?.task?.is_auto
+  // Phase 479: made by hand = on the board only if given TODAY (any due date) or due within 2 days; older hand-made far-dated ones wait behind the later bar. Phase 448: made by hand = always on the board; made by the system (repeating / from a quote / HR / finance) = only when due within 2 days
+  const showNow = (i) => !i.due || i.due <= addDaysISO(today, 2) || (!i.p?.task?.is_auto && i.createdDay === today)
   const boardItems = items.filter((i) => {
     if (i.status === 'postponed') return true   // the Postponed column always shows what is waiting
     if (i.status === 'finished') return isToday ? i.finishedDay === today : (i.finishedDay >= rFrom && i.finishedDay <= rTo)
