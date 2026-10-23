@@ -68,6 +68,7 @@ import {
   TrendingUp, UserCircle2, UserPlus, Contact2, MapPin, Tv, FileBox,
   Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet, Megaphone, MessageCircle,
   IndianRupee, GraduationCap, Activity, Gauge, Briefcase,
+  ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -269,6 +270,7 @@ const OFFICE_ADMIN_NAV = [
   { to: '/team',              label: 'Team',           icon: Users },
   { to: '/team-dashboard',    label: 'Attendance',     icon: MapPin },
   { to: '/team-work',         label: 'Team Work',      icon: Briefcase },
+  { to: '/ops-assign',        label: 'Give work to tech', icon: ClipboardList },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
@@ -303,6 +305,7 @@ const OPS_HEAD_NAV = [
   { to: '/ops-dashboard',     label: 'Live console',   icon: Tv },
   { to: '/ops-station',       label: 'Station board',  icon: LayoutDashboard },
   { to: '/ops-tickets',       label: 'Tickets',        icon: CheckSquare },
+  { to: '/ops-assign',        label: 'Give work',      icon: ClipboardList },
   // Phase 251 — personal section (same trio the sales rep gets).
   { to: '/ops-performance',   label: 'My Performance', icon: TrendingUp },
   { to: '/calls',             label: 'My Calls',       icon: Phone },

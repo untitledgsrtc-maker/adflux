@@ -89,6 +89,7 @@ const OpsLogV2 = lazyWithRetry(() => import('./pages/v2/OpsLogV2'))
 const OpsDownV2 = lazyWithRetry(() => import('./pages/v2/OpsDownV2'))
 // Ops redesign (2026-08-27) — exec ticket dashboard (Open/In process/Fixed).
 const OpsTicketsV2 = lazyWithRetry(() => import('./pages/v2/OpsTicketsV2'))
+const OpsAssignV2 = lazyWithRetry(() => import('./pages/v2/OpsAssignV2'))
 const OpsMyPerformanceV2 = lazyWithRetry(() => import('./pages/v2/OpsMyPerformanceV2'))
 const OpsHomeV2 = lazyWithRetry(() => import('./pages/v2/OpsHomeV2'))
 // Phase 365 — Work module (timeclock + tasks) for the creative team.
@@ -196,6 +197,15 @@ function RequireAccountsOrPrivileged({ children }) {
   if (loading) return <LoadingScreen />
   const isAccounts = profile?.role === 'accounts'
   if (!isPrivileged && !isAccounts) return <Navigate to="/quotes" replace />
+  return children
+}
+
+/* Phase 495 - office people who may give a field technician a job (RPC re-checks the same roles). */
+function RequireOfficeAssign({ children }) {
+  const { isPrivileged, profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  const ok = isPrivileged || ['accounts', 'hr', 'office_admin', 'operation_head'].includes(profile?.role)
+  if (!ok) return <Navigate to="/quotes" replace />
   return children
 }
 
@@ -516,6 +526,7 @@ export default function App() {
           <Route path="/ops-down"                  element={<RequireOps><OpsDownV2 /></RequireOps>} />
           <Route path="/ops-station"               element={<RequireOps><OpsStationV2 /></RequireOps>} />
           <Route path="/ops-tickets"               element={<RequireOps><OpsTicketsV2 /></RequireOps>} />
+          <Route path="/ops-assign"                element={<RequireOfficeAssign><OpsAssignV2 /></RequireOfficeAssign>} />
           <Route path="/ops-performance"           element={<RequireOps><OpsMyPerformanceV2 /></RequireOps>} />
           <Route path="/ops-home"                  element={<RequireOps><OpsHomeV2 /></RequireOps>} />
           {/* Phase 365 — Work module. /my-work is open to every signed-in user (non-members only ask + follow);

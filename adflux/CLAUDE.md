@@ -21835,3 +21835,11 @@ Owner's new "Surfaces & ink" palette (page #0A0C10, panel #11141A, card #171B22,
 
 ### 492.1 · Palette preview dropped (2026-10-24)
 Owner: "skip palette=black plan". `palette-black.css`, its import and the `?palette=` script were removed. Palette stays as before (navy). The mockup copy `_design_reference/people_module_mockup_newpalette.html` is only a design reference. Do not re-propose the near-black palette unless he asks.
+
+## 493 · Phase 495 - office gives a technician a job (/ops-assign) (2026-10-24)
+Owner approved the Operations technician redesign ("looks good go n wired"). Most of it already existed (sections 246-257: Home, Tickets, Station board, Down now, My Performance). The missing piece was the OFFICE side: an office person giving a field technician work.
+- New page `src/pages/v2/OpsAssignV2.jsx` at `/ops-assign` (guard `RequireOfficeAssign`: admin, co_owner, operation_head, hr, accounts, office_admin). Three kinds: Fix a screen, Campaign photo, Office work.
+- New function `ops_office_assign(kind, tech, depot, screen, issue, note, quote)` in `supabase_phase495_ops_office_assign.sql` (APPLIED live, dry-run first, anon cannot run it). Fault -> `ops_tickets` type fault, source manual, status in_progress (lands in the technician's In-process tab, note says who gave it). Photo -> type photo_request, source sales_request, status open (lands in "Assigned to you"). Push to the technician only inside the 09:00-21:00 window. Technician must be an active operation_executive.
+- "Office work" uses the existing Work task (`work_create_task`), so it shows in the technician's My Work; no new SQL.
+- Nav: "Give work to tech" in OFFICE_ADMIN_NAV, "Give work" in OPS_HEAD_NAV. Admin reaches it by URL only (no admin nav entry yet).
+- Not built (owner decisions): the "Can't fix, tell the office" outcome with reason, after-fix photo on close, a quote picker on Campaign photo (quote is left empty), Gujarati labels on the office page (English by design).
