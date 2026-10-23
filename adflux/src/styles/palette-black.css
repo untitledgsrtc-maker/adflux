@@ -1,0 +1,39 @@
+/* Near-black palette (owner's "Surfaces & ink", Oct 2026).
+   PREVIEW ONLY: active when <html data-palette="black"> (set by opening any
+   page with ?palette=black; back to normal with ?palette=navy). Off by
+   default so the team sees no change. Once approved, move these values into
+   tokens.css / v2.css and delete this file.
+   Palette: page #0A0C10 · panel #11141A · card #171B22 · elevated #1E232C ·
+   inset #0C0F14 · line #222834 · ink #F5F7FA / #C6CCD6 / #8892A0. */
+
+html[data-palette="black"] {
+  --bg: #0A0C10;
+  --surface: #171B22;
+  --surface-2: #1E232C;
+  --surface-3: #2A303B;
+  --border: #222834;
+  --border-strong: #2E3542;
+  --text: #F5F7FA;
+  --text-muted: #C6CCD6;
+  --text-subtle: #8892A0;
+  --sidebar-bg: #11141A;
+  --sidebar-text: #C6CCD6;
+  --sidebar-muted: #8892A0;
+  --sidebar-hover: #1E232C;
+  background: #0A0C10;
+}
+
+html[data-palette="black"] .v2,
+html[data-palette="black"] .v2d {
+  --v2-bg-0: #0A0C10;
+  --v2-bg-1: #171B22;
+  --v2-bg-2: #1E232C;
+  --v2-bg-3: #262C37;
+  --v2-surface-3: #2A303B;
+  --v2-line: #222834;
+  --v2-line-2: #2E3542;
+  --v2-ink-0: #F5F7FA;
+  --v2-ink-1: #C6CCD6;
+  --v2-ink-2: #8892A0;
+  --v2-yellow-ink: #0A0C10;
+}

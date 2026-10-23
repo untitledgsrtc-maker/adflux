@@ -21829,3 +21829,6 @@ Audit result (read-only, no code changed): colours / fonts / Lucide / theme swit
 
 ## 491 · Day mode removed - app is night-only (2026-10-24)
 Owner decision. `V2AppShell` forces `data-theme="night"` and clears any saved 'theme'; `index.html` pre-paint script forces night; Settings page lost the Day/Night toggle (shows an info note, `/settings` still works). guardian PASS. Dead `[data-theme="day"]` CSS blocks in leads.css / work.css / work-glass.css left for a later cleanup commit (section 16). Supersedes section 490.1's options.
+
+## 492 · Near-black palette PREVIEW switch (2026-10-24)
+Owner's new "Surfaces & ink" palette (page #0A0C10, panel #11141A, card #171B22, elevated #1E232C, line #222834, ink #F5F7FA/#C6CCD6/#8892A0). Shipped as an opt-in preview, NOT the default: `src/styles/palette-black.css` overrides the global + `--v2-*` tokens only under `html[data-palette="black"]`; `index.html` pre-paint script sets it from `?palette=black` (stored in that browser's localStorage) and clears it with `?palette=navy`. Team sees no change. Not seen live yet (needs admin login). Known: ~870 hardcoded navy hex in jsx stay navy (patchwork until swapped to tokens); stronger border `#2E3542` and `--v2-bg-3` `#262C37` are my picks. Next if approved: move values into tokens.css/v2.css, delete this file, then replace hardcoded hex module by module.

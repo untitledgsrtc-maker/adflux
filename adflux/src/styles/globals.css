@@ -11,6 +11,7 @@
 @import './quotes_tab_additions.css';
 @import './team.css';
 @import './wizard.css';
+@import './palette-black.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
