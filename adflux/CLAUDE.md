@@ -21803,3 +21803,7 @@ Owner: the 43% ring was identical on Today and Yesterday. Cause: `finishedToday`
 ## 486 · Evening report share no longer replaces the app page (23-10-2026)
 
 Owner: after someone shares the evening report from the app they cannot come back to the app. Cause: `MyWorkV2` `EveningCard.share` opened WhatsApp with `window.location.href = https://wa.me/?text=...`, which REPLACES the app page (Windows app / PWA have no way back). Now it uses `openExternalUrl` (new tab / system browser; native app path unchanged). It is still called straight from the tap before any await (iOS rule from 355.3). Not tested on a real Windows PC / iPhone yet - ask Safika or an iPhone user to share once and confirm the app stays. If the Windows app opens the wa.me page INSIDE its own window instead of a browser, the fix there is in the Tauri shell (`windows-agent/src/main.js`), not here.
+
+## 487 · Timeline "Days, by person": long ranges keep wide day bars (23-10-2026)
+
+Owner: 30-day timeline looked different from 7-day. The bar height scale is already the SAME in both (full height = 9 h, `TeamWorkV2` days grid); only each day's column width shrank as days grew (my earlier note that bars scale to the busiest day was wrong). Now each day column is at least 44 px; ranges over 7 days scroll sideways and open scrolled to the newest day. 7-day view unchanged.

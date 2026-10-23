@@ -795,8 +795,9 @@ function TimelineTab({ photoOf, memberIds, nameOf, byPerson, from, to, projName 
             </div>
           </div>
         ) : (
-          <div style={{ padding: 16, overflowX: 'auto' }}>
-            <div style={{ minWidth: Math.max(640, 170 + days * 22 + 90) }}>
+          // Phase 487: a long range keeps each day as wide as the 7-day view's bars (min 44px) and scrolls sideways, newest day in view
+          <div style={{ padding: 16, overflowX: 'auto' }} ref={(el) => { if (el && days > 7 && !el.dataset.scrolled) { el.scrollLeft = el.scrollWidth; el.dataset.scrolled = '1' } }}>
+            <div style={{ minWidth: Math.max(640, 170 + days * 44 + 90) }}>
               <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr 70px', gap: 12, marginBottom: 6 }}>
                 <span />
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${days}, 1fr)`, gap: 2 }}>
