@@ -21783,3 +21783,7 @@ Text only: `TotalPayableCard` deduction sub-line and `SalarySlipPDF` leave note 
 ## 481 · My Work: "Hide later tasks" after "Show upcoming" (23-10-2026)
 
 Work-team members only had "Show upcoming" (the bar vanished once clicked, so no way back except the Today button). `MyWorkV2` now shows a "Showing tasks for the next 90 days too / Hide later tasks" bar while the upcoming view (today..+90d) is on. Team Work (heads) already had Show/Hide. Open: owner's "nudge someone about an assigned task" request was unclear - no per-task nudge exists (only work_send_reminder for morning/evening); asked owner.
+
+## 482 · Dhara 5 Oct half-day waived, one day only (23-10-2026)
+
+Owner: only the app swipe counts for the 11:30 rule (Phase 478 unchanged), but Dhara's 5 Oct was waived by hand (first call 10:13, "Good morning" 10:14, swipe 14:12). `supabase_phase482_dhara_5oct_waive.sql` (applied): that one `work_sessions` row `half_day` -> `on_time` with a note in `late_reason`; backup `_bak_work_sessions_p482` (drop after 30 days). Her 7 Oct stands. Dhara Oct now: late half 0.5, deduction 2212, net 21838.
