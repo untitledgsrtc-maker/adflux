@@ -21832,3 +21832,6 @@ Owner decision. `V2AppShell` forces `data-theme="night"` and clears any saved 't
 
 ## 492 · Near-black palette PREVIEW switch (2026-10-24)
 Owner's new "Surfaces & ink" palette (page #0A0C10, panel #11141A, card #171B22, elevated #1E232C, line #222834, ink #F5F7FA/#C6CCD6/#8892A0). Shipped as an opt-in preview, NOT the default: `src/styles/palette-black.css` overrides the global + `--v2-*` tokens only under `html[data-palette="black"]`; `index.html` pre-paint script sets it from `?palette=black` (stored in that browser's localStorage) and clears it with `?palette=navy`. Team sees no change. Not seen live yet (needs admin login). Known: ~870 hardcoded navy hex in jsx stay navy (patchwork until swapped to tokens); stronger border `#2E3542` and `--v2-bg-3` `#262C37` are my picks. Next if approved: move values into tokens.css/v2.css, delete this file, then replace hardcoded hex module by module.
+
+### 492.1 · Palette preview dropped (2026-10-24)
+Owner: "skip palette=black plan". `palette-black.css`, its import and the `?palette=` script were removed. Palette stays as before (navy). The mockup copy `_design_reference/people_module_mockup_newpalette.html` is only a design reference. Do not re-propose the near-black palette unless he asks.

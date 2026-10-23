@@ -47,15 +47,6 @@
         try {
           document.documentElement.setAttribute('data-theme', 'night');
         } catch (e) { /* ignore */ }
-        // Near-black palette preview: ?palette=black turns it on for this
-        // browser only, ?palette=navy turns it off (see palette-black.css).
-        try {
-          var q = new URLSearchParams(location.search).get('palette');
-          if (q === 'black') localStorage.setItem('palette', 'black');
-          else if (q === 'navy') localStorage.removeItem('palette');
-          if (localStorage.getItem('palette') === 'black')
-            document.documentElement.setAttribute('data-palette', 'black');
-        } catch (e) { /* ignore */ }
       })();
     </script>
   </head>
