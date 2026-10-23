@@ -14,6 +14,7 @@ import { istTodayISO } from '../../utils/istDate'
 import { toastError, toastSuccess, pushToast } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { openWhatsAppShare } from '../../utils/whatsappSummary'
+import { openExternalUrl } from '../../utils/openExternal'
 import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, istHour, dueState, initialsOf, clientColor } from '../../utils/workUtils'
 import WorkBoard from '../../components/work/WorkBoard'
 import NewTaskModal from '../../components/work/NewTaskModal'
@@ -619,7 +620,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
       if (note.trim()) lines.push('', `Note: ${note.trim()}`)
       const text = lines.join('\n')
       if (Capacitor.isNativePlatform()) openWhatsAppShare(text)
-      else window.location.href = `https://wa.me/?text=${encodeURIComponent(text)}`   // works on iPhone, Android and desktop
+      else openExternalUrl(`https://wa.me/?text=${encodeURIComponent(text)}`)   // Phase 486: new tab/window, so the app page stays open (was location.href = the app was replaced and could not be returned to)
       supabase.rpc('work_mark_report_shared', { p_date: today, p_note: note.trim() || null })
         .then(({ error }) => { if (error) console.warn('report mark failed', error.message); onShared() })
     } catch (e) { toastError(e, 'Could not open WhatsApp.') } finally { setTimeout(() => setBusy(false), 1500) }
