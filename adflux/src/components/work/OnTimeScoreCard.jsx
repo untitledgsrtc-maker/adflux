@@ -22,6 +22,13 @@ export async function loadOnTime(userId) {
   return { counted, onTime: counted >= MIN_TASKS ? Math.round(pct * counted / 100) : null, pct: counted >= MIN_TASKS ? pct : null, cap: Number(r.variable_cap) || 0, earned: Number(r.variable_earned) || 0 }
 }
 
+// Phase 483 - evening reports shared this month: { days, shared } or null. Display only, never touches pay.
+export async function loadReports(userId) {
+  const { data, error } = await supabase.rpc('work_report_stats', { p_user_id: userId, p_month_start: monthStartISO() })
+  if (error || !data) return null
+  return { days: Number(data.days) || 0, shared: Number(data.shared) || 0 }
+}
+
 export function bandOf(s) {
   if (!s) return null
   if (s.pct == null) return { cls: '', label: `Not enough tasks yet (${s.counted} of ${MIN_TASKS}). Full variable for now.` }
@@ -33,6 +40,8 @@ export function bandOf(s) {
 export default function OnTimeScoreCard({ userId }) {
   const [s, setS] = useState(undefined)   // undefined = loading, null = unavailable
   useEffect(() => { let on = true; if (userId) loadOnTime(userId).then((v) => { if (on) setS(v) }); return () => { on = false } }, [userId])
+  const [rep, setRep] = useState(null)
+  useEffect(() => { let on = true; if (userId) loadReports(userId).then((v) => { if (on) setRep(v) }); return () => { on = false } }, [userId])
   if (s === undefined) return <div className="wk-card"><div className="wk-sm">Loading your on-time score...</div></div>
   if (s === null) return null
   const b = bandOf(s)
@@ -49,6 +58,7 @@ export default function OnTimeScoreCard({ userId }) {
         <div className="wk-sm">{s.pct == null ? b.label : `${s.onTime} of ${s.counted} tasks finished on time${late > 0 ? ` - ${late} late` : ''}`}</div>
         {s.pct != null && <div className="wk-sm" style={{ marginTop: 6 }}>{b.label}</div>}
         <div className="wk-sm" style={{ marginTop: 6 }}>Variable so far: <b className="wk-num">{formatCurrency(s.earned)}</b> of {formatCurrency(s.cap)}</div>
+        {rep && rep.days > 0 && <div className="wk-sm" style={{ marginTop: 6 }}>Evening reports shared: <b className="wk-num">{rep.shared} of {rep.days}</b> working days. For information only - it does not change your pay.</div>}
         <div className="wk-sm" style={{ marginTop: 6, opacity: 0.8 }}>Counts tasks whose due date has passed. Postponed tasks and leave days are not counted.</div>
       </div>
     </div>
@@ -57,11 +67,13 @@ export default function OnTimeScoreCard({ userId }) {
 
 export function OnTimeCell({ userId }) {
   const [s, setS] = useState(undefined)
-  useEffect(() => { let on = true; loadOnTime(userId).then((v) => { if (on) setS(v) }); return () => { on = false } }, [userId])
+  const [rep, setRep] = useState(null)
+  useEffect(() => { let on = true; loadOnTime(userId).then((v) => { if (on) setS(v) }); loadReports(userId).then((v) => { if (on) setRep(v) }); return () => { on = false } }, [userId])
+  const repTxt = rep && rep.days > 0 ? ` · reports ${rep.shared}/${rep.days}` : ''
   if (s === undefined) return <span className="wk-sm">...</span>
   if (!s) return <span className="wk-sm">-</span>
   const b = bandOf(s)
   return s.pct == null
-    ? <span className="wk-sm" title={b.label}>{s.counted} of {MIN_TASKS} tasks</span>
-    : <span className={`wk-pill ${b.cls}`} title={b.label}>{Math.round(s.pct)}% · {s.onTime}/{s.counted}</span>
+    ? <span className="wk-sm" title={b.label}>{s.counted} of {MIN_TASKS} tasks{repTxt}</span>
+    : <span className={`wk-pill ${b.cls}`} title={b.label}>{Math.round(s.pct)}% · {s.onTime}/{s.counted}{repTxt}</span>
 }

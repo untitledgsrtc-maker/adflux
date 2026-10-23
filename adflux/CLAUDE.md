@@ -21787,3 +21787,7 @@ Work-team members only had "Show upcoming" (the bar vanished once clicked, so no
 ## 482 · Dhara 5 Oct half-day waived, one day only (23-10-2026)
 
 Owner: only the app swipe counts for the 11:30 rule (Phase 478 unchanged), but Dhara's 5 Oct was waived by hand (first call 10:13, "Good morning" 10:14, swipe 14:12). `supabase_phase482_dhara_5oct_waive.sql` (applied): that one `work_sessions` row `half_day` -> `on_time` with a note in `late_reason`; backup `_bak_work_sessions_p482` (drop after 30 days). Her 7 Oct stands. Dhara Oct now: late half 0.5, deduction 2212, net 21838.
+
+## 483 · Evening reports shared shown next to the on-time score, no pay effect (23-10-2026)
+
+Owner: "just score, no salary deduction now". `supabase_phase483_work_report_stats.sql` (applied): `work_report_stats(user, month_start)` -> {days, shared}; gate self / Work head / admin, co_owner, hr; day = IST date with an approved time entry, not Sunday / holiday / full-day leave; today counts only once shared or after 19:00. `OnTimeScoreCard.jsx`: My Work card line "Evening reports shared N of M working days (for information only)" and the Team Work People cell gets " · reports N/M". `monthly_score` untouched. RANA DIKSHITA Oct: 2 of 4. Options 1/2 (penalty / separate score) NOT built; if chosen later, count from a date the 98982 reminders work.
