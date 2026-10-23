@@ -109,14 +109,15 @@ export default async function handler(req) {
 
   // Manual reminder (Phase 462): the person is told by WhatsApp only if their 24h window is open (they messaged the 95 number in the last day).
   if (manual) {
-    const kind = body0.kind === 'morning' ? 'morning' : 'evening'
+    const kind = body0.kind === 'morning' ? 'morning' : body0.kind === 'task' ? 'task' : 'evening'   // Phase 484: 'task' = one-task nudge, text built by work_nudge_part
     await pool(reps, 8, async (r) => {
       const last = (await sbRows(`team_assistant_requests?user_id=eq.${r.id}&created_at=gte.${dayAgo}&select=phone_number_id,wa_from&order=created_at.desc&limit=1`))?.[0]
       const to = String(last?.wa_from || '').replace(/\D/g, '')
       const pnid = String(last?.phone_number_id || '')
       if (to.length < 10 || !/^\d+$/.test(pnid)) { closed++; return }
       const first = String(r.name || '').trim().split(/\s+/)[0] || 'there'
-      const text = kind === 'morning' ? `Good morning ${first}! Please say hi here to start your day.` : `${first}, please send your evening report. Open the app and tap Share.`
+      const text = kind === 'task' ? String(body0.text || '').slice(0, 400) : kind === 'morning' ? `Good morning ${first}! Please say hi here to start your day.` : `${first}, please send your evening report. Open the app and tap Share.`
+      if (!text) return
       try { await sendText(pnid, to, text, r.id, 'reminder'); sent++ } catch (e) { failed++; errs[e.message] = (errs[e.message] || 0) + 1 }
     })
     return ok({ mode: 'manual', kind, reps: reps.length, sent, failed, errors: errs, window_closed: closed })

@@ -1,13 +1,13 @@
 // Phase 365 - one task: parts, checklist, comments, task log, due date. Opens from the board
 // and from "Asked by me". Everything it writes goes through the work_* functions.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Check, Loader2, Send, Play, Undo2, Trash2, UserMinus } from 'lucide-react'
+import { X, Check, Loader2, Send, Play, Undo2, Trash2, UserMinus, Bell } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toastError, toastSuccess } from '../v2/Toast'
 import { confirmDialog } from '../v2/ConfirmDialog'
 import UserAvatar from '../common/UserAvatar'
 import RejectModal from './RejectModal'
-import { fmtDur, fmtDateShort, dueState, STATUS_LABEL, initialsOf } from '../../utils/workUtils'
+import { fmtDur, fmtDateShort, fmtTimeIST, dueState, STATUS_LABEL, initialsOf } from '../../utils/workUtils'
 import DateField from './DateField'
 
 const EVENT_TEXT = {
@@ -29,6 +29,7 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
   const [busy, setBusy] = useState(false)
   const [people, setPeople] = useState([])
   const [rej, setRej] = useState(null)   // { part, kind }
+  const [nudges, setNudges] = useState({})   // Phase 484: part id -> { at, by } of the latest nudge
   const latch = useRef(false)
 
   const load = useCallback(async () => {
@@ -43,6 +44,11 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
     const e = t.error || p.error || s.error || c.error || l.error
     if (e || !t.data) { setErr(e?.message || 'Task not found.'); return }
     setData({ task: t.data, parts: p.data || [], steps: s.data || [], comments: c.data || [], log: l.data || [] })
+    try {   // latest nudge per person's part (best effort, read only)
+      const { data: nd } = await supabase.from('work_task_nudges').select('part_id,created_at,sent_by').eq('task_id', taskId).order('created_at', { ascending: false }).limit(50)
+      const m = {}; (nd || []).forEach((r) => { if (!m[r.part_id]) m[r.part_id] = { at: r.created_at, by: r.sent_by } })
+      setNudges(m)
+    } catch { /* nudge line is optional */ }
   }, [taskId])
   useEffect(() => { load() }, [load])
   useEffect(() => {
@@ -146,6 +152,14 @@ export default function TaskDetailModal({ taskId, uid, isHead, nameOf, projectNa
                     <div className="wk-sm" style={{ color: 'var(--w-wat, #FBBF24)' }}>
                       Postponed until {p.postponed_until ? fmtDateShort(p.postponed_until) : ''} - asked by {[...(p.postponed_by_users || []).map((id) => nameOf(id)), p.postponed_by_client ? `${p.postponed_by_client} (client)` : ''].filter(Boolean).join(', ') || 'someone'}
                       {p.postpone_count > 1 ? ` - postponed ${p.postpone_count} times` : ''}
+                    </div>
+                  )}
+                  {p.status !== 'finished' && p.status !== 'postponed' && p.assignee_id !== uid && (isHead || task.created_by === uid) && (
+                    <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <button className="wk-btn y sm" disabled={busy} onClick={() => run(() => rpc('work_nudge_part', { p_part: p.id }))}>
+                        <Bell size={14} aria-hidden="true" /> Nudge
+                      </button>
+                      {nudges[p.id] && <span className="wk-sm">Nudged by {nudges[p.id].by === uid ? 'you' : nameOf(nudges[p.id].by)}, {fmtTimeIST(nudges[p.id].at)}</span>}
                     </div>
                   )}
                   {p.status !== 'finished' && (isHead || task.created_by === uid || p.assignee_id === uid) && (

@@ -37,6 +37,8 @@ export default function MyWorkV2() {
   const [running, setRunning] = useState(null)
   const [entries, setEntries] = useState([])       // today's entries
   const [parts, setParts] = useState([])
+  const [nudgedIds, setNudgedIds] = useState([])   // Phase 484
+  const nudgedParts = useMemo(() => new Set(nudgedIds), [nudgedIds])
   const [postponing, setPostponing] = useState(null)   // item being postponed (Postpone box)
   const [tagged, setTagged] = useState([])             // tasks postponed at MY request (I was tagged)
   const [viewFrom, setViewFrom] = useState(null)   // null = Today (today's tasks + anything overdue)
@@ -88,6 +90,9 @@ export default function MyWorkV2() {
       if (srv) setSkew(Date.parse(srv) - (t0 + (Date.now() - t0) / 2))
     } catch { /* keep the last value */ }
     // tasks someone postponed and tagged ME as the one who asked (read only, best effort)
+    // Phase 484: tasks someone nudged me about in the last 2 days stay on today's board (best effort)
+    supabase.from('work_task_nudges').select('part_id').eq('user_id', uid).gte('created_at', dayStartISO(addDaysISO(today, -2)))
+      .then(({ data }) => setNudgedIds((data || []).map((r) => r.part_id)))
     supabase.from('work_task_parts').select('id,assignee_id,postponed_until,postponed_by_client,task:work_tasks(title)')
       .eq('status', 'postponed').contains('postponed_by_users', [uid]).limit(30)
       .then(({ data }) => setTagged(data || []))
@@ -183,7 +188,7 @@ export default function MyWorkV2() {
   const rFrom = viewFrom || today
   const rTo = (viewTo && viewTo >= rFrom) ? viewTo : rFrom
   // Phase 479: made by hand = on the board only if given TODAY (any due date) or due within 2 days; older hand-made far-dated ones wait behind the later bar. Phase 448: made by hand = always on the board; made by the system (repeating / from a quote / HR / finance) = only when due within 2 days
-  const showNow = (i) => !i.due || i.due <= addDaysISO(today, 2) || (!i.p?.task?.is_auto && i.createdDay === today)
+  const showNow = (i) => !i.due || i.due <= addDaysISO(today, 2) || (!i.p?.task?.is_auto && i.createdDay === today) || nudgedParts.has(i.id)   // Phase 484: nudged in the last 2 days = on today's board
   const boardItems = items.filter((i) => {
     if (i.status === 'postponed') return true   // the Postponed column always shows what is waiting
     if (i.status === 'finished') return isToday ? i.finishedDay === today : (i.finishedDay >= rFrom && i.finishedDay <= rTo)

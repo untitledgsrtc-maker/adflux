@@ -284,6 +284,12 @@ export default function WindowsAgentEngine() {
         const k = ev.new?.kind
         try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification(k === 'morning' ? 'Say good morning' : 'Send your evening report', { body: k === 'morning' ? 'Please say hi on WhatsApp to start your day.' : 'Please open My Work and share your evening report.', tag: `wk-rem-${k}` }) } catch { /* ignore */ }
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'work_task_nudges', filter: `user_id=eq.${uid}` }, async (ev) => {
+        let title = 'a task'
+        try { const { data } = await supabase.from('work_tasks').select('title').eq('id', ev.new?.task_id).maybeSingle(); if (data?.title) title = data.title } catch { /* generic */ }
+        try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('Task reminder', { body: `Someone is waiting on: ${title}`, tag: `wk-nudge-${ev.new?.id}` }) } catch { /* ignore */ }
+        window.dispatchEvent(new Event('focus'))
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'work_task_parts' }, async (ev) => {
         // someone declined a task I created -> tell me on this PC
         const n = ev.new || {}
