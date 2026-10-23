@@ -195,6 +195,7 @@ export default function MyWorkV2() {
   const dayOpen = boardItems.filter(isOpen).length
   // Phase 436: tasks given to me for a LATER date are not on today's board - say so, with one tap to see them
   const laterCount = isToday ? items.filter((i) => isOpen(i) && !showNow(i)).length : 0
+  const showingUpcoming = viewFrom === today && viewTo === addDaysISO(today, 90)   // Phase 481: the Show upcoming view needs a way back
   const dayLate = boardItems.filter((i) => isOpen(i) && i.due && i.due < today).length
   const rangeLabel = isToday ? 'Today' : (rFrom === rTo ? fmtDateShort(rFrom) : `${fmtDateShort(rFrom)} - ${fmtDateShort(rTo)}`)
 
@@ -358,6 +359,12 @@ export default function MyWorkV2() {
                     <button className={`wk-btn ${isToday ? 'y' : 'o'}`} onClick={() => { setViewFrom(null); setViewTo(null) }}>Today</button>
                   </div>
                 </div>
+                {showingUpcoming && (
+                  <div className="wk-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '12px 16px', marginBottom: 14, borderColor: 'var(--accent)' }}>
+                    <span>Showing tasks for the next 90 days too.</span>
+                    <button className="wk-btn o sm" onClick={() => { setViewFrom(null); setViewTo(null) }}>Hide later tasks</button>
+                  </div>
+                )}
                 {laterCount > 0 && (
                   <div className="wk-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '12px 16px', marginBottom: 14, borderColor: 'var(--accent)' }}>
                     <span><b className="wk-num">{laterCount}</b> {laterCount === 1 ? 'task is' : 'tasks are'} given to you for a later date.</span>

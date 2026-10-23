@@ -21779,3 +21779,7 @@ Owner: "show today's tasks only; a task I create by hand today with a due date 2
 ## 480 · Late check-in half-days named on the payable card + slip (23-10-2026)
 
 Text only: `TotalPayableCard` deduction sub-line and `SalarySlipPDF` leave note append "incl. N for check-in after 11:30" when `late_half_days` (Phase 478) > 0. No calculation change.
+
+## 481 · My Work: "Hide later tasks" after "Show upcoming" (23-10-2026)
+
+Work-team members only had "Show upcoming" (the bar vanished once clicked, so no way back except the Today button). `MyWorkV2` now shows a "Showing tasks for the next 90 days too / Hide later tasks" bar while the upcoming view (today..+90d) is on. Team Work (heads) already had Show/Hide. Open: owner's "nudge someone about an assigned task" request was unclear - no per-task nudge exists (only work_send_reminder for morning/evening); asked owner.
