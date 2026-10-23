@@ -21843,3 +21843,10 @@ Owner approved the Operations technician redesign ("looks good go n wired"). Mos
 - "Office work" uses the existing Work task (`work_create_task`), so it shows in the technician's My Work; no new SQL.
 - Nav: "Give work to tech" in OFFICE_ADMIN_NAV, "Give work" in OPS_HEAD_NAV. Admin reaches it by URL only (no admin nav entry yet).
 - Not built (owner decisions): the "Can't fix, tell the office" outcome with reason, after-fix photo on close, a quote picker on Campaign photo (quote is left empty), Gujarati labels on the office page (English by design).
+
+## 494 · Phase 496 - can't-fix outcome, after-fix photo, campaign picker, admin menu entry (2026-10-24)
+Finishes the four leftovers of section 493. `supabase_phase496_ops_cantfix_fixphoto.sql` (APPLIED live, dry-run first): `ops_tickets.cant_fix_reason / cant_fix_at / fix_photo_path`; `ops_ticket_cant_fix(ticket, reason)` (the assigned technician or admin / co_owner / operation_head, ticket must be open or in process; sets priority high, pushes admins, heads and the person who gave the job, inside push hours); `ops_office_lookup` now also returns running private LED campaigns (`quotes`) and the cant-fix reason in "Recently sent". The latest body of `ops_office_lookup` lives in THIS file (re-run this one, not 495).
+- Technician (OpsTicketsV2 In-process card): red "Can't fix" button -> reason sheet; red line with the reason on the card (head sees it too); Mark fixed now opens a sheet asking for an after-fix photo (stored in `ops-photos` as `<depot>/fix-<time>.<ext>`, path in `fix_photo_path`) with "Mark fixed without photo" as the escape; fixing clears the reason.
+- Office page: "Campaign (optional)" picker on Campaign photo (won, private, LED, ended less than 7 days ago); cant-fix reason shown under Recently sent.
+- Admin sidebar: "Give work to tech" (ADMIN_NAV).
+- Not built: showing the after-fix photo to the office/head (it is saved, no viewer yet); a Gujarati version of the office page.

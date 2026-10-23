@@ -74,6 +74,11 @@ export default function OpsTicketsV2() {
   const [photoFile, setPhotoFile] = useState(null)
   const fileRef = useRef(null)
 
+  const [fixFor, setFixFor] = useState(null)      // ticket being closed (after-fix photo sheet)
+  const [fixPhoto, setFixPhoto] = useState(null)
+  const fixFileRef = useRef(null)
+  const [cantFor, setCantFor] = useState(null)    // ticket the technician cannot fix
+  const [cantText, setCantText] = useState('')
   const [callFor, setCallFor] = useState(null)
   const [contactsFor, setContactsFor] = useState(null)   // { id, name } of the station whose number sheet is open
   const [outcome, setOutcome] = useState('')
@@ -103,7 +108,7 @@ export default function OpsTicketsV2() {
 
       // proc/fixed: head sees the whole team's manual tickets; exec sees own.
       let pQ = supabase.from('ops_tickets')
-        .select('id, screen_id, depot_id, cause, notes, created_at, issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en, issue_gu), screen:ops_screens!ops_tickets_screen_id_fkey(name), depot:ops_depots!ops_tickets_depot_id_fkey(name)')
+        .select('id, screen_id, depot_id, cause, notes, created_at, cant_fix_reason, issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en, issue_gu), screen:ops_screens!ops_tickets_screen_id_fkey(name), depot:ops_depots!ops_tickets_depot_id_fkey(name)')
         .eq('source', 'manual').eq('status', 'in_progress').order('created_at', { ascending: false })
       let fQ = supabase.from('ops_tickets')
         .select('id, screen_id, depot_id, cause, notes, resolved_at, issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en, issue_gu), screen:ops_screens!ops_tickets_screen_id_fkey(name), depot:ops_depots!ops_tickets_depot_id_fkey(name)')
@@ -265,12 +270,38 @@ export default function OpsTicketsV2() {
       const ok = await confirmDialog({ title: t('mark_fixed', lang), message: t('still_offline_q', lang), confirmLabel: t('mark_fixed', lang), cancelLabel: t('cancel', lang) })
       if (!ok) return
     }
-    setBusy(true)
+    setFixPhoto(null); if (fixFileRef.current) fixFileRef.current.value = ''
+    setFixFor(ticket)
+  }
+
+  async function doFix(withPhoto) {
+    if (savingRef.current || busy || !fixFor) return
+    if (withPhoto && !fixPhoto) { toastError(new Error(''), t('fix_photo_hint', lang)); return }
+    savingRef.current = true; setBusy(true)
     try {
-      const { error } = await supabase.from('ops_tickets').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', ticket.id)
+      let fix_photo_path = null
+      if (withPhoto && fixPhoto) {
+        const ext = (fixPhoto.name.split('.').pop() || 'jpg').toLowerCase()
+        const key = `${fixFor.depot_id}/fix-${Date.now()}.${ext}`
+        const up = await supabase.storage.from('ops-photos').upload(key, fixPhoto, { upsert: false })
+        if (up.error) { toastError(up.error, t('save_failed', lang)); return }
+        fix_photo_path = key
+      }
+      const { error } = await supabase.from('ops_tickets').update({ status: 'resolved', resolved_at: new Date().toISOString(), cant_fix_reason: null, ...(fix_photo_path ? { fix_photo_path } : {}) }).eq('id', fixFor.id)
       if (error) { toastError(error, t('save_failed', lang)); return }
-      toastSuccess(t('fixed_word', lang)); setTab('fixed'); await load()
-    } finally { setBusy(false) }
+      toastSuccess(t('fixed_word', lang)); setFixFor(null); setTab('fixed'); await load()
+    } finally { setBusy(false); savingRef.current = false }
+  }
+
+  async function sendCantFix() {
+    if (savingRef.current || busy || !cantFor) return
+    if (cantText.trim().length < 3) { toastError(new Error(''), t('cant_fix_ph', lang)); return }
+    savingRef.current = true; setBusy(true)
+    try {
+      const { error } = await supabase.rpc('ops_ticket_cant_fix', { p_ticket: cantFor.id, p_reason: cantText.trim() })
+      if (error) { toastError(error, t('save_failed', lang)); return }
+      toastSuccess(t('cant_fix_sent', lang)); setCantFor(null); setCantText(''); await load()
+    } finally { setBusy(false); savingRef.current = false }
   }
 
   // Phase 419: close an auto fault (offline / camera) from the "Assigned to you" block.
@@ -355,6 +386,8 @@ export default function OpsTicketsV2() {
 
       {sheet && IssueSheet()}
       {callFor && CallSheet()}
+      {fixFor && FixSheet()}
+      {cantFor && CantSheet()}
       {contactsFor && (
         <DepotContactsModal depot={contactsFor} lang={lang} meId={uid} canDeleteAll={isHead}
           onClose={() => setContactsFor(null)} onChanged={load} />
@@ -474,6 +507,8 @@ export default function OpsTicketsV2() {
           )}
           {contact && canAdd && <button onClick={() => setContactsFor(addTarget)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', padding: '10px 0 0', minHeight: 44 }}>{t('add_number_cta', lang)}</button>}
           {calls.length > 0 && <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 10 }}>{calls.length} {t('n_calls', lang)} · {calls[0].notes || calls[0].outcome}</div>}
+          {tk.cant_fix_reason && <div style={{ marginTop: 10, background: 'var(--danger-soft)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 10, padding: '8px 10px', fontSize: 13, fontWeight: 600 }}>{t('cant_fix_tag', lang)}: {tk.cant_fix_reason}</div>}
+          {!isHead && <button onClick={() => { setCantText(''); setCantFor(tk) }} disabled={busy} className="lead-btn" style={{ width: '100%', justifyContent: 'center', minHeight: 44, marginTop: 10, color: 'var(--danger)', borderColor: 'var(--danger)' }}>{t('cant_fix', lang)}</button>}
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button onClick={() => reopen(tk)} disabled={busy} className="lead-btn" style={{ justifyContent: 'center' }}>{t('reopen', lang)}</button>
             <button onClick={() => markFixed(tk)} disabled={busy} className="lead-btn lead-btn-primary" style={{ flex: 1, justifyContent: 'center' }}>{t('mark_fixed', lang)} <Check size={14} /></button>
@@ -589,6 +624,33 @@ export default function OpsTicketsV2() {
           <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={e => setPhotoFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
           <button onClick={() => fileRef.current?.click()} style={{ ...fieldSel, marginTop: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: photoFile ? 'var(--success)' : 'var(--text)' }}>{photoFile ? <Check size={18} /> : <Camera size={18} />}{photoFile ? t('photo_added', lang) : t('upload_photo', lang)}</button>
           <button onClick={submitIssue} disabled={busy} className="lead-btn lead-btn-primary" style={{ width: '100%', marginTop: 14, justifyContent: 'center', padding: '12px' }}>{busy ? t('saving', lang) : t('submit_proc', lang)}</button>
+        </div>
+      </div>
+    )
+  }
+
+  function FixSheet() {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 9000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setFixFor(null)}>
+        <div className="lead-card" style={{ width: '100%', maxWidth: 480, margin: 0, borderRadius: '16px 16px 0 0', padding: 16 }} onClick={e => e.stopPropagation()}>
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{t('fix_photo_title', lang)}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>{t('fix_photo_hint', lang)}</div>
+          <input ref={fixFileRef} type="file" accept="image/*" capture="environment" onChange={e => setFixPhoto(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+          <button onClick={() => fixFileRef.current?.click()} style={{ ...fieldSel, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, color: fixPhoto ? 'var(--success)' : 'var(--text)' }}>{fixPhoto ? <Check size={18} /> : <Camera size={18} />}{fixPhoto ? t('photo_added', lang) : t('upload_photo', lang)}</button>
+          <button onClick={() => doFix(true)} disabled={busy || !fixPhoto} className="lead-btn lead-btn-primary" style={{ width: '100%', marginTop: 12, justifyContent: 'center', minHeight: 48, opacity: fixPhoto ? 1 : .5 }}>{busy ? t('saving', lang) : t('fix_with_photo', lang)}</button>
+          <button onClick={() => doFix(false)} disabled={busy} className="lead-btn" style={{ width: '100%', marginTop: 8, justifyContent: 'center', minHeight: 44 }}>{t('fix_no_photo', lang)}</button>
+        </div>
+      </div>
+    )
+  }
+
+  function CantSheet() {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 9000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={() => setCantFor(null)}>
+        <div className="lead-card" style={{ width: '100%', maxWidth: 480, margin: 0, borderRadius: '16px 16px 0 0', padding: 16 }} onClick={e => e.stopPropagation()}>
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 10 }}>{t('cant_fix_title', lang)}</div>
+          <textarea value={cantText} onChange={e => setCantText(e.target.value)} rows={3} placeholder={t('cant_fix_ph', lang)} style={{ ...fieldSel, resize: 'none' }} />
+          <button onClick={sendCantFix} disabled={busy} className="lead-btn lead-btn-primary" style={{ width: '100%', marginTop: 12, justifyContent: 'center', minHeight: 48 }}>{busy ? t('saving', lang) : t('cant_fix_send', lang)}</button>
         </div>
       </div>
     )

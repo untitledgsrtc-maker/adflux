@@ -22,12 +22,13 @@ export default function OpsAssignV2() {
   const [depots, setDepots] = useState([])
   const [screens, setScreens] = useState([])
   const [issues, setIssues] = useState([])
+  const [quotes, setQuotes] = useState([])
   const [recent, setRecent] = useState([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const latch = useRef(false)
-  const [f, setF] = useState({ tech: '', depot: '', screen: '', issue: '', note: '', title: '', due: istTodayISO() })
+  const [f, setF] = useState({ tech: '', depot: '', screen: '', issue: '', quote: '', note: '', title: '', due: istTodayISO() })
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
 
   const [allScreens, setAllScreens] = useState([])
@@ -36,7 +37,7 @@ export default function OpsAssignV2() {
       const { data, error } = await supabase.rpc('ops_office_lookup')
       if (error) throw error
       if (!data || !data.techs) throw new Error('You do not have access to this page.')
-      setTechs(data.techs); setDepots(data.depots); setIssues(data.issues); setAllScreens(data.screens || [])
+      setTechs(data.techs); setDepots(data.depots); setIssues(data.issues); setQuotes(data.quotes || []); setAllScreens(data.screens || [])
       setRecent((data.recent || []).map((r) => ({ ...r, depot: { name: r.depot }, tech: { name: r.tech } })))
       setErr('')
     } catch (e) { setErr(e?.message || 'Could not load.') }
@@ -61,12 +62,12 @@ export default function OpsAssignV2() {
       } else {
         const { error } = await supabase.rpc('ops_office_assign', {
           p_kind: kind, p_tech: f.tech, p_depot: f.depot, p_screen: f.screen || null,
-          p_issue: kind === 'fault' ? (f.issue || null) : null, p_note: f.note.trim() || null, p_quote: null,
+          p_issue: kind === 'fault' ? (f.issue || null) : null, p_note: f.note.trim() || null, p_quote: kind === 'photo' ? (f.quote || null) : null,
         })
         if (error) throw error
       }
       toastSuccess('Sent to the technician.')
-      setF((p) => ({ ...p, screen: '', issue: '', note: '', title: '' }))
+      setF((p) => ({ ...p, screen: '', issue: '', quote: '', note: '', title: '' }))
       load()
     } catch (e) { toastError(e, 'Could not send.') } finally { latch.current = false; setBusy(false) }
   }
@@ -122,6 +123,15 @@ export default function OpsAssignV2() {
             )}
           </>
         )}
+        {kind === 'photo' && (
+          <div>
+            <label style={lbl}>Campaign (optional)</label>
+            <select style={field} value={f.quote} onChange={(e) => set('quote', e.target.value)}>
+              <option value="">Not linked to a campaign</option>
+              {quotes.map((q) => <option key={q.id} value={q.id}>{q.client || 'Client'} · {q.no}</option>)}
+            </select>
+          </div>
+        )}
         {kind === 'fault' && (
           <div>
             <label style={lbl}>What is wrong</label>
@@ -162,6 +172,7 @@ export default function OpsAssignV2() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>{t.type === 'photo_request' ? 'Campaign photo' : 'Fix a screen'} · {t.depot?.name || '-'}</div>
                 <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>to {t.tech?.name || '-'}</div>
+                {t.cant_fix && <div style={{ fontSize: 12.5, color: 'var(--danger)', fontWeight: 600 }}>Can&apos;t fix: {t.cant_fix}</div>}
               </div>
               <span style={{ fontSize: 12, fontWeight: 700, color: t.status === 'resolved' ? 'var(--success)' : 'var(--warning)', whiteSpace: 'nowrap' }}>{t.status.replace('_', ' ')}</span>
             </div>

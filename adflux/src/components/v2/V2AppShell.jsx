@@ -91,6 +91,7 @@ const ADMIN_NAV = [
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/pending-approvals', label: 'Approvals',      icon: CheckSquare },
+  { to: '/ops-assign',        label: 'Give work to tech', icon: ClipboardList },
   // Phase 62.7 (20 May 2026) — Cities / Auto Districts / GSRTC
   // Stations entries dropped per owner directive. Same admin
   // surfaces still exist as tabs inside /master and via direct URL
