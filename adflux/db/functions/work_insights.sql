@@ -31,7 +31,7 @@ BEGIN
   v_wk_end := v_today + (7 - extract(isodow FROM v_today)::int);
   SELECT GREATEST(1, count(*)) INTO v_days FROM generate_series(v_today, v_wk_end, interval '1 day') g WHERE extract(isodow FROM g) <> 7;
   SELECT COALESCE(avg(seconds) / 3600.0, 1) INTO v_team_avg FROM public.work_task_parts
-   WHERE status = 'finished' AND seconds > 0 AND finished_at >= now() - interval '60 days';
+   WHERE status = 'finished' AND seconds >= 60 AND finished_at >= now() - interval '60 days';   -- Phase 488: ignore finished-without-timer (0 s) tasks
   v_team_avg := GREATEST(0.25, v_team_avg);
 
   WITH mem AS (
@@ -39,8 +39,9 @@ BEGIN
      WHERE u.is_active AND u.role NOT IN ('admin', 'co_owner', 'agency')
   ),
   fin AS (
-    SELECT p.assignee_id, p.created_at, p.finished_at, (p.finished_at AT TIME ZONE 'Asia/Kolkata')::date AS d
-      FROM public.work_task_parts p WHERE p.status = 'finished' AND p.finished_at >= v_pf AND p.finished_at < v_t
+    SELECT p.assignee_id, p.created_at, p.finished_at, (p.finished_at AT TIME ZONE 'Asia/Kolkata')::date AS d, COALESCE(t.is_auto, false) AS auto
+      FROM public.work_task_parts p JOIN public.work_tasks t ON t.id = p.task_id
+     WHERE p.status = 'finished' AND p.finished_at >= v_pf AND p.finished_at < v_t
   ),
   te AS (
     SELECT e.project_id, e.started_at,
@@ -55,7 +56,7 @@ BEGIN
   ),
   avgh AS (
     SELECT p.assignee_id, avg(p.seconds) / 3600.0 AS h FROM public.work_task_parts p
-     WHERE p.status = 'finished' AND p.seconds > 0 AND p.finished_at >= now() - interval '60 days' GROUP BY p.assignee_id
+     WHERE p.status = 'finished' AND p.seconds >= 60 AND p.finished_at >= now() - interval '60 days' GROUP BY p.assignee_id
   ),
   op AS (
     SELECT p.assignee_id, count(*) n FROM public.work_task_parts p
@@ -66,15 +67,19 @@ BEGIN
     'kpis', jsonb_build_object(
       'finished', (SELECT count(*) FROM fin WHERE finished_at >= v_f),
       'finished_prev', (SELECT count(*) FROM fin WHERE finished_at < v_f),
+      -- Phase 488: the headline counts tasks made BY HAND; system-made (repeating / HR / finance / quote) are shown separately
+      'finished_hand', (SELECT count(*) FROM fin WHERE finished_at >= v_f AND NOT auto),
+      'finished_hand_prev', (SELECT count(*) FROM fin WHERE finished_at < v_f AND NOT auto),
+      'finished_auto', (SELECT count(*) FROM fin WHERE finished_at >= v_f AND auto),
       'seconds', (SELECT COALESCE(sum(secs), 0)::bigint FROM te WHERE started_at >= v_f),
       'seconds_prev', (SELECT COALESCE(sum(secs), 0)::bigint FROM te WHERE started_at < v_f),
-      'avg_days', (SELECT round(avg(extract(epoch FROM (finished_at - created_at)) / 86400.0)::numeric, 1) FROM fin WHERE finished_at >= v_f),
-      'avg_days_prev', (SELECT round(avg(extract(epoch FROM (finished_at - created_at)) / 86400.0)::numeric, 1) FROM fin WHERE finished_at < v_f)),
+      'avg_days', (SELECT round(avg(extract(epoch FROM (finished_at - created_at)) / 86400.0)::numeric, 1) FROM fin WHERE finished_at >= v_f AND NOT auto),
+      'avg_days_prev', (SELECT round(avg(extract(epoch FROM (finished_at - created_at)) / 86400.0)::numeric, 1) FROM fin WHERE finished_at < v_f AND NOT auto)),
     'ontime', (SELECT jsonb_build_object('counted', COALESCE(cc0, 0), 'on_time', COALESCE(co0, 0), 'counted_prev', COALESCE(pc0, 0), 'on_time_prev', COALESCE(po0, 0)) FROM ot),
     'series', jsonb_build_object(
-      'this', COALESCE((SELECT jsonb_agg(jsonb_build_object('d', g::date, 'n', (SELECT count(*) FROM fin f WHERE f.d = g::date)) ORDER BY g)
+      'this', COALESCE((SELECT jsonb_agg(jsonb_build_object('d', g::date, 'n', (SELECT count(*) FROM fin f WHERE f.d = g::date AND NOT f.auto), 'n_all', (SELECT count(*) FROM fin f WHERE f.d = g::date)) ORDER BY g)
                           FROM generate_series(p_from, p_to, interval '1 day') g), '[]'::jsonb),
-      'prev', COALESCE((SELECT jsonb_agg(jsonb_build_object('d', g::date, 'n', (SELECT count(*) FROM fin f WHERE f.d = g::date)) ORDER BY g)
+      'prev', COALESCE((SELECT jsonb_agg(jsonb_build_object('d', g::date, 'n', (SELECT count(*) FROM fin f WHERE f.d = g::date AND NOT f.auto), 'n_all', (SELECT count(*) FROM fin f WHERE f.d = g::date)) ORDER BY g)
                           FROM generate_series(v_pfrom, v_pto, interval '1 day') g), '[]'::jsonb)),
     'by_client', COALESCE((SELECT jsonb_agg(jsonb_build_object('project_id', x.project_id, 'seconds', x.s) ORDER BY x.s DESC)
                              FROM (SELECT project_id, sum(secs)::bigint s FROM te WHERE started_at >= v_f GROUP BY project_id) x), '[]'::jsonb),

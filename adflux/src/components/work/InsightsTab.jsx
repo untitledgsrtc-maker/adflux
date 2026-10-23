@@ -26,18 +26,21 @@ function useCount(to, dec = 0) {
   return v.toFixed(dec)
 }
 
-function Kpi({ label, value, dec = 0, suffix = '', delta, good, delay }) {
+function Kpi({ label, value, dec = 0, suffix = '', delta, good, delay, note, neutral }) {
   const shown = useCount(value, dec)
   return (
     <div className="wk-in-k" style={{ animationDelay: `${delay}s` }}>
       <small>{label}</small>
       <b>{shown}{suffix}</b>
-      {delta != null && <i className={good ? 'ok' : 'bad'}>{delta}</i>}
+      {delta != null && <i className={neutral ? '' : good ? 'ok' : 'bad'}>{delta}</i>}
+      {note && <span className="wk-sm" style={{ display: 'block', marginTop: 2 }}>{note}</span>}
     </div>
   )
 }
 
-const pctDelta = (a, b) => (b > 0 ? `${a >= b ? '+' : '-'}${Math.round(Math.abs(a - b) / b * 100)}%` : null)
+// Phase 488: a % change against a tiny earlier number is meaningless (+3,360%), so say there is no earlier data instead
+const pctDelta = (a, b, min = 10) => (b >= min ? `${a >= b ? '+' : '-'}${Math.round(Math.abs(a - b) / b * 100)}%` : null)
+const NO_PREV = 'no earlier data'
 
 export default function InsightsTab({ nameOf, projName }) {
   const [range, setRange] = useState('30')
@@ -63,9 +66,11 @@ export default function InsightsTab({ nameOf, projName }) {
 
   const k = data?.kpis, ot = data?.ontime
   const hours = k ? k.seconds / 3600 : 0
+  const finDelta = k ? pctDelta(k.finished_hand, k.finished_hand_prev) : null
   const hoursPrev = k ? k.seconds_prev / 3600 : 0
+  const hoursDelta = pctDelta(hours, hoursPrev, 10)
   const otPct = ot && ot.counted > 0 ? Math.round(ot.on_time / ot.counted * 100) : 0
-  const otPrev = ot && ot.counted_prev > 0 ? Math.round(ot.on_time_prev / ot.counted_prev * 100) : null
+  const otPrev = ot && ot.counted_prev >= 5 ? Math.round(ot.on_time_prev / ot.counted_prev * 100) : null
 
   const chart = useMemo(() => {
     if (!data) return null
@@ -89,8 +94,8 @@ export default function InsightsTab({ nameOf, projName }) {
   const exportCsv = () => {
     if (!data) return
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
-    const lines = [['Day', 'Tasks finished'].map(esc).join(',')]
-    data.series.this.forEach((r) => lines.push([fmtDateShort(r.d), r.n].map(esc).join(',')))
+    const lines = [['Day', 'Tasks finished (by hand)', 'All finished incl. system'].map(esc).join(',')]
+    data.series.this.forEach((r) => lines.push([fmtDateShort(r.d), r.n, r.n_all ?? r.n].map(esc).join(',')))
     lines.push('', ['Person', 'Open tasks', 'Avg hours per task', 'Open work (h)', 'Capacity this week (h)'].map(esc).join(','))
     data.workload.forEach((w) => lines.push([nameOf(w.user_id), w.open, w.avg_hours, w.est_hours, w.capacity_hours].map(esc).join(',')))
     const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
@@ -119,17 +124,17 @@ export default function InsightsTab({ nameOf, projName }) {
       {data && !err && (
         <div key={animKey} style={{ display: 'grid', gap: 16, opacity: loading ? .6 : 1 }}>
           <div className="wk-in-kpis">
-            <Kpi label="Tasks finished" value={k.finished} delta={pctDelta(k.finished, k.finished_prev)} good={k.finished >= k.finished_prev} delay={0} />
-            <Kpi label="On-time rate, this month" value={otPct} suffix="%" delta={otPrev != null ? `${otPct >= otPrev ? '+' : '-'}${Math.abs(otPct - otPrev)} pts` : null} good={otPrev == null || otPct >= otPrev} delay={.08} />
-            <Kpi label="Hours tracked" value={hours} suffix="h" delta={pctDelta(hours, hoursPrev)} good={hours >= hoursPrev} delay={.16} />
-            <Kpi label="Avg time to finish" value={k.avg_days ?? 0} dec={1} suffix="d" delta={k.avg_days_prev != null && k.avg_days != null ? `${k.avg_days <= k.avg_days_prev ? '-' : '+'}${Math.abs(k.avg_days - k.avg_days_prev).toFixed(1)}d` : null} good={k.avg_days == null || k.avg_days_prev == null || k.avg_days <= k.avg_days_prev} delay={.24} />
+            <Kpi label="Tasks finished (made by hand)" value={k.finished_hand} delta={finDelta ?? NO_PREV} neutral={finDelta == null} good={k.finished_hand >= k.finished_hand_prev} note={k.finished_auto > 0 ? `+ ${k.finished_auto} system tasks (repeating, HR, finance)` : null} delay={0} />
+            <Kpi label="On-time rate, this month" value={otPct} suffix="%" delta={otPrev != null ? `${otPct >= otPrev ? '+' : '-'}${Math.abs(otPct - otPrev)} pts` : NO_PREV} neutral={otPrev == null} good={otPrev == null || otPct >= otPrev} note={`${ot.on_time} of ${ot.counted} tasks · whole month, not the days picked`} delay={.08} />
+            <Kpi label="Hours tracked" value={hours} suffix="h" delta={hoursDelta ?? NO_PREV} neutral={hoursDelta == null} good={hours >= hoursPrev} delay={.16} />
+            <Kpi label="Avg time to finish (by hand)" value={k.avg_days ?? 0} dec={1} suffix="d" delta={k.finished_hand_prev >= 10 && k.avg_days_prev != null && k.avg_days != null ? `${k.avg_days <= k.avg_days_prev ? '-' : '+'}${Math.abs(k.avg_days - k.avg_days_prev).toFixed(1)}d` : null} good={k.avg_days == null || k.avg_days_prev == null || k.avg_days <= k.avg_days_prev} delay={.24} />
           </div>
           <div className="wk-in-two">
             <div className="wk-in-card">
-              <h3>Tasks finished each day</h3>
+              <h3>Tasks finished each day (made by hand)</h3>
               <p>{fmtDateShort(chart.first)} to {fmtDateShort(chart.lastD)}, against the same number of days before</p>
               <div className="wk-in-lg"><span><em style={{ background: '#1baf7a' }} />This period</span><span><em style={{ background: '#b4b2a9' }} />Before</span></div>
-              <svg viewBox={`0 0 ${chart.W} ${chart.H + 6}`} width="100%" role="img" aria-label={`Tasks finished per day, ${k.finished} in this period`}>
+              <svg viewBox={`0 0 ${chart.W} ${chart.H + 6}`} width="100%" role="img" aria-label={`Tasks finished per day, ${k.finished_hand} in this period`}>
                 {[0, 1, 2, 3, 4].map((i) => <line key={i} x1="0" x2={chart.W} y1={chart.H - i * chart.H / 4} y2={chart.H - i * chart.H / 4} stroke="currentColor" strokeOpacity=".12" />)}
                 <path d={chart.pb} fill="none" stroke="#b4b2a9" strokeWidth="2" strokeDasharray="5 4" />
                 <path d={chart.pa} className="wk-in-line" pathLength="1" fill="none" stroke="#1baf7a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
