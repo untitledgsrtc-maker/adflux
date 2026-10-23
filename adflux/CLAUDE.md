@@ -21763,3 +21763,7 @@ Owner asked to switch off the 95 number (131042 on every send) and to be able to
 - Outbound is logged best-effort by `api/wa/team-assistant.js` (kind reply) and `api/wa/team-nudge.js` (nudge / evening / reminder); `api/wa/webhook.js` statuses loop updates status + `error` ([code,title]) by wamid.
 - UI: `src/pages/v2/CampaignTeamChatsV2.jsx`, tab "Team" in `CampaignChrome` TABS, route `/campaigns/team` behind `RequirePrivileged`. Read-only; refreshes every 20 s.
 - Open: re-test the 95 number after Meta answers the section 475 case; backups `_bak_*_p471/_p473` drop after 30 days.
+
+## 477 · Salary daily rate: 30 days for the Work team, 26 for sales + telecaller (23-10-2026)
+
+Owner: the Phase 390 move to 30 days was for the Work team only; sales and telecaller stay on 26. `_compute_monthly_salary_base` now forces `unpaid_divisor = 26` when `users.role IN ('sales','telecaller')` (canonical `db/functions/_compute_monthly_salary_base.sql`, applied live; marker file `supabase_phase477_salary_26_sales_tc.sql`). Everyone else keeps 30 from 2026-10. Dhara Oct: 2 unpaid days now 1769 (was 1533). Salary tab note updated. Not changed: Work hourly cost rate stays /30 (Work team). Open: late check-in after 11:30 (`work_sessions.check_in_status='half_day'`) is only a label and never reaches salary; owner has not yet said whether it should deduct half a day.

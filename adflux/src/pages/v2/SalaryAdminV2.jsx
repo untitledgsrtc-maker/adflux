@@ -360,7 +360,7 @@ export default function SalaryAdminV2({ embedded = false }) {
             <h1 className="v2d-page-title">Salary Sheet</h1>
             <div className="v2d-page-sub">
               Per-person monthly breakdown: base + variable + incentive + TA – leave
-              deduction. Policy: {policy ? `every leave deducted · salary ÷ ${divisorFor(month)} per day` : 'loading…'}.
+              deduction. Policy: {policy ? `every leave deducted · salary ÷ ${divisorFor(month)} per day (sales + telecaller ÷ 26)` : 'loading…'}.
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'end', gap: 8 }}>

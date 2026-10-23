@@ -102,6 +102,10 @@ BEGIN
   IF v_div_from IS NOT NULL AND v_div_new IS NOT NULL AND v_month_year >= v_div_from THEN
     v_unpaid_divisor := v_div_new;
   END IF;
+  -- Phase 477 (owner 23 Oct 2026): the 30-day rate is for the Work team only. Sales + telecaller stay on 26.
+  IF EXISTS (SELECT 1 FROM public.users u WHERE u.id = p_user_id AND u.role IN ('sales','telecaller')) THEN
+    v_unpaid_divisor := 26;
+  END IF;
 
   SELECT * INTO v_score_row
     FROM public.monthly_score(p_user_id, v_month_start)

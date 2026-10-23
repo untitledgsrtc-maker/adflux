@@ -1,0 +1,4 @@
+-- supabase_phase477_salary_26_sales_tc.sql
+-- Phase 477 (owner 23 Oct 2026): 30-day daily rate is for the Work team only; sales + telecaller stay on 26.
+-- The function body lives in db/functions/_compute_monthly_salary_base.sql (canonical). Run that file.
+-- VERIFY: SELECT (public._compute_monthly_salary_base(id,2026,10))->>'unpaid_divisor' FROM users WHERE name='Dhara'; -> 26
