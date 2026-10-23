@@ -29,7 +29,7 @@ import { istTodayISO } from '../../utils/istDate'
 //  • Self-hides once greeted today (per-IST-day), or once the valve is used
 //    (per-IST-day, localStorage) — prompts once each morning, not all day.
 
-const ASSISTANT_WA = '9581578261'           // 95 815 78261 → +91 = 919581578261
+const ASSISTANT_WA = '9898273686'           // 98982 73686 (marketing number) → +91 = 919898273686; was 95815 78261 until Meta's 131042 billing block (§475/§476)
 const GREET_TEXT = 'Good morning'
 const POLL_MS = 4000                        // re-check while the gate is open
 const VALVE_AFTER_SEND_MS = 20000           // escape after they tried + it didn't register

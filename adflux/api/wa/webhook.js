@@ -525,6 +525,13 @@ async function storeInbound(payload) {
             .eq('wamid', swamid).not('status', 'in', '(read,failed)')
           await admin.from('whatsapp_messages').update({ status: sstatus })
             .eq('wamid', swamid).not('status', 'in', '(read,failed)')
+          // Phase 476 — the team assistant's own replies / nudges (Campaigns -> Team). Best-effort, tolerant.
+          try {
+            const te = (s.errors && s.errors[0]) || null
+            const tdetail = (sstatus === 'failed' && te) ? [te.code, te.title].filter(Boolean).join(' ').slice(0, 300) : null
+            await admin.from('team_wa_messages').update(tdetail ? { status: sstatus, error: tdetail } : { status: sstatus })
+              .eq('wamid', swamid).not('status', 'in', '(read,failed)')
+          } catch { /* team log only */ }
           // Phase 253 — keep Meta's failure REASON, not just the word 'failed'.
           // SEPARATE tolerant update: if the error_detail column's SQL hasn't
           // run yet this update just errors quietly and the ticks above are

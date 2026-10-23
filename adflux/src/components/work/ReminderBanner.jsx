@@ -8,7 +8,7 @@ import { useAuthStore } from '../../store/authStore'
 import { istTodayISO } from '../../utils/istDate'
 import { openWhatsApp } from '../../utils/whatsapp'
 
-const ASSISTANT = '9581578261'
+const ASSISTANT = '9898273686'
 
 export default function ReminderBanner() {
   const uid = useAuthStore((s) => s.profile?.id)

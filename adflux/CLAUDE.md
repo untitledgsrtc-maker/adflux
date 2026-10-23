@@ -21754,3 +21754,12 @@ Clicking a TA/DA row (section 275) opened the day-track but meetings, calls and 
 
 ## 475 · Meta support case opened for the 95 number, 131042 (23-10-2026)
 Checked in Meta (read only): the 95 WhatsApp account `122098901360016777` has Visa 0015 attached; payment account `1301442997141573` shows Rs 3 paid + Rs 3 refunded on 22 Oct (card verified). Business Support Home shows NO account or asset issues, so this is not a policy restriction. Yet team-reminder / "good morning" replies still failed with 131042 at 12:37 IST (test to Riya) after the owner also paid the marketing dues. With the owner's "u do", Claude opened a Meta support case via Billing -> Get support (issue "Disabled or restricted asset", business edigiexpert 125328062238966); Meta's AI assistant could not hand off to a person, but the case is listed as Received (23 Oct 2026) under Business Support Home -> Your support cases (Go to chat / View details). Check it there; re-test with a "hi" insert for Riya (recipe in section 470) after Meta replies.
+
+## 476 · Team assistant moved to the 98982 73686 number + read-only "Team" chats tab (23-10-2026)
+
+Owner asked to switch off the 95 number (131042 on every send) and to be able to SEE the team's WhatsApp texts, which were invisible before. Staff must now message **98982 73686** (marketing WABA, delivers fine; replies inside the 24h window are free). The webhook rep-fork is account-agnostic and `team-assistant.js` replies from the number the person messaged, so no routing change was needed; only the two in-app constants (`ReminderBanner.jsx` ASSISTANT, `MorningGreetGate.jsx` ASSISTANT_WA) now point at `9898273686`. Old 95 windows cannot deliver: the team must send a fresh "good morning" to 98982.
+
+- `supabase_phase476_team_wa_messages.sql` (applied live): table `team_wa_messages` (user_id, direction in/out, body, wamid, status, error, kind, phone_number_id, at), admin/co_owner SELECT policy only, trigger `team_wa_log_in()` on `team_assistant_requests` logs inbound, 407-row backfill.
+- Outbound is logged best-effort by `api/wa/team-assistant.js` (kind reply) and `api/wa/team-nudge.js` (nudge / evening / reminder); `api/wa/webhook.js` statuses loop updates status + `error` ([code,title]) by wamid.
+- UI: `src/pages/v2/CampaignTeamChatsV2.jsx`, tab "Team" in `CampaignChrome` TABS, route `/campaigns/team` behind `RequirePrivileged`. Read-only; refreshes every 20 s.
+- Open: re-test the 95 number after Meta answers the section 475 case; backups `_bak_*_p471/_p473` drop after 30 days.

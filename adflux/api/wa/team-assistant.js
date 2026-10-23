@@ -155,7 +155,13 @@ export default async function handler(req) {
       headers: { Authorization: `Bearer ${WA_TOKEN}`, 'content-type': 'application/json' },
       body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: text } }),
     })
-    if (!gr.ok) { const gd = await gr.json().catch(() => ({})); throw new Error(gd?.error?.message || ('graph_' + gr.status)) }
+    const gd = await gr.json().catch(() => ({}))
+    if (!gr.ok) throw new Error(gd?.error?.message || ('graph_' + gr.status))
+    // Phase 476: keep the reply so Campaigns -> Team can show it (best-effort, never blocks the reply)
+    try {
+      await sb('team_wa_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+        user_id: uid, direction: 'out', body: String(text).slice(0, 4000), wamid: gd?.messages?.[0]?.id || null, status: 'sent', kind: 'reply', phone_number_id: pnid }) })
+    } catch { /* log only */ }
   }
 
   // ── Phase 372: non-sales roles (Work staff, operations, HR, accounts) get a role-shaped day, no Claude ──

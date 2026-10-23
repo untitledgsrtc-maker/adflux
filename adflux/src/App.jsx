@@ -68,6 +68,7 @@ const CampaignSegmentsV2 = lazyWithRetry(() => import('./pages/v2/CampaignSegmen
 const CampaignBroadcastV2 = lazyWithRetry(() => import('./pages/v2/CampaignBroadcastV2'))
 const CampaignIntegrationsV2 = lazyWithRetry(() => import('./pages/v2/CampaignIntegrationsV2'))
 const CampaignChatbotV2 = lazyWithRetry(() => import('./pages/v2/CampaignChatbotV2'))
+const CampaignTeamChatsV2 = lazyWithRetry(() => import('./pages/v2/CampaignTeamChatsV2'))
 const WorkV2 = lazyWithRetry(() => import('./pages/v2/WorkV2'))
 // Phase 230 — Operations module (screen-maintenance field app + Head overview).
 const OpsWorkV2 = lazyWithRetry(() => import('./pages/v2/OpsWorkV2'))
@@ -500,6 +501,7 @@ export default function App() {
           <Route path="/campaigns/broadcast"       element={<RequirePrivileged><CampaignBroadcastV2 /></RequirePrivileged>} />
           <Route path="/campaigns/integrations"    element={<RequirePrivileged><CampaignIntegrationsV2 /></RequirePrivileged>} />
           <Route path="/campaigns/chatbot"         element={<RequirePrivileged><CampaignChatbotV2 /></RequirePrivileged>} />
+          <Route path="/campaigns/team"            element={<RequirePrivileged><CampaignTeamChatsV2 /></RequirePrivileged>} />
           <Route path="/campaigns"                 element={<RequirePrivileged><CampaignsV2 /></RequirePrivileged>} />
           <Route path="/leads/new"                 element={<RequireNonAgency><LeadFormV2 /></RequireNonAgency>} />
           <Route path="/leads/:id"                 element={<RequireNonAgency><LeadDetailV2 /></RequireNonAgency>} />

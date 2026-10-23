@@ -20,6 +20,7 @@ import { useAuthStore } from '../../store/authStore'
 const TABS = [
   { key: 'campaigns', label: 'Campaigns',       to: '/campaigns' },
   { key: 'inbox',     label: 'Inbox',           to: '/campaigns/inbox' },
+  { key: 'team',      label: 'Team',            to: '/campaigns/team' },
   { key: 'qr',        label: 'QR & Locations',  to: '/campaigns/qr' },
   { key: 'clients',   label: 'Client QRs',      to: '/campaigns/clients' },
   { key: 'broadcast', label: 'Broadcast',  to: '/campaigns/broadcast' },
