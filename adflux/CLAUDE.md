@@ -21767,3 +21767,7 @@ Owner asked to switch off the 95 number (131042 on every send) and to be able to
 ## 477 · Salary daily rate: 30 days for the Work team, 26 for sales + telecaller (23-10-2026)
 
 Owner: the Phase 390 move to 30 days was for the Work team only; sales and telecaller stay on 26. `_compute_monthly_salary_base` now forces `unpaid_divisor = 26` when `users.role IN ('sales','telecaller')` (canonical `db/functions/_compute_monthly_salary_base.sql`, applied live; marker file `supabase_phase477_salary_26_sales_tc.sql`). Everyone else keeps 30 from 2026-10. Dhara Oct: 2 unpaid days now 1769 (was 1533). Salary tab note updated. Not changed: Work hourly cost rate stays /30 (Work team). Open: late check-in after 11:30 (`work_sessions.check_in_status='half_day'`) is only a label and never reaches salary; owner has not yet said whether it should deduct half a day.
+
+## 478 · Check-in after 11:30 deducts half a day for sales + telecaller (23-10-2026)
+
+`_compute_monthly_salary_base` (canonical file, applied live) counts `work_sessions.check_in_status='half_day'` days in the month for roles sales/telecaller, 0.5 day each, skipping days that already have an approved leave; added to unpaid leave days (same daily rate, 26). New return key `late_half_days`. It is computed live, so it also covers earlier October half-days (Dhara 5 + 7 Oct = 1.0 day, deduction 2654 total with her 2 leave days). Work team and others unaffected. Open: the Salary tab / slip show it inside "unpaid leave days" without a separate line.

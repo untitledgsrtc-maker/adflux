@@ -73,6 +73,7 @@ DECLARE
   v_leave_paid        numeric := 0;
   v_leave_unpaid      numeric := 0;
   v_unpaid_deduction  numeric := 0;
+  v_late_half         numeric := 0;
   v_fy_start       date;
   v_net            numeric;
   v_score_row      record;
@@ -151,6 +152,20 @@ BEGIN
      AND status = 'approved'
      AND leave_date BETWEEN v_month_start AND v_month_end;
 
+  -- Phase 478 (owner 23 Oct 2026): sales + telecaller who check in after 11:30 IST
+  -- (work_sessions.check_in_status='half_day') lose half a day. Skipped on a day that already has an
+  -- approved leave (no double deduction). Counted as unpaid, same daily rate as leave.
+  IF EXISTS (SELECT 1 FROM public.users u WHERE u.id = p_user_id AND u.role IN ('sales','telecaller')) THEN
+    SELECT COUNT(*) * 0.5 INTO v_late_half
+      FROM public.work_sessions w
+     WHERE w.user_id = p_user_id
+       AND w.check_in_status = 'half_day'
+       AND w.work_date BETWEEN v_month_start AND v_month_end
+       AND NOT EXISTS (SELECT 1 FROM public.leaves l
+                        WHERE l.user_id = p_user_id AND l.status = 'approved' AND l.leave_date = w.work_date);
+    v_leave_unpaid_req := v_leave_unpaid_req + v_late_half;
+  END IF;
+
   v_leave_total := v_leave_paid_req + v_leave_unpaid_req;
 
   SELECT COALESCE(SUM(CASE WHEN is_half_day THEN 0.5 ELSE 1 END), 0)
@@ -197,6 +212,7 @@ BEGIN
     'leave_unpaid_req',   v_leave_unpaid_req,
     'paid_quota',         v_paid_quota,
     'paid_used_ytd',      v_paid_used_ytd,
+    'late_half_days',     v_late_half,
     'unpaid_divisor',     v_unpaid_divisor,
     'unpaid_deduction',   v_unpaid_deduction,
     'net_payable',        v_net
