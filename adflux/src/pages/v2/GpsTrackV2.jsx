@@ -202,7 +202,7 @@ export default function GpsTrackV2() {
       // through ONE gated RPC, mapped into the same *Res shapes; every line after
       // is untouched. Admin keeps the exact Promise.all (else) — byte-unchanged.
       let userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes, networkOffRes
-      if (!isPrivileged && canViewTeam) {
+      if ((!isPrivileged && canViewTeam) || profile?.role === 'accounts') {   // Phase 474: accounts reads the day via the same gated RPC (her own RLS hides meetings/calls)
         const { data: b, error: bErr } = await supabase.rpc('team_rep_daytrack', {
           p_user_id: userId, p_start: start, p_end: end, p_date: targetDate,
         })
