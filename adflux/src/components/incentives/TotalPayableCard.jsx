@@ -141,6 +141,7 @@ export default function TotalPayableCard() {
         incentive, incentiveProposed,
         taDaTotal,
         leaveUnpaid, unpaidDeduction, unpaidDivisor: Number(salary.unpaid_divisor || 26),
+        lateHalf: Number(salary.late_half_days || 0),
         netPayable,
         taDaPending, pendingCount: pendingRows.length,
       })
@@ -205,7 +206,7 @@ export default function TotalPayableCard() {
         <Row
           label="Unpaid-leave deduction"
           value={-data.unpaidDeduction}
-          sub={`${data.leaveUnpaid} day${data.leaveUnpaid === 1 ? '' : 's'} · salary ÷ ${data.unpaidDivisor || 26}`}
+          sub={`${data.leaveUnpaid} day${data.leaveUnpaid === 1 ? '' : 's'} · salary ÷ ${data.unpaidDivisor || 26}${data.lateHalf > 0 ? ` · incl. ${data.lateHalf} for check-in after 11:30` : ''}`}
           negative
         />
       )}

@@ -21775,3 +21775,7 @@ Owner: the Phase 390 move to 30 days was for the Work team only; sales and telec
 ## 479 · Today's board: hand-made tasks only if given today (23-10-2026)
 
 Owner: "show today's tasks only; a task I create by hand today with a due date 2-3 days away should show in today's assigned; right now too many, we solved it before". Cause: Phase 448 made EVERY hand-made task show always (any age, any due date), so old hand-made far-dated tasks flooded the board. Now (My Work `showNow`, Team Work `isNewPart` + `laterCount`): a task shows on the default board if no due date, or due within 2 days, or hand-made AND created today (IST). Older hand-made far-dated tasks sit behind the "later date" bar. System-made (`is_auto`) rule unchanged. Frontend only, no SQL.
+
+## 480 · Late check-in half-days named on the payable card + slip (23-10-2026)
+
+Text only: `TotalPayableCard` deduction sub-line and `SalarySlipPDF` leave note append "incl. N for check-in after 11:30" when `late_half_days` (Phase 478) > 0. No calculation change.
