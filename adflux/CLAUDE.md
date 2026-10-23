@@ -21815,3 +21815,10 @@ Owner "not happy with the data". Audit (7 days): "173 finished" had ~89 system-m
 ## 489 · Test account dixita@untitledad.in (operation_head) deactivated (23-10-2026)
 
 Owner: it was a test account. `supabase_phase489_deactivate_test_dixita.sql` (applied): `users.is_active=false` (not deleted; undo line in the file; backup `_bak_users_p489`, drop after 30 days) + removed from `work_members`. She had 0 time entries / open Work tasks / tickets; 9 leads still assigned to her and a second test user ("test", operation_executive) still reports to her - left as is, owner not asked. The real Dixita is "DIXITA UMEDBHAI GOHEL" (office_admin) - untouched.
+
+---
+
+## 490 · Brand guideline "Adflux Design Rules v1.0 (Jun 2026)" kept + code audit (2026-10-24)
+
+Owner supplied `Adflux Design Rules (standalone).html`; saved as `_design_reference/Adflux_Design_Rules_v1.html` (+ `.txt` readable copy). Rules: one yellow primary per screen; money in Space Grotesk 22-42px; status colours only from tokens; every screen has a teal hero card; DM Sans body, JetBrains Mono for refs; radius 8/12/14-16/999; Lucide stroke 1.6-1.7; min body 12px, 44px taps; day + night via CSS variables (`data-theme="day"`); Gujarati original + English subtitle; 10-point build checklist.
+Audit result (read-only, no code changed): colours / fonts / Lucide / theme switch match. NOT followed everywhere: hero on only 19 of 90 pages; about 870 hardcoded night-palette hex in jsx (should be var(--surface) etc.); `#facc15` still in 4 files; about 800 font sizes under 12px; app radius scale is 6/10/14/20 not 8/12/14-16/999; guideline wants JetBrains Mono but owner dropped it on purpose (section 41.6) - keep Space Grotesk unless he says otherwise. The Quotation_392 PDF he also sent is an old GoGSTBill invoice layout (Roboto, black bordered table), not part of this guideline.

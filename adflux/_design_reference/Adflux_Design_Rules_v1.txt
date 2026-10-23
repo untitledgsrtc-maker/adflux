@@ -1,0 +1,316 @@
+
+Adflux · Design Rules
+A
+Adflux · Product Design System
+Design Rules
+The single source of truth for building Adflux screens — dashboards, the Sales module, mobile apps, and everything in between. Hand this to any designer or developer and they can match the system.
+v1.0 · June 2026
+Dark + Light themes
+Mobile-first
+Gujarati-ready
+Contents
+01
+ Principles
+02
+ Color
+03
+ Typography
+04
+ Spacing & Radius
+05
+ Icons
+06
+ Components
+07
+ Hero & Data Viz
+08
+ Voice & Gujarati
+09
+ Day / Night
+10
+ Build Checklist
+01
+Principles
+Five rules that decide every design call. When in doubt, re-read these.
+1
+One primary action per screen.
+ The single most important thing the user should do is the biggest, the boldest, and the only yellow button on the screen. Everything else is secondary (outline) or tertiary (text).
+2
+Money is sacred.
+ Rupee amounts, pipeline totals, incentives and scores get 
+Space Grotesk
+ at 22–42px. They are always the loudest number in any card.
+3
+Mobile is the default.
+ Field reps live on their phones. Design for the thumb first: primary actions in the bottom third, identity/status up top, 44px minimum tap targets.
+4
+Status uses tokens, never new colors.
+ Green = good, amber = attention, red = urgent, blue = info, purple = AI/voice. Don't invent hues.
+5
+Every screen earns a hero.
+ A teal hero card anchors each screen with the one number that matters there — today's revenue, score, SLA, queue size.
+02
+Color
+Yellow is the brand and the only call-to-action color. Deep navy surfaces in night mode, clean whites in day. Teal is reserved for hero moments.
+Brand & Action
+Accent
+#FFE600
+CTAs, key numbers, active states
+Accent Ink
+#0f172a
+Text on yellow
+Teal Hero
+#0d3d3a → #0f766e
+Hero card gradients only
+Purple
+#c084fc
+AI & voice features
+Status
+Success
+#10B981
+Won, paid, on-target
+Warning
+#F59E0B
+Due soon, attention
+Danger
+#EF4444
+Overdue, hot, SLA breach
+Info
+#3B82F6
+New, contacted, neutral
+Neutrals — Night (default)
+Background
+#0f172a
+Surface
+#1e293b
+Surface 2
+#334155
+Surface 3
+#475569
+✓
+Do
+ use tints (12–16% opacity of a status color) for chip and icon-tile backgrounds.
+✕
+Don't
+ use yellow for anything except the one primary action and the single hero number. Two yellow buttons on a screen = bug.
+03
+Typography
+Three families, each with one job. Never substitute.
+Space Grotesk
+Headings, numbers, money, scores. The "loud" font.
+DM Sans
+Body, labels, UI copy. The workhorse.
+JetBrains Mono
+Reference numbers, phone numbers, timestamps, GPS coords. 
+UA/PR/2026-27/0078
+Type scale
+Display
+Grotesk 46 / 600
+₹3,80,000
+H1 · Page
+Grotesk 26 / 600
+Leads
+H2 · Section
+Grotesk 18 / 600
+Today's route
+Card title
+DM Sans 13 / 600
+Pending hand-offs
+Body
+DM Sans 14 / 400
+Demo scheduled. Owner is decision maker.
+Eyebrow
+DM Sans 11 / 600 · .14em caps
+Expected value
+↳
+Minimum body size is 
+12px
+ (mobile), 
+13px
+ for dense tables. Eyebrows are always uppercase with 
+.14em
+ letter-spacing.
+04
+Spacing & Radius
+A simple 4-based rhythm. Generous radii keep the system friendly, not corporate.
+Spacing scale
+4
+8
+12
+16
+24
+32
+Card padding 
+16–18px
+. Gaps between cards 
+12–16px
+. Page margins 
+16px
+ mobile, 
+24–28px
+ desktop.
+Corner radius
+8px
+inputs, small chips, icon tiles
+12px
+buttons, inner cards, list items
+14–16px
+cards, hero, modals
+999px
+pills, avatars, FAB
+05
+Icons
+Line icons only, in the Lucide style. The system is icon-led — every metric, action, and list item carries an icon in a tinted tile.
+Rule
+Spec
+Style
+Lucide / Feather — outline, rounded caps & joins
+Stroke width
+1.6–1.7
+Sizes
+11 · 14 · 16 · 18 · 20 · 22
+ px
+Icon tiles
+Square 
+28–40px
+, radius 8–11px, tinted background of the status color at ~14% opacity, icon in full color
+Color
+Inherits the tile's status color — never multi-color
+Icon tile pattern
+☎
+✓
+◷
+⚠
+✦
+★
+06
+Components
+The shared vocabulary. Reuse these — don't reinvent them per screen.
+Buttons
+★ Primary action
+Secondary
+Tertiary
+Pill-shaped. One primary (yellow) per screen. Icon + label, never icon-only for key actions.
+Status pills & stage chips
+Won
+Due soon
+Overdue 4h
+New
+SalesReady
+Won
+Lost
+Stage chips carry a leading colored dot. Pills are tinted by status. Write urgency in plain words ("Overdue 4h"), never jargon ("BREACH").
+Lead row · 2 lines max
+Dr. Mehta 
+· Sunrise Diagnostics
+SalesReady
+2h ago
+· Send quote today
+₹3.8L
+Line 1: name + company. Line 2: stage · last contact · next action. Heat dot only for hot leads. Value right-aligned in Grotesk.
+Avatars
+BR
+SO
+AR
+PD
+Initials in Space Grotesk, soft pastel fills. Consistent color per person across the app.
+07
+Hero & Data Viz
+The hero card is the signature element. Data viz stays minimal — sparklines, ring meters, thin bars. No chart junk.
+Hero card
+●  Today added
+₹3.8L
++₹1.2L vs avg · rank 3 of 6
+Teal gradient, yellow corner glow, the one number in yellow Grotesk, supporting delta below. Every screen gets one.
+Ring meters · milestones
+3/5
+5/10
+Sparkline · KPI tiles
+↳
+Ring meters auto-color: 
+green
+ when complete, 
+yellow
+ mid-progress, 
+red
+ when far behind.
+08
+Voice & Gujarati
+Voice-first is core. Field reps speak Gujarati; the system transcribes and structures it. Voice and AI always read purple-blue.
+Voice transcript block
+મહેતા સાહેબને મળી આવ્યો, ડેમો સેટ થઈ ગયો. ₹3.8 લાખનું ક્વોટ મોકલવાનું છે.
+EN · Met Mehta. Demo scheduled. Send ₹3.8L quote.
+Positive
+Next: Quote
+SalesReady
+↳
+Always show 
+Gujarati original
+ (Noto Sans/Serif Gujarati) with an 
+English subtitle
+ underneath. AI-extracted fields appear as confirmable rows, never auto-committed.
+↳
+The mic affordance is large and obvious — a 100–120px circle that pulses red while recording with a live waveform.
+09
+Day / Night
+Every screen ships in both themes. Night is default (field reps work early & late). Drive everything from CSS variables — never hard-code a neutral.
+Token
+Night
+Day
+Background
+#0f172a
+#f4f5f8
+Surface
+#1e293b
+#ffffff
+Border
+#334155
+#e3e6ee
+Text
+#f1f5f9
+#0f172a
+Text muted
+#94a3b8
+#64748b
+Accent
+#FFE600
+ — identical in both
+Status colors
+Same hue, tints drop to ~10% opacity in day mode
+✓
+Do
+ set 
+data-theme="day"
+ on a wrapper and let variables cascade.
+✕
+Don't
+ write literal 
+#1e293b
+ in a component. Use 
+var(--surface)
+ so it flips automatically.
+10
+Build Checklist
+Run every new screen through this before shipping.
+☐
+Exactly one yellow primary action
+☐
+A hero card with the screen's one key number in Grotesk
+☐
+All money/numbers in Space Grotesk; refs in JetBrains Mono
+☐
+Every metric / list item / action has a tinted icon tile
+☐
+Status colors only from tokens; no new hues
+☐
+Lead rows are 2 lines; heat dot only when hot
+☐
+Mobile: primary action reachable by thumb; 44px tap targets
+☐
+Works in both day & night via CSS variables
+☐
+Voice/AI elements read purple; Gujarati has English subtitle
+☐
+No chart junk — sparklines, rings, thin bars only
+Adflux · Design Rules · v1.0
+June 2026 · hand-off ready
