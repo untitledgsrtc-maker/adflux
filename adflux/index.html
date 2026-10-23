@@ -45,9 +45,8 @@
     <script>
       (function () {
         try {
-          var t = localStorage.getItem('theme') || 'night';
-          document.documentElement.setAttribute('data-theme', t);
-        } catch (e) { /* localStorage blocked — default to night */ }
+          document.documentElement.setAttribute('data-theme', 'night');
+        } catch (e) { /* ignore */ }
       })();
     </script>
   </head>

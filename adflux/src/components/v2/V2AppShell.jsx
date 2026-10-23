@@ -397,13 +397,11 @@ const MOBILE_NAV_MANAGER = [
 export function V2AppShell() {
   const { user, profile, isPrivileged, isManager, signOut } = useAuth()
 
-  // Apply the rep's persisted theme preference on mount; CSS keys
-  // off `<html data-theme="day">` in v2.css.
+  // Night-only (Day mode removed, section 491). Also clears an old saved
+  // 'day' choice so nobody stays on a half-built light look.
   useEffect(() => {
-    try {
-      const t = localStorage.getItem('theme') || 'night'
-      document.documentElement.setAttribute('data-theme', t)
-    } catch { /* localStorage blocked — leave attr empty, defaults to night */ }
+    try { localStorage.removeItem('theme') } catch { /* storage blocked */ }
+    document.documentElement.setAttribute('data-theme', 'night')
   }, [])
 
   // Personalize the pitch deck's "point of contact" card with the presenting
