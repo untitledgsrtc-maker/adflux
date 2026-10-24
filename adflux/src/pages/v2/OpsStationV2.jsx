@@ -3,6 +3,7 @@
 // coloured by REAL status (ops_screens online/offline + open ops_tickets), editable
 // depot contacts (ops_depot_contacts), and the issue→solution reference
 // (ops_issue_types). Admin / co_owner / operation_head. Additive; app tokens only.
+import OpsScreenHistory from '../../components/ops/OpsScreenHistory'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Monitor, MonitorCheck, MonitorX, AlertTriangle, Phone, Plus, X, MapPin,
@@ -207,6 +208,8 @@ export default function OpsStationV2() {
             <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: STATE_COLOR[k] }} />{t}</span>)}
         </div>
       </div>
+
+      <OpsScreenHistory depotId={depotId} screens={screens} />
 
       {/* two-col: contacts + issue types */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 18, marginTop: 18 }}>

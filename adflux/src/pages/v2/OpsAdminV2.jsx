@@ -77,12 +77,14 @@ export default function OpsAdminV2() {
   const [depots, setDepots] = useState([])    // [{ id, name, assigned_to }]
   const [people, setPeople] = useState({})    // user id -> name
   const [err, setErr] = useState('')
+  const [ft, setFt] = useState(null)   // faults today (Phase 505), best-effort
   const [showMonth, setShowMonth] = useState(false)
   const onHours = isOnHours()
 
   const load = useCallback(async () => {
     setErr('')
     try {
+      supabase.rpc('ops_head_fault_report').then(({ data: fr }) => { if (fr && fr.ok) setFt(fr.totals || null) }, () => {})
       const [c, t, d] = await Promise.all([
         supabase.rpc('ops_admin_cockpit', { p_days: 30 }),
         supabase.from('ops_tickets').select('id, status, depot_id, assigned_to, opened_at, cant_fix_reason, type').in('status', ['open', 'in_progress']).limit(1000),
@@ -163,6 +165,7 @@ export default function OpsAdminV2() {
         <StatTile icon={Wrench} tone="warning" label="Jobs open" value={jobs.length} sub={`${waiting} waiting, ${inProcess} in process`} onClick={() => navigate('/ops-tickets')} />
         <StatTile icon={UserX} tone={nobody.length ? 'danger' : 'success'} label="With no technician" value={nobody.length} sub={nobody.length ? 'Give them to someone' : 'Everything has an owner'} onClick={() => navigate('/ops-dashboard')} />
         <StatTile icon={AlertTriangle} tone={cantFix.length ? 'danger' : 'success'} label="Can't fix" value={cantFix.length} sub={cantFix.length ? 'Technician needs your help' : 'None right now'} onClick={() => navigate('/ops-tickets?tab=proc')} />
+        {ft && <StatTile icon={Wrench} tone={ft.pending > 0 ? 'warning' : 'success'} label="Faults today" value={ft.went_off} sub={`${ft.fixed} fixed · ${ft.pending} pending`} onClick={() => navigate('/ops-command')} />}
         <StatTile icon={BarChart3} tone="blue" label="Uptime this month" value={`${d.uptime_month ?? 0}%`} sub="average of daily uptime" />
       </div>
 
