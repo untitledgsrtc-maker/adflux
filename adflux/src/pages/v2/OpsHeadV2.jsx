@@ -91,7 +91,7 @@ export default function OpsHeadV2() {
         supabase.from('ops_screens').select('id, name, status, depot_id').eq('is_active', true).order('name'),
         supabase.from('ops_depots').select('id, name, assigned_to, city:cities!ops_depots_city_id_fkey(name)').eq('is_active', true).order('name'),
         supabase.from('ops_tickets')
-          .select('id, type, status, priority, assigned_to, opened_at, ' +
+          .select('id, type, status, priority, assigned_to, opened_at, source, ' +
                   'screen:ops_screens!ops_tickets_screen_id_fkey(name), ' +
                   'depot:ops_depots!ops_tickets_depot_id_fkey(name), ' +
                   'issue:ops_issue_types!ops_tickets_issue_type_id_fkey(issue_en)')
