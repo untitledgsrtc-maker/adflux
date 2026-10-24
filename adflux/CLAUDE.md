@@ -21868,3 +21868,6 @@ Phase 504: `OpsScreenHistory.jsx` on the station board (/ops-station) lists ever
 
 ## 500 · Technician Open list shows repeat-fault screens (Phase 506, 2026-10-24)
 `OpsTicketsV2` Open tab: each station card now also lists up to 2 screens that were faulty 2 or more times before ("Screen 4 - 3x faulty before", amber), read from `ops_screen_fault_counts` (best-effort). The list stays one card per STATION (tap opens the sheet for the station's screens) - changing it to one row per screen was left out so the technicians' main screen is not disturbed; revisit after a week of live data. Camera faults are still outside `ops_screen_faults`.
+
+## 501 · Phase 507 - Live console (/ops-dashboard) in tabs, obsolete approval block removed (2026-10-24)
+`OpsHeadV2.jsx`: the long wall of tables is now four tabs - Tickets (default), Stations, Screens, Field team. The old purple hero is now the shared teal `lead-hero-strip`. The "Awaiting approval" approve/reject table was removed (head approval was dropped, sections 244/496; a resolved ticket is final); the `approveTicket`/`rejectTicket` handlers are left unused. All other handlers (reassign depot/ticket, contacts modal) unchanged. Display only, no SQL, no APK. Next in queue: camera faults into `ops_screen_faults`.

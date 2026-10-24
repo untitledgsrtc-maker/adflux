@@ -55,6 +55,7 @@ function StatusIcon({ Icon, on, title }) {
 }
 
 export default function OpsHeadV2() {
+  const [tab, setTab] = useState('tickets')
   const profile = useAuthStore(s => s.profile)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -270,8 +271,8 @@ export default function OpsHeadV2() {
         <div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 12, padding: '12px 16px', marginBottom: 12, fontSize: 13 }}>{err}</div>
       )}
 
-      {/* purple hero (matches /team-dashboard) */}
-      <div className="lead-hero-strip" style={{ background: 'radial-gradient(700px 220px at 100% 0%, rgba(192,132,252,.22), transparent 60%), linear-gradient(120deg, #1e1b4b 0%, #312e81 55%, #4338ca 100%)', borderColor: '#4338ca' }}>
+      {/* hero (teal, same as the other ops pages) */}
+      <div className="lead-hero-strip">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,.7)' }}>
             <span className="lead-live-dot" />&nbsp;&nbsp;Network activity · live
@@ -298,6 +299,15 @@ export default function OpsHeadV2() {
         </div>
       )}
 
+      {/* tabs: the console used to be one long wall of tables (Phase 507) */}
+      <div style={{ display: 'flex', gap: 4, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 4, marginBottom: 14, flexWrap: 'wrap' }}>
+        {[['tickets', `Tickets (${tickets.length})`], ['stations', `Stations (${depots.length})`], ['screens', 'Screens'], ['team', `Field team (${techs.length})`]].map(([k, l]) => (
+          <button key={k} type="button" onClick={() => setTab(k)}
+            style={{ flex: '1 1 120px', minHeight: 44, border: 'none', borderRadius: 9, fontSize: 13.5, fontWeight: tab === k ? 700 : 500, cursor: 'pointer', background: tab === k ? 'var(--surface-3)' : 'transparent', color: tab === k ? 'var(--text)' : 'var(--text-muted)' }}>{l}</button>
+        ))}
+      </div>
+
+      {tab === 'team' && (<>
       {/* live field map */}
       <div className="lead-card" style={{ marginBottom: 14, padding: 0, overflow: 'hidden' }}>
         <div className="lead-card-head" style={{ padding: '12px 16px' }}>
@@ -350,6 +360,8 @@ export default function OpsHeadV2() {
         </div>
       )}
 
+      </>)}
+      {tab === 'stations' && (<>
       {/* Screens board — reassign a depot */}
       <div className="lead-card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
         <div className="lead-card-head" style={{ padding: '12px 16px' }}>
@@ -390,6 +402,8 @@ export default function OpsHeadV2() {
         </div>
       </div>
 
+      </>)}
+      {tab === 'screens' && (<>
       {/* Screen-wise status — each screen's display + camera badge */}
       <div className="lead-card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
         <div className="lead-card-head" style={{ padding: '12px 16px', flexWrap: 'wrap', gap: 10 }}>
@@ -430,33 +444,9 @@ export default function OpsHeadV2() {
         </div>
       </div>
 
-      {/* Awaiting approval — resolved tickets the head signs off */}
-      {approvals.length > 0 && (
-        <div className="lead-card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
-          <div className="lead-card-head" style={{ padding: '12px 16px' }}>
-            <div><div className="lead-card-title">Awaiting approval</div><div className="lead-card-sub">{approvals.length} resolved ticket(s) to sign off.</div></div>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
-              <thead><tr><th style={th}>Station</th><th style={th}>Tech</th><th style={th}>Cause</th><th style={th}>Resolved</th><th style={th}></th></tr></thead>
-              <tbody>
-                {approvals.map(a => (
-                  <tr key={a.id}>
-                    <td style={{ ...td, fontWeight: 600 }}>{a.depot?.name || '—'}</td>
-                    <td style={{ ...td, color: 'var(--text-muted)' }}>{a.tech?.name || 'Unassigned'}</td>
-                    <td style={{ ...td, color: 'var(--text-muted)' }}>{a.cause || '—'}</td>
-                    <td style={{ ...td, color: 'var(--text-muted)' }}>{a.resolved_at ? new Date(a.resolved_at).toLocaleDateString('en-GB') : '—'}</td>
-                    <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                      <button className="btn btn-sm" onClick={() => approveTicket(a.id)} style={{ background: 'var(--success)', color: 'var(--accent-fg, #0f172a)', marginRight: 6 }}>Approve</button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => rejectTicket(a.id)}>Reject</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      </>)}
+      {tab === 'tickets' && (<>
+      {/* head approval was dropped (sections 244/496): a resolved ticket is final */}
 
       {/* Tickets board — reassign a ticket */}
       <div className="lead-card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
@@ -489,6 +479,8 @@ export default function OpsHeadV2() {
           </table>
         </div>
       </div>
+
+      </>)}
 
       {/* depot-contacts manager — the exec "Call the depot" data (was seed-only) */}
       {cDepot && (
