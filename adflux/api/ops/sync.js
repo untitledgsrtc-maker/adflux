@@ -287,7 +287,9 @@ export default async function handler(req) {
   // 5d · per-screen faults (Phase 501): open after ~15 min offline, auto-Fixed after ~30 min online,
   // 07:00-21:00 IST minutes only. Best-effort + separate; {error} if the Phase 501 SQL isn't run yet.
   const faultFlow = await callRpc('ops_faults_reconcile')
-  console.log('[ops/sync] reconcile', JSON.stringify({ offline: reconcileOffline, camera: reconcileCamera, notify: notifyOutages, faults: faultFlow }))
+  // 5e · camera faults into the same history (Phase 508) — separate + best-effort; {error} if the SQL isn't run yet.
+  const cameraFaults = await callRpc('ops_camera_faults_reconcile')
+  console.log('[ops/sync] reconcile', JSON.stringify({ offline: reconcileOffline, camera: reconcileCamera, notify: notifyOutages, faults: faultFlow, camera_faults: cameraFaults }))
 
   return j({
     ok: true,
