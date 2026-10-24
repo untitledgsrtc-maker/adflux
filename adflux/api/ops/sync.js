@@ -283,7 +283,11 @@ export default async function handler(req) {
   // freshly-upserted statuses. Gujarati push to the owning technician + (thresholds) the head,
   // only inside 09:00-20:59 IST; returns counts only. {error} if the Phase 352 SQL isn't run yet.
   const notifyOutages = await callRpc('ops_notify_outages')
-  console.log('[ops/sync] reconcile', JSON.stringify({ offline: reconcileOffline, camera: reconcileCamera, notify: notifyOutages }))
+
+  // 5d · per-screen faults (Phase 501): open after ~15 min offline, auto-Fixed after ~30 min online,
+  // 07:00-21:00 IST minutes only. Best-effort + separate; {error} if the Phase 501 SQL isn't run yet.
+  const faultFlow = await callRpc('ops_faults_reconcile')
+  console.log('[ops/sync] reconcile', JSON.stringify({ offline: reconcileOffline, camera: reconcileCamera, notify: notifyOutages, faults: faultFlow }))
 
   return j({
     ok: true,
@@ -294,6 +298,7 @@ export default async function handler(req) {
     reconcile_offline: reconcileOffline,
     reconcile_camera: reconcileCamera,
     notify_outages: notifyOutages,
+    fault_flow: faultFlow,
   })
 }
 

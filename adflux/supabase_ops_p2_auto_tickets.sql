@@ -118,25 +118,9 @@ BEGIN
         END IF;
       END IF;
 
-    ELSE
-      -- depot fully back online: auto-cancel an UNTOUCHED auto-ticket ONLY if it
-      -- was a recent blip opened TODAY (IST). OWNER RULE (2026-08-28, §259 —
-      -- supersedes the 2026-08-27 rolling-24h version): a ticket opened on ANY
-      -- PREVIOUS calendar day is a real, lingering fault — it must STAY open even
-      -- if the screen flickers back, so a tech actually confirms/closes it. Never
-      -- auto-close a ticket not opened today.
-      -- Calendar-day IST, NOT a rolling 24h: "yesterday's ticket" is protected even
-      -- if only a few hours old (a ticket opened yesterday 8 PM is safe this morning).
-      UPDATE public.ops_tickets
-         SET status = 'cancelled',
-             resolved_at = now(),
-             notes = COALESCE(notes,'') || ' [auto-recovered]',
-             updated_at = now()
-       WHERE depot_id = d.id AND source = 'auto_offline' AND status = 'open'
-         AND (opened_at AT TIME ZONE 'Asia/Kolkata')::date
-             = (now()       AT TIME ZONE 'Asia/Kolkata')::date;
-      GET DIAGNOSTICS v_row = ROW_COUNT;
-      v_cancelled := v_cancelled + v_row;
+    -- Phase 501 (24 Oct 2026): the depot-back-online branch moved to ops_faults_reconcile()
+    -- (db: supabase_phase501_ops_fault_flow.sql) - it closes tickets as Fixed after 30 min online.
+    -- The old same-day auto-cancel and section 259 rule are gone (owner decision).
     END IF;
   END LOOP;
 
