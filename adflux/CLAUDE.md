@@ -21850,3 +21850,6 @@ Finishes the four leftovers of section 493. `supabase_phase496_ops_cantfix_fixph
 - Office page: "Campaign (optional)" picker on Campaign photo (won, private, LED, ended less than 7 days ago); cant-fix reason shown under Recently sent.
 - Admin sidebar: "Give work to tech" (ADMIN_NAV).
 - Not built: showing the after-fix photo to the office/head (it is saved, no viewer yet); a Gujarati version of the office page.
+
+## 495 · /ops-admin rebuilt to the Adflux Design Rules (2026-10-24)
+Owner called the Operations owner page confusing. `OpsAdminV2.jsx` rewritten, display only (same `ops_admin_cockpit` RPC, pay math and `estVariable` untouched): teal hero with ONE yellow number (screens working now, night-aware note), four tinted-icon tiles (jobs open / with no technician / can't fix / month uptime) each saying what it counts, a "Needs you now" list (can't-fix reasons from `cant_fix_reason`, jobs with no technician, jobs open over 2 days), stations with problems (with who has each one) beside technicians, and the month report (trend, time to fix, admin-only pay estimate) folded away. Extra reads: open `ops_tickets` and `ops_depots` (admin RLS), names via a second `users` query, no FK embed. Old page had contradicting counts (62 open vs 211 this month), a purple hero and five equal stats. Guideline copy: `_design_reference/Adflux_Design_Rules_v1.html`.
