@@ -218,6 +218,9 @@ DECLARE
   v_tag           text;
   v_dark          int;
   v_pushed        int := 0;
+  v_f_off         int := 0;
+  v_f_fix         int := 0;
+  v_f_pend        int := 0;
 BEGIN
   IF NOT COALESCE(public.is_push_allowed_now(), false) THEN
     RETURN jsonb_build_object('skipped', 'quiet-hours', 'heads_pushed', 0);
@@ -239,9 +242,17 @@ BEGIN
   -- (No "technician has not checked in" line: check-in does not drive ops pay or TA, it is only a soft
   --  roster nudge, so a standing alert about it would be noise. The head sees it on /ops-command instead.)
 
+  -- Phase 503: the fault headline for today (ops_screen_faults, IST day). Best effort - a failure here never stops the push.
+  BEGIN
+    SELECT count(*) FILTER (WHERE f.kind IN ('offline','manual') AND f.status <> 'cancelled' AND f.started_at >= (v_today::timestamp AT TIME ZONE 'Asia/Kolkata')),
+           count(*) FILTER (WHERE f.kind IN ('offline','manual') AND f.status = 'fixed' AND f.fixed_at >= (v_today::timestamp AT TIME ZONE 'Asia/Kolkata')),
+           count(*) FILTER (WHERE f.kind IN ('offline','manual') AND f.status = 'open')
+      INTO v_f_off, v_f_fix, v_f_pend FROM public.ops_screen_faults f;
+  EXCEPTION WHEN OTHERS THEN NULL; END;
+
   FOR h IN
     SELECT u.id FROM public.users u
-     WHERE u.role = 'operation_head' AND u.is_active IS TRUE
+     WHERE u.role IN ('operation_head','admin') AND u.is_active IS TRUE
      ORDER BY u.id
   LOOP
     v_tag := 'ops-evening-' || h.id::text || '-' || v_ymd;
@@ -254,8 +265,8 @@ BEGIN
       PERFORM public.enqueue_push(
         h.id,
         'ઓપરેશન રિપોર્ટ તૈયાર છે',
-        CASE WHEN COALESCE(v_dark, 0) > 0 THEN format('%s સ્ટેશન બંધ', v_dark)
-             ELSE 'બધા સ્ટેશન ચાલુ છે' END,
+        (CASE WHEN COALESCE(v_dark, 0) > 0 THEN format('%s સ્ટેશન બંધ', v_dark) ELSE 'બધા સ્ટેશન ચાલુ છે' END)
+          || format(' · ખરાબી: %s બંધ થઈ, %s ઠીક, %s બાકી', COALESCE(v_f_off,0), COALESCE(v_f_fix,0), COALESCE(v_f_pend,0)),
         '/ops-command',
         v_tag);
       v_pushed := v_pushed + 1;
