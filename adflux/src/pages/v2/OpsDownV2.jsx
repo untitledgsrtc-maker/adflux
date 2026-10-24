@@ -5,6 +5,7 @@
 // ops_depot_contacts — no writes. Head lands here; exec + admin can open it.
 // Gujarati-first (§231). App v2 tokens.
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import OpsSectionNav from '../../components/ops/OpsSectionNav'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Activity, RefreshCw, Phone, Loader2, CheckCircle2, FilePlus, ChevronDown, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -95,7 +96,8 @@ export default function OpsDownV2() {
   if (err) return <div style={{ padding: 20 }}><div style={{ background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 10, padding: '12px 16px' }}>{err} <button className="btn btn-sec btn-sm" onClick={() => { setErr(''); load() }} style={{ marginLeft: 10 }}>{t('retry', lang)}</button></div></div>
 
   return (
-    <div style={{ padding: '16px 16px 40px', maxWidth: 480, margin: '0 auto' }}>
+    <div className="lead-root" style={{ maxWidth: 760 }}>
+      <OpsSectionNav />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Activity size={20} style={{ color: 'var(--v2-blue, #3B82F6)' }} />

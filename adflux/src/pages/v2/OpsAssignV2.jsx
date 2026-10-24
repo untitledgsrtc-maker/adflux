@@ -3,6 +3,7 @@
 // Office work (a normal Work task via work_create_task, shows in the technician's My Work).
 // Office roles only (route guard + RPC gate). English UI for the office; lead-* / global tokens.
 import { useCallback, useEffect, useRef, useState } from 'react'
+import OpsSectionNav from '../../components/ops/OpsSectionNav'
 import { Wrench, Camera, ClipboardList, Loader2, Send } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
@@ -77,6 +78,7 @@ export default function OpsAssignV2() {
 
   return (
     <div className="lead-root">
+      <OpsSectionNav />
       <div className="lead-page-head">
         <div>
           <div className="lead-page-eyebrow">Operations · office</div>

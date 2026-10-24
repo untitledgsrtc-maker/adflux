@@ -10,6 +10,7 @@
 // Data: ops_admin_cockpit (gated RPC) + a few read-only queries the admin may read directly. Display only.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import OpsSectionNav from '../../components/ops/OpsSectionNav'
 import { useNavigate } from 'react-router-dom'
 import { Tv, Wrench, Camera, Users as UsersIcon, Loader2, RefreshCw, ArrowRight, Clock, AlertTriangle, CheckCircle2, UserX, MonitorOff, BarChart3, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -116,7 +117,7 @@ export default function OpsAdminV2() {
   const inProcess = jobs.filter(j => j.status === 'in_progress').length
   const cantFix = jobs.filter(j => j.cant_fix_reason)
   const nobody = jobs.filter(j => !j.assigned_to)
-  const old = jobs.filter(j => j.opened_at && Date.now() - new Date(j.opened_at).getTime() > 48 * 3600e3 && !j.cant_fix_reason && j.assigned_to)
+  const old = jobs.filter(j => j.opened_at && Date.now() - new Date(j.opened_at).getTime() > 48 * 3600e3)
 
   const needs = [
     ...cantFix.map(j => ({ key: 'c' + j.id, tone: 'danger', icon: Wrench, text: `${depotName[j.depot_id] || 'Station'}: ${people[j.assigned_to] || 'technician'} says can't fix. "${j.cant_fix_reason}"`, to: '/ops-tickets?tab=proc' })),
@@ -132,6 +133,7 @@ export default function OpsAdminV2() {
 
   return (
     <div className="lead-root">
+      <OpsSectionNav />
       <div className="lead-page-head">
         <div>
           <div className="lead-page-eyebrow">Operations · owner view</div>
@@ -186,7 +188,7 @@ export default function OpsAdminV2() {
       </div>
 
       {/* stations with problems + technicians */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, marginBottom: 14, alignItems: 'start' }}>
         <div className="lead-card" style={{ padding: 0, overflow: 'hidden' }}>
           <div className="lead-card-head" style={{ padding: '12px 16px' }}><div><div className="lead-card-title">Stations with problems</div><div className="lead-card-sub">Worst first, and who has each one.</div></div></div>
           {(d.worst_stations || []).length === 0 ? (

@@ -4,6 +4,7 @@
 // ops_admin_cockpit RPC (§233, already head-accessible) + a few head-readable
 // ops reads — no new SQL. AdFlux brand tokens (§5), Gujarati-first (§231).
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import OpsSectionNav from '../../components/ops/OpsSectionNav'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, RefreshCw, Monitor, WifiOff, VideoOff, UserX, Clock, ChevronRight, Activity, Tv, LayoutDashboard, CheckSquare, CalendarOff, Wallet } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -63,12 +64,12 @@ export default function OpsCommandV2() {
     const s = data?.cockpit?.screens || {}
     const online = s.online || 0, offline = s.offline || 0
     return {
-      uptime: (online + offline) > 0 ? Math.round(online / (online + offline) * 100) : 100,
+      uptime: !onHours ? Math.round(data?.cockpit?.uptime_month ?? 0) : ((online + offline) > 0 ? Math.round(online / (online + offline) * 100) : 100),
       total: s.total || 0, offline,
       stations: (data?.cockpit?.worst_stations || []).length,
       camOff: data?.camOff ?? 0,
     }
-  }, [data])
+  }, [data, onHours])
 
   const techs = useMemo(() => {
     const lb = data?.cockpit?.leaderboard || []
@@ -82,6 +83,7 @@ export default function OpsCommandV2() {
 
   return (
     <div className="lead-root">
+      <OpsSectionNav />
       <div className="lead-page-head" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <div className="lead-page-eyebrow">{t('ops_field', lang)}</div>
@@ -95,10 +97,10 @@ export default function OpsCommandV2() {
 
       {/* network health */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10, marginBottom: 18 }}>
-        <Tile icon={Activity} n={`${numL(health.uptime, lang)}%`} label={t('network_uptime', lang)} tone={health.uptime >= 90 ? 'success' : health.uptime >= 75 ? 'warning' : 'danger'} />
+        <Tile icon={Activity} n={`${numL(health.uptime, lang)}%`} label={!onHours ? (lang === 'gu' ? 'આ મહિનાની સરેરાશ' : 'Month average uptime') : t('network_uptime', lang)} tone={health.uptime >= 90 ? 'success' : health.uptime >= 75 ? 'warning' : 'danger'} />
         <Tile icon={WifiOff} n={numL(health.offline, lang)} label={t('screens_down', lang)} tone={onHours ? 'danger' : 'muted'} sub={`${numL(health.stations, lang)} ${t('across_stations', lang)}`} note={!onHours ? t('all_quiet', lang) : null} />
         <Tile icon={Monitor} n={numL(health.total, lang)} label={t('total_screens', lang)} tone="muted" />
-        <Tile icon={VideoOff} n={numL(health.camOff, lang)} label={t('cameras_off', lang)} tone="warning" onClick={() => nav('/ops-down?view=camera')} />
+        <Tile icon={VideoOff} n={numL(health.camOff, lang)} label={t('cameras_off', lang)} tone={onHours ? 'warning' : 'muted'} note={!onHours ? t('all_quiet', lang) : null} onClick={() => nav('/ops-down?view=camera')} />
       </div>
 
       {/* needs you */}

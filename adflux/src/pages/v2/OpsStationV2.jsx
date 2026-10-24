@@ -4,6 +4,7 @@
 // depot contacts (ops_depot_contacts), and the issue→solution reference
 // (ops_issue_types). Admin / co_owner / operation_head. Additive; app tokens only.
 import OpsScreenHistory from '../../components/ops/OpsScreenHistory'
+import OpsSectionNav from '../../components/ops/OpsSectionNav'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Monitor, MonitorCheck, MonitorX, AlertTriangle, Phone, Plus, X, MapPin,
@@ -158,7 +159,8 @@ export default function OpsStationV2() {
   if (err) return <div style={{ padding: 20 }}><div style={{ background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 10, padding: '12px 16px' }}>{err} <button className="btn btn-sec btn-sm" onClick={refresh} style={{ marginLeft: 10 }}>Retry</button></div></div>
 
   return (
-    <div style={{ padding: '18px 20px', maxWidth: 1120, margin: '0 auto' }}>
+    <div className="lead-root">
+      <OpsSectionNav />
       {/* header · station picker */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
         <div>

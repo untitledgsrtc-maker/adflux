@@ -14,6 +14,7 @@
 // byte-untouched (§45).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import OpsSectionNav from '../../components/ops/OpsSectionNav'
 import {
   Wrench, Camera, Loader2, RefreshCw, Timer, AlertTriangle, Phone, Plus, Trash2, X, Monitor,
 } from 'lucide-react'
@@ -254,6 +255,7 @@ export default function OpsHeadV2() {
 
   return (
     <div className="lead-root">
+      <OpsSectionNav />
       <div className="lead-page-head">
         <div>
           <div className="lead-page-eyebrow">Screen network · {health.total} screens · live</div>
@@ -282,7 +284,7 @@ export default function OpsHeadV2() {
         <div className="lead-hero-stats">
           <HeroStat label="Screens online"  value={health.online}  delta={`of ${health.total}`}       up={health.online > 0} />
           <HeroStat label="Screens offline" value={health.offline} delta={!onHours ? 'off for night' : health.offline ? 'down now' : 'all up'} down={onHours && health.offline > 0} />
-          <HeroStat label="Cameras off"     value={camOff}         delta={camOff ? 'not reporting' : 'all reporting'} down={camOff > 0} />
+          <HeroStat label="Cameras off"     value={camOff}         delta={!onHours ? 'off for night' : (camOff ? 'not reporting' : 'all reporting')} down={onHours && camOff > 0} />
           <HeroStat label="Open tickets"    value={tickets.length} delta="fault + photo"              down={tickets.length > 0} />
           <HeroStat label="Techs on duty"   value={`${liveCount} / ${techs.length}`} delta={`${techs.length - liveCount} off`} down={liveCount < techs.length} />
         </div>
@@ -464,7 +466,7 @@ export default function OpsHeadV2() {
                     ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--blue)' }}><Camera size={14} strokeWidth={1.6} />Photo</span>
                     : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Wrench size={14} strokeWidth={1.6} />Fault</span>}</td>
                   <td style={{ ...td, color: 'var(--text-muted)' }}>{[tk.screen?.name, tk.depot?.name].filter(Boolean).join(' · ') || '—'}</td>
-                  <td style={{ ...td, color: 'var(--text-muted)' }}>{tk.issue?.issue_en || (tk.type === 'photo_request' ? 'Live photo' : '—')}</td>
+                  <td style={{ ...td, color: 'var(--text-muted)' }}>{tk.issue?.issue_en || (tk.type === 'photo_request' ? 'Live photo' : tk.type === 'camera_fault' ? 'Camera off' : (tk.source === 'auto_offline' ? 'Screens offline' : tk.source === 'auto_timer' ? 'Screen not switched off' : '—'))}</td>
                   <td style={td}>{tk.priority === 'high' ? chipInline('High', 'var(--warning)', 'var(--warning-soft, rgba(245,158,11,.12))') : <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{tk.priority}</span>}</td>
                   <td style={td}>{tk.status === 'in_progress' ? chipInline('In progress', 'var(--blue)', 'rgba(59,130,246,.12)') : chipInline('Open', 'var(--danger)', 'var(--danger-soft, rgba(239,68,68,.12))')}</td>
                   <td style={td}>
