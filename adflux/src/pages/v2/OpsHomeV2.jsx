@@ -21,6 +21,7 @@ import { t, getOpsLang, setOpsLang } from '../../utils/opsStrings'
 import { isOnHours, faultAgeHours, ageLabel, severityOf } from '../../utils/opsHours'
 import { istTodayISO } from '../../utils/istDate'
 import OpsEveningCard from '../../components/ops/OpsEveningCard'
+import OpsFaultReportCard from '../../components/ops/OpsFaultReportCard'
 
 const NIL = '00000000-0000-0000-0000-000000000000'
 const SEV = { 2: 'var(--danger)', 1: 'var(--warning)', 0: 'var(--text-subtle, var(--text-muted))' }
@@ -241,6 +242,7 @@ export default function OpsHomeV2() {
       {/* evening report — from 19:00 IST (small "view" button before that). Read-only:
           shows my day + a Share on WhatsApp button; writes nothing. Kept out of the
           no-stations empty state so that stays clean (§253). */}
+      {!noDepots && <OpsFaultReportCard kind="exec" lang={lang} />}
       {!noDepots && <OpsEveningCard lang={lang} />}
 
       {/* Down > 1 day — genuine multi-day faults (auto tickets opened a previous day,

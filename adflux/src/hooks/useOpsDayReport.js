@@ -26,7 +26,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const RPC_BY_KIND = { exec: 'ops_my_day_report', head: 'ops_head_day_report' }
+const RPC_BY_KIND = { exec: 'ops_my_day_report', head: 'ops_head_day_report', exec_faults: 'ops_my_fault_report', head_faults: 'ops_head_fault_report' }
 const POLL_MS = 5 * 60 * 1000
 const MIN_EVENT_GAP_MS = 1500
 

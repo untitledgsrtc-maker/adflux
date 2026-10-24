@@ -11,6 +11,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { t, getOpsLang, setOpsLang, numL } from '../../utils/opsStrings'
 import { isOnHours } from '../../utils/opsHours'
 import OpsHeadEveningCard from '../../components/ops/OpsHeadEveningCard'
+import OpsFaultReportCard from '../../components/ops/OpsFaultReportCard'
 
 const upTone = (p) => (p == null ? 'muted' : p >= 90 ? 'success' : p >= 75 ? 'warning' : 'danger')
 const toneVar = { success: 'var(--success)', warning: 'var(--warning)', danger: 'var(--danger)', muted: 'var(--text-muted)', blue: 'var(--blue, #3B82F6)' }
@@ -158,6 +159,7 @@ export default function OpsCommandV2() {
       {/* evening report — from 19:00 IST (a small "view" button before that).
           Read-only: the whole team's day + a Share on WhatsApp button. Works for
           admin / co_owner too (the RPC allows them). */}
+      <OpsFaultReportCard kind="head" lang={lang} />
       <OpsHeadEveningCard lang={lang} />
 
       {/* quick links */}
