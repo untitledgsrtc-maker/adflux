@@ -21865,3 +21865,6 @@ Built from the approved design (section 496). `supabase_phase501_ops_fault_flow.
 
 ## 499 · Ops per-screen history + Faults today tile (2026-10-24)
 Phase 504: `OpsScreenHistory.jsx` on the station board (/ops-station) lists every screen of the station with "N times faulty", open-now flag and an expandable past-fault list (start, fixed, downtime, response, reason), read from `ops_screen_faults` (RLS: head/admin all, technician own depots). Phase 505: "Faults today" tile (went off, fixed, pending) on /ops-admin from `ops_head_fault_report`. Phase 503: the 19:30 head evening push (`ops_head_evening_push`, `db/functions/ops_digest.sql`) now also goes to admin and carries today's fault numbers. History counts only from 24 Oct 2026. Camera faults are still outside the new table.
+
+## 500 · Technician Open list shows repeat-fault screens (Phase 506, 2026-10-24)
+`OpsTicketsV2` Open tab: each station card now also lists up to 2 screens that were faulty 2 or more times before ("Screen 4 - 3x faulty before", amber), read from `ops_screen_fault_counts` (best-effort). The list stays one card per STATION (tap opens the sheet for the station's screens) - changing it to one row per screen was left out so the technicians' main screen is not disturbed; revisit after a week of live data. Camera faults are still outside `ops_screen_faults`.

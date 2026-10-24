@@ -188,6 +188,17 @@ export default function OpsTicketsV2() {
   }, [load])
 
   const cityScreens = useMemo(() => cityId ? screens.filter(s => s.depot_id === cityId) : screens, [screens, cityId])
+  // Phase 506: "faulty N times" per screen (history view, own RLS scope). Best-effort: a failure just hides the counts.
+  const [faultCounts, setFaultCounts] = useState({})
+  const faultIdsKey = cityScreens.map(s => s.id).join(',')
+  useEffect(() => {
+    let alive = true
+    const ids = faultIdsKey ? faultIdsKey.split(',') : []
+    if (!ids.length) { setFaultCounts({}); return undefined }
+    supabase.from('ops_screen_fault_counts').select('screen_id, faults_total').in('screen_id', ids.slice(0, 300))
+      .then(({ data, error }) => { if (alive && !error) setFaultCounts(Object.fromEntries((data || []).map(r => [r.screen_id, Number(r.faults_total) || 0]))) }, () => {})
+    return () => { alive = false }
+  }, [faultIdsKey])
   const cityProc = useMemo(() => cityId ? proc.filter(p => p.depot_id === cityId) : proc, [proc, cityId])
   const cityFixed = useMemo(() => cityId ? fixed.filter(f => f.depot_id === cityId) : fixed, [fixed, cityId])
   const depotName = useCallback(id => depots.find(d => d.id === id)?.name || '—', [depots])
@@ -457,6 +468,10 @@ export default function OpsTicketsV2() {
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {one ? `${r.list[0].name || `${t('screen', lang)} ${screenNo[r.list[0].id] || ''}`} · ` : ''}{typeLabel} · {ageStr}
               </div>
+              {(() => {
+                const rep = r.list.filter(x => (faultCounts[x.id] || 0) >= 2).sort((a, b) => (faultCounts[b.id] || 0) - (faultCounts[a.id] || 0)).slice(0, 2)
+                return rep.length ? <div style={{ fontSize: 12, color: 'var(--warning)', marginTop: 3 }}>{rep.map(x => `${x.name || t('screen', lang)} - ${faultCounts[x.id]}x`).join(' · ')} {lang === 'gu' ? 'ખરાબ થયેલ' : 'faulty before'}</div> : null
+              })()}
             </div>
             <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           </button>
