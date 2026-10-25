@@ -277,7 +277,7 @@ function ReasonGrid({ issues, value, onPick }) {
 }
 
 function CallBtn({ c, onCall }) {
-  return <button className="callb" onClick={() => onCall(c)}><span className="calli"><Ic n="phone" s={22} /></span><span style={{ flex: 1, textAlign: 'left', minWidth: 0 }}><span style={{ display: 'block', fontWeight: 600 }}>{c.name || c.role_en}</span><span style={{ display: 'block', fontSize: 15, opacity: .85 }}>{c.role_gu || ''} {c.role_gu ? '· ' : ''}{c.role_en}</span></span><span className="mono" style={{ fontSize: 14, opacity: .85 }}>{c.phone}</span></button>
+  return <button className="callb" onClick={() => onCall(c)}><span className="calli"><Ic n="phone" s={22} /></span><span style={{ flex: 1, textAlign: 'left', minWidth: 0 }}><span style={{ display: 'block', fontWeight: 600 }}>{c.name || c.role_en}</span><span style={{ display: 'block', fontSize: 15, opacity: .85 }}><Bi g={c.role_gu || c.role_en} e={c.role_en || c.role_gu} /></span></span><span className="mono" style={{ fontSize: 14, opacity: .85 }}>{c.phone}</span></button>
 }
 
 async function uploadPhoto(depotId, prefix, file) {
