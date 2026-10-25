@@ -330,7 +330,9 @@ const MOBILE_NAV_OPS_EXEC = [
 ]
 const MOBILE_NAV_OPS_HEAD = [
   { to: '/ops-command',       label: 'Home',           icon: Gauge },
-  { to: '/ops-log',           label: 'Log',            icon: FileText },
+  { to: '/ops-performance',   label: 'Performance',    icon: Activity },
+  { to: '/calls',             label: 'Calls',          icon: Phone },
+  { to: '/my-offer',          label: 'Offer',          icon: Wallet },
 ]
 
 // Phase 365 — Work module. Creative / office staff (role 'staff') get their Work page,
