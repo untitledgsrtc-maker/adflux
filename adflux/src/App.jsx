@@ -92,6 +92,7 @@ const OpsTicketsV2 = lazyWithRetry(() => import('./pages/v2/OpsTicketsV2'))
 const OpsAssignV2 = lazyWithRetry(() => import('./pages/v2/OpsAssignV2'))
 const OpsMyPerformanceV2 = lazyWithRetry(() => import('./pages/v2/OpsMyPerformanceV2'))
 const OpsHomeV2 = lazyWithRetry(() => import('./pages/v2/OpsHomeV2'))
+const OpsTechApp = lazyWithRetry(() => import('./pages/v2/OpsTechApp'))
 // Phase 365 — Work module (timeclock + tasks) for the creative team.
 const MyWorkV2 = lazyWithRetry(() => import('./pages/v2/MyWorkV2'))
 const TeamWorkV2 = lazyWithRetry(() => import('./pages/v2/TeamWorkV2'))
@@ -528,7 +529,8 @@ export default function App() {
           <Route path="/ops-tickets"               element={<RequireOps><OpsTicketsV2 /></RequireOps>} />
           <Route path="/ops-assign"                element={<RequireOfficeAssign><OpsAssignV2 /></RequireOfficeAssign>} />
           <Route path="/ops-performance"           element={<RequireOps><OpsMyPerformanceV2 /></RequireOps>} />
-          <Route path="/ops-home"                  element={<RequireOps><OpsHomeV2 /></RequireOps>} />
+          <Route path="/ops-home"                  element={<RequireOps><OpsTechApp /></RequireOps>} />
+          <Route path="/ops-home-classic"          element={<RequireOps><OpsHomeV2 /></RequireOps>} />
           {/* Phase 365 — Work module. /my-work is open to every signed-in user (non-members only ask + follow);
               /team-work checks head access itself and bounces everyone else to /my-work. */}
           <Route path="/my-work"                   element={<MyWorkV2 />} />
