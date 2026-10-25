@@ -64,6 +64,15 @@ export function LangToggle() {
   const l = useOps2Lang()
   return <div className="seg" role="group" aria-label="Language">{[['gu', 'ગુ'], ['en', 'EN']].map(([k, t]) => <button key={k} className={l === k ? 'on' : ''} aria-pressed={l === k} onClick={() => setOps2Lang(k)}>{t}</button>)}</div>
 }
+const HAS_GU = /[઀-૿]/
+// "ગુજરાતી · English" strings: English mode keeps only the English parts.
+export function lgText(str, l) {
+  if (l !== 'en' || typeof str !== 'string' || !HAS_GU.test(str)) return str
+  const parts = str.split(' · ').filter(x => !HAS_GU.test(x))
+  return parts.length ? parts.join(' · ') : str
+}
+export const useLg = () => { const l = useOps2Lang(); return s => lgText(s, l) }
+export function G({ t }) { const lg = useLg(); return <>{lg(t)}</> }
 export function Bi({ g, e, big, center }) {
   const l = useOps2Lang()
   if (l === 'en') return <span className={'bi' + (big ? ' big' : '')} style={center ? { textAlign: 'center' } : null}><span className="g">{e}</span></span>
@@ -74,7 +83,8 @@ export function Btn({ kind, icon, children, sm, lg, onClick, title, style, disab
   return <button className={c} onClick={e => { e.stopPropagation(); onClick && onClick(e) }} title={title} aria-label={title || undefined} style={style} disabled={disabled}>{icon && <Ic n={icon} s={lg ? 22 : sm ? 16 : 18} />}{children}</button>
 }
 export function Pill({ tone = 'n', icon, children }) {
-  return <span className={'pill t-' + tone}>{icon && <Ic n={icon} s={14} />}{children}</span>
+  const lg = useLg()
+  return <span className={'pill t-' + tone}>{icon && <Ic n={icon} s={14} />}{typeof children === 'string' ? lg(children) : children}</span>
 }
 export function Tile({ n, tone = 'n', s = 36 }) {
   return <span className={'tl t-' + tone} style={{ width: s, height: s, borderRadius: s > 34 ? 12 : 8 }}><Ic n={n} s={s > 34 ? 18 : 16} /></span>
@@ -85,18 +95,20 @@ export function Ring({ v, s = 88, txt, lab, max = 100 }) {
     <div style={{ position: 'absolute', inset: 0, display: 'grid', placeContent: 'center', textAlign: 'center', color: '#f1f5f9' }}><span className="num" style={{ fontSize: s * .21, fontWeight: 600, lineHeight: 1 }}>{txt ?? v + '%'}</span>{lab && <span style={{ fontSize: 12, color: '#ccfbf1', marginTop: 3 }}>{lab}</span>}</div></div>
 }
 export function Hero({ eyebrow, value, unit, sub, right, icon }) {
+  const lg = useLg()
   return <section className="hero"><div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
-    <div style={{ display: 'grid', gap: 6, minWidth: 0, position: 'relative', zIndex: 1 }}><span className="heb">{icon && <Ic n={icon} s={14} />}{eyebrow}</span>
+    <div style={{ display: 'grid', gap: 6, minWidth: 0, position: 'relative', zIndex: 1 }}><span className="heb">{icon && <Ic n={icon} s={14} />}{typeof eyebrow === 'string' ? lg(eyebrow) : eyebrow}</span>
       <div className="row" style={{ gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}><span className="num hv">{value}</span>{unit && <span className="hu">{unit}</span>}</div>
-      {sub && <span className="hs">{sub}</span>}</div>{right}</div></section>
+      {sub && <span className="hs">{typeof sub === 'string' ? lg(sub) : sub}</span>}</div>{right}</div></section>
 }
 export function StatTile({ icon, tone = 'n', value, label, sub, onClick }) {
   const Tag = onClick ? 'button' : 'div'
   return <Tag className={'stt s-' + tone} onClick={onClick} style={onClick ? { textAlign: 'left', cursor: 'pointer', font: 'inherit', color: 'inherit' } : null}><Tile n={icon} tone={tone} s={36} /><div className="num stv">{value}</div><div className="stl">{label}</div>{sub && <div className="mu sm">{sub}</div>}</Tag>
 }
 export function Card({ title, icon, tone, action, children, pad = true, style, sub }) {
+  const lg = useLg()
   return <section className="card" style={style}>
-    {title && <header className="ch"><div className="row" style={{ gap: 10, minWidth: 0 }}>{icon && <Tile n={icon} tone={tone || 'n'} s={32} />}<h3>{title}</h3>{sub && <span className="mu sm">{sub}</span>}</div>{action}</header>}
+    {title && <header className="ch"><div className="row" style={{ gap: 10, minWidth: 0 }}>{icon && <Tile n={icon} tone={tone || 'n'} s={32} />}<h3>{typeof title === 'string' ? lg(title) : title}</h3>{sub && <span className="mu sm">{sub}</span>}</div>{action}</header>}
     <div style={pad ? { padding: 18 } : null}>{children}</div></section>
 }
 export function Seg({ value, onChange, opts, full }) {
@@ -123,7 +135,8 @@ export function Sheet({ title, sub, onClose, children, footer, side }) {
     {footer && <footer style={{ display: 'flex', gap: 12, padding: '14px 20px', borderTop: '1px solid var(--bd)' }}>{footer}</footer>}</aside></div>
 }
 export function Toast({ m }) {
-  return m ? <div className="toast" role="status"><Ic n={m.icon || 'checkc'} /><span style={{ flex: 1 }}>{m.t}</span></div> : null
+  const lg = useLg()
+  return m ? <div className="toast" role="status"><Ic n={m.icon || 'checkc'} /><span style={{ flex: 1 }}>{lg(m.t)}</span></div> : null
 }
 export function useToast() {
   const [m, setM] = useState(null); const t = useRef()

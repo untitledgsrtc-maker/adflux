@@ -18,7 +18,7 @@ import { dialPhone } from '../../utils/openExternal'
 import { normalizeIndianPhone } from '../../utils/phone'
 import { captureGps } from '../../utils/captureGps'
 import '../../components/ops2/ops2.css'
-import { Ic, Bi, Btn, Pill, Tile, Ring, Hero, StatTile, Card, Seg, Sel, Bar, ScrTile, Sheet, Toast, useToast, Photo, Swipe, LangToggle } from '../../components/ops2/ui'
+import { Ic, Bi, Btn, Pill, Tile, Ring, Hero, StatTile, Card, Seg, Sel, Bar, ScrTile, Sheet, Toast, useToast, Photo, Swipe, LangToggle, G } from '../../components/ops2/ui'
 
 const NIL = '00000000-0000-0000-0000-000000000000'
 const ago = (iso) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)) : 0)
@@ -194,7 +194,7 @@ export default function OpsTechApp() {
     body = <div style={{ display: 'grid', gap: 14 }}>
       {!onHours
         ? <Hero icon="moon" eyebrow="આજનો ચાલુ સમય · Uptime" value={uptime != null ? `${Number(uptime).toFixed(1)}%` : '—'} sub="7 AM – 9 PM · રાત્રે સ્ક્રીન આરામ કરે છે" />
-        : <Hero icon="monoff" eyebrow="બંધ સ્ક્રીન · Screens off" value={offN} unit={`/ ${totalScr}`} sub={<><span className="num">{new Set(plan.map(f => f.st)).size}</span> સ્ટેશન · stations to visit</>} />}
+        : <Hero icon="monoff" eyebrow="બંધ સ્ક્રીન · Screens off" value={offN} unit={`/ ${totalScr}`} sub={<><span className="num">{new Set(plan.map(f => f.st)).size}</span> <G t="સ્ટેશન · stations to visit" /></>} />}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 8 }}>
         <StatTile icon="loader" tone="in" value={workN} label={<Bi g="કામ ચાલુ" e="In process" />} onClick={() => { setFt('work'); setTab('faults') }} />
         <StatTile icon="checkc" tone="ok" value={Math.max(fixedScreens, doneToday.reduce((a, f) => a + f.scr.length, 0))} label={<Bi g="આજે ઠીક" e="Fixed today" />} onClick={() => { setFt('fixed'); setTab('faults') }} />
@@ -207,10 +207,10 @@ export default function OpsTechApp() {
           <Swipe g="હાજરી માટે સ્વાઇપ કરો" e="Swipe to check in" onDone={doCheckIn} />
           <div className="mu sm">11:30 પછી અડધો દિવસ · After 11:30 it is a half day</div></section>)}
       {!onHours && <div className="card" style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}><Tile n="moon" s={40} /><Bi g="રાત્રે 9 થી સવારે 7 સ્ક્રીન આરામ કરે છે. રાત્રે કંઈ ગણાતું નથી." e="Screens rest 9 PM to 7 AM. Off at night is normal. Only a screen still on after 9 PM is a timer fault." /></div>}
-      <div className="row" style={{ justifyContent: 'space-between', marginTop: 4 }}><span className="lbl">આજની મુલાકાત · Visit plan</span></div>
+      <div className="row" style={{ justifyContent: 'space-between', marginTop: 4 }}><span className="lbl"><G t="આજની મુલાકાત · Visit plan" /></span></div>
       {plan.length === 0 && <div className="okrow"><Ic n="checkc" /><Bi g="બધા સ્ક્રીન ચાલુ છે" e="All screens are working" /></div>}
       {plan.map((f, i) => <VisitCard key={f.id} f={f} i={i} st={stById[f.st]} onOpen={() => setOpenId(f.id)} />)}
-      {jobs.length > 0 && <span className="lbl" style={{ marginTop: 4 }}>બીજું કામ · Other jobs</span>}
+      {jobs.length > 0 && <span className="lbl" style={{ marginTop: 4 }}><G t="બીજું કામ · Other jobs" /></span>}
       {jobs.map(f => <VisitCard key={f.id} f={f} st={stById[f.st]} onOpen={() => setOpenId(f.id)} />)}
     </div>
   } else if (tab === 'faults') {
@@ -246,9 +246,9 @@ function VisitCard({ f, i, st, onOpen }) {
   return <button className={'card vcard v-' + tone} onClick={onOpen}>
     {i != null ? <span className="vnum num">{i + 1}</span> : <Tile n={SRC[f.src][2]} tone={tone} s={40} />}
     <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 6 }}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}><Bi g={st.name} e={SRC[f.src][1] + ' · ' + SRC[f.src][0]} big />{!job && f.scr.length > 0 && <Pill tone={tone} icon={f.src === 'cam' ? 'camoff' : 'monoff'}><span className="num">{f.scr.length}</span>/<span className="num">{st.n}</span></Pill>}</div>
-      {job && <div style={{ fontSize: 16 }}>{SRC.photo[0]} <span className="mu">· {f.note}</span></div>}
-      <div className="row mu" style={{ gap: 12, flexWrap: 'wrap', fontSize: 15 }}>{f.age > 0 && <span className="row" style={{ gap: 4 }}><Ic n="clock" s={14} /><span className="num">{age(f.age)}</span></span>}<Pill tone={STAT[f.status][2]} icon={STAT[f.status][3]}>{STAT[f.status][0]}</Pill></div>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}><span style={{ display: 'grid', gap: 2, minWidth: 0 }}><span className="h" style={{ fontSize: 20, fontWeight: 600 }}>{st.name}</span><span className="mu sm"><Bi g={SRC[f.src][0]} e={SRC[f.src][1]} /></span></span>{!job && f.scr.length > 0 && <Pill tone={tone} icon={f.src === 'cam' ? 'camoff' : 'monoff'}><span className="num">{f.scr.length}</span>/<span className="num">{st.n}</span></Pill>}</div>
+      {job && <div style={{ fontSize: 16 }}><Bi g={SRC.photo[0]} e={SRC.photo[1]} /> <span className="mu">· {f.note}</span></div>}
+      <div className="row mu" style={{ gap: 12, flexWrap: 'wrap', fontSize: 15 }}>{f.age > 0 && <span className="row" style={{ gap: 4 }}><Ic n="clock" s={14} /><span className="num">{age(f.age)}</span></span>}<Pill tone={STAT[f.status][2]} icon={STAT[f.status][3]}><Bi g={STAT[f.status][0]} e={STAT[f.status][1]} /></Pill></div>
     </div></button>
 }
 
@@ -343,7 +343,7 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
   if (f.tickets.some(t => t.cant_fix_reason)) story.push([dd(f.tickets.find(t => t.cant_fix_reason).cant_fix_at) + ' ' + hhmm(f.tickets.find(t => t.cant_fix_reason).cant_fix_at), 'flag', 'ઠીક ન થયું', "Can't fix: " + f.cant])
   if (f.status === 'fixed') story.push([hhmm(f.tickets[0]?.resolved_at), 'checkc', 'ઠીક થયું', 'Fixed'])
 
-  const screensPick = <section style={{ display: 'grid', gap: 10 }}><span className="lbl">1 · કઈ સ્ક્રીન? Which screens</span>
+  const screensPick = <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="1 · કઈ સ્ક્રીન? Which screens" /></span>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>{st.scr.map(s => { const faulty = f.scrIds.includes(s.id); return <ScrTile key={s.id} n={s.n} st={!onHours && f.src === 'timer' ? (faulty ? 'tm' : 'rest') : faulty ? 'off' : s.status === 'online' ? 'on' : 'off'} sel={faulty && sel.includes(s.id)} onClick={faulty && f.status === 'open' ? () => setSel(sel.includes(s.id) ? sel.filter(x => x !== s.id) : [...sel, s.id]) : null} /> })}</div>
     <div className="row mu sm" style={{ gap: 14 }}><span className="row" style={{ gap: 6 }}><i className="lg t-da"></i>બંધ · Off</span><span className="row" style={{ gap: 6 }}><i className="lg t-ok"></i>ચાલુ · On</span></div></section>
 
@@ -356,9 +356,9 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
         <Btn kind="pri" lg full icon="send" disabled={!photo || busy} onClick={sendPhoto}>ફોટો મોકલો · Send photo</Btn></> : <>
         <Stepper f={f} called={called} />
         {screensPick}
-        {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl">2 · શું ખરાબી છે? What is wrong</span><ReasonGrid issues={d.issues} value={reason} onPick={setReason} /></section>}
+        {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="2 · શું ખરાબી છે? What is wrong" /></span><ReasonGrid issues={d.issues} value={reason} onPick={setReason} /></section>}
         {issue && f.status === 'open' && issue.solution_en && <div className="okrow"><Ic n="check" /><Bi g={issue.solution_gu || issue.solution_en} e={issue.solution_en} /></div>}
-        {reason && f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl">3 · કોને કૉલ કરવો · Who to call</span>{callList.length ? callList.map(c => <CallBtn key={c.id} c={c} onCall={doCall} />) : <div className="warnrow"><Ic n="alert" /><Bi g="આ સ્ટેશનનો કોઈ નંબર નથી" e="No number saved for this station. Ask the head to add one." /></div>}</section>}
+        {reason && f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="3 · કોને કૉલ કરવો · Who to call" /></span>{callList.length ? callList.map(c => <CallBtn key={c.id} c={c} onCall={doCall} />) : <div className="warnrow"><Ic n="alert" /><Bi g="આ સ્ટેશનનો કોઈ નંબર નથી" e="No number saved for this station. Ask the head to add one." /></div>}</section>}
         {f.status === 'open' && <div style={{ display: 'grid', gap: 10 }}>
           <Photo label={<Bi g="પહેલાંનો ફોટો (વૈકલ્પિક)" e="Before photo (optional)" />} file={before} onFile={setBefore} />
           <Btn kind="pri" lg full icon="arrow" disabled={!reason || !sel.length || busy} onClick={() => startWork(true)}>કૉલ થયો, કામ શરૂ · Called, start work</Btn>
@@ -371,7 +371,7 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
           {f.status === 'work' && <Btn kind="wa" lg full icon="flag" onClick={() => setSheet('cant')}>ઠીક ન થાય – ઓફિસને કહો · Can’t fix</Btn>}</div>}
         {f.status === 'cant' && <div className="warnrow"><Ic n="flag" s={22} /><Bi g="ઓફિસને મોકલ્યું" e={f.cant || 'Sent to the office'} /></div>}
         {f.status === 'fixed' && <div className="okrow big"><Ic n="checkc" s={24} /><Bi g="ઠીક થયું" e="Fixed" /></div>}
-        {story.length > 0 && <section style={{ display: 'grid', gap: 10 }}><span className="lbl">ફોલ્ટની વિગત · Fault story</span><ol className="story">{story.map(([t, i, g, e], k) => <li key={k}><span className="sdot"><Ic n={i} s={14} /></span><div style={{ minWidth: 0 }}><Bi g={g} e={e} /><div className="mono mu sm">{t}</div></div></li>)}</ol></section>}</>}
+        {story.length > 0 && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="ફોલ્ટની વિગત · Fault story" /></span><ol className="story">{story.map(([t, i, g, e], k) => <li key={k}><span className="sdot"><Ic n={i} s={14} /></span><div style={{ minWidth: 0 }}><Bi g={g} e={e} /><div className="mono mu sm">{t}</div></div></li>)}</ol></section>}</>}
     </div>
     {sheet === 'fix' && <FixSheet onClose={() => setSheet(null)} onSave={fix} busy={busy} />}
     {sheet === 'cant' && <CantSheet onClose={() => setSheet(null)} onSave={cant} busy={busy} />}
