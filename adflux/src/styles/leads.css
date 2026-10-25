@@ -1425,3 +1425,11 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 .tl-row-fresh {
   animation: tl-row-pop .35s ease-out 1;
 }
+
+/* Phone tap size: small buttons reach the 44px touch minimum (design rules).
+   Affects only narrow screens; desktop look is unchanged. */
+@media (max-width: 720px) {
+  .lead-btn-sm,
+  .v2d-btn-ghost,
+  .v2d-cta { min-height: 44px; }
+}

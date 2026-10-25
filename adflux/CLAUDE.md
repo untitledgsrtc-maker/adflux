@@ -21900,3 +21900,6 @@ Note (508 follow-up): language toggle (ગુ / EN, default English) in the tech
 Note (508 follow-up 2): station names on technician visit cards restored (EN mode had hidden them behind `Bi`); `G`/`useLg` in ops2/ui.jsx make the hardcoded "ગુ · EN" strings show English only in EN mode (Pill, Hero, Card, Toast, labels in OpsTechApp). Rule: a station/depot name is data, never wrap it in `Bi`.
 
 Note (508 follow-up 3): technician app (OpsTechApp) now has a menu button (3 lines) opening My Performance / My Calls / My Offer / My Work / My profile, and the fault page shows "Who to call" at once with an "Add number" button (shared DepotContactsModal, §325). Training pill sits higher on ops screens.
+
+## 509 · Phone tap size (2026-10-25)
+Admin UI audit at 390 px (all main pages): no page scrolls sideways; small tap targets were `.lead-btn-sm` (33 px, 3,500+ on Follow-ups), `.v2d-btn-ghost` (28 px, Clients) and `.v2d-cta`. One rule at the end of `leads.css` (max-width 720 px) sets min-height 44 px. CSS only, desktop unchanged. Still to look at by eye: Finance and Campaigns tables at phone width, tab strips that extend past 390 px.
