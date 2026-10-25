@@ -17,6 +17,7 @@ import { estVariable } from '../../utils/opsPay'
 import { dialPhone } from '../../utils/openExternal'
 import { normalizeIndianPhone } from '../../utils/phone'
 import { captureGps } from '../../utils/captureGps'
+import DepotContactsModal from '../../components/ops/DepotContactsModal'
 import '../../components/ops2/ops2.css'
 import { Ic, Bi, Btn, Pill, Tile, Ring, Hero, StatTile, Card, Seg, Sel, Bar, ScrTile, Sheet, Toast, useToast, Photo, Swipe, LangToggle, G } from '../../components/ops2/ui'
 
@@ -59,6 +60,7 @@ export default function OpsTechApp() {
   const [openId, setOpenId] = useState(null)
   const [ft, setFt] = useState('open')
   const [sheet, setSheet] = useState(null)
+  const [menu, setMenu] = useState(false)
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)
   const onHours = isOnHours()
 
@@ -178,7 +180,7 @@ export default function OpsTechApp() {
 
   const header = (
     <div className="row" style={{ justifyContent: 'space-between', padding: '8px 16px', minHeight: 56 }}>
-      <span className="row" style={{ gap: 10 }}><span className="logo">A</span><Bi g="ઓપરેશન" e={profile?.name || ''} /></span>
+      <span className="row" style={{ gap: 10 }}><Btn kind="gh" icon="menu" title="Menu" onClick={() => setMenu(true)} /><span className="logo">A</span><Bi g="ઓપરેશન" e={profile?.name || ''} /></span>
       <span className="row" style={{ gap: 8 }}><LangToggle />{online ? <Pill tone="ok" icon="wifi">Live</Pill> : <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}</span>
     </div>)
 
@@ -234,6 +236,11 @@ export default function OpsTechApp() {
       <nav className="bnav">{[['today', 'home', 'આજે', 'Today'], ['faults', 'list', 'ફોલ્ટ', 'Faults'], ['me', 'user', 'મારું', 'Me']].map(([k, i, g, e]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => { setTab(k); setOpenId(null) }} aria-current={tab === k}><Ic n={i} s={22} /><Bi g={g} e={e} center /></button>)}</nav>
       {openFault && <FaultPage key={openFault.id} f={openFault} st={stById[openFault.st]} d={d} uid={uid} onHours={onHours} back={() => setOpenId(null)} reload={load} show={show} setTabFixed={() => { setOpenId(null); setFt('fixed'); setTab('faults') }} />}
       {sheet && sheet.k === 'log' && <LogSheet stations={stations} issues={d.issues} uid={uid} onClose={() => setSheet(null)} onDone={() => { setSheet(null); show({ t: 'નોંધાયું · Fault logged' }); load() }} show={show} />}
+      {menu && <Sheet title={<Bi g="મેનુ" e="Menu" />} onClose={() => setMenu(false)}>
+        <div style={{ display: 'grid', gap: 8 }}>
+          {[['/ops-performance', 'મારું પર્ફોર્મન્સ', 'My Performance'], ['/calls', 'મારા કૉલ', 'My Calls'], ['/my-offer', 'મારો ઑફર', 'My Offer'], ['/my-work', 'મારું કામ', 'My Work'], ['/work-profile', 'મારી પ્રોફાઇલ', 'My profile']].map(([to, g, e]) => <Btn key={to} lg full onClick={() => { setMenu(false); nav(to) }}><Bi g={g} e={e} /></Btn>)}
+        </div>
+      </Sheet>}
       <Toast m={toast} />
     </div></div>
   )
@@ -282,6 +289,7 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
   const [before, setBefore] = useState(null)
   const [photo, setPhoto] = useState(null)
   const [sheet, setSheet] = useState(null)
+  const [addNum, setAddNum] = useState(false)
   const [busy, setBusy] = useState(false)
   const lock = useRef(false)
   if (!st) return null
@@ -358,7 +366,8 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
         {screensPick}
         {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="2 · શું ખરાબી છે? What is wrong" /></span><ReasonGrid issues={d.issues} value={reason} onPick={setReason} /></section>}
         {issue && f.status === 'open' && issue.solution_en && <div className="okrow"><Ic n="check" /><Bi g={issue.solution_gu || issue.solution_en} e={issue.solution_en} /></div>}
-        {reason && f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="3 · કોને કૉલ કરવો · Who to call" /></span>{callList.length ? callList.map(c => <CallBtn key={c.id} c={c} onCall={doCall} />) : <div className="warnrow"><Ic n="alert" /><Bi g="આ સ્ટેશનનો કોઈ નંબર નથી" e="No number saved for this station. Ask the head to add one." /></div>}</section>}
+        {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="row" style={{ justifyContent: 'space-between' }}><span className="lbl"><G t="3 · કોને કૉલ કરવો · Who to call" /></span><Btn sm icon="plus" onClick={() => setAddNum(true)}><G t="નવો નંબર · Add number" /></Btn></span>{(reason ? callList : contacts).length ? (reason ? callList : contacts).map(c => <CallBtn key={c.id} c={c} onCall={doCall} />) : <div className="warnrow"><Ic n="alert" /><Bi g="આ સ્ટેશનનો કોઈ નંબર નથી" e="No number saved for this station. Add one." /></div>}</section>}
+        {addNum && <DepotContactsModal depot={{ id: st.id, name: st.name }} lang={(typeof localStorage !== 'undefined' && localStorage.getItem('ops2_lang')) || 'en'} meId={uid} onClose={() => setAddNum(false)} onChanged={() => reload()} />}
         {f.status === 'open' && <div style={{ display: 'grid', gap: 10 }}>
           <Photo label={<Bi g="પહેલાંનો ફોટો (વૈકલ્પિક)" e="Before photo (optional)" />} file={before} onFile={setBefore} />
           <Btn kind="pri" lg full icon="arrow" disabled={!reason || !sel.length || busy} onClick={() => startWork(true)}><G t="કૉલ થયો, કામ શરૂ · Called, start work" /></Btn>
