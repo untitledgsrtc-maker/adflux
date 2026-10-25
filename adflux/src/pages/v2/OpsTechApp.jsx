@@ -17,7 +17,6 @@ import { estVariable } from '../../utils/opsPay'
 import { dialPhone } from '../../utils/openExternal'
 import { normalizeIndianPhone } from '../../utils/phone'
 import { captureGps } from '../../utils/captureGps'
-import NotificationPanel from '../../components/v2/NotificationPanel'
 import DepotContactsModal from '../../components/ops/DepotContactsModal'
 import '../../components/ops2/ops2.css'
 import { Ic, Bi, Btn, Pill, Tile, Ring, Hero, StatTile, Card, Seg, Sel, Bar, ScrTile, Sheet, Toast, useToast, Photo, Swipe, LangToggle, G } from '../../components/ops2/ui'
@@ -59,6 +58,7 @@ export default function OpsTechApp() {
   const [d, setD] = useState({ depots: [], screens: [], tickets: [], contacts: [], issues: [], fixedFaults: [], checkedIn: true, checkInAt: null, pay: null, calls: 0 })
   const [tab, setTab] = useState('today')
   const [openId, setOpenId] = useState(null)
+  const [bell, setBell] = useState(false)
   const [ft, setFt] = useState('open')
   const [vp, setVp] = useState('off')
   const [sheet, setSheet] = useState(null)
@@ -179,10 +179,11 @@ export default function OpsTechApp() {
     } catch (e) { show({ t: e?.message || 'Check-in failed', icon: 'alert' }) }
   }
 
+  const alerts = useMemo(() => faults.filter(f => f.status !== 'fixed').sort((a, b) => (b.src === 'photo') - (a.src === 'photo') || b.age - a.age), [faults])
   const header = (
     <div className="row" style={{ justifyContent: 'space-between', padding: '8px 16px', minHeight: 56 }}>
       <span className="row" style={{ gap: 10 }}><Btn kind="gh" icon="menu" title="Menu" onClick={() => window.dispatchEvent(new Event('open-shell-drawer'))} /><span className="logo">A</span><Bi g="ઓપરેશન" e={profile?.name || ''} /></span>
-      <span className="row" style={{ gap: 6 }}><span className="ltsm"><LangToggle /></span>{!online && <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}<NotificationPanel /></span>
+      <span className="row" style={{ gap: 6 }}><span className="ltsm"><LangToggle /></span>{!online && <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}<span style={{ position: 'relative' }}><Btn kind="gh" icon="bell" title="Alerts" onClick={() => setBell(true)} />{alerts.length > 0 && <span className="num" style={{ position: 'absolute', top: 2, right: 2, minWidth: 18, height: 18, borderRadius: 999, background: 'var(--r, #ef4444)', color: '#fff', fontSize: 11, display: 'grid', placeItems: 'center', padding: '0 4px', pointerEvents: 'none' }}>{alerts.length > 9 ? '9+' : alerts.length}</span>}</span></span>
     </div>)
 
   let body
@@ -212,10 +213,10 @@ export default function OpsTechApp() {
       {!onHours && <div className="card" style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}><Tile n="moon" s={40} /><Bi g="રાત્રે 9 થી સવારે 7 સ્ક્રીન આરામ કરે છે. રાત્રે કંઈ ગણાતું નથી." e="Screens rest 9 PM to 7 AM. Off at night is normal. Only a screen still on after 9 PM is a timer fault." /></div>}
       <div className="row" style={{ justifyContent: 'space-between', marginTop: 4 }}><span className="lbl"><G t="આજની મુલાકાત · Visit plan" /></span></div>
       {(() => {
-        const offPlan = plan.filter(f => f.src !== 'cam'), camPlan = plan.filter(f => f.src === 'cam'), shown = vp === 'cam' ? camPlan : offPlan
+        const offPlan = plan.filter(f => f.src !== 'cam'), camPlan = plan.filter(f => f.src === 'cam'), vpe = (vp === 'off' && offPlan.length === 0 && camPlan.length > 0) ? 'cam' : vp, shown = vpe === 'cam' ? camPlan : offPlan
         return <>
-          <Seg full value={vp} onChange={setVp} opts={[['off', <Bi g="સ્ક્રીન બંધ" e={<><span className="num">{offPlan.length}</span> Screen offline</>} />], ['cam', <Bi g="કૅમેરા બંધ" e={<><span className="num">{camPlan.length}</span> Camera off</>} />]]} />
-          {shown.length === 0 && <div className="okrow"><Ic n="checkc" /><Bi g={vp === 'cam' ? 'બધા કૅમેરા ચાલુ છે' : 'બધા સ્ક્રીન ચાલુ છે'} e={vp === 'cam' ? 'All cameras are working' : 'All screens are working'} /></div>}
+          <Seg full value={vpe} onChange={setVp} opts={[['off', <Bi g="સ્ક્રીન બંધ" e={<><span className="num">{offPlan.length}</span> Screen offline</>} />], ['cam', <Bi g="કૅમેરા બંધ" e={<><span className="num">{camPlan.length}</span> Camera off</>} />]]} />
+          {shown.length === 0 && <div className="okrow"><Ic n="checkc" /><Bi g={vpe === 'cam' ? 'બધા કૅમેરા ચાલુ છે' : 'બધા સ્ક્રીન ચાલુ છે'} e={vpe === 'cam' ? 'All cameras are working' : 'All screens are working'} /></div>}
           {shown.map((f, i) => <VisitCard key={f.id} f={f} i={i} st={stById[f.st]} onOpen={() => setOpenId(f.id)} />)}
         </>
       })()}
@@ -243,6 +244,12 @@ export default function OpsTechApp() {
       <nav className="bnav">{[['today', 'home', 'આજે', 'Today'], ['faults', 'list', 'ફોલ્ટ', 'Faults'], ['me', 'user', 'મારું', 'Me']].map(([k, i, g, e]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => { setTab(k); setOpenId(null) }} aria-current={tab === k}><Ic n={i} s={22} /><Bi g={g} e={e} center /></button>)}</nav>
       {openFault && <FaultPage key={openFault.id} f={openFault} st={stById[openFault.st]} d={d} uid={uid} onHours={onHours} back={() => setOpenId(null)} reload={load} show={show} setTabFixed={() => { setOpenId(null); setFt('fixed'); setTab('faults') }} />}
       {sheet && sheet.k === 'log' && <LogSheet stations={stations} issues={d.issues} uid={uid} onClose={() => setSheet(null)} onDone={() => { setSheet(null); show({ t: 'નોંધાયું · Fault logged' }); load() }} show={show} />}
+      {bell && <Sheet title={<Bi g="એલર્ટ" e="Alerts" />} onClose={() => setBell(false)}>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {alerts.length === 0 && <div className="okrow"><Ic n="checkc" /><Bi g="કોઈ નવો એલર્ટ નથી" e="Nothing needs you right now" /></div>}
+          {alerts.slice(0, 20).map(f => <VisitCard key={f.id} f={f} i={null} st={stById[f.st]} onOpen={() => { setBell(false); setOpenId(f.id) }} />)}
+        </div>
+      </Sheet>}
       <Toast m={toast} />
     </div></div>
   )
