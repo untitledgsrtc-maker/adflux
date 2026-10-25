@@ -184,3 +184,11 @@
 .ox .ltsm .seg button{min-height:28px;height:28px;padding:0 9px;font-size:12px}
 /* head console on a desktop leaves the app's left menu (232px) visible; phones stay full screen */
 @media(min-width:861px){.ox.ox-head{left:232px}}
+
+/* Phone: the head console header has a fixed 68px height but its items wrap
+   (tabs, More, Give work, avatar), so they overlapped the first card. Let it grow. */
+@media(max-width:860px){
+  .ox .head>header{height:auto!important;padding:10px 14px!important;gap:10px 14px!important}
+  .ox .head>header nav{height:auto!important;width:100%;overflow-x:auto;flex-wrap:nowrap;order:3}
+  .ox .head>header nav .htab{height:44px;white-space:nowrap}
+}

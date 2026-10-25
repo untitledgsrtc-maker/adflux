@@ -21909,3 +21909,6 @@ At 390 px the Finance page content grew to 886 px (cards cut off at the right). 
 
 ### 509.2 Finance root cause (the real one)
 Fix 509.1 was not enough: the page wrappers were one-column grids (`display:grid; gap`) whose single column grows to its widest child (886 px). They now use `gridTemplateColumns: 'minmax(0, 1fr)'`. Rule: a one-column grid needs `minmax(0,1fr)` or it stretches past the screen.
+
+### 509.3 Operations head console header overlapped on phones
+At 390 px the header (`OpsHeadApp` `.head > header`, fixed 68 px height) had tabs, More, Give work and the avatar wrapping and sitting on top of the first card. A phone-only rule at the end of `ops2.css` lets the header grow and makes the tab row swipe sideways. Desktop unchanged. Second admin pass (38 more pages, 390 px): nothing sticks out sideways; `/lead-dashboard` never leaves "Loading lead dashboard…" (old orphan page, not in any menu); `/manager` says "team leads only" for admin (by design).
