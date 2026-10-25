@@ -411,10 +411,14 @@ export default function OpsTicketsV2() {
   function OpenTab() {
     // F4: one worst-first fault list (no grouped/individual toggle — the double
     // scroll is gone). Off-hours + no timer faults = the "all quiet" good state.
-    const assignedBlock = assignedTk.length > 0 && (
+    // a station already shown in the live list below must not appear twice: keep only
+    // photo requests, and faults for stations with no live row below (e.g. camera-only).
+    const liveDepots = new Set(cityScreens.map(sc => sc.depot_id))
+    const assignedShown = assignedTk.filter(a => a.source === 'sales_request' || !liveDepots.has(a.depot_id))
+    const assignedBlock = assignedShown.length > 0 && (
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t('assigned_to_you', lang)} <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-display)' }}>{assignedTk.length}</span></div>
-        <div style={gridWrap}>{assignedTk.map(a => {
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t('assigned_to_you', lang)} <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-display)' }}>{assignedShown.length}</span></div>
+        <div style={gridWrap}>{assignedShown.map(a => {
           const kind = a.source === 'auto_camera' ? t('kind_camera', lang) : a.source === 'sales_request' ? t('kind_photo', lang) : t('kind_offline', lang)
           const days = Math.max(0, Math.floor((Date.now() - new Date(a.created_at).getTime()) / 86400000))
           return (
