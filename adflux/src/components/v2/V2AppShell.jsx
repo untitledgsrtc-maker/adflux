@@ -91,7 +91,6 @@ const ADMIN_NAV = [
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/pending-approvals', label: 'Approvals',      icon: CheckSquare },
-  { to: '/ops-assign',        label: 'Give work to tech', icon: ClipboardList },
   // Phase 62.7 (20 May 2026) — Cities / Auto Districts / GSRTC
   // Stations entries dropped per owner directive. Same admin
   // surfaces still exist as tabs inside /master and via direct URL
@@ -306,7 +305,6 @@ const OPS_HEAD_NAV = [
   { to: '/ops-dashboard',     label: 'Live console',   icon: Tv },
   { to: '/ops-station',       label: 'Station board',  icon: LayoutDashboard },
   { to: '/ops-tickets',       label: 'Tickets',        icon: CheckSquare },
-  { to: '/ops-assign',        label: 'Give work',      icon: ClipboardList },
   // Phase 251 — personal section (same trio the sales rep gets).
   { to: '/ops-performance',   label: 'My Performance', icon: TrendingUp },
   { to: '/calls',             label: 'My Calls',       icon: Phone },
