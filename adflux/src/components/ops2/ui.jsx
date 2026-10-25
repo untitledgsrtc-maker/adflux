@@ -1,5 +1,6 @@
 // Operations design primitives (from the owner Claude Design file). Pure display, no data.
 import { useRef, useState } from 'react'
+import UserAvatar from '../common/UserAvatar'
 export const IC={
 phone:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
 camera:'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
@@ -100,8 +101,11 @@ export function ScrTile({ n, st, sel, onClick, small }) {
   return <button className={'stile t-' + m + (sel ? ' sel' : '') + (small ? ' sm' : '')} disabled={!onClick} onClick={onClick} aria-pressed={sel} aria-label={`Screen ${n}, ${st}`}>
     <span className="num">{n}</span>{!small && <Ic n={st === 'on' ? 'mon' : st === 'rest' ? 'moon' : st === 'tm' ? 'clock' : 'monoff'} s={14} />}</button>
 }
-export function Sheet({ title, sub, onClose, children, footer }) {
-  return <div className="scrim" onClick={onClose}><aside className="sheet" onClick={e => e.stopPropagation()} role="dialog" aria-label={typeof title === 'string' ? title : 'Details'}>
+export function Av({ name, userId, s = 36 }) {
+  return <UserAvatar name={name} userId={userId} size={s} style={{ background: 'var(--y)', color: '#0f172a', fontFamily: "'Space Grotesk',sans-serif", fontWeight: 600 }} />
+}
+export function Sheet({ title, sub, onClose, children, footer, side }) {
+  return <div className={'scrim' + (side ? ' side' : '')} onClick={onClose}><aside className={side ? 'panel' : 'sheet'} onClick={e => e.stopPropagation()} role="dialog" aria-label={typeof title === 'string' ? title : 'Details'}>
     <header className="row" style={{ justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--bd)', alignItems: 'flex-start' }}><div style={{ minWidth: 0 }}><h2 className="h" style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>{title}</h2>{sub && <div className="mu" style={{ marginTop: 2 }}>{sub}</div>}</div><Btn kind="gh" icon="x" title="Close" onClick={onClose} /></header>
     <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'grid', gap: 20, alignContent: 'start' }}>{children}</div>
     {footer && <footer style={{ display: 'flex', gap: 12, padding: '14px 20px', borderTop: '1px solid var(--bd)' }}>{footer}</footer>}</aside></div>

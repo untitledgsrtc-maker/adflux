@@ -174,3 +174,8 @@
 .ox .tech .stl .e{font-size:12px}
 .ox .frame{position:relative;border-radius:20px;overflow:hidden;border:1px solid var(--bd2);background:var(--bg)}
 .ox .tool{position:sticky;top:0;z-index:60;display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:12px 28px;background:#0a0f1c;border-bottom:1px solid var(--bd)}
+
+.ox .scrim.side{align-items:stretch}
+.ox .panel{max-width:100%}
+.ox .hgrid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px;align-items:start}
+@media(max-width:900px){.ox .hgrid{grid-template-columns:1fr}.ox .hgrid>*{grid-column:auto!important}.ox .swall{grid-template-columns:repeat(2,minmax(0,1fr))!important}}

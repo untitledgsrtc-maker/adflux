@@ -117,7 +117,7 @@ const ADMIN_NAV = [
   // Phase 230 — Operations (GSRTC LED screens). Admin opens the owner
   // cockpit (/ops-admin: trends · money · leaderboard · ticket-flow); a
   // "Live console" link there jumps to the Head's /ops-dashboard.
-  { to: '/ops-admin',         label: 'Operations',     icon: Tv },
+  { to: '/ops-command',       label: 'Operations',     icon: Tv },
   // Phase 365 — creative team timeclock + tasks (head view).
   { to: '/team-work',         label: 'Team Work',      icon: Briefcase },
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
@@ -299,11 +299,8 @@ const ACCOUNTS_NAV = [
 // Phase 230 (2026-08-25) — Operations module. Head → the desk console
 // (/ops-dashboard, Phase 2); exec → the mobile field app (/ops).
 const OPS_HEAD_NAV = [
-  { to: '/ops-command',       label: 'Command center', icon: Gauge },
-  { to: '/ops-down',          label: 'Down now',       icon: Activity },
+  { to: '/ops-command',       label: 'Operations',     icon: Gauge },   // Phase 508: one head console (Network / Faults / Team / Reports); old pages redirect here
   { to: '/ops-log',           label: 'Log issue',      icon: FileText },
-  { to: '/ops-dashboard',     label: 'Live console',   icon: Tv },
-  { to: '/ops-station',       label: 'Station board',  icon: LayoutDashboard },
   { to: '/ops-tickets',       label: 'Tickets',        icon: CheckSquare },
   // Phase 251 — personal section (same trio the sales rep gets).
   { to: '/ops-performance',   label: 'My Performance', icon: TrendingUp },
@@ -332,8 +329,6 @@ const MOBILE_NAV_OPS_EXEC = [
 ]
 const MOBILE_NAV_OPS_HEAD = [
   { to: '/ops-command',       label: 'Home',           icon: Gauge },
-  { to: '/ops-down',          label: 'Down now',       icon: Activity },
-  { to: '/ops-dashboard',     label: 'Console',        icon: Tv },
   { to: '/ops-log',           label: 'Log',            icon: FileText },
 ]
 

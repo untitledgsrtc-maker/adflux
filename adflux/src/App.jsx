@@ -73,20 +73,16 @@ const WorkV2 = lazyWithRetry(() => import('./pages/v2/WorkV2'))
 // Phase 230 — Operations module (screen-maintenance field app + Head overview).
 const OpsWorkV2 = lazyWithRetry(() => import('./pages/v2/OpsWorkV2'))
 // Phase 230 (Phase 2) — Operation Head desk console.
-const OpsHeadV2 = lazyWithRetry(() => import('./pages/v2/OpsHeadV2'))
-const OpsCommandV2 = lazyWithRetry(() => import('./pages/v2/OpsCommandV2'))
+const OpsHeadApp = lazyWithRetry(() => import('./pages/v2/OpsHeadApp'))
 // Command center per-tech drill-down (2026-08-28) — tap a tech → their detail.
 const OpsTechV2 = lazyWithRetry(() => import('./pages/v2/OpsTechV2'))
 // Command center approvals (2026-08-28) — head approves the field team's leave + TA/DA.
 const OpsApprovalsV2 = lazyWithRetry(() => import('./pages/v2/OpsApprovalsV2'))
 // Phase 230 (Phase 6) — admin Operations owner cockpit.
-const OpsAdminV2 = lazyWithRetry(() => import('./pages/v2/OpsAdminV2'))
 // Phase 230 — per-station Operations board (KPIs + screen wall + contacts + issue ref).
-const OpsStationV2 = lazyWithRetry(() => import('./pages/v2/OpsStationV2'))
 // Ops redesign (2026-08-27) — the primary "Log a screen issue" screen.
 const OpsLogV2 = lazyWithRetry(() => import('./pages/v2/OpsLogV2'))
 // Ops redesign (2026-08-27) — "Down now" live board (head home).
-const OpsDownV2 = lazyWithRetry(() => import('./pages/v2/OpsDownV2'))
 // Ops redesign (2026-08-27) — exec ticket dashboard (Open/In process/Fixed).
 const OpsTicketsV2 = lazyWithRetry(() => import('./pages/v2/OpsTicketsV2'))
 const OpsAssignV2 = lazyWithRetry(() => import('./pages/v2/OpsAssignV2'))
@@ -521,13 +517,13 @@ export default function App() {
           <Route path="/work"                      element={<StaffToMyWork><WorkV2 /></StaffToMyWork>} />
           {/* Phase 230 — Operations field app (exec) + Head desk console. */}
           <Route path="/ops"                       element={<RequireOps execToHome><OpsWorkV2 /></RequireOps>} />
-          <Route path="/ops-command"               element={<RequireOps><OpsCommandV2 /></RequireOps>} />
+          <Route path="/ops-command"               element={<RequireOps><OpsHeadApp /></RequireOps>} />
           <Route path="/ops-tech/:userId"          element={<RequireOps><OpsTechV2 /></RequireOps>} />
           <Route path="/ops-approvals"             element={<RequireOps><OpsApprovalsV2 /></RequireOps>} />
-          <Route path="/ops-dashboard"             element={<RequireOps><OpsHeadV2 /></RequireOps>} />
+          <Route path="/ops-dashboard"             element={<RequireOps><Navigate to="/ops-command" replace /></RequireOps>} />
           <Route path="/ops-log"                   element={<RequireOps execToHome><OpsLogV2 /></RequireOps>} />
-          <Route path="/ops-down"                  element={<RequireOps execToHome><OpsDownV2 /></RequireOps>} />
-          <Route path="/ops-station"               element={<RequireOps execToHome><OpsStationV2 /></RequireOps>} />
+          <Route path="/ops-down"                  element={<RequireOps execToHome><Navigate to="/ops-command" replace /></RequireOps>} />
+          <Route path="/ops-station"               element={<RequireOps execToHome><Navigate to="/ops-command" replace /></RequireOps>} />
           <Route path="/ops-tickets"               element={<RequireOps execToHome><OpsTicketsV2 /></RequireOps>} />
           <Route path="/ops-assign"                element={<RequireOfficeAssign><OpsAssignV2 /></RequireOfficeAssign>} />
           <Route path="/ops-performance"           element={<RequireOps><OpsMyPerformanceV2 /></RequireOps>} />
@@ -539,7 +535,7 @@ export default function App() {
           <Route path="/team-work"                 element={<TeamWorkV2 />} />
           <Route path="/work-profile"              element={<WorkProfileV2 />} />
           <Route path="/ops-fix/:depotId"          element={<RequireOps execToHome><OpsFixV2 /></RequireOps>} />
-          <Route path="/ops-admin"                 element={<RequirePrivileged><OpsAdminV2 /></RequirePrivileged>} />
+          <Route path="/ops-admin"                 element={<RequirePrivileged><Navigate to="/ops-command" replace /></RequirePrivileged>} />
           {/* Phase 61 — Manager dashboard. Shows the team-lead's
               direct reports + today's metrics. Sales head + TC head
               land here on app open via RootRedirect. */}
