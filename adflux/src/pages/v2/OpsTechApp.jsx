@@ -59,6 +59,7 @@ export default function OpsTechApp() {
   const [tab, setTab] = useState('today')
   const [openId, setOpenId] = useState(null)
   const [ft, setFt] = useState('open')
+  const [vp, setVp] = useState('off')
   const [sheet, setSheet] = useState(null)
   const [menu, setMenu] = useState(false)
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)
@@ -210,8 +211,14 @@ export default function OpsTechApp() {
           <div className="mu sm"><G t="11:30 પછી અડધો દિવસ · After 11:30 it is a half day" /></div></section>)}
       {!onHours && <div className="card" style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}><Tile n="moon" s={40} /><Bi g="રાત્રે 9 થી સવારે 7 સ્ક્રીન આરામ કરે છે. રાત્રે કંઈ ગણાતું નથી." e="Screens rest 9 PM to 7 AM. Off at night is normal. Only a screen still on after 9 PM is a timer fault." /></div>}
       <div className="row" style={{ justifyContent: 'space-between', marginTop: 4 }}><span className="lbl"><G t="આજની મુલાકાત · Visit plan" /></span></div>
-      {plan.length === 0 && <div className="okrow"><Ic n="checkc" /><Bi g="બધા સ્ક્રીન ચાલુ છે" e="All screens are working" /></div>}
-      {plan.map((f, i) => <VisitCard key={f.id} f={f} i={i} st={stById[f.st]} onOpen={() => setOpenId(f.id)} />)}
+      {(() => {
+        const offPlan = plan.filter(f => f.src !== 'cam'), camPlan = plan.filter(f => f.src === 'cam'), shown = vp === 'cam' ? camPlan : offPlan
+        return <>
+          <Seg full value={vp} onChange={setVp} opts={[['off', <Bi g="સ્ક્રીન બંધ" e={<><span className="num">{offPlan.length}</span> Screen offline</>} />], ['cam', <Bi g="કૅમેરા બંધ" e={<><span className="num">{camPlan.length}</span> Camera off</>} />]]} />
+          {shown.length === 0 && <div className="okrow"><Ic n="checkc" /><Bi g={vp === 'cam' ? 'બધા કૅમેરા ચાલુ છે' : 'બધા સ્ક્રીન ચાલુ છે'} e={vp === 'cam' ? 'All cameras are working' : 'All screens are working'} /></div>}
+          {shown.map((f, i) => <VisitCard key={f.id} f={f} i={i} st={stById[f.st]} onOpen={() => setOpenId(f.id)} />)}
+        </>
+      })()}
       {jobs.length > 0 && <span className="lbl" style={{ marginTop: 4 }}><G t="બીજું કામ · Other jobs" /></span>}
       {jobs.map(f => <VisitCard key={f.id} f={f} st={stById[f.st]} onOpen={() => setOpenId(f.id)} />)}
     </div>
