@@ -324,8 +324,9 @@ const OPS_EXEC_NAV = [
 // trio in the bottom bar). The trio lives on the desktop sidebar + the ⋯ drawer.
 const MOBILE_NAV_OPS_EXEC = [
   { to: '/ops-home',          label: 'Home',           icon: LayoutDashboard },
-  { to: '/ops-down',          label: 'Down now',       icon: Activity },
-  { to: '/ops-log',           label: 'Log',            icon: FileText },
+  { to: '/ops-performance',   label: 'Performance',    icon: Gauge },
+  { to: '/calls',             label: 'Calls',          icon: Phone },
+  { to: '/my-offer',          label: 'Offer',          icon: Wallet },
 ]
 const MOBILE_NAV_OPS_HEAD = [
   { to: '/ops-command',       label: 'Home',           icon: Gauge },
