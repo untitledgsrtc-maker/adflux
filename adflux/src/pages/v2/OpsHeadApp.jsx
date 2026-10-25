@@ -147,13 +147,13 @@ export default function OpsHeadApp() {
   const openS = s => setPanel({ k: 's', s })
   const openScr = (s, n) => setPanel({ k: 'scr', s, n })
 
-  if (loading) return <div className="ox"><div className="head"><div className="mu" style={{ padding: 48, textAlign: 'center' }}>Loading...</div></div></div>
+  if (loading) return <div className="ox ox-head"><div className="head"><div className="mu" style={{ padding: 48, textAlign: 'center' }}>Loading...</div></div></div>
 
   const T = [['network', 'Network', 'gauge'], ['faults', 'Faults', 'list'], ['team', 'Team', 'users'], ['reports', 'Reports', 'chart']]
   const now = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div className="ox" style={{ overflowY: 'auto' }}>
+    <div className="ox ox-head" style={{ overflowY: 'auto' }}>
       <div className="head">
         <header className="row" style={{ padding: '0 28px', height: 68, borderBottom: '1px solid var(--bd)', gap: 24, flexWrap: 'wrap' }}>
           <span className="row" style={{ gap: 10, fontWeight: 600, fontSize: 17 }}><span className="logo">A</span>Operations</span>

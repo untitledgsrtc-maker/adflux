@@ -182,3 +182,5 @@
 
 .ox .ltsm .seg{padding:2px;border-radius:999px}
 .ox .ltsm .seg button{min-height:28px;height:28px;padding:0 9px;font-size:12px}
+/* head console on a desktop leaves the app's left menu (232px) visible; phones stay full screen */
+@media(min-width:861px){.ox.ox-head{left:232px}}
