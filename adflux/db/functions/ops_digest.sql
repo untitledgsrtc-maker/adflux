@@ -377,9 +377,9 @@ BEGIN
       BEGIN
         PERFORM public.enqueue_push(
           h.id,
-          'ટિકિટ મંજૂરીની રાહ જુએ છે',
-          COALESCE(v_depot, '') || ' - ખરાબી ઠીક થઈ, જોઈને મંજૂર કરો',
-          '/ops-dashboard',
+          'ખરાબી ઠીક થઈ',
+          COALESCE(v_depot, '') || ' - ટેકનિશિયને ખરાબી ઠીક કરી',
+          '/ops-tickets?tab=fixed',
           'ops-resolved-' || NEW.id::text);
       EXCEPTION WHEN OTHERS THEN
         RAISE WARNING 'ops_ticket_resolved_push: push failed for %: %', h.id, SQLERRM;

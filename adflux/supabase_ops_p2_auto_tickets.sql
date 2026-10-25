@@ -43,9 +43,8 @@ NOTIFY pgrst, 'reload schema';
 --   * Once ops_notify_outages() is installed it OWNS the technician push (20-minute debounce, one push
 --     per technician, quiet hours). The engine's own push then stays SILENT, otherwise one outage would
 --     produce two pushes. Until it is installed the engine keeps its push (now quiet-hours gated).
--- OPEN OWNER DECISION: the WhatsApp has no debounce - it still fires at ticket-open (09:00-20:59) the
---   moment one screen reads offline. If a flicker should not WhatsApp the technician, add the same
---   20-minute test as ops_notify_outages (offline AND last_response_at older than 20 minutes) here.
+-- DECIDED (owner 25 Oct 2026): a ticket (and so its WhatsApp) opens only when a screen has been offline for
+--   20+ minutes (offline AND last_response_at older than 20 minutes) - same test as ops_notify_outages.
 CREATE OR REPLACE FUNCTION public.ops_reconcile_offline_tickets()
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -55,6 +54,7 @@ AS $$
 DECLARE
   d           record;
   v_down      int;
+  v_down20    int;   -- offline for 20+ minutes (a flicker does not open a ticket or send a WhatsApp)
   v_ticket    uuid;
   v_row       int;
   v_opened    int := 0;
@@ -79,10 +79,14 @@ BEGIN
     SELECT count(*) INTO v_down
       FROM public.ops_screens
      WHERE depot_id = d.id AND is_active AND status = 'offline';
+    SELECT count(*) INTO v_down20
+      FROM public.ops_screens
+     WHERE depot_id = d.id AND is_active AND status = 'offline'
+       AND (last_response_at IS NULL OR last_response_at < now() - interval '20 minutes');
 
     IF v_down > 0 THEN
       -- ON-HOURS only: off-hours, offline is normal (timer) → never auto-open (§250).
-      IF v_on_hours AND NOT EXISTS (
+      IF v_on_hours AND v_down20 > 0 AND NOT EXISTS (
         SELECT 1 FROM public.ops_tickets
          WHERE depot_id = d.id AND source = 'auto_offline'
            AND status IN ('open','in_progress')
@@ -154,15 +158,17 @@ END $$;
 -- in_progress -> resolved (assigned tech OR head/admin) — BLOCKED while offline
 CREATE OR REPLACE FUNCTION public.ops_ticket_resolve(p_ticket uuid, p_cause text DEFAULT NULL, p_notes text DEFAULT NULL)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
-DECLARE v_role text := public.get_my_role(); v_assigned uuid; v_status text; v_depot uuid;
+DECLARE v_role text := public.get_my_role(); v_assigned uuid; v_status text; v_depot uuid; v_src text; v_type text;
 BEGIN
-  SELECT assigned_to, status, depot_id INTO v_assigned, v_status, v_depot FROM public.ops_tickets WHERE id = p_ticket;
+  SELECT assigned_to, status, depot_id, source, type INTO v_assigned, v_status, v_depot, v_src, v_type FROM public.ops_tickets WHERE id = p_ticket;
   IF NOT FOUND THEN RAISE EXCEPTION 'ticket not found'; END IF;
   IF v_role IS NULL OR NOT (v_role IN ('admin','co_owner','operation_head') OR (v_assigned IS NOT NULL AND v_assigned = auth.uid())) THEN
     RAISE EXCEPTION 'not allowed';
   END IF;
   IF v_status <> 'in_progress' THEN RAISE EXCEPTION 'ticket must be in progress to close'; END IF;
-  IF EXISTS (SELECT 1 FROM public.ops_screens WHERE depot_id = v_depot AND is_active AND status = 'offline') THEN
+  -- camera tickets (owner 25 Oct 2026): offline screens are a different fault, so they do not block closing a camera ticket
+  IF NOT (v_src = 'auto_camera' OR v_type = 'camera_fault')
+     AND EXISTS (SELECT 1 FROM public.ops_screens WHERE depot_id = v_depot AND is_active AND status = 'offline') THEN
     RAISE EXCEPTION 'screens still offline — cannot close yet';
   END IF;
   UPDATE public.ops_tickets
