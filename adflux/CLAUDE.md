@@ -21898,3 +21898,5 @@ Owner approved the mockup `_design_reference/ops_technician_flow_mockup.html`; b
 Note (508 follow-up): language toggle (ગુ / EN, default English) in the technician app and head console header; stored in localStorage ops2_lang; Bi shows English only in EN, Gujarati-first with English under in ગુ. Head console body text is English either way.
 
 Note (508 follow-up 2): station names on technician visit cards restored (EN mode had hidden them behind `Bi`); `G`/`useLg` in ops2/ui.jsx make the hardcoded "ગુ · EN" strings show English only in EN mode (Pill, Hero, Card, Toast, labels in OpsTechApp). Rule: a station/depot name is data, never wrap it in `Bi`.
+
+Note (508 follow-up 3): technician app (OpsTechApp) now has a menu button (3 lines) opening My Performance / My Calls / My Offer / My Work / My profile, and the fault page shows "Who to call" at once with an "Add number" button (shared DepotContactsModal, §325). Training pill sits higher on ops screens.
