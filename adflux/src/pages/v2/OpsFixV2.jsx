@@ -14,9 +14,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Loader2, ArrowLeft, Phone, WifiOff, Wifi, Check, Camera, AlertTriangle, Clock, Wrench } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { t, getOpsLang, setOpsLang, numL } from '../../utils/opsStrings'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
-import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { dialPhone } from '../../utils/openExternal'
 import { normalizeIndianPhone } from '../../utils/phone'
 
@@ -146,7 +146,8 @@ export default function OpsFixV2() {
         supabase.from('ops_issue_types').select('id, issue_en, issue_gu, solution_en, solution_gu, display_order').eq('is_active', true).order('display_order'),
         pQ, fQ,
       ])
-      if (dRes.error) throw dRes.error
+      const bad = [dRes, sRes, cRes, iRes, pRes, fRes].find(r => r.error)
+      if (bad) throw bad.error
       setDepot(dRes.data || null)
       setScreens([...(sRes.data || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })))
       setContacts(cRes.data || [])
@@ -158,12 +159,7 @@ export default function OpsFixV2() {
   }, [depotId, uid, isHead])
 
   useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false) })() }, [load])
-  useEffect(() => {
-    const again = () => { if (document.visibilityState === 'visible') load() }
-    const id = setInterval(again, 60000)
-    document.addEventListener('visibilitychange', again); window.addEventListener('focus', again)
-    return () => { clearInterval(id); document.removeEventListener('visibilitychange', again); window.removeEventListener('focus', again) }
-  }, [load])
+  useAutoRefresh(load, { userId: uid, enabled: !!uid, pollSeconds: 60 })
 
   const procScreenIds = useMemo(() => new Set(proc.map(p => p.screen_id).filter(Boolean)), [proc])
   const offScreens = useMemo(() => screens.filter(s => s.status === 'offline' && !procScreenIds.has(s.id)), [screens, procScreenIds])
@@ -199,7 +195,8 @@ export default function OpsFixV2() {
     savingRef.current = true; setBusy(true)
     try {
       // one screen = one open job: skip screens already in process
-      const { data: dup } = await supabase.from('ops_tickets').select('screen_id').eq('source', 'manual').eq('status', 'in_progress').in('screen_id', pickedIds)
+      const { data: dup, error: dupErr } = await supabase.from('ops_tickets').select('screen_id').eq('source', 'manual').eq('status', 'in_progress').in('screen_id', pickedIds)
+      if (dupErr) { toastError(dupErr, t('save_failed', lang)); return }
       const taken = new Set((dup || []).map(r => r.screen_id))
       const ids = pickedIds.filter(id => !taken.has(id))
       if (!ids.length) { toastError(new Error(''), t('already_in_proc', lang)); return }
@@ -282,14 +279,12 @@ export default function OpsFixV2() {
 
   async function markFixedMyself() {
     if (busy) return
-    if (procBackOn < proc.length) {
-      const ok = await confirmDialog({ title: T('fixed_now', lang), message: t('still_offline_q', lang), confirmLabel: t('mark_fixed', lang), cancelLabel: t('cancel', lang) })
-      if (!ok) return
-    }
     setBusy(true)
     try {
-      const { error } = await supabase.from('ops_tickets').update({ status: 'resolved', resolved_at: new Date().toISOString(), cant_fix_reason: null }).in('id', proc.map(p => p.id))
-      if (error) { toastError(error, t('save_failed', lang)); return }
+      for (const p of proc) {
+        const { error } = await supabase.rpc('ops_ticket_resolve', { p_ticket: p.id })
+        if (error) { toastError(error, t('still_offline_q', lang)); await load(); return }
+      }
       toastSuccess(t('fixed_word', lang)); await load(); setTab('fixed')
     } finally { setBusy(false) }
   }
@@ -387,7 +382,7 @@ export default function OpsFixV2() {
                           <div style={{ fontSize: 13, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{c.phone || '—'}</div>
                         </div>
                         <button onClick={() => callNow(c)} disabled={!c.phone} aria-label={t('call', lang)}
-                          style={{ minWidth: 104, minHeight: 48, borderRadius: 12, border: 'none', background: c.phone ? 'var(--success)' : 'var(--surface-3)', color: c.phone ? '#fff' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 15, fontWeight: 700, cursor: c.phone ? 'pointer' : 'default' }}>
+                          style={{ minWidth: 104, minHeight: 48, borderRadius: 12, border: 'none', background: c.phone ? 'var(--success)' : 'var(--surface-3)', color: c.phone ? 'var(--text)' : 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 15, fontWeight: 700, cursor: c.phone ? 'pointer' : 'default' }}>
                           <Phone size={17} /> {t('call', lang)}
                         </button>
                       </div>
@@ -470,7 +465,7 @@ export default function OpsFixV2() {
                         <div style={{ fontWeight: 700, fontSize: 15 }}>{c.name || nm(c, 'role')}</div>
                         <div style={{ fontSize: 13, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{c.phone || '—'}</div>
                       </div>
-                      <button onClick={() => callAgain(c)} disabled={!c.phone} style={{ minWidth: 120, minHeight: 48, borderRadius: 12, border: 'none', background: c.phone ? 'var(--success)' : 'var(--surface-3)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14.5, fontWeight: 700, cursor: 'pointer' }}>
+                      <button onClick={() => callAgain(c)} disabled={!c.phone} style={{ minWidth: 120, minHeight: 48, borderRadius: 12, border: 'none', background: c.phone ? 'var(--success)' : 'var(--surface-3)', color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14.5, fontWeight: 700, cursor: 'pointer' }}>
                         <Phone size={16} /> {T('call_again', lang)}
                       </button>
                     </div>
@@ -485,7 +480,7 @@ export default function OpsFixV2() {
                   <textarea value={cantText} onChange={e => setCantText(e.target.value)} rows={3} style={{ ...field, resize: 'none' }} />
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                     <button className="lead-btn" onClick={() => setCantOpen(false)} style={{ flex: 1, minHeight: 44 }}>{t('cancel', lang)}</button>
-                    <button onClick={sendCant} disabled={busy} style={{ flex: 1, minHeight: 44, borderRadius: 999, border: 'none', background: 'var(--danger)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>{T('send', lang)}</button>
+                    <button onClick={sendCant} disabled={busy} style={{ flex: 1, minHeight: 44, borderRadius: 999, border: 'none', background: 'var(--danger)', color: 'var(--text)', fontWeight: 700, cursor: 'pointer' }}>{T('send', lang)}</button>
                   </div>
                 </div>
               ) : (

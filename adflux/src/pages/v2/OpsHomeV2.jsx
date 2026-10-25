@@ -204,7 +204,7 @@ export default function OpsHomeV2() {
       {!noDepots && (
         <>
           {/* HERO — only three numbers: total down, in process, fixed today */}
-          <div style={{ borderRadius: 16, padding: '18px 14px', marginBottom: 14, background: 'linear-gradient(135deg,#0f766e,#134e4a)', color: '#fff', display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
+          <div className="lead-hero-strip" style={{ padding: '18px 14px', marginBottom: 14, display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
             <HeroNum n={onHours ? offNow : 0} label={lang === 'gu' ? 'કુલ બંધ' : 'Total down'} big onClick={() => nav('/ops-down')} />
             <HeroNum n={s.inProc ?? 0} label={lang === 'gu' ? 'કામ ચાલુ' : 'In process'} onClick={() => nav('/ops-tickets?tab=proc')} />
             <HeroNum n={s.fixedToday ?? 0} label={lang === 'gu' ? 'આજે ઠીક' : 'Fixed today'} onClick={() => nav('/ops-tickets?tab=fixed')} />
@@ -273,8 +273,8 @@ export default function OpsHomeV2() {
 
 function HeroNum({ n, label, big, onClick }) {
   return (
-    <button onClick={onClick} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, font: 'inherit', minHeight: 64 }}>
-      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: big ? 52 : 38, lineHeight: 1, color: big ? 'var(--accent)' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{n}</div>
+    <button onClick={onClick} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, font: 'inherit', minHeight: 64 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: big ? 52 : 38, lineHeight: 1, color: big ? 'var(--accent)' : 'inherit', fontVariantNumeric: 'tabular-nums' }}>{n}</div>
       <div style={{ fontSize: 13, fontWeight: 600, marginTop: 8, opacity: 0.92 }}>{label}</div>
     </button>
   )

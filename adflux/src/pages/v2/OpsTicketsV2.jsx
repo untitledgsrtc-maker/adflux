@@ -195,8 +195,14 @@ export default function OpsTicketsV2() {
     let alive = true
     const ids = faultIdsKey ? faultIdsKey.split(',') : []
     if (!ids.length) { setFaultCounts({}); return undefined }
-    supabase.from('ops_screen_fault_counts').select('screen_id, faults_total').in('screen_id', ids.slice(0, 300))
-      .then(({ data, error }) => { if (alive && !error) setFaultCounts(Object.fromEntries((data || []).map(r => [r.screen_id, Number(r.faults_total) || 0]))) }, () => {})
+    const chunks = []
+    for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100))
+    Promise.all(chunks.map(c => supabase.from('ops_screen_fault_counts').select('screen_id, faults_total').in('screen_id', c)))
+      .then(rs => {
+        if (!alive || rs.some(r => r.error)) return
+        // faults_total includes the fault happening now, so "before" = total - 1
+        setFaultCounts(Object.fromEntries(rs.flatMap(r => r.data || []).map(r => [r.screen_id, Math.max(0, (Number(r.faults_total) || 0) - 1)])))
+      }, () => {})
     return () => { alive = false }
   }, [faultIdsKey])
   const cityProc = useMemo(() => cityId ? proc.filter(p => p.depot_id === cityId) : proc, [proc, cityId])
@@ -413,8 +419,9 @@ export default function OpsTicketsV2() {
     // scroll is gone). Off-hours + no timer faults = the "all quiet" good state.
     // a station already shown in the live list below must not appear twice: keep only
     // photo requests, and faults for stations with no live row below (e.g. camera-only).
-    const liveDepots = new Set(cityScreens.map(sc => sc.depot_id))
-    const assignedShown = assignedTk.filter(a => a.source === 'sales_request' || !liveDepots.has(a.depot_id))
+    // only an auto_offline ticket on-hours is already covered by the live (offline) row of its station
+    const liveDepots = new Set(onHours ? cityScreens.map(sc => sc.depot_id) : [])
+    const assignedShown = assignedTk.filter(a => (!cityId || a.depot_id === cityId) && (a.source !== 'auto_offline' || !liveDepots.has(a.depot_id)))
     const assignedBlock = assignedShown.length > 0 && (
       <div style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t('assigned_to_you', lang)} <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-display)' }}>{assignedShown.length}</span></div>
@@ -473,7 +480,7 @@ export default function OpsTicketsV2() {
                 {one ? `${r.list[0].name || `${t('screen', lang)} ${screenNo[r.list[0].id] || ''}`} · ` : ''}{typeLabel} · {ageStr}
               </div>
               {(() => {
-                const rep = r.list.filter(x => (faultCounts[x.id] || 0) >= 2).sort((a, b) => (faultCounts[b.id] || 0) - (faultCounts[a.id] || 0)).slice(0, 2)
+                const rep = r.list.filter(x => (faultCounts[x.id] || 0) >= 1).sort((a, b) => (faultCounts[b.id] || 0) - (faultCounts[a.id] || 0)).slice(0, 2)
                 return rep.length ? <div style={{ fontSize: 12, color: 'var(--warning)', marginTop: 3 }}>{rep.map(x => `${x.name || t('screen', lang)} - ${faultCounts[x.id]}x`).join(' · ')} {lang === 'gu' ? 'ખરાબ થયેલ' : 'faulty before'}</div> : null
               })()}
             </div>

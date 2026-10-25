@@ -11,7 +11,7 @@ Untitled Advertising runs about 265–300 LED advertising screens inside Gujarat
 | Role | Who today | Device | Language | Main job |
 |---|---|---|---|---|
 | Operation executive ("field tech") | Gohil Ankitkumar, Gulshan Yadav (about 10 stations each) | Android phone (the app) | Gujarati first, low reading level | See what is off at my stations, call the right person, fix, log |
-| Operation head | Dixita (desk) | Laptop + phone | English / Gujarati | Run the network, give work, watch the team, handle "can't fix" |
+| Operation head | Role holder to be confirmed (the earlier Dixita test account was deactivated, section 489; Dixita Gohel is office admin) | Laptop + phone | English / Gujarati | Run the network, give work, watch the team, handle "can't fix" |
 | Admin / owner | Brijesh | Laptop + phone | English | Is the network healthy, what does it cost, who is performing |
 | Office (office admin, HR, accounts) | Dixita Gohel, Riya, Diya | Laptop | English | Give a technician a job (fault, campaign photo, office work) |
 | Sales rep | Sales team | Phone | English | Ask for a live photo of a running campaign |
