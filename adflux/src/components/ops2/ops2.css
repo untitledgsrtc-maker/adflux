@@ -179,3 +179,6 @@
 .ox .panel{max-width:100%}
 .ox .hgrid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px;align-items:start}
 @media(max-width:900px){.ox .hgrid{grid-template-columns:1fr}.ox .hgrid>*{grid-column:auto!important}.ox .swall{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+
+.ox .ltsm .seg{padding:2px;border-radius:999px}
+.ox .ltsm .seg button{min-height:28px;height:28px;padding:0 9px;font-size:12px}

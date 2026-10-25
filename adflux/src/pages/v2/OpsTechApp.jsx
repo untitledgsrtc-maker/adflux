@@ -17,6 +17,7 @@ import { estVariable } from '../../utils/opsPay'
 import { dialPhone } from '../../utils/openExternal'
 import { normalizeIndianPhone } from '../../utils/phone'
 import { captureGps } from '../../utils/captureGps'
+import NotificationPanel from '../../components/v2/NotificationPanel'
 import DepotContactsModal from '../../components/ops/DepotContactsModal'
 import '../../components/ops2/ops2.css'
 import { Ic, Bi, Btn, Pill, Tile, Ring, Hero, StatTile, Card, Seg, Sel, Bar, ScrTile, Sheet, Toast, useToast, Photo, Swipe, LangToggle, G } from '../../components/ops2/ui'
@@ -181,7 +182,7 @@ export default function OpsTechApp() {
   const header = (
     <div className="row" style={{ justifyContent: 'space-between', padding: '8px 16px', minHeight: 56 }}>
       <span className="row" style={{ gap: 10 }}><Btn kind="gh" icon="menu" title="Menu" onClick={() => window.dispatchEvent(new Event('open-shell-drawer'))} /><span className="logo">A</span><Bi g="ઓપરેશન" e={profile?.name || ''} /></span>
-      <span className="row" style={{ gap: 8 }}><LangToggle />{online ? <Pill tone="ok" icon="wifi">Live</Pill> : <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}</span>
+      <span className="row" style={{ gap: 6 }}><span className="ltsm"><LangToggle /></span>{!online && <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}<NotificationPanel /></span>
     </div>)
 
   let body
