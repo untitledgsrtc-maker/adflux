@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, MapPin, ChevronRight, FilePlus, Activity, AlertCircle, Monitor, Wifi, WifiOff, VideoOff, ClipboardList } from 'lucide-react'
+import { Loader2, MapPin, ChevronRight, FilePlus, AlertCircle, Wifi, VideoOff } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
@@ -171,11 +171,14 @@ export default function OpsHomeV2() {
   if (err) return <div className="lead-root"><div style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 12, padding: '12px 16px', fontSize: 13 }}>{err} <button className="lead-btn" onClick={() => { setErr(''); load() }} style={{ marginLeft: 10 }}>{t('retry', lang)}</button></div></div>
 
   const s = stats || {}
-  const top = cityFaults.slice(0, 4)
   const noDepots = depots.length === 0
-  const stationCount = cityId ? 1 : depots.length
-  const downHref = cityId ? `/ops-down?depot=${cityId}` : '/ops-down'   // carry the city filter into the Down-now board
-  const camHref = cityId ? `/ops-down?view=camera&depot=${cityId}` : '/ops-down?view=camera'   // camera-off tile → the cameras-off board
+  const offNow = net.offline
+  // one row per station: worst first; carry how many days it has been dark (from the screens' own last response)
+  const agedBy = Object.fromEntries(cityAged.map(a => [a.did, a]))
+  const stations = cityFaults.map(r => ({ ...r, days: agedBy[r.did]?.days || 0 }))
+  const camHref = cityId ? `/ops-down?view=camera&depot=${cityId}` : '/ops-down?view=camera'
+  const heroGu = onHours ? 'સ્ક્રીન બંધ' : 'સ્ક્રીન રાત્રે બંધ'
+  const heroEn = onHours ? 'screens off' : 'screens off for the night'
 
   return (
     <div className="lead-root">
@@ -187,14 +190,12 @@ export default function OpsHomeV2() {
         <button className="lead-btn" onClick={flip} style={{ fontWeight: 700 }}>{lang === 'gu' ? 'EN' : 'ગુ'}</button>
       </div>
 
-      {/* check-in nudge */}
       {!checkedIn && (
-        <button onClick={() => nav('/ops')} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--accent-soft, rgba(255,230,0,.12))', border: '1px solid var(--accent)', color: 'var(--text)', borderRadius: 12, padding: '11px 14px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', marginBottom: 14, textAlign: 'left' }}>
-          <AlertCircle size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />{t('start_day_ban', lang)}<ChevronRight size={16} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
+        <button onClick={() => nav('/ops')} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 12, padding: '9px 14px', fontSize: 12.5, cursor: 'pointer', marginBottom: 12, textAlign: 'left' }}>
+          <AlertCircle size={15} style={{ flexShrink: 0 }} />{t('start_day_ban', lang)}<ChevronRight size={15} style={{ marginLeft: 'auto' }} />
         </button>
       )}
 
-      {/* no stations assigned — the §253 no-data root cause, told plainly */}
       {noDepots && (
         <div className="lead-card" style={{ padding: '18px 16px', textAlign: 'center', marginBottom: 14 }}>
           <MapPin size={26} style={{ color: 'var(--text-subtle, var(--text-muted))' }} />
@@ -203,173 +204,83 @@ export default function OpsHomeV2() {
         </div>
       )}
 
-      {/* city */}
-      {depots.length > 1 && (
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}><MapPin size={13} />{t('city', lang)}</div>
-          <select value={cityId} onChange={e => setCityId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--accent)', borderRadius: 10, padding: '11px 12px', fontSize: 15 }}>
-            <option value="">{lang === 'gu' ? 'બધા સ્ટેશન' : 'All my stations'}</option>
-            {depots.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        </div>
-      )}
-
-      {/* network snapshot — every tile taps into the live board */}
       {!noDepots && (
-        <div className="lead-card" style={{ padding: '15px 15px 13px', marginBottom: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }}>
-            <span style={{ fontSize: 16, fontWeight: 700 }}>{t('my_network', lang)}</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-muted)' }}>
-              <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--success)', boxShadow: '0 0 0 4px var(--success-soft)' }} />{t('live_10min', lang)}
-            </span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11 }}>
-            <SnapTile icon={Monitor} n={net.total} label={t('total_screens', lang)} tone="neutral" onClick={() => nav(downHref)} />
-            <SnapTile icon={Wifi} n={net.online} label={t('online', lang)} tone="success" onClick={() => nav(downHref)} />
-            <SnapTile icon={WifiOff} n={net.offline} label={t('offline', lang)} tone={onHours ? 'danger' : 'neutral'} onClick={() => nav(downHref)} />
-            <SnapTile icon={VideoOff} n={net.cameraOff != null ? net.cameraOff : '—'} label={t('camera_off', lang)} tone="warning" onClick={() => nav(camHref)} />
-          </div>
-          {/* off-hours: offline is normal (timer, §250) — not an alarm */}
-          {!onHours && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 10, textAlign: 'center' }}>{t('all_quiet', lang)}</div>}
-          <div style={{ display: 'flex', marginTop: 13, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-            <SubStat val={stationCount} label={t('stations_word', lang)} onClick={() => nav(downHref)} />
-            <SubStat val={s.fixedToday ?? 0} label={t('fixed_today_w', lang)} border onClick={() => nav('/ops-tickets?tab=fixed')} />
-            <SubStat val={s.inProc ?? 0} label={t('in_process', lang)} border onClick={() => nav('/ops-tickets?tab=proc')} />
-          </div>
-        </div>
-      )}
-
-      {/* evening report — from 19:00 IST (small "view" button before that). Read-only:
-          shows my day + a Share on WhatsApp button; writes nothing. Kept out of the
-          no-stations empty state so that stays clean (§253). */}
-      {!noDepots && <OpsFaultReportCard kind="exec" lang={lang} />}
-      {!noDepots && <OpsEveningCard lang={lang} />}
-
-      {/* Down > 1 day — genuine multi-day faults (auto tickets opened a previous day,
-          §259/§264). Shown even off-hours; these are broken, not a night timer-off. */}
-      {!noDepots && cityAged.length > 0 && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'inline-flex', alignItems: 'center', gap: 5 }}><AlertCircle size={13} />{lang === 'gu' ? '1 દિવસથી વધુ બંધ' : 'Down over 1 day'}</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-            {cityAged.map(r => (
-              <button key={r.id} onClick={() => nav(`/ops-fix/${r.did}`)} className="lead-card" style={{ padding: '12px 13px', borderLeft: '4px solid var(--danger)', display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{r.count} {t('screens_word', lang)} · {lang === 'gu' ? 'બંધ' : 'down'}</div>
-                </div>
-                <span style={{ background: 'var(--danger-soft)', color: 'var(--danger)', borderRadius: 999, padding: '4px 10px', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{r.days}{lang === 'gu' ? ' દિવસ' : 'd'}</span>
-                <ChevronRight size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          {/* HERO — the one number that matters */}
+          <div style={{ borderRadius: 16, padding: '20px 18px', marginBottom: 14, background: 'linear-gradient(135deg,#0f766e,#134e4a)', color: '#fff' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 52, lineHeight: 1, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{onHours ? offNow : net.online}</div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginTop: 8 }}>{onHours ? (lang === 'gu' ? heroGu : heroEn) : (lang === 'gu' ? 'સ્ક્રીન ચાલુ' : 'screens online')}</div>
+            <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 3 }}>
+              {numStations(depots.length, lang)} · {net.total} {lang === 'gu' ? 'સ્ક્રીન' : 'screens'}{!onHours ? ` · ${t('all_quiet', lang)}` : ''}
+            </div>
+            {net.cameraOff ? (
+              <button onClick={() => nav(camHref)} style={{ marginTop: 12, minHeight: 36, borderRadius: 999, border: '1px solid rgba(255,255,255,.35)', background: 'transparent', color: '#fff', fontSize: 12.5, fontWeight: 600, padding: '0 12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <VideoOff size={14} /> {net.cameraOff} {t('camera_off', lang)}
               </button>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* worst-first faults — the action. tap a station → who to call + fix */}
-      {!noDepots && top.length > 0 && (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{t('needs_you', lang)}</span>
-            {cityFaults.length > top.length && <button onClick={() => nav(downHref)} style={{ background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>{t('see_all', lang)} {cityFaults.length}<ChevronRight size={13} /></button>}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-            {top.map(r => {
-              const one = r.list.length === 1
-              const typeLabel = onHours ? t('signal_lost', lang) : t('timer_fault', lang)
-              const ageStr = onHours ? ageLabel(r.oldest, lang) : t('still_on', lang)
-              return (
-                <button key={r.did} onClick={() => nav(`/ops-fix/${r.did}`)} className="lead-card" style={{ padding: '12px 13px', borderLeft: `4px solid ${SEV[r.sev]}`, display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{one ? (r.list[0].name || r.name) : r.name}</div>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{one ? '' : `${r.list.length} ${t('screens_word', lang)} · `}{typeLabel} · {ageStr}</div>
-                  </div>
-                  <ChevronRight size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
-
-      {/* action area — hidden when the tech has no stations (keeps the empty state clean) */}
-      {!noDepots && (
-        <>
-          <button onClick={() => nav('/ops-log')} className="lead-btn lead-btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '13px', fontSize: 15, fontWeight: 700, marginBottom: 10 }}><FilePlus size={16} /> {t('report_fault', lang)}</button>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-            <button onClick={() => nav('/ops-tickets?tab=proc')} className="lead-card" style={{ flex: 1, padding: '15px 12px', textAlign: 'center', cursor: 'pointer', color: 'inherit', display: 'block' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 27, fontWeight: 800, color: 'var(--warning)', lineHeight: 1 }}>{s.inProc ?? 0}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>{t('in_process', lang)}</div>
-            </button>
-            <button onClick={() => nav('/ops-tickets?tab=fixed')} className="lead-card" style={{ flex: 1, padding: '15px 12px', textAlign: 'center', cursor: 'pointer', color: 'inherit', display: 'block' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 27, fontWeight: 800, color: 'var(--success)', lineHeight: 1 }}>{s.fixedToday ?? 0}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>{t('fixed_today_w', lang)}</div>
-            </button>
+            ) : null}
           </div>
 
-          {/* everything assigned to me that is still open (auto + manual). /ops is in no
-              nav, and it is the page that lists the auto-opened faults. */}
-          {(s.openTickets ?? 0) > 0 && (
-            <button onClick={() => nav('/ops')} className="lead-card" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', marginBottom: 14, minHeight: 48, textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
-              <ClipboardList size={18} strokeWidth={1.6} style={{ color: 'var(--warning)', flexShrink: 0 }} />
-              <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{t('open_tickets', lang)}</span>
-              <span style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 20, fontWeight: 700, color: 'var(--warning)' }}>{s.openTickets}</span>
-              <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            </button>
+          {depots.length > 1 && (
+            <select value={cityId} onChange={e => setCityId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 12px', fontSize: 14.5, marginBottom: 14 }}>
+              <option value="">{lang === 'gu' ? 'બધા સ્ટેશન' : 'All my stations'}</option>
+              {depots.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
           )}
 
-          {/* my month */}
-          <div className="lead-card" style={{ padding: '13px 14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{t('my_month', lang)}</span>
-              <button onClick={() => nav('/ops-performance')} style={{ background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>{t('my_perf', lang)}<ChevronRight size={13} /></button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 10px', textAlign: 'center' }}>
-              <MiniStat val={s.fixedMo ?? 0} label={t('fixed_this_mo', lang)} />
-              <MiniStat val={s.fixedWk ?? 0} label={t('fixed_this_wk', lang)} />
-              <MiniStat val={s.avgFixH != null ? `${s.avgFixH}${t('hrs', lang)}` : '—'} label={t('avg_fix', lang)} />
-              <MiniStat val={s.avgUptime != null ? `${s.avgUptime}%` : '—'} label={t('avg_uptime', lang)} />
-            </div>
-            {/* My calls on its own row — call activity, not a screen-fix stat, so not crammed with the 4 above */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 13, borderTop: '1px solid var(--border)' }}>
-              <span style={{ fontSize: 13.5, color: 'var(--text-muted)', fontWeight: 600 }}>{t('my_calls', lang)}</span>
-              <span style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 23, fontWeight: 800, color: 'var(--text)' }}>{s.callsMo ?? 0}</span>
-            </div>
+          {/* STATIONS — worst first, one tap opens the fix screen */}
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>
+            {lang === 'gu' ? 'તમારા સ્ટેશન · સૌથી ખરાબ પહેલા' : 'Your stations · worst first'}
           </div>
+          {stations.length === 0 ? (
+            <div className="lead-card" style={{ padding: '18px 16px', textAlign: 'center', color: 'var(--success)', fontWeight: 600, marginBottom: 14 }}>
+              <Wifi size={18} style={{ verticalAlign: -3, marginRight: 6 }} />{lang === 'gu' ? 'બધા સ્ક્રીન ચાલુ છે' : 'All screens are working'}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+              {stations.map(r => {
+                const total = screensAll.filter(x => x.depot_id === r.did).length
+                const chipTxt = r.days >= 1 ? `${r.days}${lang === 'gu' ? ' દિવસ' : 'd'}` : (onHours ? ageLabel(r.oldest, lang) : t('still_on', lang))
+                return (
+                  <button key={r.did} onClick={() => nav(`/ops-fix/${r.did}`)} className="lead-card" style={{ padding: '13px', borderLeft: `4px solid ${SEV[r.sev]}`, display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit', minHeight: 56 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+                      <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{r.list.length} {lang === 'gu' ? 'માંથી' : 'of'} {total} {t('screens_word', lang)} · {onHours ? (lang === 'gu' ? 'બંધ' : 'down') : t('timer_fault', lang)}</div>
+                    </div>
+                    <span style={{ background: r.days >= 1 ? 'var(--danger-soft)' : 'var(--warning-soft)', color: r.days >= 1 ? 'var(--danger)' : 'var(--warning)', borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{chipTxt}</span>
+                    <ChevronRight size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* problem on a screen that is still working (blank picture, camera, timer…) */}
+          <button onClick={() => nav('/ops-log')} className="lead-btn" style={{ width: '100%', justifyContent: 'center', minHeight: 48, fontSize: 14.5, fontWeight: 700, marginBottom: 14 }}>
+            <FilePlus size={16} /> {lang === 'gu' ? 'ચાલુ સ્ક્રીનમાં સમસ્યા? નોંધો' : 'Problem on a working screen? Report it'}
+          </button>
+
+          {/* everything else is one tap away, folded so the screen stays calm */}
+          <details className="lead-card" style={{ padding: '12px 14px', marginBottom: 14 }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 14, minHeight: 28 }}>{lang === 'gu' ? 'આજનો રિપોર્ટ અને મારો મહિનો' : "Today's report and my month"}</summary>
+            <div style={{ marginTop: 12 }}>
+              <OpsFaultReportCard kind="exec" lang={lang} />
+              <OpsEveningCard lang={lang} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 10px', textAlign: 'center', marginTop: 8 }}>
+                <MiniStat val={s.fixedMo ?? 0} label={t('fixed_this_mo', lang)} />
+                <MiniStat val={s.fixedWk ?? 0} label={t('fixed_this_wk', lang)} />
+                <MiniStat val={s.avgFixH != null ? `${s.avgFixH}${t('hrs', lang)}` : '—'} label={t('avg_fix', lang)} />
+                <MiniStat val={s.avgUptime != null ? `${s.avgUptime}%` : '—'} label={t('avg_uptime', lang)} />
+              </div>
+              <button onClick={() => nav('/ops-performance')} style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', fontSize: 13, cursor: 'pointer' }}>{t('my_perf', lang)} →</button>
+            </div>
+          </details>
         </>
       )}
     </div>
   )
 }
 
-// A big color-coded network tile — icon + colored number + label (color-not-only).
-function SnapTile({ icon: Icon, n, label, tone = 'neutral', onClick }) {
-  const T = {
-    neutral: { c: 'var(--text)',    bg: 'var(--surface-2)',    ic: 'var(--text-muted)' },
-    success: { c: 'var(--success)', bg: 'var(--success-soft)', ic: 'var(--success)' },
-    danger:  { c: 'var(--danger)',  bg: 'var(--danger-soft)',  ic: 'var(--danger)' },
-    warning: { c: 'var(--warning)', bg: 'var(--warning-soft)', ic: 'var(--warning)' },
-  }[tone] || {}
-  const El = onClick ? 'button' : 'div'
-  return (
-    <El onClick={onClick} style={{ background: T.bg, border: '1px solid var(--border)', borderRadius: 12, padding: '13px 13px 12px', textAlign: 'left', minHeight: 90, width: '100%', display: 'block', cursor: onClick ? 'pointer' : 'default', boxSizing: 'border-box', color: 'inherit' }}>
-      <div style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-3)', color: T.ic }}><Icon size={17} /></div>
-      <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 30, fontWeight: 700, lineHeight: 1, marginTop: 10, color: T.c }}>{n}</div>
-      <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>{label}</div>
-    </El>
-  )
-}
-
-function SubStat({ val, label, border, onClick }) {
-  const El = onClick ? 'button' : 'div'
-  return (
-    <El onClick={onClick} style={{ flex: 1, textAlign: 'center', borderTop: 'none', borderRight: 'none', borderBottom: 'none', borderLeft: border ? '1px solid var(--border)' : 'none', background: 'none', cursor: onClick ? 'pointer' : 'default', color: 'inherit', padding: 0, font: 'inherit' }}>
-      <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 19, fontWeight: 700, color: 'var(--text)' }}>{val}</div>
-      <div style={{ fontSize: 11, color: 'var(--text-subtle, var(--text-muted))', marginTop: 3 }}>{label}</div>
-    </El>
-  )
-}
+function numStations(n, lang) { return lang === 'gu' ? `${n} સ્ટેશન` : `${n} station${n === 1 ? '' : 's'}` }
 
 function MiniStat({ val, label }) {
   return (
