@@ -254,7 +254,7 @@ export default function OpsHomeV2() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
             {cityAged.map(r => (
-              <button key={r.id} onClick={() => nav(`/ops-station?depot=${r.did}`)} className="lead-card" style={{ padding: '12px 13px', borderLeft: '4px solid var(--danger)', display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
+              <button key={r.id} onClick={() => nav(`/ops-fix/${r.did}`)} className="lead-card" style={{ padding: '12px 13px', borderLeft: '4px solid var(--danger)', display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
                   <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{r.count} {t('screens_word', lang)} · {lang === 'gu' ? 'બંધ' : 'down'}</div>
@@ -280,7 +280,7 @@ export default function OpsHomeV2() {
               const typeLabel = onHours ? t('signal_lost', lang) : t('timer_fault', lang)
               const ageStr = onHours ? ageLabel(r.oldest, lang) : t('still_on', lang)
               return (
-                <button key={r.did} onClick={() => nav(`/ops-station?depot=${r.did}`)} className="lead-card" style={{ padding: '12px 13px', borderLeft: `4px solid ${SEV[r.sev]}`, display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
+                <button key={r.did} onClick={() => nav(`/ops-fix/${r.did}`)} className="lead-card" style={{ padding: '12px 13px', borderLeft: `4px solid ${SEV[r.sev]}`, display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{one ? (r.list[0].name || r.name) : r.name}</div>
                     <div style={{ fontSize: 12.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{one ? '' : `${r.list.length} ${t('screens_word', lang)} · `}{typeLabel} · {ageStr}</div>
