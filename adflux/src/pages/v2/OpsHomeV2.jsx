@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, MapPin, ChevronRight, FilePlus, AlertCircle, Wifi, VideoOff } from 'lucide-react'
+import { Loader2, MapPin, ChevronRight, FilePlus, AlertCircle, Wifi } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
@@ -176,9 +176,6 @@ export default function OpsHomeV2() {
   // one row per station: worst first; carry how many days it has been dark (from the screens' own last response)
   const agedBy = Object.fromEntries(cityAged.map(a => [a.did, a]))
   const stations = cityFaults.map(r => ({ ...r, days: agedBy[r.did]?.days || 0 }))
-  const camHref = cityId ? `/ops-down?view=camera&depot=${cityId}` : '/ops-down?view=camera'
-  const heroGu = onHours ? 'સ્ક્રીન બંધ' : 'સ્ક્રીન રાત્રે બંધ'
-  const heroEn = onHours ? 'screens off' : 'screens off for the night'
 
   return (
     <div className="lead-root">
@@ -206,19 +203,13 @@ export default function OpsHomeV2() {
 
       {!noDepots && (
         <>
-          {/* HERO — the one number that matters */}
-          <div style={{ borderRadius: 16, padding: '20px 18px', marginBottom: 14, background: 'linear-gradient(135deg,#0f766e,#134e4a)', color: '#fff' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 52, lineHeight: 1, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{onHours ? offNow : net.online}</div>
-            <div style={{ fontSize: 16, fontWeight: 600, marginTop: 8 }}>{onHours ? (lang === 'gu' ? heroGu : heroEn) : (lang === 'gu' ? 'સ્ક્રીન ચાલુ' : 'screens online')}</div>
-            <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 3 }}>
-              {numStations(depots.length, lang)} · {net.total} {lang === 'gu' ? 'સ્ક્રીન' : 'screens'}{!onHours ? ` · ${t('all_quiet', lang)}` : ''}
-            </div>
-            {net.cameraOff ? (
-              <button onClick={() => nav(camHref)} style={{ marginTop: 12, minHeight: 36, borderRadius: 999, border: '1px solid rgba(255,255,255,.35)', background: 'transparent', color: '#fff', fontSize: 12.5, fontWeight: 600, padding: '0 12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <VideoOff size={14} /> {net.cameraOff} {t('camera_off', lang)}
-              </button>
-            ) : null}
+          {/* HERO — only three numbers: total down, in process, fixed today */}
+          <div style={{ borderRadius: 16, padding: '18px 14px', marginBottom: 14, background: 'linear-gradient(135deg,#0f766e,#134e4a)', color: '#fff', display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
+            <HeroNum n={onHours ? offNow : 0} label={lang === 'gu' ? 'કુલ બંધ' : 'Total down'} big onClick={() => nav('/ops-down')} />
+            <HeroNum n={s.inProc ?? 0} label={lang === 'gu' ? 'કામ ચાલુ' : 'In process'} onClick={() => nav('/ops-tickets?tab=proc')} />
+            <HeroNum n={s.fixedToday ?? 0} label={lang === 'gu' ? 'આજે ઠીક' : 'Fixed today'} onClick={() => nav('/ops-tickets?tab=fixed')} />
           </div>
+          {!onHours && <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', margin: '-6px 0 12px' }}>{t('all_quiet', lang)}</div>}
 
           {depots.length > 1 && (
             <select value={cityId} onChange={e => setCityId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 12px', fontSize: 14.5, marginBottom: 14 }}>
@@ -280,7 +271,14 @@ export default function OpsHomeV2() {
   )
 }
 
-function numStations(n, lang) { return lang === 'gu' ? `${n} સ્ટેશન` : `${n} station${n === 1 ? '' : 's'}` }
+function HeroNum({ n, label, big, onClick }) {
+  return (
+    <button onClick={onClick} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, font: 'inherit', minHeight: 64 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: big ? 52 : 38, lineHeight: 1, color: big ? 'var(--accent)' : '#fff', fontVariantNumeric: 'tabular-nums' }}>{n}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 8, opacity: 0.92 }}>{label}</div>
+    </button>
+  )
+}
 
 function MiniStat({ val, label }) {
   return (
