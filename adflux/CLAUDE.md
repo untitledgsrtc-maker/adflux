@@ -21906,3 +21906,6 @@ Admin UI audit at 390 px (all main pages): no page scrolls sideways; small tap t
 
 ### 509.1 Finance page was 900 px wide on a phone
 At 390 px the Finance page content grew to 886 px (cards cut off at the right). Cause: grids with fixed column minimums (`g3row` minmax(360px), `g2` 1fr 1fr, `g4` repeat(4,1fr)) in `FinanceV2.jsx`. They now use `minmax(min(Npx,100%),1fr)` so columns drop to one on a phone; desktop unchanged. Campaigns page checked at 390 px: fine.
+
+### 509.2 Finance root cause (the real one)
+Fix 509.1 was not enough: the page wrappers were one-column grids (`display:grid; gap`) whose single column grows to its widest child (886 px). They now use `gridTemplateColumns: 'minmax(0, 1fr)'`. Rule: a one-column grid needs `minmax(0,1fr)` or it stretches past the screen.

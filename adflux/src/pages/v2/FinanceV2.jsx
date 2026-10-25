@@ -170,7 +170,7 @@ function PnlTab({ seg }) {
   const expLines = moneyOut.filter(l => (l.pnl != null ? l.pnl : !CASH_OUT_LABELS.has(l.label)))
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button onClick={() => setRefreshKey(k => k + 1)} disabled={loading}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
@@ -434,7 +434,7 @@ function HomeTab({ onReview }) {
   const tc = d?.to_collect || {}, tasks = d?.tasks || []
   const today = tasks.filter(t => t.frequency === 'daily' || t.status !== 'done').slice(0, 5)
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
       <div style={g4}>
         <Kpi label="To collect" value={fmtINR(tc.total || 0)} sub={`${tc.count || 0} won deals, unpaid`} Icon={IndianRupee} color="var(--danger)" tint="var(--danger-soft, rgba(239,68,68,.12))" />
         <Kpi label="Approvals pending" value={d?.approvals_pending ?? 0} sub="payments from reps" Icon={CheckSquare} color="var(--warning)" tint="var(--warning-soft, rgba(245,158,11,.12))" />
@@ -541,7 +541,7 @@ function ReconcileTab() {
   const noBank = bankTotal === 0 && bank.length === 0
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 16 }}>
       <Card>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <CH>Bank ↔ CRM reconciliation</CH>
@@ -667,7 +667,7 @@ function TasksTab() {
   const DelBtn = ({ id }) => <span onClick={() => delTask(id)} style={{ cursor: 'pointer', color: 'var(--text-subtle)', display: 'inline-flex' }} title="Delete"><Trash2 size={14} /></span>
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
       <Card>
         <CH>Add a task or reminder</CH>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -934,7 +934,7 @@ function ImportTab() {
   )
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
       <Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 600 }}>Smart auto-tagging <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>keyword → category, applied on every import</span></div>
