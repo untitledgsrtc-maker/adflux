@@ -148,7 +148,7 @@ export default function OpsFixV2() {
       ])
       if (dRes.error) throw dRes.error
       setDepot(dRes.data || null)
-      setScreens(sRes.data || [])
+      setScreens([...(sRes.data || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })))
       setContacts(cRes.data || [])
       setIssueTypes(iRes.data || [])
       setProc(pRes.data || [])
