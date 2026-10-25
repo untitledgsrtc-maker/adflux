@@ -205,7 +205,7 @@ export default function OpsTechApp() {
         : <section className="card" style={{ padding: 14, display: 'grid', gap: 10, borderColor: 'var(--y)' }}>
           <div className="row" style={{ justifyContent: 'space-between' }}><Bi g="હાજરી પૂરી નથી" e="Not checked in" /></div>
           <Swipe g="હાજરી માટે સ્વાઇપ કરો" e="Swipe to check in" onDone={doCheckIn} />
-          <div className="mu sm">11:30 પછી અડધો દિવસ · After 11:30 it is a half day</div></section>)}
+          <div className="mu sm"><G t="11:30 પછી અડધો દિવસ · After 11:30 it is a half day" /></div></section>)}
       {!onHours && <div className="card" style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}><Tile n="moon" s={40} /><Bi g="રાત્રે 9 થી સવારે 7 સ્ક્રીન આરામ કરે છે. રાત્રે કંઈ ગણાતું નથી." e="Screens rest 9 PM to 7 AM. Off at night is normal. Only a screen still on after 9 PM is a timer fault." /></div>}
       <div className="row" style={{ justifyContent: 'space-between', marginTop: 4 }}><span className="lbl"><G t="આજની મુલાકાત · Visit plan" /></span></div>
       {plan.length === 0 && <div className="okrow"><Ic n="checkc" /><Bi g="બધા સ્ક્રીન ચાલુ છે" e="All screens are working" /></div>}
@@ -220,7 +220,7 @@ export default function OpsTechApp() {
       <Seg full value={ft} onChange={setFt} opts={['open', 'work', 'fixed'].map(k => [k, <Bi g={STAT[k][0]} e={<><span className="num">{cnt(k)}</span> {STAT[k][1]}</>} />])} />
       {list.length === 0 && <div className="card" style={{ padding: 18 }}><Bi g="અહીં કંઈ નથી" e="Nothing here" /></div>}
       {list.map(f => <VisitCard key={f.id} f={f} st={stById[f.st]} onOpen={() => setOpenId(f.id)} />)}
-      <Btn lg full icon="plus" onClick={() => setSheet({ k: 'log' })}>ચાલુ સ્ક્રીનમાં સમસ્યા · Problem on a working screen</Btn>
+      <Btn lg full icon="plus" onClick={() => setSheet({ k: 'log' })}><G t="ચાલુ સ્ક્રીનમાં સમસ્યા · Problem on a working screen" /></Btn>
     </div>
   } else {
     body = <TechMe d={d} avgFixM={avgFixM} monthFixed={monthFixed.length} nav={nav} />
@@ -345,15 +345,15 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
 
   const screensPick = <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="1 · કઈ સ્ક્રીન? Which screens" /></span>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>{st.scr.map(s => { const faulty = f.scrIds.includes(s.id); return <ScrTile key={s.id} n={s.n} st={!onHours && f.src === 'timer' ? (faulty ? 'tm' : 'rest') : faulty ? 'off' : s.status === 'online' ? 'on' : 'off'} sel={faulty && sel.includes(s.id)} onClick={faulty && f.status === 'open' ? () => setSel(sel.includes(s.id) ? sel.filter(x => x !== s.id) : [...sel, s.id]) : null} /> })}</div>
-    <div className="row mu sm" style={{ gap: 14 }}><span className="row" style={{ gap: 6 }}><i className="lg t-da"></i>બંધ · Off</span><span className="row" style={{ gap: 6 }}><i className="lg t-ok"></i>ચાલુ · On</span></div></section>
+    <div className="row mu sm" style={{ gap: 14 }}><span className="row" style={{ gap: 6 }}><i className="lg t-da"></i><G t="બંધ · Off" /></span><span className="row" style={{ gap: 6 }}><i className="lg t-ok"></i><G t="ચાલુ · On" /></span></div></section>
 
   return <div className="push">
     <div className="row" style={{ padding: '8px 12px', gap: 8, borderBottom: '1px solid var(--bd)' }}><Btn kind="gh" icon="cl" title="Back" onClick={back} /><div style={{ flex: 1, minWidth: 0 }}><Bi g={st.name} e={`${st.n} screens`} big /></div></div>
     <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'grid', gap: 18, alignContent: 'start' }}>
       {isJob ? <>
-        <Card><div style={{ display: 'grid', gap: 12 }}><span className="row mu sm" style={{ gap: 6 }}><Ic n="camera" s={15} />Live photo</span><div style={{ fontSize: 19, fontWeight: 600 }}>{f.note}</div>{f.scr.length > 0 && <div className="mu">સ્ક્રીન · Screen <span className="num">{f.scr.join(', ')}</span></div>}</div></Card>
+        <Card><div style={{ display: 'grid', gap: 12 }}><span className="row mu sm" style={{ gap: 6 }}><Ic n="camera" s={15} />Live photo</span><div style={{ fontSize: 19, fontWeight: 600 }}>{f.note}</div>{f.scr.length > 0 && <div className="mu"><G t="સ્ક્રીન · Screen " /><span className="num">{f.scr.join(', ')}</span></div>}</div></Card>
         <Photo label={<Bi g="જાહેરાત ચાલુ હોય ત્યારે ફોટો લો" e="Take it while the ad is on screen" />} file={photo} onFile={setPhoto} />
-        <Btn kind="pri" lg full icon="send" disabled={!photo || busy} onClick={sendPhoto}>ફોટો મોકલો · Send photo</Btn></> : <>
+        <Btn kind="pri" lg full icon="send" disabled={!photo || busy} onClick={sendPhoto}><G t="ફોટો મોકલો · Send photo" /></Btn></> : <>
         <Stepper f={f} called={called} />
         {screensPick}
         {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="2 · શું ખરાબી છે? What is wrong" /></span><ReasonGrid issues={d.issues} value={reason} onPick={setReason} /></section>}
@@ -361,33 +361,33 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
         {reason && f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="3 · કોને કૉલ કરવો · Who to call" /></span>{callList.length ? callList.map(c => <CallBtn key={c.id} c={c} onCall={doCall} />) : <div className="warnrow"><Ic n="alert" /><Bi g="આ સ્ટેશનનો કોઈ નંબર નથી" e="No number saved for this station. Ask the head to add one." /></div>}</section>}
         {f.status === 'open' && <div style={{ display: 'grid', gap: 10 }}>
           <Photo label={<Bi g="પહેલાંનો ફોટો (વૈકલ્પિક)" e="Before photo (optional)" />} file={before} onFile={setBefore} />
-          <Btn kind="pri" lg full icon="arrow" disabled={!reason || !sel.length || busy} onClick={() => startWork(true)}>કૉલ થયો, કામ શરૂ · Called, start work</Btn>
-          {!reason ? <div className="mu" style={{ textAlign: 'center' }}>પહેલાં કારણ પસંદ કરો · Pick what is wrong first</div> : !called && <button className="lnk" style={{ justifySelf: 'center' }} onClick={() => startWork(false)}>કૉલ વગર શરૂ કરો · Start without calling</button>}</div>}
+          <Btn kind="pri" lg full icon="arrow" disabled={!reason || !sel.length || busy} onClick={() => startWork(true)}><G t="કૉલ થયો, કામ શરૂ · Called, start work" /></Btn>
+          {!reason ? <div className="mu" style={{ textAlign: 'center' }}><G t="પહેલાં કારણ પસંદ કરો · Pick what is wrong first" /></div> : !called && <button className="lnk" style={{ justifySelf: 'center' }} onClick={() => startWork(false)}><G t="કૉલ વગર શરૂ કરો · Start without calling" /></button>}</div>}
         {(f.status === 'work' || f.status === 'cant') && <div style={{ display: 'grid', gap: 10 }}>
-          {f.tickets.some(t => /Reached station/i.test(t.notes || '')) ? <div className="okrow"><Ic n="navi" /><Bi g="સ્ટેશને પહોંચ્યા" e="Reached station" /></div> : <Btn lg full icon="navi" disabled={busy} onClick={reached}>હું સ્ટેશને પહોંચ્યો · I reached</Btn>}
+          {f.tickets.some(t => /Reached station/i.test(t.notes || '')) ? <div className="okrow"><Ic n="navi" /><Bi g="સ્ટેશને પહોંચ્યા" e="Reached station" /></div> : <Btn lg full icon="navi" disabled={busy} onClick={reached}><G t="હું સ્ટેશને પહોંચ્યો · I reached" /></Btn>}
           <div className="mu sm" style={{ textAlign: 'center' }}>{f.scrIds.filter(id => st.scr.find(s => s.id === id)?.status === 'online').length} / {f.scrIds.length} પાછા ચાલુ · back online. 30 મિનિટ ચાલુ રહે તો આપમેળે ઠીક.</div>
-          {f.status === 'work' && <Btn kind="pri" lg full icon="camera" onClick={() => setSheet('fix')}>ઠીક થયું – ફોટો લો · Fixed</Btn>}
-          {callList.length > 0 || contacts.length > 0 ? <Btn lg full icon="phone" onClick={() => contacts[0] && doCall(contacts[0])}>ફરી કૉલ કરો · Call again</Btn> : null}
-          {f.status === 'work' && <Btn kind="wa" lg full icon="flag" onClick={() => setSheet('cant')}>ઠીક ન થાય – ઓફિસને કહો · Can’t fix</Btn>}</div>}
+          {f.status === 'work' && <Btn kind="pri" lg full icon="camera" onClick={() => setSheet('fix')}><G t="ઠીક થયું – ફોટો લો · Fixed" /></Btn>}
+          {callList.length > 0 || contacts.length > 0 ? <Btn lg full icon="phone" onClick={() => contacts[0] && doCall(contacts[0])}><G t="ફરી કૉલ કરો · Call again" /></Btn> : null}
+          {f.status === 'work' && <Btn kind="wa" lg full icon="flag" onClick={() => setSheet('cant')}><G t="ઠીક ન થાય – ઓફિસને કહો · Can’t fix" /></Btn>}</div>}
         {f.status === 'cant' && <div className="warnrow"><Ic n="flag" s={22} /><Bi g="ઓફિસને મોકલ્યું" e={f.cant || 'Sent to the office'} /></div>}
         {f.status === 'fixed' && <div className="okrow big"><Ic n="checkc" s={24} /><Bi g="ઠીક થયું" e="Fixed" /></div>}
         {story.length > 0 && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="ફોલ્ટની વિગત · Fault story" /></span><ol className="story">{story.map(([t, i, g, e], k) => <li key={k}><span className="sdot"><Ic n={i} s={14} /></span><div style={{ minWidth: 0 }}><Bi g={g} e={e} /><div className="mono mu sm">{t}</div></div></li>)}</ol></section>}</>}
     </div>
     {sheet === 'fix' && <FixSheet onClose={() => setSheet(null)} onSave={fix} busy={busy} />}
     {sheet === 'cant' && <CantSheet onClose={() => setSheet(null)} onSave={cant} busy={busy} />}
-    {call && <div className="callov" role="dialog"><span className="calli" style={{ width: 88, height: 88 }}><Ic n="phone" s={36} /></span><Bi g="કૉલ થાય છે" e="Calling" center /><div className="h" style={{ fontSize: 28, fontWeight: 600 }}>{call.name || call.role_en}</div><div className="mono mu" style={{ fontSize: 18 }}>+91 {call.phone}</div><div style={{ flex: 1 }}></div><Btn kind="da" lg full icon="x" onClick={endCall}>કૉલ બંધ કરો · End call</Btn></div>}
+    {call && <div className="callov" role="dialog"><span className="calli" style={{ width: 88, height: 88 }}><Ic n="phone" s={36} /></span><Bi g="કૉલ થાય છે" e="Calling" center /><div className="h" style={{ fontSize: 28, fontWeight: 600 }}>{call.name || call.role_en}</div><div className="mono mu" style={{ fontSize: 18 }}>+91 {call.phone}</div><div style={{ flex: 1 }}></div><Btn kind="da" lg full icon="x" onClick={endCall}><G t="કૉલ બંધ કરો · End call" /></Btn></div>}
   </div>
 }
 
 function FixSheet({ onClose, onSave, busy }) {
   const [p, setP] = useState(null)
-  return <Sheet title={<Bi g="ઠીક થયું" e="Fixed" />} onClose={onClose} footer={<Btn kind="pri" lg full icon="check" disabled={!p || busy} onClick={() => onSave(p)}>સાચવો · Save</Btn>}>
-    <Photo label={<Bi g="પછીનો ફોટો (જરૂરી)" e="After photo (needed)" />} file={p} onFile={setP} /><div className="mu">હેડ અને માલિક આ ફોટો જોઈ શકે છે · Head and owner can see this photo.</div></Sheet>
+  return <Sheet title={<Bi g="ઠીક થયું" e="Fixed" />} onClose={onClose} footer={<Btn kind="pri" lg full icon="check" disabled={!p || busy} onClick={() => onSave(p)}><G t="સાચવો · Save" /></Btn>}>
+    <Photo label={<Bi g="પછીનો ફોટો (જરૂરી)" e="After photo (needed)" />} file={p} onFile={setP} /><div className="mu"><G t="હેડ અને માલિક આ ફોટો જોઈ શકે છે · Head and owner can see this photo." /></div></Sheet>
 }
 function CantSheet({ onClose, onSave, busy }) {
   const [w, setW] = useState(null); const [note, setNote] = useState('')
   const O = [['ઇલેક્ટ્રિશિયન જોઈએ', 'Needs electrician'], ['પાર્ટ જોઈએ', 'Needs a part'], ['ડેપો મંજૂરી નથી આપતું', 'Depot not allowing'], ['બીજું', 'Other']]
-  return <Sheet title={<Bi g="ઠીક ન થાય" e="Can’t fix" />} onClose={onClose} footer={<Btn kind="pri" lg full icon="send" disabled={w == null || busy || (w === 3 && note.trim().length < 3)} onClick={() => onSave(O[w][1], note.trim())}>ઓફિસને મોકલો · Send to office</Btn>}>
+  return <Sheet title={<Bi g="ઠીક ન થાય" e="Can’t fix" />} onClose={onClose} footer={<Btn kind="pri" lg full icon="send" disabled={w == null || busy || (w === 3 && note.trim().length < 3)} onClick={() => onSave(O[w][1], note.trim())}><G t="ઓફિસને મોકલો · Send to office" /></Btn>}>
     <div style={{ display: 'grid', gap: 8 }}>{O.map(([g, e], i) => <button key={i} className={'rrow' + (w === i ? ' on' : '')} onClick={() => setW(i)}><Ic n={w === i ? 'checkc' : 'circle'} s={22} /><Bi g={g} e={e} /></button>)}</div>
     <textarea className="inp" rows={3} style={{ height: 'auto', padding: 12 }} placeholder="નોંધ · Note" value={note} onChange={e => setNote(e.target.value)}></textarea>
     <div className="mu sm">The office is told with this reason.</div></Sheet>
@@ -410,7 +410,7 @@ function LogSheet({ stations, issues, uid, onClose, onDone, show }) {
       onDone()
     } catch (e) { show({ t: e?.message || 'Failed', icon: 'alert' }) } finally { setBusy(false) }
   }
-  return <Sheet title={<Bi g="ચાલુ સ્ક્રીનમાં સમસ્યા" e="Problem on a working screen" />} onClose={onClose} footer={<Btn kind="pri" lg full icon="check" disabled={!scr.length || !r || busy} onClick={save}>સાચવો · Save</Btn>}>
+  return <Sheet title={<Bi g="ચાલુ સ્ક્રીનમાં સમસ્યા" e="Problem on a working screen" />} onClose={onClose} footer={<Btn kind="pri" lg full icon="check" disabled={!scr.length || !r || busy} onClick={save}><G t="સાચવો · Save" /></Btn>}>
     <Sel label="Station" value={stId} onChange={v => { setStId(v); setScr([]) }} opts={stations.map(x => [x.id, x.name])} />
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>{(s?.scr || []).map(x => <ScrTile key={x.id} n={x.n} st={x.status === 'offline' ? 'off' : 'on'} sel={scr.includes(x.id)} onClick={() => setScr(scr.includes(x.id) ? scr.filter(y => y !== x.id) : [...scr, x.id])} />)}</div>
     <ReasonGrid issues={issues} value={r} onPick={setR} /><Photo label={<Bi g="ફોટો" e="Photo" />} file={file} onFile={setFile} /></Sheet>
@@ -428,7 +428,7 @@ function TechMe({ d, avgFixM, monthFixed, nav }) {
     <Card title={<Bi g="મેં શું કર્યું" e="What I did" />} icon="check" tone="ok" pad={false}><div className="list">{[['ઠીક કર્યા', 'Faults fixed', String(monthFixed)], ['સરેરાશ સમય', 'Avg fix time', avgFixM ? age(avgFixM) : '—'], ['કૉલ', 'Calls', String(d.calls)]].map(([g, e, n]) => <div key={e} className="row" style={{ padding: '12px 16px', justifyContent: 'space-between', minHeight: 56 }}><Bi g={g} e={e} /><span className="num" style={{ fontSize: 22, fontWeight: 600 }}>{n}</span></div>)}</div></Card>
     {salary > 0 && <Card title={<Bi g="મને શું મળશે" e="What I earn" />} icon="rupee" tone="y">
       <div style={{ display: 'grid', gap: 12 }}>
-        <div className="mu sm">ચાલુ સમય 85% થી 95% વચ્ચે વધારાનો પગાર વધે છે · Variable pay grows from 85% to 95% uptime</div>
+        <div className="mu sm"><G t="ચાલુ સમય 85% થી 95% વચ્ચે વધારાનો પગાર વધે છે · Variable pay grows from 85% to 95% uptime" /></div>
         <div style={{ paddingTop: 6 }}><Bar v={u != null ? pos(u) : 0} tone="ok" h={14} marks={[pos(85), pos(95)]} /></div>
         <div style={{ position: 'relative', height: 40, fontSize: 14 }}><span className="mu" style={{ position: 'absolute', left: `${pos(85)}%`, transform: 'translateX(-50%)', textAlign: 'center' }}><b className="num" style={{ color: 'var(--tx)' }}>85%</b><br />Rs 0</span><span className="mu" style={{ position: 'absolute', left: `${pos(95)}%`, transform: 'translateX(-50%)', textAlign: 'center' }}><b className="num" style={{ color: 'var(--tx)' }}>95%</b><br />{inr(vmax)}</span></div>
         <div className="list">{[['મૂળ પગાર', 'Base pay', base], ['વધારાનો પગાર', 'Variable pay', v]].map(([g, e, n]) => <div key={e} className="row" style={{ padding: '10px 0', justifyContent: 'space-between' }}><Bi g={g} e={e} /><span className="num" style={{ fontSize: 18 }}>{inr(n)}</span></div>)}
