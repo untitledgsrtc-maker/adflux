@@ -21903,3 +21903,6 @@ Note (508 follow-up 3): technician app (OpsTechApp) now has a menu button (3 lin
 
 ## 509 · Phone tap size (2026-10-25)
 Admin UI audit at 390 px (all main pages): no page scrolls sideways; small tap targets were `.lead-btn-sm` (33 px, 3,500+ on Follow-ups), `.v2d-btn-ghost` (28 px, Clients) and `.v2d-cta`. One rule at the end of `leads.css` (max-width 720 px) sets min-height 44 px. CSS only, desktop unchanged. Still to look at by eye: Finance and Campaigns tables at phone width, tab strips that extend past 390 px.
+
+### 509.1 Finance page was 900 px wide on a phone
+At 390 px the Finance page content grew to 886 px (cards cut off at the right). Cause: grids with fixed column minimums (`g3row` minmax(360px), `g2` 1fr 1fr, `g4` repeat(4,1fr)) in `FinanceV2.jsx`. They now use `minmax(min(Npx,100%),1fr)` so columns drop to one on a phone; desktop unchanged. Campaigns page checked at 390 px: fine.
