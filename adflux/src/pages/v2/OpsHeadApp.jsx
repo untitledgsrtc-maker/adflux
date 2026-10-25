@@ -15,7 +15,7 @@ import { estVariable } from '../../utils/opsPay'
 import { dialPhone } from '../../utils/openExternal'
 import { openWhatsAppShare } from '../../utils/whatsappSummary'
 import '../../components/ops2/ops2.css'
-import { Ic, Btn, Pill, Tile, Ring, Hero, StatTile, Card, Seg, Sel, Bar, ScrTile, Sheet, Toast, useToast, Av } from '../../components/ops2/ui'
+import { Ic, Btn, Pill, Tile, Ring, Hero, StatTile, Card, Seg, Sel, Bar, ScrTile, Sheet, Toast, useToast, Av, LangToggle } from '../../components/ops2/ui'
 
 const NIL = '00000000-0000-0000-0000-000000000000'
 const ago = (iso) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)) : 0)
@@ -160,7 +160,7 @@ export default function OpsHeadApp() {
           <nav className="row" style={{ gap: 4, height: '100%' }} role="tablist">{T.map(([k, l, i]) => <button key={k} role="tab" aria-selected={tab === k} className={'htab' + (tab === k ? ' on' : '')} onClick={() => setTab(k)}><Ic n={i} />{l}{k === 'faults' && live.length > 0 && <span className="tabn num">{live.length}</span>}</button>)}</nav>
           <div style={{ flex: 1 }} />
           <span className="mono mu sm">{now}</span>
-          <div style={{ width: 150 }}><Sel label="My pages" value="" onChange={v => v && nav(v)} opts={[['', 'More'], ...(owner ? [['/dashboard', 'Dashboard']] : []), ['/ops-assign', 'Give work page'], ['/ops-log', 'Log issue'], ['/ops-tickets', 'Tickets'], ['/ops-performance', 'My Performance'], ['/calls', 'My Calls'], ['/my-offer', 'My Offer'], ['/my-work', 'My Work'], ['/work-profile', 'My profile']]} /></div>
+          <LangToggle /><div style={{ width: 150 }}><Sel label="My pages" value="" onChange={v => v && nav(v)} opts={[['', 'More'], ...(owner ? [['/dashboard', 'Dashboard']] : []), ['/ops-assign', 'Give work page'], ['/ops-log', 'Log issue'], ['/ops-tickets', 'Tickets'], ['/ops-performance', 'My Performance'], ['/calls', 'My Calls'], ['/my-offer', 'My Offer'], ['/my-work', 'My Work'], ['/work-profile', 'My profile']]} /></div>
           <Btn kind="pri" icon="plus" onClick={() => setPanel({ k: 'give' })}>Give work</Btn>
           <span className="row" style={{ gap: 10 }}><Av name={profile?.name} userId={uid} /><span><span style={{ display: 'block', fontWeight: 500 }}>{first(profile?.name)}</span><span className="mu sm">{owner ? 'Owner' : 'Operation head'}</span></span></span>
         </header>

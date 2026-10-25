@@ -1,5 +1,5 @@
 // Operations design primitives (from the owner Claude Design file). Pure display, no data.
-import { useRef, useState } from 'react'
+import { useRef, useState, useSyncExternalStore } from 'react'
 import UserAvatar from '../common/UserAvatar'
 export const IC={
 phone:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
@@ -54,7 +54,19 @@ dl:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 
 export function Ic({ n, s = 18, style }) {
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flex: 'none', ...style }} dangerouslySetInnerHTML={{ __html: IC[n] || '' }} />
 }
+// Language: English by default, ગુ shows Gujarati first with English under (as the old ops pages did).
+const LK = 'ops2_lang'
+const subs = new Set()
+let lang = (() => { try { return localStorage.getItem(LK) === 'gu' ? 'gu' : 'en' } catch { return 'en' } })()
+export const setOps2Lang = (l) => { lang = l; try { localStorage.setItem(LK, l) } catch { /* private mode */ } subs.forEach(f => f()) }
+export const useOps2Lang = () => useSyncExternalStore(f => { subs.add(f); return () => subs.delete(f) }, () => lang)
+export function LangToggle() {
+  const l = useOps2Lang()
+  return <div className="seg" role="group" aria-label="Language">{[['gu', 'ગુ'], ['en', 'EN']].map(([k, t]) => <button key={k} className={l === k ? 'on' : ''} aria-pressed={l === k} onClick={() => setOps2Lang(k)}>{t}</button>)}</div>
+}
 export function Bi({ g, e, big, center }) {
+  const l = useOps2Lang()
+  if (l === 'en') return <span className={'bi' + (big ? ' big' : '')} style={center ? { textAlign: 'center' } : null}><span className="g">{e}</span></span>
   return <span className={'bi' + (big ? ' big' : '')} style={center ? { textAlign: 'center' } : null}><span className="g">{g}</span><span className="e">{e}</span></span>
 }
 export function Btn({ kind, icon, children, sm, lg, onClick, title, style, disabled, full }) {

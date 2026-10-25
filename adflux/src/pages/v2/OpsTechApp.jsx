@@ -18,7 +18,7 @@ import { dialPhone } from '../../utils/openExternal'
 import { normalizeIndianPhone } from '../../utils/phone'
 import { captureGps } from '../../utils/captureGps'
 import '../../components/ops2/ops2.css'
-import { Ic, Bi, Btn, Pill, Tile, Ring, Hero, StatTile, Card, Seg, Sel, Bar, ScrTile, Sheet, Toast, useToast, Photo, Swipe } from '../../components/ops2/ui'
+import { Ic, Bi, Btn, Pill, Tile, Ring, Hero, StatTile, Card, Seg, Sel, Bar, ScrTile, Sheet, Toast, useToast, Photo, Swipe, LangToggle } from '../../components/ops2/ui'
 
 const NIL = '00000000-0000-0000-0000-000000000000'
 const ago = (iso) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)) : 0)
@@ -179,7 +179,7 @@ export default function OpsTechApp() {
   const header = (
     <div className="row" style={{ justifyContent: 'space-between', padding: '8px 16px', minHeight: 56 }}>
       <span className="row" style={{ gap: 10 }}><span className="logo">A</span><Bi g="ઓપરેશન" e={profile?.name || ''} /></span>
-      <span className="row" style={{ gap: 8 }}>{online ? <Pill tone="ok" icon="wifi">Live</Pill> : <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}</span>
+      <span className="row" style={{ gap: 8 }}><LangToggle />{online ? <Pill tone="ok" icon="wifi">Live</Pill> : <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}</span>
     </div>)
 
   let body
