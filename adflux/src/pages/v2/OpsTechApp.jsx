@@ -49,7 +49,7 @@ function contactsFor(issueEn, contacts) {
 }
 
 export default function OpsTechApp() {
-  const { profile, signOut } = useAuth()
+  const { profile } = useAuth()
   const uid = profile?.id
   const nav = useNavigate()
   const [toast, show] = useToast()
@@ -61,7 +61,6 @@ export default function OpsTechApp() {
   const [ft, setFt] = useState('open')
   const [vp, setVp] = useState('off')
   const [sheet, setSheet] = useState(null)
-  const [menu, setMenu] = useState(false)
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)
   const onHours = isOnHours()
 
@@ -181,7 +180,7 @@ export default function OpsTechApp() {
 
   const header = (
     <div className="row" style={{ justifyContent: 'space-between', padding: '8px 16px', minHeight: 56 }}>
-      <span className="row" style={{ gap: 10 }}><Btn kind="gh" icon="menu" title="Menu" onClick={() => setMenu(true)} /><span className="logo">A</span><Bi g="ઓપરેશન" e={profile?.name || ''} /></span>
+      <span className="row" style={{ gap: 10 }}><Btn kind="gh" icon="menu" title="Menu" onClick={() => window.dispatchEvent(new Event('open-shell-drawer'))} /><span className="logo">A</span><Bi g="ઓપરેશન" e={profile?.name || ''} /></span>
       <span className="row" style={{ gap: 8 }}><LangToggle />{online ? <Pill tone="ok" icon="wifi">Live</Pill> : <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}</span>
     </div>)
 
@@ -243,13 +242,6 @@ export default function OpsTechApp() {
       <nav className="bnav">{[['today', 'home', 'આજે', 'Today'], ['faults', 'list', 'ફોલ્ટ', 'Faults'], ['me', 'user', 'મારું', 'Me']].map(([k, i, g, e]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => { setTab(k); setOpenId(null) }} aria-current={tab === k}><Ic n={i} s={22} /><Bi g={g} e={e} center /></button>)}</nav>
       {openFault && <FaultPage key={openFault.id} f={openFault} st={stById[openFault.st]} d={d} uid={uid} onHours={onHours} back={() => setOpenId(null)} reload={load} show={show} setTabFixed={() => { setOpenId(null); setFt('fixed'); setTab('faults') }} />}
       {sheet && sheet.k === 'log' && <LogSheet stations={stations} issues={d.issues} uid={uid} onClose={() => setSheet(null)} onDone={() => { setSheet(null); show({ t: 'નોંધાયું · Fault logged' }); load() }} show={show} />}
-      {menu && <Sheet side title={<Bi g="Untitled OS · ફીલ્ડ ટેક" e="Untitled OS · Field tech" />} onClose={() => setMenu(false)}>
-        <div style={{ display: 'grid', gap: 8 }}>
-          {[['/ops-home', 'હોમ', 'Home'], ['/ops-performance', 'મારું પર્ફોર્મન્સ', 'My Performance'], ['/calls', 'મારા કૉલ', 'My Calls'], ['/my-offer', 'મારો ઑફર', 'My Offer'], ['/my-work', 'મારું કામ', 'My Work'], ['/work-profile', 'મારી પ્રોફાઇલ', 'My profile']].map(([to, g, e]) => <Btn key={to} lg full kind={to === '/ops-home' ? 'pri' : undefined} onClick={() => { setMenu(false); if (to !== '/ops-home') nav(to) }}><Bi g={g} e={e} /></Btn>)}
-          <div className="card" style={{ padding: 12, marginTop: 8 }}><div style={{ fontWeight: 600 }}>{profile?.name}</div><div className="mu sm">{profile?.email}</div></div>
-          <Btn lg full kind="wa" icon="x" onClick={async () => { setMenu(false); await signOut(); nav('/login') }}><Bi g="લૉગ આઉટ" e="Log out" /></Btn>
-        </div>
-      </Sheet>}
       <Toast m={toast} />
     </div></div>
   )

@@ -420,6 +420,8 @@ export function V2AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  // The full-screen technician app (OpsTechApp) has no shell topbar; its menu button asks the shell to open this drawer.
+  useEffect(() => { const open = () => setDrawerOpen(true); window.addEventListener('open-shell-drawer', open); return () => window.removeEventListener('open-shell-drawer', open) }, [])
   // Avatar-tap "More" drawer (overflow nav for sales).
   const [moreOpen, setMoreOpen] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
