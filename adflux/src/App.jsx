@@ -340,10 +340,12 @@ function StaffToMyWork({ children }) {
   return children
 }
 
-function RequireOps({ children }) {
+function RequireOps({ children, execToHome }) {
   const { profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
   const role = profile?.role
+  // Technicians use ONLY the new app (/ops-home); the old screens stay for head/admin.
+  if (execToHome && role === 'operation_executive') return <Navigate to="/ops-home" replace />
   if (role === 'operation_head' || role === 'operation_executive'
       || role === 'admin' || role === 'co_owner') return children
   return <Navigate to="/dashboard" replace />
@@ -518,25 +520,25 @@ export default function App() {
           <Route path="/leads/:id"                 element={<RequireNonAgency><LeadDetailV2 /></RequireNonAgency>} />
           <Route path="/work"                      element={<StaffToMyWork><WorkV2 /></StaffToMyWork>} />
           {/* Phase 230 — Operations field app (exec) + Head desk console. */}
-          <Route path="/ops"                       element={<RequireOps><OpsWorkV2 /></RequireOps>} />
+          <Route path="/ops"                       element={<RequireOps execToHome><OpsWorkV2 /></RequireOps>} />
           <Route path="/ops-command"               element={<RequireOps><OpsCommandV2 /></RequireOps>} />
           <Route path="/ops-tech/:userId"          element={<RequireOps><OpsTechV2 /></RequireOps>} />
           <Route path="/ops-approvals"             element={<RequireOps><OpsApprovalsV2 /></RequireOps>} />
           <Route path="/ops-dashboard"             element={<RequireOps><OpsHeadV2 /></RequireOps>} />
-          <Route path="/ops-log"                   element={<RequireOps><OpsLogV2 /></RequireOps>} />
-          <Route path="/ops-down"                  element={<RequireOps><OpsDownV2 /></RequireOps>} />
-          <Route path="/ops-station"               element={<RequireOps><OpsStationV2 /></RequireOps>} />
-          <Route path="/ops-tickets"               element={<RequireOps><OpsTicketsV2 /></RequireOps>} />
+          <Route path="/ops-log"                   element={<RequireOps execToHome><OpsLogV2 /></RequireOps>} />
+          <Route path="/ops-down"                  element={<RequireOps execToHome><OpsDownV2 /></RequireOps>} />
+          <Route path="/ops-station"               element={<RequireOps execToHome><OpsStationV2 /></RequireOps>} />
+          <Route path="/ops-tickets"               element={<RequireOps execToHome><OpsTicketsV2 /></RequireOps>} />
           <Route path="/ops-assign"                element={<RequireOfficeAssign><OpsAssignV2 /></RequireOfficeAssign>} />
           <Route path="/ops-performance"           element={<RequireOps><OpsMyPerformanceV2 /></RequireOps>} />
           <Route path="/ops-home"                  element={<RequireOps><OpsTechApp /></RequireOps>} />
-          <Route path="/ops-home-classic"          element={<RequireOps><OpsHomeV2 /></RequireOps>} />
+          <Route path="/ops-home-classic"          element={<RequireOps execToHome><OpsHomeV2 /></RequireOps>} />
           {/* Phase 365 — Work module. /my-work is open to every signed-in user (non-members only ask + follow);
               /team-work checks head access itself and bounces everyone else to /my-work. */}
           <Route path="/my-work"                   element={<MyWorkV2 />} />
           <Route path="/team-work"                 element={<TeamWorkV2 />} />
           <Route path="/work-profile"              element={<WorkProfileV2 />} />
-          <Route path="/ops-fix/:depotId"          element={<RequireOps><OpsFixV2 /></RequireOps>} />
+          <Route path="/ops-fix/:depotId"          element={<RequireOps execToHome><OpsFixV2 /></RequireOps>} />
           <Route path="/ops-admin"                 element={<RequirePrivileged><OpsAdminV2 /></RequirePrivileged>} />
           {/* Phase 61 — Manager dashboard. Shows the team-lead's
               direct reports + today's metrics. Sales head + TC head
