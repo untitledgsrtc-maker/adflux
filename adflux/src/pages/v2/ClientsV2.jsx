@@ -31,6 +31,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { pushToast, toastError } from '../../components/v2/Toast'
+import V2Hero from '../../components/v2/V2Hero'
 
 function formatCurrency(n) {
   return `₹${new Intl.NumberFormat('en-IN').format(Math.round(Number(n) || 0))}`
@@ -333,7 +334,16 @@ export default function ClientsV2() {
         const scoped = (isAdmin && repFilter !== 'all')
           ? clients.filter(c => c.created_by === repFilter)
           : clients
+        const wonTotal = scoped.reduce((s, c) => s + (Number(c.total_won_amount) || 0), 0)
         return (
+          <>
+          {!loading && (
+            <V2Hero
+              eyebrow={(isAdmin && repFilter !== 'all') ? 'This rep\'s clients' : 'Client book'}
+              value={formatCurrency(wonTotal)}
+              label={`won from ${scoped.length} client${scoped.length === 1 ? '' : 's'}`}
+            />
+          )}
           <section className="v2d-kpi-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <StatCard label="Total clients" value={scoped.length} />
             <StatCard label="Quotes on record" value={scoped.reduce((s, c) => s + (c.quote_count || 0), 0)} />
@@ -342,6 +352,7 @@ export default function ClientsV2() {
               money={scoped.reduce((s, c) => s + (Number(c.total_won_amount) || 0), 0)}
             />
           </section>
+          </>
         )
       })()}
 

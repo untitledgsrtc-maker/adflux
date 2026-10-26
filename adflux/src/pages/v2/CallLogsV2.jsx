@@ -19,6 +19,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
+import V2Hero from '../../components/v2/V2Hero'
 
 export default function CallLogsV2() {
   const navigate = useNavigate()
@@ -176,6 +177,14 @@ export default function CallLogsV2() {
       </div>
 
       {/* KPI tiles */}
+      {!loading && (
+        <V2Hero
+          eyebrow="Calls in range"
+          value={String(stats.outgoing.count + stats.incoming.count + stats.missed.count)}
+          label={`${stats.outgoing.count} outgoing · ${stats.incoming.count} incoming · ${stats.missed.count} missed`}
+        />
+      )}
+
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',

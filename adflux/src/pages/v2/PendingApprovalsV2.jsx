@@ -24,6 +24,7 @@ import { fetchPendingApprovals, fetchApprovedPayments } from '../../hooks/usePay
 // confirm/prompt/alert dialogs for in-app primitives + Lucide icon.
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { toastError } from '../../components/v2/Toast'
+import V2Hero from '../../components/v2/V2Hero'
 // Phase 360 - private-LED quotes priced below Rs 600/screen wait here for the
 // admin (the Sales Head approves from /quote-approvals). Hidden when empty.
 import QuotePriceApprovals from '../../components/quotes/QuotePriceApprovals'
@@ -202,6 +203,14 @@ export default function PendingApprovalsV2() {
       </div>
 
       <QuotePriceApprovals hideWhenEmpty />
+      {!loading && (
+        <V2Hero
+          eyebrow="Waiting for your approval"
+          value={formatCurrency(rows.reduce((s, r) => s + (Number(r.amount_received) || 0), 0))}
+          label={`${rows.length} payment${rows.length === 1 ? '' : 's'} pending`}
+        />
+      )}
+
 
       {fetchErr && (
         <div style={{
