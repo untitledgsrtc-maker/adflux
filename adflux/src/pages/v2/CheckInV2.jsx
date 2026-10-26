@@ -467,7 +467,7 @@ function KpiChip({ icon, value, label, accent = false }) {
       }}>
         {value}
       </div>
-      <div style={{ fontSize: 10, color: 'var(--v2-ink-2, #94a3b8)' }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)' }}>{label}</div>
     </div>
   )
 }

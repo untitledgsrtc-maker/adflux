@@ -105,7 +105,7 @@ export default function TcWeeklyTiles() {
       background: 'var(--surface)', border: '1px solid var(--border)',
     }}>
       <div style={{
-        fontSize: 11, fontWeight: 700, letterSpacing: '.12em',
+        fontSize: 12, fontWeight: 700, letterSpacing: '.12em',
         color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12,
       }}>
         This week — TC policy
@@ -208,7 +208,7 @@ function Tile({ icon, label, value, target, hit, gates, sub }) {
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        fontSize: 10, fontWeight: 700, letterSpacing: '.10em',
+        fontSize: 12, fontWeight: 700, letterSpacing: '.10em',
         color: 'var(--text-muted)', textTransform: 'uppercase',
         marginBottom: 6,
       }}>
@@ -225,7 +225,7 @@ function Tile({ icon, label, value, target, hit, gates, sub }) {
         }}>{value}</span>
         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{target}</span>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.35 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.35 }}>
         {sub}
       </div>
     </div>

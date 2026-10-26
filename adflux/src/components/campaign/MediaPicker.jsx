@@ -144,4 +144,4 @@ const uploadBtn = { display: 'inline-flex', alignItems: 'center', gap: 7, backgr
 const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }
 const tile = { background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, padding: 6, cursor: 'pointer', textAlign: 'left' }
 const tilePh = { width: '100%', height: 78, borderRadius: 8, background: 'var(--v2-bg-0, #0a0f1c)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--v2-ink-2, #6a7590)' }
-const tileName = { fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', marginTop: 5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
+const tileName = { fontSize: 12, color: 'var(--v2-ink-2, #6a7590)', marginTop: 5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }

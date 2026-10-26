@@ -40,7 +40,7 @@ function ScoreSparkline({ userId }) {
   return (
     <div style={{ marginTop: 12 }}>
       <div style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: '.12em',
+        fontSize: 12, fontWeight: 700, letterSpacing: '.12em',
         color: 'var(--text-muted)', textTransform: 'uppercase',
         marginBottom: 8,
       }}>
@@ -70,13 +70,13 @@ function ScoreSparkline({ userId }) {
                 opacity: isCurrent ? 1 : 0.7,
               }} />
               <div style={{
-                fontSize: 10, color: isCurrent ? 'var(--text)' : 'var(--text-muted)',
+                fontSize: 12, color: isCurrent ? 'var(--text)' : 'var(--text-muted)',
                 fontWeight: isCurrent ? 700 : 500,
               }}>
                 {m.month_label}
               </div>
               <div style={{
-                fontSize: 9, fontFamily: 'inherit',
+                fontSize: 12, fontFamily: 'inherit',
                 color: 'var(--text-muted)',
               }}>
                 {pct.toFixed(0)}%
@@ -238,7 +238,7 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader, r
     }}>
       {!hideHeader && (
         <div style={{
-          fontSize: 11, fontWeight: 700, letterSpacing: '.12em',
+          fontSize: 12, fontWeight: 700, letterSpacing: '.12em',
           color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12,
         }}>
           This month — performance score
@@ -307,7 +307,7 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader, r
             fontSize: 12,
           }}>
             <div style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: '.12em',
+              fontSize: 12, fontWeight: 700, letterSpacing: '.12em',
               color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6,
             }}>
               What's hurting your score
@@ -344,7 +344,7 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader, r
                 {hitHundred ? 'Maxed out' : `${remainingToHundred}% to maximise payout`}
               </span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
               Score = ({activityNounPlur} done ÷ daily {activityNoun} target) × 100, averaged across {days} working day{days !== 1 ? 's' : ''} this month.
             </div>
           </div>

@@ -153,7 +153,7 @@ function Pill({ label, status }) {
       padding: '6px 14px',
       border: `1px solid ${color}`,
       borderRadius: 999,
-      fontSize: 11, fontWeight: 700,
+      fontSize: 12, fontWeight: 700,
       color,
       letterSpacing: '.06em',
       textTransform: 'uppercase',

@@ -586,7 +586,7 @@ export default function OpsTicketsV2() {
           <div style={{ width: 92, height: 92, flexShrink: 0, borderRadius: '50%', background: `conic-gradient(var(--success) 0 ${ring}%, var(--surface-3) ${ring}% 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--surface)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800 }}>{s?.uptimePct != null ? `${s.uptimePct}%` : '—'}</span>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{t('uptime_short', lang)}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('uptime_short', lang)}</span>
             </div>
           </div>
           <div style={{ flex: 1 }}>
@@ -692,7 +692,7 @@ export default function OpsTicketsV2() {
             <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--success-soft)', margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Phone size={24} style={{ color: 'var(--success)' }} /></div>
             <div style={{ fontWeight: 700, fontSize: 16 }}>{t('calling', lang)} {c?.name || ''}</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{c ? ((lang === 'gu' ? c.role_gu : c.role_en) || c.role_en || '') + ' · ' + (c.phone || '') : ''}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-subtle, var(--text-muted))', marginTop: 4 }}>{t('recorded_auto', lang)}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-subtle, var(--text-muted))', marginTop: 4 }}>{t('recorded_auto', lang)}</div>
           </div>
           <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10 }}>{t('call_ended_q', lang)}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>

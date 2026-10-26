@@ -282,7 +282,7 @@ export function MyPerformance() {
                 shown when there's actually a forecast lift, otherwise
                 it's noise. */}
             {proposedExtraRevenue > 0 && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
                 <span style={{ color: 'var(--text)' }}>Proposed: </span>
                 <strong style={{ color: 'var(--accent)' }}>{formatCurrency(proposed.incentive)}</strong>
                 {proposedDelta > 0 && (
@@ -291,12 +291,12 @@ export function MyPerformance() {
               </div>
             )}
             {!result.slabReached && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 Need {formatCurrency(threshold - result.total)} more to unlock
               </div>
             )}
             {result.targetExceeded && (
-              <div style={{ fontSize: 11, color: 'var(--success)', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'var(--success)', marginTop: 4 }}>
                 Includes ₹{Number(result.flatBonus || 0).toLocaleString('en-IN')} bonus!
               </div>
             )}
@@ -356,7 +356,7 @@ export function MyPerformance() {
           {activeCampaigns.length > 0 && (
             <span style={{
               marginLeft: 8, background: 'rgba(255,230,0,.15)', color: 'var(--accent)',
-              borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 700,
+              borderRadius: 20, padding: '1px 8px', fontSize: 12, fontWeight: 700,
             }}>{activeCampaigns.length}</span>
           )}
         </div>

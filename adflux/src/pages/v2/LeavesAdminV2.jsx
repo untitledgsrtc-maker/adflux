@@ -506,7 +506,7 @@ export default function LeavesAdminV2({ embedded = false }) {
                 padding: '1px 7px', borderRadius: 999,
                 background: active ? t.tint : 'var(--v2-bg-2)',
                 color: active ? 'var(--accent-fg, #0f172a)' : 'var(--v2-ink-2)',
-                fontSize: 11, fontWeight: 700,
+                fontSize: 12, fontWeight: 700,
                 fontFamily: 'var(--font-mono, monospace)',
               }}>{count}</span>
             </button>
@@ -569,7 +569,7 @@ export default function LeavesAdminV2({ embedded = false }) {
                         <div style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
                           <span style={{
                             display: 'inline-block', padding: '2px 10px',
-                            borderRadius: 999, fontSize: 11, fontWeight: 600,
+                            borderRadius: 999, fontSize: 12, fontWeight: 600,
                             textTransform: 'capitalize',
                             background: 'rgba(255,255,255,.06)',
                             color: 'var(--v2-ink-1)',
@@ -580,7 +580,7 @@ export default function LeavesAdminV2({ embedded = false }) {
                           {row.is_paid_request === false ? (
                             <span style={{
                               display: 'inline-block', padding: '2px 8px',
-                              borderRadius: 999, fontSize: 10, fontWeight: 700,
+                              borderRadius: 999, fontSize: 12, fontWeight: 700,
                               background: 'rgba(255,111,97,.14)',
                               color: '#FF6F61',
                               border: '1px solid rgba(255,111,97,.35)',
@@ -589,7 +589,7 @@ export default function LeavesAdminV2({ embedded = false }) {
                           ) : (
                             <span style={{
                               display: 'inline-block', padding: '2px 8px',
-                              borderRadius: 999, fontSize: 10, fontWeight: 700,
+                              borderRadius: 999, fontSize: 12, fontWeight: 700,
                               background: 'rgba(43,216,160,.14)',
                               color: '#2BD8A0',
                               border: '1px solid rgba(43,216,160,.35)',
@@ -601,7 +601,7 @@ export default function LeavesAdminV2({ embedded = false }) {
                       <td style={tdStyle}>
                         <span style={{
                           display: 'inline-block', padding: '2px 10px',
-                          borderRadius: 999, fontSize: 11, fontWeight: 700,
+                          borderRadius: 999, fontSize: 12, fontWeight: 700,
                           textTransform: 'capitalize',
                           background: `${statusTint}22`,
                           color: statusTint,
@@ -671,7 +671,7 @@ export default function LeavesAdminV2({ embedded = false }) {
 
 const labelStyle = {
   display: 'block',
-  fontSize: 11, fontWeight: 600,
+  fontSize: 12, fontWeight: 600,
   color: 'var(--v2-ink-2)',
   marginBottom: 4,
   textTransform: 'uppercase',
@@ -689,5 +689,5 @@ const inputStyle = {
   fontFamily: 'inherit',
   height: 38,
 }
-const thStyle = { padding: '10px 14px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.08em' }
+const thStyle = { padding: '10px 14px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.08em' }
 const tdStyle = { padding: '12px 14px', fontSize: 13, color: 'var(--v2-ink-1)', verticalAlign: 'top' }

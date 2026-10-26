@@ -85,7 +85,7 @@ function MemberCard({ member, settings, onDeactivate, onReactivate, onEdit }) {
             {member.name}
             <span className={`role-badge role-badge--${member.role}`}>{member.role === 'staff' && member.designation ? member.designation : member.role}</span>
             {!member.is_active && (
-              <span className="badge badge-inactive" style={{ fontSize: 10 }}>Inactive</span>
+              <span className="badge badge-inactive" style={{ fontSize: 12 }}>Inactive</span>
             )}
           </div>
           <div className="member-email">{member.email}</div>

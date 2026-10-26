@@ -239,7 +239,7 @@ export default function CallLogsV2() {
                   style={{
                     marginTop: 6, padding: '4px 10px', borderRadius: 999,
                     background: 'transparent', border: '1px solid var(--border)',
-                    color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer',
+                    color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer',
                     fontFamily: 'inherit',
                   }}
                 >
@@ -372,7 +372,7 @@ function Tile({ icon, label, count, sub, color, active, onClick }) {
     >
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        fontSize: 10, fontWeight: 700, letterSpacing: '.10em',
+        fontSize: 12, fontWeight: 700, letterSpacing: '.10em',
         textTransform: 'uppercase', color, marginBottom: 6,
       }}>
         {icon} {label}
@@ -382,7 +382,7 @@ function Tile({ icon, label, count, sub, color, active, onClick }) {
         fontFamily: 'var(--font-display, var(--font-sans))',
         color: 'var(--text)',
       }}>{count}</div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sub}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{sub}</div>
     </div>
   )
 }
@@ -479,7 +479,7 @@ function DirectionPill({ direction }) {
       display: 'inline-flex', alignItems: 'center', gap: 4,
       padding: '2px 8px',
       borderRadius: 999,
-      fontSize: 10, fontWeight: 700, letterSpacing: 0.4,
+      fontSize: 12, fontWeight: 700, letterSpacing: 0.4,
       textTransform: 'uppercase',
       color: palette,
       border: `1px solid ${palette}`,
@@ -492,7 +492,7 @@ function DirectionPill({ direction }) {
 function Th({ children }) {
   return (
     <th style={{
-      fontSize: 10, fontWeight: 700, letterSpacing: '.10em',
+      fontSize: 12, fontWeight: 700, letterSpacing: '.10em',
       textTransform: 'uppercase', color: 'var(--text-muted)',
       padding: '8px 10px', textAlign: 'left',
       borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap',
@@ -531,7 +531,7 @@ const ghostBtn = {
 const miniBtn = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
   padding: '4px 10px',
-  fontSize: 11, fontWeight: 600,
+  fontSize: 12, fontWeight: 600,
   borderRadius: 10,
   border: '1px solid var(--accent)',
   background: 'var(--accent)',

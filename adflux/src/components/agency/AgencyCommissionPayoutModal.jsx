@@ -228,7 +228,7 @@ export default function AgencyCommissionPayoutModal({ agency, quote, onClose, on
           {/* History list */}
           <div style={{ marginTop: 16 }}>
             <div style={{
-              fontSize: 11, fontWeight: 700, letterSpacing: '.08em',
+              fontSize: 12, fontWeight: 700, letterSpacing: '.08em',
               color: 'var(--v2-ink-2)', textTransform: 'uppercase',
               marginBottom: 8,
             }}>
@@ -267,7 +267,7 @@ export default function AgencyCommissionPayoutModal({ agency, quote, onClose, on
                         {formatCurrency(Number(p.amount_paid || 0))}
                         {p.is_full_payment && (
                           <span style={{
-                            fontSize: 10, fontWeight: 700,
+                            fontSize: 12, fontWeight: 700,
                             background: 'var(--success-soft)',
                             color: 'var(--success)',
                             border: '1px solid var(--success)',
@@ -277,7 +277,7 @@ export default function AgencyCommissionPayoutModal({ agency, quote, onClose, on
                         )}
                       </div>
                       <div style={{
-                        fontSize: 11, color: 'var(--v2-ink-2)',
+                        fontSize: 12, color: 'var(--v2-ink-2)',
                         marginTop: 2, display: 'flex', alignItems: 'center', gap: 6,
                       }}>
                         <Calendar size={12} />
@@ -342,7 +342,7 @@ function SummaryTile({ label, value, tone }) {
       background: 'var(--v2-bg-1)',
     }}>
       <div style={{
-        fontSize: 10, fontWeight: 700, letterSpacing: '.08em',
+        fontSize: 12, fontWeight: 700, letterSpacing: '.08em',
         color: 'var(--v2-ink-2)', textTransform: 'uppercase',
       }}>{label}</div>
       <div style={{

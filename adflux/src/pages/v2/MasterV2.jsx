@@ -446,7 +446,7 @@ function AttachmentsTab() {
             className="govt-list__row"
             style={{
               gridTemplateColumns: '50px 1.4fr 90px 1.6fr 90px 28px',
-              fontSize: 11, color: 'var(--text-subtle)',
+              fontSize: 12, color: 'var(--text-subtle)',
               textTransform: 'uppercase', letterSpacing: '.06em',
               fontWeight: 600,
             }}
@@ -508,7 +508,7 @@ function AttachmentsTab() {
                   }}
                   style={{
                     padding: '4px 10px', borderRadius: 999, border: 'none',
-                    cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                    cursor: 'pointer', fontSize: 12, fontWeight: 700,
                     background: r.is_required ? 'rgba(229,57,53,.15)' : 'var(--surface-2)',
                     color:      r.is_required ? '#ef9a9a' : 'var(--text-muted)',
                     textTransform: 'uppercase', letterSpacing: '.06em',
@@ -557,7 +557,7 @@ function AttachmentsTab() {
                         style={{
                           background: 'transparent', border: 'none',
                           color: '#64b5f6', cursor: 'pointer',
-                          fontSize: 11, fontWeight: 600,
+                          fontSize: 12, fontWeight: 600,
                         }}
                         title="View current default file"
                       >View</button>
@@ -567,7 +567,7 @@ function AttachmentsTab() {
                         style={{
                           background: 'transparent', border: 'none',
                           color: 'var(--danger)', cursor: 'pointer',
-                          fontSize: 11, fontWeight: 600,
+                          fontSize: 12, fontWeight: 600,
                         }}
                         title="Remove default file"
                       >Clear</button>
@@ -684,7 +684,7 @@ function AssetUploader({ row, field, label, kind, accept, onUpload, onClear }) {
   return (
     <div>
       <label style={{
-        display: 'block', fontSize: 10, fontWeight: 700,
+        display: 'block', fontSize: 12, fontWeight: 700,
         color: 'var(--text-subtle)', textTransform: 'uppercase',
         letterSpacing: '.06em', marginBottom: 6,
       }}>{label}</label>
@@ -779,7 +779,7 @@ function AssetUploader({ row, field, label, kind, accept, onUpload, onClear }) {
       )}
 
       {err && (
-        <div style={{ color: '#ef9a9a', fontSize: 11, marginTop: 6 }}>{err}</div>
+        <div style={{ color: '#ef9a9a', fontSize: 12, marginTop: 6 }}>{err}</div>
       )}
     </div>
   )
@@ -913,7 +913,7 @@ function CompaniesTab() {
     return (
       <div style={{ gridColumn: wide ? '1 / span 2' : 'auto' }}>
         <label style={{
-          display: 'block', fontSize: 10, fontWeight: 700,
+          display: 'block', fontSize: 12, fontWeight: 700,
           color: 'var(--text-subtle)', textTransform: 'uppercase',
           letterSpacing: '.06em', marginBottom: 4,
         }}>{label}</label>
@@ -980,7 +980,7 @@ function CompaniesTab() {
             }}>
               <div>
                 <div style={{
-                  fontSize: 10, letterSpacing: '.12em',
+                  fontSize: 12, letterSpacing: '.12em',
                   color: r.segment === 'GOVERNMENT' ? '#fbbf24' : '#64b5f6',
                   fontWeight: 700, textTransform: 'uppercase',
                   marginBottom: 2,
@@ -1010,7 +1010,7 @@ function CompaniesTab() {
 
               {/* Tax fields */}
               <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--surface-3)', paddingTop: 12, marginTop: 6 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Tax</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Tax</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <Field row={r} field="gstin" label="GSTIN" />
                   <Field row={r} field="pan"   label="PAN" />
@@ -1019,7 +1019,7 @@ function CompaniesTab() {
 
               {/* Bank fields */}
               <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--surface-3)', paddingTop: 12, marginTop: 6 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Bank</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Bank</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <Field row={r} field="bank_name"       label="Bank name" />
                   <Field row={r} field="bank_branch"     label="Branch" />
@@ -1037,7 +1037,7 @@ function CompaniesTab() {
                   URL is saved into companies.letterhead_url / logo_url
                   and used directly by the proposal renderer. */}
               <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--surface-3)', paddingTop: 12, marginTop: 6 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Branding</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Branding</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                   <AssetUploader
                     row={r}
@@ -1354,7 +1354,7 @@ function SignersTab() {
             className="govt-list__row"
             style={{
               gridTemplateColumns: '1.2fr 100px 1.2fr 1fr 60px',
-              fontSize: 11, color: 'var(--text-subtle)',
+              fontSize: 12, color: 'var(--text-subtle)',
               textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600,
             }}
           >
@@ -1373,11 +1373,11 @@ function SignersTab() {
               <span style={{ color: 'var(--text)', fontWeight: 600 }}>
                 {u.name}
                 {u.email && (
-                  <div style={{ fontSize: 11, color: 'var(--text-subtle)', fontWeight: 400 }}>{u.email}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-subtle)', fontWeight: 400 }}>{u.email}</div>
                 )}
               </span>
               <span style={{
-                fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+                fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
                 letterSpacing: '.06em', color: 'var(--text-muted)',
               }}>{u.role}</span>
               <input
@@ -1501,7 +1501,7 @@ function MediaTab() {
           >
             <div style={{ flex: 1, minWidth: 260 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{m.label}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 2 }}>
                 {m.segment} · {m.media_type}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.45 }}>
@@ -1907,7 +1907,7 @@ function DocumentsTab() {
                 <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 14 }}>
                   {segment} — {media_type}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-subtle)' }}>
                   Language: {language} · {versions.length} version{versions.length === 1 ? '' : 's'}
                 </div>
               </div>
@@ -1924,7 +1924,7 @@ function DocumentsTab() {
                 >
                   <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>v{t.version}</span>
                   <span style={{
-                    fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+                    fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
                     padding: '2px 8px', borderRadius: 999,
                     background: t.is_active ? 'rgba(74,222,128,.15)' : 'var(--surface-2)',
                     color:      t.is_active ? '#4ade80' : 'var(--text-subtle)',
@@ -1932,7 +1932,7 @@ function DocumentsTab() {
                   }}>
                     {t.is_active ? 'active' : 'draft'}
                   </span>
-                  <span style={{ color: 'var(--text-subtle)', fontSize: 11 }}>
+                  <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>
                     {t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
                   </span>
                   <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
@@ -1943,7 +1943,7 @@ function DocumentsTab() {
                         disabled={saving}
                         style={{
                           padding: '4px 10px', borderRadius: 6, border: 'none',
-                          background: '#4ade80', color: 'var(--accent-fg, #0f172a)', fontSize: 11, fontWeight: 700,
+                          background: '#4ade80', color: 'var(--accent-fg, #0f172a)', fontSize: 12, fontWeight: 700,
                           cursor: 'pointer',
                         }}
                       >
@@ -1957,7 +1957,7 @@ function DocumentsTab() {
                         padding: '4px 10px', borderRadius: 6,
                         border: '1px solid var(--surface-3)',
                         background: 'transparent', color: 'var(--text)',
-                        fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        fontSize: 12, fontWeight: 600, cursor: 'pointer',
                       }}
                     >
                       View / Edit
@@ -1998,7 +1998,7 @@ function DocumentsTab() {
             display: 'flex', flexDirection: 'column', gap: 14, overflow: 'hidden',
           }}>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-subtle)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>
                 {editBuf.segment} — {editBuf.media_type} · {editBuf.language} · editing v{editBuf.version}
               </div>
               <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 16 }}>
@@ -2016,7 +2016,7 @@ function DocumentsTab() {
             </div>
             <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Subject line</label>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Subject line</label>
                 <input
                   type="text"
                   value={editBuf.subject_line}
@@ -2025,7 +2025,7 @@ function DocumentsTab() {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Header HTML (optional)</label>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Header HTML (optional)</label>
                 <textarea
                   value={editBuf.header_html}
                   onChange={e => setEditBuf({ ...editBuf, header_html: e.target.value })}
@@ -2034,7 +2034,7 @@ function DocumentsTab() {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Body HTML</label>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Body HTML</label>
                 <textarea
                   value={editBuf.body_html}
                   onChange={e => setEditBuf({ ...editBuf, body_html: e.target.value })}
@@ -2043,7 +2043,7 @@ function DocumentsTab() {
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Footer HTML (optional)</label>
+                <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Footer HTML (optional)</label>
                 <textarea
                   value={editBuf.footer_html}
                   onChange={e => setEditBuf({ ...editBuf, footer_html: e.target.value })}
@@ -2340,13 +2340,13 @@ function TemplateEditor({ row, stageMeta, busy, status, onSave, onToggleActive }
             {stageMeta.label}
             {!row.is_active && (
               <span style={{
-                marginLeft: 8, fontSize: 10, fontWeight: 600,
+                marginLeft: 8, fontSize: 12, fontWeight: 600,
                 color: 'var(--text-muted)', border: '1px solid var(--border-strong)',
                 padding: '2px 6px', borderRadius: 4,
               }}>OFF</span>
             )}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             {stageMeta.desc} · <span className="mono">stage = {row.stage}</span>
           </div>
         </div>
@@ -2381,10 +2381,10 @@ function TemplateEditor({ row, stageMeta, busy, status, onSave, onToggleActive }
           </button>
         )}
         {status === 'saved' && (
-          <span style={{ fontSize: 11, color: 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> Saved</span>
+          <span style={{ fontSize: 12, color: 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> Saved</span>
         )}
         {status && status !== 'saved' && (
-          <span style={{ fontSize: 11, color: 'var(--danger)' }}>{status}</span>
+          <span style={{ fontSize: 12, color: 'var(--danger)' }}>{status}</span>
         )}
       </div>
     </div>
@@ -2566,7 +2566,7 @@ function MediaTypesTab() {
             gridTemplateColumns: '1fr 0.5fr 0.5fr 60px',
             gap: 0,
             background: 'var(--surface-2)',
-            fontSize: 10, fontWeight: 700,
+            fontSize: 12, fontWeight: 700,
             color: 'var(--text-subtle)',
             textTransform: 'uppercase', letterSpacing: '.06em',
             borderBottom: '1px solid var(--surface-3)',
@@ -2947,7 +2947,7 @@ function HolidaysTab() {
             </button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: 'var(--text-subtle)', marginRight: 2 }}>Official list:</span>
+            <span style={{ fontSize: 12, color: 'var(--text-subtle)', marginRight: 2 }}>Official list:</span>
             {HOLIDAY_NAME_CHIPS.map(n => (
               <button
                 key={n}
@@ -2992,7 +2992,7 @@ function HolidaysTab() {
               display: 'grid',
               gridTemplateColumns: '150px 1fr 130px 52px',
               background: 'var(--surface-2)',
-              fontSize: 10, fontWeight: 700,
+              fontSize: 12, fontWeight: 700,
               color: 'var(--text-subtle)',
               textTransform: 'uppercase', letterSpacing: '.06em',
               borderBottom: '1px solid var(--surface-3)',
@@ -3019,14 +3019,14 @@ function HolidaysTab() {
                   }}
                 >
                   <div style={{ padding: '10px 12px', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
-                    {f.date} <span style={{ color: 'var(--text-subtle)', fontSize: 11 }}>{f.day}</span>
+                    {f.date} <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>{f.day}</span>
                   </div>
                   <div style={{ padding: '10px 12px', fontSize: 13, color: 'var(--text)' }}>
                     {r.name}
                     {r.is_active === false && (
                       <span
                         title="Inactive row. Scoring, the 9:30 check-in push and the daily digests treat this day as a working day, but the check-in screen, check-in reminders, 8 PM auto-checkout and the 8:30 PM auto-absent still treat it as a holiday. Delete the row to make it a working day everywhere."
-                        style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 999, border: '1px solid var(--warning)', background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: 10, fontWeight: 700 }}
+                        style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 999, border: '1px solid var(--warning)', background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: 12, fontWeight: 700 }}
                       >inactive</span>
                     )}
                   </div>
@@ -3082,7 +3082,7 @@ function FieldBlock({ label, children }) {
   return (
     <div>
       <label style={{
-        display: 'block', fontSize: 10, fontWeight: 700,
+        display: 'block', fontSize: 12, fontWeight: 700,
         color: 'var(--text-subtle)', textTransform: 'uppercase',
         letterSpacing: '.06em', marginBottom: 4,
       }}>{label}</label>
@@ -3178,7 +3178,7 @@ function WhatsAppTemplatesTab() {
       }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 10, alignItems: 'end' }}>
           <div>
-            <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Name</label>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Name</label>
             <input
               value={newName}
               onChange={e => setNewName(e.target.value)}
@@ -3187,7 +3187,7 @@ function WhatsAppTemplatesTab() {
             />
           </div>
           <div>
-            <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Body</label>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Body</label>
             <input
               value={newBody}
               onChange={e => setNewBody(e.target.value)}
@@ -3240,10 +3240,10 @@ function WhatsAppTemplatesTab() {
                 style={{ width: 70, padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12, textAlign: 'center' }}
                 title="Display order"
               />
-              <button onClick={() => toggleActive(r)} style={{ padding: '6px 10px', background: r.is_active ? 'var(--success-soft)' : 'var(--border)', color: r.is_active ? 'var(--success)' : 'var(--text-muted)', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => toggleActive(r)} style={{ padding: '6px 10px', background: r.is_active ? 'var(--success-soft)' : 'var(--border)', color: r.is_active ? 'var(--success)' : 'var(--text-muted)', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 {r.is_active ? 'Active' : 'Off'}
               </button>
-              <button onClick={() => remove(r)} style={{ padding: '6px 10px', background: 'transparent', color: 'var(--danger, #EF4444)', border: '1px solid var(--danger, #EF4444)', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => remove(r)} style={{ padding: '6px 10px', background: 'transparent', color: 'var(--danger, #EF4444)', border: '1px solid var(--danger, #EF4444)', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 Delete
               </button>
             </div>
@@ -3254,7 +3254,7 @@ function WhatsAppTemplatesTab() {
               style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, lineHeight: 1.5, fontFamily: 'inherit', resize: 'vertical' }}
             />
             {status[r.id] && (
-              <div style={{ fontSize: 11, marginTop: 4, color: status[r.id] === 'saved' ? 'var(--success)' : 'var(--danger)' }}>
+              <div style={{ fontSize: 12, marginTop: 4, color: status[r.id] === 'saved' ? 'var(--success)' : 'var(--danger)' }}>
                 {savingId === r.id ? 'Saving…' : status[r.id]}
               </div>
             )}
@@ -3357,7 +3357,7 @@ function CallScriptsTab() {
       }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 2fr auto', gap: 10, alignItems: 'end' }}>
           <div>
-            <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Name</label>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Name</label>
             <input
               value={newName}
               onChange={e => setNewName(e.target.value)}
@@ -3366,7 +3366,7 @@ function CallScriptsTab() {
             />
           </div>
           <div>
-            <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Segment</label>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Segment</label>
             <select
               value={newSegment}
               onChange={e => setNewSegment(e.target.value)}
@@ -3378,7 +3378,7 @@ function CallScriptsTab() {
             </select>
           </div>
           <div>
-            <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Body</label>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>Body</label>
             <input
               value={newBody}
               onChange={e => setNewBody(e.target.value)}
@@ -3440,10 +3440,10 @@ function CallScriptsTab() {
                 style={{ width: 60, padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12, textAlign: 'center' }}
                 title="Display order"
               />
-              <button onClick={() => toggleActive(r)} style={{ padding: '6px 10px', background: r.is_active ? 'var(--success-soft)' : 'var(--border)', color: r.is_active ? 'var(--success)' : 'var(--text-muted)', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => toggleActive(r)} style={{ padding: '6px 10px', background: r.is_active ? 'var(--success-soft)' : 'var(--border)', color: r.is_active ? 'var(--success)' : 'var(--text-muted)', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 {r.is_active ? 'Active' : 'Off'}
               </button>
-              <button onClick={() => remove(r)} style={{ padding: '6px 10px', background: 'transparent', color: 'var(--danger, #EF4444)', border: '1px solid var(--danger, #EF4444)', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => remove(r)} style={{ padding: '6px 10px', background: 'transparent', color: 'var(--danger, #EF4444)', border: '1px solid var(--danger, #EF4444)', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 Delete
               </button>
             </div>
@@ -3454,7 +3454,7 @@ function CallScriptsTab() {
               style={{ width: '100%', padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 13, lineHeight: 1.5, fontFamily: 'inherit', resize: 'vertical' }}
             />
             {status[r.id] && (
-              <div style={{ fontSize: 11, marginTop: 4, color: status[r.id] === 'saved' ? 'var(--success)' : 'var(--danger)' }}>
+              <div style={{ fontSize: 12, marginTop: 4, color: status[r.id] === 'saved' ? 'var(--success)' : 'var(--danger)' }}>
                 {savingId === r.id ? 'Saving…' : status[r.id]}
               </div>
             )}
@@ -3590,7 +3590,7 @@ function DesignationsTab() {
           <DesSel label="Auth role" v={draft.auth_role} onChange={v => setDraft(d => ({ ...d, auth_role: v }))} options={AUTH_ROLES.map(o => [o.v, o.label])} />
           <DesSel label="Team role" v={draft.team_role} onChange={v => setDraft(d => ({ ...d, team_role: v }))} options={TEAM_ROLES.map(t => [t, t])} />
           <div>
-            <label style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 3 }}>Salary</label>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 3 }}>Salary</label>
             <div style={{ ...inputBase, width: '100%', color: 'var(--text-muted)', background: 'transparent', borderStyle: 'dashed' }}>Typed per person</div>
           </div>
           <button
@@ -3665,15 +3665,15 @@ function DesignationsTab() {
               >
                 Salary: typed per person
               </div>
-              <button onClick={() => toggleActive(r)} style={{ padding: '6px 10px', background: r.is_active ? 'var(--success-soft)' : 'var(--border)', color: r.is_active ? 'var(--success)' : 'var(--text-muted)', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => toggleActive(r)} style={{ padding: '6px 10px', background: r.is_active ? 'var(--success-soft)' : 'var(--border)', color: r.is_active ? 'var(--success)' : 'var(--text-muted)', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 {r.is_active ? 'Active' : 'Off'}
               </button>
-              <button onClick={() => remove(r)} style={{ padding: '6px 10px', background: 'transparent', color: 'var(--danger, #EF4444)', border: '1px solid var(--danger, #EF4444)', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => remove(r)} style={{ padding: '6px 10px', background: 'transparent', color: 'var(--danger, #EF4444)', border: '1px solid var(--danger, #EF4444)', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                 Delete
               </button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 8, alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)' }}>
                 <input
                   type="checkbox"
                   defaultChecked={r.has_incentive}
@@ -3687,12 +3687,12 @@ function DesignationsTab() {
               <NumIn label="Display order" v={r.display_order} onSave={v => saveField(r, 'display_order', v)} />
             </div>
             {r.notes && (
-              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
                 {r.notes}
               </div>
             )}
             {status[r.id] && (
-              <div style={{ fontSize: 11, marginTop: 6, color: status[r.id] === 'saved' ? 'var(--success)' : 'var(--danger)' }}>
+              <div style={{ fontSize: 12, marginTop: 6, color: status[r.id] === 'saved' ? 'var(--success)' : 'var(--danger)' }}>
                 {savingId === r.id ? 'Saving…' : status[r.id]}
               </div>
             )}
@@ -3714,7 +3714,7 @@ const inputBase = {
 function DesIn({ label, v, onChange, type = 'text', placeholder }) {
   return (
     <div>
-      <label style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 3 }}>{label}</label>
+      <label style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 3 }}>{label}</label>
       <input
         type={type}
         value={v}
@@ -3728,7 +3728,7 @@ function DesIn({ label, v, onChange, type = 'text', placeholder }) {
 function DesSel({ label, v, onChange, options }) {
   return (
     <div>
-      <label style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 3 }}>{label}</label>
+      <label style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 3 }}>{label}</label>
       <select
         value={v}
         onChange={e => onChange(e.target.value)}
@@ -3741,7 +3741,7 @@ function DesSel({ label, v, onChange, options }) {
 }
 function NumIn({ label, v, onSave }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11, color: 'var(--text-muted)' }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12, color: 'var(--text-muted)' }}>
       <span>{label}</span>
       <input
         type="number"
@@ -4028,7 +4028,7 @@ function CleanupCard({ title, body, ctaLabel, onClick, busy, disabled, progress,
       borderRadius: 10,
     }}>
       <div style={{
-        fontSize: 11, fontWeight: 700, letterSpacing: '.08em',
+        fontSize: 12, fontWeight: 700, letterSpacing: '.08em',
         color: 'var(--text-subtle)', textTransform: 'uppercase',
         marginBottom: 6,
       }}>

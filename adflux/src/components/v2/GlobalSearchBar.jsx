@@ -145,7 +145,7 @@ export default function GlobalSearchBar() {
           </button>
         ) : (
           <span style={{
-            fontFamily: 'inherit', fontSize: 10,
+            fontFamily: 'inherit', fontSize: 12,
             background: 'rgba(255,255,255,.06)',
             padding: '2px 6px', borderRadius: 4,
             color: 'var(--v2-ink-2)',
@@ -197,7 +197,7 @@ export default function GlobalSearchBar() {
                   </div>
                   {item.secondary && (
                     <div style={{
-                      fontSize: 11, color: 'var(--text-muted)',
+                      fontSize: 12, color: 'var(--text-muted)',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {item.secondary}
@@ -205,7 +205,7 @@ export default function GlobalSearchBar() {
                   )}
                 </div>
                 <span style={{
-                  fontSize: 9, letterSpacing: '.08em', textTransform: 'uppercase',
+                  fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase',
                   color: tint, opacity: .85,
                 }}>
                   {item.kind}

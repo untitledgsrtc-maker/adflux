@@ -73,7 +73,7 @@ export default function CampaignChrome({ active, title = 'Campaigns', sub, right
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 240 }}>
           <div style={{
-            fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase',
+            fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase',
             color: 'var(--v2-ink-2, #6a7590)', fontWeight: 600,
           }}>
             Lead capture · WhatsApp · QR · Routing
@@ -131,7 +131,7 @@ export default function CampaignChrome({ active, title = 'Campaigns', sub, right
               )}
               {t.soon && (
                 <span style={{
-                  fontSize: 9, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+                  fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
                   color: 'var(--v2-ink-2, #6a7590)', background: 'var(--v2-bg-2, #1a2742)',
                   border: '1px solid var(--v2-line, #1f2b47)', padding: '2px 6px', borderRadius: 999,
                 }}>

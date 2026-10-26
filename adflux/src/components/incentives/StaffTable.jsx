@@ -168,7 +168,7 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, pr
                       {formatCurrency(result.total)}
                     </div>
                     {md && (
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                         New: {formatCurrency(md.new_client_revenue)} / Ren: {formatCurrency(md.renewal_revenue)}
                       </div>
                     )}
@@ -192,12 +192,12 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, pr
                         lift (rep has open pipeline or won-unsettled).
                         Otherwise it'd just echo the earned number. */}
                     {proposed.incentive > result.incentive && (
-                      <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 2 }}>
                         Proposed: {formatCurrency(proposed.incentive)}
                       </div>
                     )}
                     {result.targetExceeded && (
-                      <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 2 }}>
                         +{formatCurrency(result.flatBonus)} bonus
                       </div>
                     )}
@@ -205,7 +205,7 @@ export function StaffTable({ profiles, settings, monthlySales, selectedMonth, pr
                   <td>
                     <StreakBadge streak={streak} />
                     {eligible && (
-                      <div style={{ fontSize: 11, color: 'var(--success)', marginTop: 4 }}>
+                      <div style={{ fontSize: 12, color: 'var(--success)', marginTop: 4 }}>
                         Increment eligible
                       </div>
                     )}

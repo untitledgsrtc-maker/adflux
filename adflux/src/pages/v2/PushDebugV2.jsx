@@ -74,7 +74,7 @@ function Status({ ok, warn, label, detail, action }) {
           {label}
         </div>
         {detail && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.5 }}>
             {detail}
           </div>
         )}
@@ -330,7 +330,7 @@ export default function PushDebugV2() {
         </div>
 
         <div style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 11, letterSpacing: '.08em', color: 'var(--text-subtle)', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 12, letterSpacing: '.08em', color: 'var(--text-subtle)', textTransform: 'uppercase' }}>
             Settings · diagnostics
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: '4px 0 6px', color: 'var(--text)' }}>
@@ -360,7 +360,7 @@ export default function PushDebugV2() {
             <div style={{ fontSize: 14, fontWeight: 600 }}>
               {allGreen ? 'Push is fully wired on this device.' : 'Push is not fully wired yet.'}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
               {allGreen
                 ? 'Tap "Send test push" below to confirm an actual notification lands.'
                 : 'Fix the red rows below, then tap "Send test push".'}
@@ -416,7 +416,7 @@ export default function PushDebugV2() {
             {/* Step 1 — Battery */}
             <div style={{ marginBottom: 12 }}>
               <div style={{
-                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                fontSize: 12, fontWeight: 700, color: 'var(--text)',
                 textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
               }}>Step 1 · Battery → Unrestricted</div>
               <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
@@ -431,7 +431,7 @@ export default function PushDebugV2() {
             {/* Step 2 — Background data */}
             <div style={{ marginBottom: 12 }}>
               <div style={{
-                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                fontSize: 12, fontWeight: 700, color: 'var(--text)',
                 textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
               }}>Step 2 · Background data ON</div>
               <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
@@ -445,7 +445,7 @@ export default function PushDebugV2() {
             {/* Step 3 — Battery saver */}
             <div style={{ marginBottom: 12 }}>
               <div style={{
-                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                fontSize: 12, fontWeight: 700, color: 'var(--text)',
                 textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
               }}>Step 3 · Battery Saver OFF</div>
               <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
@@ -458,7 +458,7 @@ export default function PushDebugV2() {
             {/* Step 4 — Samsung specific */}
             <div style={{ marginBottom: 12 }}>
               <div style={{
-                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                fontSize: 12, fontWeight: 700, color: 'var(--text)',
                 textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
               }}>Step 4 · Samsung only — whitelist {browserName}</div>
               <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
@@ -474,7 +474,7 @@ export default function PushDebugV2() {
             {isCallTrackedRole && (
             <div>
               <div style={{
-                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                fontSize: 12, fontWeight: 700, color: 'var(--text)',
                 textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
               }}>Step 5 · Use the Untitled Advertising Android app (APK)</div>
               <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
@@ -490,7 +490,7 @@ export default function PushDebugV2() {
             {!isCallTrackedRole && (
             <div>
               <div style={{
-                fontSize: 11, fontWeight: 700, color: 'var(--text)',
+                fontSize: 12, fontWeight: 700, color: 'var(--text)',
                 textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4,
               }}>Step 5 · Install app to home screen (recommended)</div>
               <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
@@ -753,7 +753,7 @@ export default function PushDebugV2() {
                 borderRadius: 8,
                 background: 'var(--surface-2, #334155)',
                 marginBottom: 6,
-                fontSize: 11, color: 'var(--text-muted)',
+                fontSize: 12, color: 'var(--text-muted)',
                 wordBreak: 'break-word', lineHeight: 1.5,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -777,7 +777,7 @@ export default function PushDebugV2() {
           background: 'var(--surface, #1e293b)',
           border: '1px dashed var(--border-strong, #475569)',
           borderRadius: 8,
-          fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6,
+          fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6,
         }}>
           <div style={{ color: 'var(--text)', fontWeight: 600, marginBottom: 4 }}>
             If "Send test push" succeeds but no notification appears

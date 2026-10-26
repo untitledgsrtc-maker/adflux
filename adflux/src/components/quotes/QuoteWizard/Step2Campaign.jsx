@@ -358,7 +358,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                               type="button"
                               onClick={() => { setBulk(b => ({ ...b, duration_months: String(m) })); setBulkNote('') }}
                               style={{
-                                fontSize: 10, padding: '2px 8px', borderRadius: 999, cursor: 'pointer', fontWeight: 600,
+                                fontSize: 12, padding: '2px 8px', borderRadius: 999, cursor: 'pointer', fontWeight: 600,
                                 border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
                                 background: active ? 'var(--accent-soft)' : 'transparent',
                                 color: active ? 'var(--accent)' : 'var(--text-muted)',
@@ -501,7 +501,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                             type="button"
                             onClick={() => updateEntry(sc.city.id, 'duration_months', m)}
                             style={{
-                              fontSize: 10,
+                              fontSize: 12,
                               padding: '2px 8px',
                               borderRadius: 999,
                               border: active
@@ -529,7 +529,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                             type="button"
                             onClick={() => setDays(sc.city.id, dn)}
                             style={{
-                              fontSize: 10,
+                              fontSize: 12,
                               padding: '2px 8px',
                               borderRadius: 999,
                               border: active ? '1px solid var(--v2-yellow, #FFE600)' : '1px solid rgba(255,255,255,.15)',

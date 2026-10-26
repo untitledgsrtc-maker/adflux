@@ -317,7 +317,7 @@ export default function CampaignsV2() {
                       </td>
                       <td style={td}>
                         <span style={{
-                          display: 'inline-flex', padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+                          display: 'inline-flex', padding: '2px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
                           background: c.is_active ? 'var(--v2-green-soft, rgba(34,197,94,0.14))' : 'rgba(106,117,144,0.18)',
                           color: c.is_active ? 'var(--v2-green, #22c55e)' : 'var(--v2-ink-2, #6a7590)',
                         }}>
@@ -345,12 +345,12 @@ export default function CampaignsV2() {
 function Kpi({ label, value, hint, accent }) {
   return (
     <div style={panel}>
-      <div style={{ fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'uppercase', letterSpacing: '.10em', fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'uppercase', letterSpacing: '.10em', fontWeight: 600 }}>{label}</div>
       <div style={{
         fontFamily: 'var(--v2-display, "Space Grotesk")', fontSize: 26, fontWeight: 700, marginTop: 6,
         color: accent ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-ink-0, #f5f7fb)',
       }}>{value}</div>
-      {hint && <div style={{ fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', marginTop: 4 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #6a7590)', marginTop: 4 }}>{hint}</div>}
     </div>
   )
 }
@@ -362,12 +362,12 @@ function fmtDate(iso) {
 // ─── inline styles ───────────────────────────────────────────────────────
 const panel = { background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 14, padding: 18 }
 const banner = { ...panel, borderColor: 'var(--v2-amber, #F59E0B)', background: 'var(--v2-amber-soft, rgba(245,158,11,0.12))', display: 'flex', gap: 10, alignItems: 'flex-start' }
-const lbl = { fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 6, display: 'block' }
+const lbl = { fontSize: 12, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 6, display: 'block' }
 const inp = { width: '100%', height: 38, padding: '0 12px', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
 const btnY = { background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0b1220)', border: 'none', borderRadius: 10, height: 38, padding: '0 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
 const btnGhost = { background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, height: 34, padding: '0 12px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }
-const th = { padding: '11px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--v2-ink-2, #6a7590)', borderBottom: '1px solid var(--v2-line, #1f2b47)', whiteSpace: 'nowrap', background: 'rgba(255,255,255,.02)' }
+const th = { padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--v2-ink-2, #6a7590)', borderBottom: '1px solid var(--v2-line, #1f2b47)', whiteSpace: 'nowrap', background: 'rgba(255,255,255,.02)' }
 const td = { padding: '13px 16px', borderBottom: '1px solid var(--v2-line, #1f2b47)', fontSize: 13, color: 'var(--v2-ink-1, #a9b3c7)', verticalAlign: 'middle' }
 const tcPill = { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--v2-ink-1, #a9b3c7)', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', padding: '3px 9px', borderRadius: 999 }
-const tcAv = { width: 18, height: 18, borderRadius: 999, background: 'var(--v2-blue-soft, rgba(96,165,250,0.16))', color: 'var(--v2-blue, #60a5fa)', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }
-const chip = (c) => ({ display: 'inline-flex', padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', background: c === 'GOVERNMENT' ? 'var(--v2-blue-soft, rgba(96,165,250,0.16))' : 'var(--v2-tint-yellow, rgba(255,230,0,0.14))', color: c === 'GOVERNMENT' ? 'var(--v2-blue, #60a5fa)' : 'var(--v2-yellow, #FFE600)' })
+const tcAv = { width: 18, height: 18, borderRadius: 999, background: 'var(--v2-blue-soft, rgba(96,165,250,0.16))', color: 'var(--v2-blue, #60a5fa)', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }
+const chip = (c) => ({ display: 'inline-flex', padding: '2px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', background: c === 'GOVERNMENT' ? 'var(--v2-blue-soft, rgba(96,165,250,0.16))' : 'var(--v2-tint-yellow, rgba(255,230,0,0.14))', color: c === 'GOVERNMENT' ? 'var(--v2-blue, #60a5fa)' : 'var(--v2-yellow, #FFE600)' })

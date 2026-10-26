@@ -102,7 +102,7 @@ function Kpi({ label, value, sub, color, Icon, tint }) {
   return (
     <Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ fontSize: 11, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--text-subtle, #64748b)', fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 12, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--text-subtle, #64748b)', fontWeight: 600 }}>{label}</div>
         {Icon && <span style={{ width: 32, height: 32, borderRadius: 9, display: 'grid', placeItems: 'center', background: tint || 'var(--surface-2)', color: color || 'var(--text-muted)' }}><Icon size={17} /></span>}
       </div>
       <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 25, marginTop: 8, color: color || 'var(--text, #f1f5f9)' }}>{value}</div>
@@ -184,12 +184,12 @@ function PnlTab({ seg }) {
         background: 'radial-gradient(480px 220px at 92% -10%, rgba(255,230,0,.16), transparent 60%), linear-gradient(160deg,#10192e,#0c1424)' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div>
-            <div style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600 }}>Business Profit / (Loss){seg !== 'all' ? ` · ${seg === 'GOVERNMENT' ? 'Government' : 'Private'}` : ''}</div>
+            <div style={{ fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600 }}>Business Profit / (Loss){seg !== 'all' ? ` · ${seg === 'GOVERNMENT' ? 'Government' : 'Private'}` : ''}</div>
             <div style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 46, lineHeight: 1.05, margin: '8px 0 4px', color: bprofit >= 0 ? 'var(--accent, #FFE600)' : 'var(--danger)' }}>{fmtINR(bprofit)}</div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Revenue {fmtINR(income)} · Running costs {fmtINR(cost)}</div>
           </div>
           <div style={{ textAlign: 'right', minWidth: 110 }}>
-            <div style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600 }}>Profit Margin</div>
+            <div style={{ fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600 }}>Profit Margin</div>
             <div style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 46, lineHeight: 1.05, margin: '8px 0 0', color: bprofit >= 0 ? 'var(--success, #10B981)' : 'var(--danger)' }}>{d.margin_pct == null ? '—' : `${d.margin_pct}%`}</div>
           </div>
         </div>
@@ -209,13 +209,13 @@ function PnlTab({ seg }) {
       <Card>
         <CH><LayoutDashboard size={15} style={{ verticalAlign: -2, color: 'var(--accent, #FFE600)' }} /> Profit Statement <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>income − expenses = profit</span></CH>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}><tbody>
-          <tr><td colSpan={2} style={{ padding: '10px 0 4px', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 700 }}>Income</td></tr>
+          <tr><td colSpan={2} style={{ padding: '10px 0 4px', fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 700 }}>Income</td></tr>
           {mix.length === 0
             ? <tr><td style={{ ...tdL, color: 'var(--text-subtle)' }}>No income in range.</td><td style={tdR}></td></tr>
             : mix.map((m, i) => <tr key={i}><td style={tdL}>{prettyStmtLbl(m.label)}</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600 }}>{fmtINR(m.amount)}</td></tr>)}
           <tr style={totRow}><td style={tdL}>Total income</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 700 }}>{fmtINR(income)}</td></tr>
 
-          <tr><td colSpan={2} style={{ padding: '14px 0 4px', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 700 }}>Less expenses</td></tr>
+          <tr><td colSpan={2} style={{ padding: '14px 0 4px', fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 700 }}>Less expenses</td></tr>
           {expLines.length === 0
             ? <tr><td style={{ ...tdL, color: 'var(--text-subtle)' }}>No expenses in range.</td><td style={tdR}></td></tr>
             : expLines.map((l, i) => <tr key={i}><td style={tdL}>{prettyStmtLbl(l.label)}</td><td style={{ ...tdR, fontFamily: 'Space Grotesk', fontWeight: 600, color: 'var(--danger)' }}>{fmtINR(l.amount)}</td></tr>)}
@@ -265,7 +265,7 @@ function PnlTab({ seg }) {
       <div style={g2}>
         <Card>
           <CH>Monthly Trend <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>income vs costs</span></CH>
-          <div style={{ display: 'flex', gap: 14, marginBottom: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', gap: 14, marginBottom: 6, fontSize: 12, color: 'var(--text-muted)' }}>
             <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Dot c="var(--blue, #3B82F6)" />Income</span>
             <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Dot c="var(--danger, #EF4444)" />Costs</span>
           </div>
@@ -327,7 +327,7 @@ function PnlTab({ seg }) {
               <tr><td style={tdL}>Loan In (borrowed)</td><td style={{ ...tdR, color: 'var(--success)' }}>{fmtINR(excl.loan_in || 0)}</td></tr>
               <tr><td style={tdL}>Loan Out (repaid / given)</td><td style={{ ...tdR, color: 'var(--danger)' }}>{fmtINR(excl.loan_out || 0)}</td></tr>
               <tr style={totRow}><td style={tdL}>Net loan position</td><td style={{ ...tdR, color: 'var(--success)' }}>{fmtINR((+excl.loan_in || 0) - (+excl.loan_out || 0))}</td></tr>
-              <tr><td style={tdL}>Internal transfers <span style={{ color: 'var(--text-subtle)', fontSize: 11 }}>own accounts</span></td><td style={{ ...tdR, color: 'var(--blue)' }}>{fmtINR(excl.internal_transfer || 0)}</td></tr>
+              <tr><td style={tdL}>Internal transfers <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>own accounts</span></td><td style={{ ...tdR, color: 'var(--blue)' }}>{fmtINR(excl.internal_transfer || 0)}</td></tr>
               <tr><td style={tdL}>Owner drawings</td><td style={{ ...tdR, color: 'var(--warning)' }}>{fmtINR(excl.owner_drawings || 0)}</td></tr>
               <tr><td style={tdL}>Tax paid</td><td style={tdR}>{fmtINR(excl.tax || 0)}</td></tr>
             </tbody>
@@ -414,7 +414,7 @@ function MixDonut({ mix, total }) {
         {mix.map((m, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', gap: 8 }}>
           <span style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5 }}><Dot c={MIX_COLORS[i % MIX_COLORS.length]} />{m.label}</span>
           <span style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 13 }}>{fmtL(m.amount)}</span>
-          <span style={{ fontSize: 11, color: 'var(--text-subtle)' }}>{m.pct}%</span>
+          <span style={{ fontSize: 12, color: 'var(--text-subtle)' }}>{m.pct}%</span>
         </div>)}
       </div>
     </div>
@@ -447,7 +447,7 @@ function HomeTab({ onReview }) {
           {today.map(t => <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 2px', borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.06))' }}>
             <span style={{ width: 18, height: 18, borderRadius: 5, border: '1.6px solid var(--border-strong, #475569)', flexShrink: 0 }} />
             <div style={{ flex: 1, fontSize: 13.5 }}>{t.title}</div>
-            <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: 'var(--blue-soft, rgba(59,130,246,.12))', color: 'var(--blue)' }}>{t.frequency}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: 'var(--blue-soft, rgba(59,130,246,.12))', color: 'var(--blue)' }}>{t.frequency}</span>
           </div>)}
           {today.length === 0 && <div style={{ color: 'var(--text-subtle)', fontSize: 13 }}>Nothing due.</div>}
         </Card>
@@ -457,7 +457,7 @@ function HomeTab({ onReview }) {
             <thead><tr><th style={thL}>Client</th><th style={thR}>Overdue</th><th style={thR}>Amount</th></tr></thead>
             <tbody>
               {(tc.rows || []).slice(0, 8).map((r, i) => <tr key={i}><td style={tdL}>{r.client}</td>
-                <td style={tdR}><span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: r.days > 30 ? 'var(--danger-soft, rgba(239,68,68,.12))' : 'var(--warning-soft, rgba(245,158,11,.12))', color: r.days > 30 ? 'var(--danger)' : 'var(--warning)' }}>{r.days}d</span></td>
+                <td style={tdR}><span style={{ fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: r.days > 30 ? 'var(--danger-soft, rgba(239,68,68,.12))' : 'var(--warning-soft, rgba(245,158,11,.12))', color: r.days > 30 ? 'var(--danger)' : 'var(--warning)' }}>{r.days}d</span></td>
                 <td style={tdR}>{fmtINR(r.amount)}</td></tr>)}
               <tr style={totRow}><td style={tdL}>{tc.count || 0} clients</td><td style={tdR}></td><td style={tdR}>{fmtINR(tc.total || 0)}</td></tr>
             </tbody>
@@ -663,7 +663,7 @@ function TasksTab() {
   if (loading) return <Spin />
   const recurring = tasks.filter(t => t.frequency !== 'oneoff')
   const oneoff = tasks.filter(t => t.frequency === 'oneoff')
-  const Pill = ({ t }) => <span onClick={() => toggleStatus(t)} style={{ cursor: 'pointer', fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: t.status === 'done' ? 'var(--success-soft, rgba(16,185,129,.12))' : 'var(--surface-2)', color: t.status === 'done' ? 'var(--success)' : 'var(--text-muted)' }}>{t.status === 'done' ? 'done' : 'open'}</span>
+  const Pill = ({ t }) => <span onClick={() => toggleStatus(t)} style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: t.status === 'done' ? 'var(--success-soft, rgba(16,185,129,.12))' : 'var(--surface-2)', color: t.status === 'done' ? 'var(--success)' : 'var(--text-muted)' }}>{t.status === 'done' ? 'done' : 'open'}</span>
   const DelBtn = ({ id }) => <span onClick={() => delTask(id)} style={{ cursor: 'pointer', color: 'var(--text-subtle)', display: 'inline-flex' }} title="Delete"><Trash2 size={14} /></span>
 
   return (
@@ -684,8 +684,8 @@ function TasksTab() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead><tr><th style={thL}>Task</th><th style={thL}>Frequency</th><th style={thL}>Reminder</th><th style={thR}>Status</th><th style={thL}></th></tr></thead>
           <tbody>
-            {recurring.map(t => <tr key={t.id}><td style={tdL}>{t.title}{t.next_due ? <span style={{ color: 'var(--text-subtle)', fontSize: 11, marginLeft: 8 }}>next {fmtDate(t.next_due)}</span> : <span style={{ color: 'var(--warning)', fontSize: 11, marginLeft: 8 }}>set a date to arm</span>}</td><td style={tdL}>{FREQ_LABEL[t.frequency] || t.frequency}{t.remind_hour === 18 ? <span style={{ color: 'var(--text-subtle)', fontSize: 11, marginLeft: 6 }}>6 PM</span> : null}</td>
-              <td style={tdL}><span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{t.reminder_channel === 'push_wa' ? 'Push + WA' : 'Push'}</span></td>
+            {recurring.map(t => <tr key={t.id}><td style={tdL}>{t.title}{t.next_due ? <span style={{ color: 'var(--text-subtle)', fontSize: 12, marginLeft: 8 }}>next {fmtDate(t.next_due)}</span> : <span style={{ color: 'var(--warning)', fontSize: 12, marginLeft: 8 }}>set a date to arm</span>}</td><td style={tdL}>{FREQ_LABEL[t.frequency] || t.frequency}{t.remind_hour === 18 ? <span style={{ color: 'var(--text-subtle)', fontSize: 12, marginLeft: 6 }}>6 PM</span> : null}</td>
+              <td style={tdL}><span style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{t.reminder_channel === 'push_wa' ? 'Push + WA' : 'Push'}</span></td>
               <td style={tdR}><Pill t={t} /></td><td style={tdL}><DelBtn id={t.id} /></td></tr>)}
             {recurring.length === 0 && <tr><td colSpan={5} style={{ ...tdL, color: 'var(--text-subtle)' }}>No recurring tasks yet.</td></tr>}
           </tbody>
@@ -693,7 +693,7 @@ function TasksTab() {
         <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 10 }}>Set a due date to arm a reminder — a push fires at 10 AM IST (or 6 PM where shown) on the due date to the accounts person, and recurring tasks roll to the next date automatically. (WhatsApp reminders come later.)</div>
       </Card>
 
-      {oneoff.length > 0 && <Card><CH>One-off</CH>{oneoff.map(t => <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.06))' }}><div style={{ flex: 1, fontSize: 13.5, textDecoration: t.status === 'done' ? 'line-through' : 'none', color: t.status === 'done' ? 'var(--text-subtle)' : 'var(--text)' }}>{t.title}{t.next_due ? <span style={{ color: 'var(--text-subtle)', fontSize: 11, marginLeft: 8 }}>{fmtDate(t.next_due)}</span> : ''}</div><Pill t={t} /><DelBtn id={t.id} /></div>)}</Card>}
+      {oneoff.length > 0 && <Card><CH>One-off</CH>{oneoff.map(t => <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', borderBottom: '1px solid var(--border-soft, rgba(255,255,255,.06))' }}><div style={{ flex: 1, fontSize: 13.5, textDecoration: t.status === 'done' ? 'line-through' : 'none', color: t.status === 'done' ? 'var(--text-subtle)' : 'var(--text)' }}>{t.title}{t.next_due ? <span style={{ color: 'var(--text-subtle)', fontSize: 12, marginLeft: 8 }}>{fmtDate(t.next_due)}</span> : ''}</div><Pill t={t} /><DelBtn id={t.id} /></div>)}</Card>}
     </div>
   )
 }
@@ -926,7 +926,7 @@ function ImportTab() {
   const cols = raw ? (raw[hdr] || []).map((c, i) => ({ i, name: String(c == null ? '' : c) || `Col ${i + 1}` })) : []
   const ColSel = ({ field, label }) => (
     <div style={{ marginBottom: 9 }}>
-      <label style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>{label}</label>
+      <label style={{ display: 'block', fontSize: 12, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>{label}</label>
       <select value={map[field] === '' || map[field] == null ? '' : map[field]} onChange={e => setMap(m => ({ ...m, [field]: e.target.value === '' ? '' : +e.target.value }))} style={{ ...selStyle, width: '100%' }}>
         <option value="">— none —</option>{cols.map(c => <option key={c.i} value={c.i}>{c.name}</option>)}
       </select>
@@ -973,9 +973,9 @@ function ImportTab() {
             <div style={g2}>
               <div><ColSel field="date" label="Date" /><ColSel field="desc" label="Description" /><ColSel field="cr" label="Money In (Credit)" /><ColSel field="crtag" label="In category" /></div>
               <div><ColSel field="dr" label="Money Out (Debit)" /><ColSel field="drtag" label="Out category" /><ColSel field="cat" label="Expense head column (optional)" /><ColSel field="receipt" label="Receipt No (optional)" />
-                <div style={{ marginBottom: 9 }}><label style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>Which bank</label>
+                <div style={{ marginBottom: 9 }}><label style={{ display: 'block', fontSize: 12, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>Which bank</label>
                   <select value={bankId} onChange={e => setBankId(e.target.value)} style={{ ...selStyle, width: '100%' }}>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
-                <div style={{ marginBottom: 9 }}><label style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>Company</label>
+                <div style={{ marginBottom: 9 }}><label style={{ display: 'block', fontSize: 12, textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }}>Company</label>
                   <select value={impCompany} onChange={e => setImpCompany(e.target.value)} style={{ ...selStyle, width: '100%' }}><option value="">Auto (from bank / tag)</option>{COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
               </div>
             </div>
@@ -1245,7 +1245,7 @@ function RegisterTab() {
               const inn = mt.inn, out = mt.out
               const head = (
                 <tr key={'h' + m} style={{ background: 'var(--surface-2, #334155)' }}>
-                  <td style={{ ...tdL, fontWeight: 700, color: 'var(--accent, #FFE600)', fontFamily: 'Space Grotesk', whiteSpace: 'nowrap' }} colSpan={4}>{monthLabel(m)} <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 11 }}>&middot; {mt.n} txns</span></td>
+                  <td style={{ ...tdL, fontWeight: 700, color: 'var(--accent, #FFE600)', fontFamily: 'Space Grotesk', whiteSpace: 'nowrap' }} colSpan={4}>{monthLabel(m)} <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>&middot; {mt.n} txns</span></td>
                   <td style={{ ...tdL, fontSize: 11.5 }} colSpan={3}><span style={{ color: 'var(--success)' }}>In {fmtINR(inn)}</span> &nbsp; <span style={{ color: 'var(--danger)' }}>Out {fmtINR(out)}</span> &nbsp; <b>Net {fmtINR(inn - out)}</b></td>
                 </tr>
               )

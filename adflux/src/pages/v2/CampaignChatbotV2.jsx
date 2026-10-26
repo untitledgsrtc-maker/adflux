@@ -100,7 +100,7 @@ function MessageNode({ data, selected }) {
 }
 function KeywordNode({ data, selected }) {
   return <Shell type="keyword" selected={selected}>
-    <div style={{ color: 'var(--v2-green, #22c55e)', fontSize: 11, marginBottom: 3 }}>
+    <div style={{ color: 'var(--v2-green, #22c55e)', fontSize: 12, marginBottom: 3 }}>
       if contains: {(data?.keywords || []).join(', ') || '—'}
     </div>
     {clip(data?.reply, 60) || <i style={{ color: 'var(--v2-ink-2)' }}>reply…</i>}
@@ -134,7 +134,7 @@ function ButtonsNode({ data, selected }) {
         {clip(data?.text, 60) || <i style={{ color: 'var(--v2-ink-2)' }}>prompt…</i>}
       </div>
       <div style={{ borderTop: '1px solid var(--v2-line)' }}>
-        {btns.length === 0 && <div style={{ padding: '7px 11px', fontSize: 11, color: 'var(--v2-ink-2)' }}>No buttons yet</div>}
+        {btns.length === 0 && <div style={{ padding: '7px 11px', fontSize: 12, color: 'var(--v2-ink-2)' }}>No buttons yet</div>}
         {btns.map((b, i) => (
           <div key={i} style={{ position: 'relative', padding: '7px 11px', fontSize: 11.5, color: 'var(--v2-ink-0)', borderTop: i ? '1px solid var(--v2-line)' : 'none' }}>
             {b.label || `Button ${i + 1}`}
@@ -409,7 +409,7 @@ export default function CampaignChatbotV2() {
       sub="Drag a block from the left onto the canvas, then drag between the dots to connect. Click a block to edit it on the right."
       right={(
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {saving ? <span style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>saving…</span> : null}
+          {saving ? <span style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>saving…</span> : null}
           {refreshBtn}
           <button type="button" onClick={publish} disabled={publishing} style={{ ...btnG, opacity: publishing ? 0.6 : 1 }}>
             {publishing ? <Loader2 size={14} strokeWidth={1.6} className="spin" /> : <UploadCloud size={14} strokeWidth={1.6} />} Publish
@@ -579,7 +579,7 @@ function NodeEditor({ node, patch }) {
           <Plus size={14} strokeWidth={1.6} /> Add button
         </button>
       )}
-      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 6 }}>1-3 buttons show as tap buttons; 4-10 as a pick-list.</div>
+      <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 6 }}>1-3 buttons show as tap buttons; 4-10 as a pick-list.</div>
     </>
   }
   return null
@@ -594,8 +594,8 @@ const ri = { width: 50, height: 50, borderRadius: 10, border: '1px solid var(--v
 const canvas = { flex: 1, position: 'relative', backgroundColor: 'var(--v2-bg-0, #0b1222)' }
 const props = { width: 300, borderLeft: '1px solid var(--v2-line)', background: 'var(--v2-bg-1, #0f1525)', padding: 18, overflow: 'auto', flexShrink: 0 }
 const ph = { fontFamily: 'var(--v2-display)', fontSize: 15, fontWeight: 600, color: 'var(--v2-ink-0)', display: 'flex', alignItems: 'center', gap: 8 }
-const psub = { fontSize: 11, color: 'var(--v2-ink-2)', margin: '3px 0 14px', textTransform: 'capitalize' }
-const plabel = { fontSize: 10, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, margin: '0 0 6px', display: 'block' }
+const psub = { fontSize: 12, color: 'var(--v2-ink-2)', margin: '3px 0 14px', textTransform: 'capitalize' }
+const plabel = { fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, margin: '0 0 6px', display: 'block' }
 const pinp = { width: '100%', height: 38, padding: '0 11px', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line)', borderRadius: 8, color: 'var(--v2-ink-0)', fontSize: 12.5, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }
 const ptext = { width: '100%', minHeight: 80, background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line)', borderRadius: 8, color: 'var(--v2-ink-0)', fontFamily: 'inherit', fontSize: 12.5, padding: '9px 11px', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }
 const btnY = { background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0b1220)', border: 'none', borderRadius: 10, height: 38, padding: '0 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }

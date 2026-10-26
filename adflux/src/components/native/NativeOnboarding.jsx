@@ -186,7 +186,7 @@ export default function NativeOnboarding({ userId, onClose }) {
           <current.Icon size={28} strokeWidth={1.6} color="var(--accent, #FFE600)" />
         </div>
         <div style={{
-          fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase',
+          fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase',
           color: 'var(--text-muted)', marginTop: 14, marginBottom: 4,
         }}>
           Step {step + 1} of {STEPS.length}
@@ -206,7 +206,7 @@ export default function NativeOnboarding({ userId, onClose }) {
             {anyAttempted && (
               <div style={{
                 display: 'flex', flexWrap: 'wrap', gap: 6,
-                fontSize: 11, color: 'var(--text-muted)',
+                fontSize: 12, color: 'var(--text-muted)',
               }}>
                 <PermPill icon={<MapPin size={10} strokeWidth={1.6} />} label="Location" state={locState} />
                 <PermPill icon={<PhoneCall size={10} strokeWidth={1.6} />} label="Call log" state={callState} />
@@ -225,7 +225,7 @@ export default function NativeOnboarding({ userId, onClose }) {
                   : <><ShieldCheck size={14} strokeWidth={1.6} /> Allow all access</>}
               </button>
             )}
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
               You'll see 3 Android prompts in sequence — tap <b>Allow</b> on each.
               For Location, pick <b>"Allow all the time"</b> so tracking continues when the screen is off.
             </div>
@@ -314,7 +314,7 @@ function PermPill({ icon, label, state }) {
       display: 'inline-flex', alignItems: 'center', gap: 4,
       padding: '2px 8px', borderRadius: 999,
       border: `1px solid ${color}`, color,
-      fontSize: 10, fontWeight: 600,
+      fontSize: 12, fontWeight: 600,
     }}>
       {icon} {label}{state === 'granted' ? ' ✓' : state === 'denied' ? ' ✗' : ''}
     </span>

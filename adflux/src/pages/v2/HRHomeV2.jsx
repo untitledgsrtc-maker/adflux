@@ -100,7 +100,7 @@ function Kpi({ label, value, accent, onClick, Icon }) {
   return (
     <div onClick={onClick} style={{ cursor: 'pointer', background: 'var(--surface, #1e293b)', border: `1px solid ${accent ? 'var(--warning, #F59E0B)' : 'var(--border, #334155)'}`, borderRadius: 14, padding: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-subtle, #64748b)', fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-subtle, #64748b)', fontWeight: 600 }}>{label}</div>
         <Icon size={18} style={{ color: accent ? 'var(--warning, #F59E0B)' : 'var(--text-muted, #94a3b8)' }} />
       </div>
       <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 30, marginTop: 6, color: accent ? 'var(--warning, #F59E0B)' : 'var(--text, #f1f5f9)' }}>{value}</div>
@@ -126,10 +126,10 @@ function Tile({ title, sub, Icon, onClick, soon, badge }) {
       style={{ cursor: soon ? 'default' : 'pointer', opacity: soon ? 0.55 : 1, background: 'var(--surface, #1e293b)', border: '1px solid var(--border, #334155)', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
       <span style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--surface-2, #334155)', display: 'grid', placeItems: 'center', color: 'var(--accent, #FFE600)', flexShrink: 0 }}><Icon size={18} /></span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text, #f1f5f9)' }}>{title}{soon && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 999, background: 'var(--surface-2, #334155)', color: 'var(--text-subtle)' }}>soon</span>}</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text, #f1f5f9)' }}>{title}{soon && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, padding: '2px 7px', borderRadius: 999, background: 'var(--surface-2, #334155)', color: 'var(--text-subtle)' }}>soon</span>}</div>
         <div style={{ fontSize: 11.5, color: 'var(--text-subtle, #64748b)', marginTop: 2 }}>{sub}</div>
       </div>
-      {badge > 0 && <span style={{ fontSize: 11, fontWeight: 700, minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999, background: 'var(--warning-soft, rgba(245,158,11,.12))', color: 'var(--warning, #F59E0B)', display: 'grid', placeItems: 'center' }}>{badge}</span>}
+      {badge > 0 && <span style={{ fontSize: 12, fontWeight: 700, minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999, background: 'var(--warning-soft, rgba(245,158,11,.12))', color: 'var(--warning, #F59E0B)', display: 'grid', placeItems: 'center' }}>{badge}</span>}
       {!soon && <ChevronRight size={16} style={{ color: 'var(--text-subtle)', flexShrink: 0 }} />}
     </div>
   )

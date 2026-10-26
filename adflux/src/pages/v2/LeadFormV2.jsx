@@ -401,7 +401,7 @@ export default function LeadFormV2() {
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
               Have a business card?
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
               Snap or upload a photo — we'll fill the form for you.
             </div>
           </div>
@@ -662,7 +662,7 @@ export default function LeadFormV2() {
                     }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{o.label}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{o.sub}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{o.sub}</div>
                   </button>
                 )
               })}

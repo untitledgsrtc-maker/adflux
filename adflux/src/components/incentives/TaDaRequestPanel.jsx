@@ -240,7 +240,7 @@ export default function TaDaRequestPanel() {
       fontFamily: 'inherit',
     }),
     grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
-    label: { fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700 },
+    label: { fontSize: 12, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 700 },
     historyRow: {
       display: 'grid',
       gridTemplateColumns: '90px 80px 1fr 90px',
@@ -252,7 +252,7 @@ export default function TaDaRequestPanel() {
     },
     chip: (status) => ({
       display: 'inline-block', padding: '2px 8px', borderRadius: 999,
-      fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+      fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
       background:
         status === 'approved' ? 'rgba(16,185,129,.18)'
         : status === 'rejected' ? 'rgba(239,68,68,.18)'
@@ -280,7 +280,7 @@ export default function TaDaRequestPanel() {
       <div style={styles.card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <MapPin size={14} style={{ color: 'var(--accent)' }} />
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.12em' }}>
             Today · fetched by GPS
           </div>
         </div>
@@ -307,7 +307,7 @@ export default function TaDaRequestPanel() {
                 <Stat label="Bike TA"  value={formatCurrency(bikeTa)} />
                 <Stat label="Day Total" value={formatCurrency(dayTotal)} highlight />
               </div>
-              <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
                 {usingNightly
                   ? 'Approved last night — admin can adjust in TA Payouts.'
                   : km > 0
@@ -404,7 +404,7 @@ export default function TaDaRequestPanel() {
                       } />
                     {showCap && (
                       <div style={{
-                        marginTop: 4, fontSize: 11,
+                        marginTop: 4, fontSize: 12,
                         color: overCap ? 'var(--danger, #EF4444)' : 'var(--text-muted)',
                       }}>
                         {overCap
@@ -449,7 +449,7 @@ export default function TaDaRequestPanel() {
             background: 'var(--accent-soft, rgba(255,230,0,0.14))',
             border: '1px dashed var(--v2-yellow, var(--accent, #FFE600))',
             borderRadius: 10,
-            fontSize: 11, color: 'var(--text-muted)',
+            fontSize: 12, color: 'var(--text-muted)',
           }}>
             <b style={{ color: 'var(--accent)' }}>Pre-filled from GPS:</b> {liveTrack.km} km today.
             Edit only if the GPS missed a trip — otherwise submit to confirm.
@@ -479,7 +479,7 @@ export default function TaDaRequestPanel() {
           </div>
         ) : (
           <>
-            <div style={{ ...styles.historyRow, fontWeight: 700, color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+            <div style={{ ...styles.historyRow, fontWeight: 700, color: 'var(--text-muted)', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em' }}>
               <span>Date</span>
               <span>Kind</span>
               <span>Detail</span>
@@ -518,7 +518,7 @@ export default function TaDaRequestPanel() {
 function Stat({ label, value, highlight }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase', fontWeight: 700 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase', fontWeight: 700 }}>
         {label}
       </div>
       <div style={{

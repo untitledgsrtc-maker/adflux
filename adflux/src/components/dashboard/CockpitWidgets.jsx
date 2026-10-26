@@ -179,7 +179,7 @@ export function AiBriefingCard() {
       <div>
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
-          fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase',
+          fontSize: 12, letterSpacing: '.18em', textTransform: 'uppercase',
           color: 'var(--v2-ink-1, rgba(255,255,255,.62))', marginBottom: 10,
           fontWeight: 700,
         }}>
@@ -226,7 +226,7 @@ export function AiBriefingCard() {
                   {it.text}
                 </span>
                 <Chip tone={it.chip.tone}>{it.chip.label}</Chip>
-                <span style={{ fontSize: 11, color: 'var(--v2-ink-2)', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 12, color: 'var(--v2-ink-2)', whiteSpace: 'nowrap' }}>
                   {it.meta}
                 </span>
                 <ArrowRight size={13} style={{ color: 'var(--v2-ink-2)' }} />
@@ -246,7 +246,7 @@ export function AiBriefingCard() {
         alignItems: 'flex-end', justifyContent: 'space-between',
         height: '100%', minHeight: 80,
       }}>
-        <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', whiteSpace: 'nowrap' }}>
+        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', whiteSpace: 'nowrap' }}>
           Updated {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
         </div>
         {items.length > 0 && (
@@ -294,7 +294,7 @@ function Chip({ tone, children }) {
       background: c.bg,
       border: `1px solid ${c.bd}`,
       color: c.fg,
-      fontSize: 10,
+      fontSize: 12,
       fontWeight: 700,
       letterSpacing: '.04em',
       textTransform: 'uppercase',
@@ -352,7 +352,7 @@ export function LeadPipelinePanel() {
       }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600 }}>Lead pipeline</div>
-          <div style={{ fontSize: 11, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', marginTop: 2 }}>
             {counts.total} total · ₹{(counts.value/100000).toFixed(1)}L active value
           </div>
         </div>
@@ -436,7 +436,7 @@ export function TeamActivityPanel() {
         borderBottom: '1px solid var(--v2-line, rgba(255,255,255,.06))',
       }}>
         <div style={{ fontSize: 13, fontWeight: 600 }}>Today's team activity</div>
-        <div style={{ fontSize: 11, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', marginTop: 2 }}>
           {Array.from(data.sessions.values()).filter(s => s.check_in_at).length} of {data.team.length} field staff checked in
         </div>
       </div>
@@ -461,7 +461,7 @@ export function TeamActivityPanel() {
               <tr key={u.id} onClick={() => navigate('/team')} style={{ cursor: 'pointer' }}>
                 <td>
                   <div style={{ fontWeight: 600 }}>{u.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                  <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', textTransform: 'uppercase', letterSpacing: '.08em' }}>
                     {u.team_role?.replace('_', ' ')}{u.city && ` · ${u.city}`}
                   </div>
                 </td>
@@ -476,10 +476,10 @@ export function TeamActivityPanel() {
                 </td>
                 <td>
                   {checkedOut
-                    ? <span style={{ fontSize: 11, color: '#c084fc' }}>✓ Done</span>
+                    ? <span style={{ fontSize: 12, color: '#c084fc' }}>✓ Done</span>
                     : checkedIn
-                    ? <span style={{ fontSize: 11, color: '#4ade80' }}>● In</span>
-                    : <span style={{ fontSize: 11, color: '#f87171' }}>○ No</span>}
+                    ? <span style={{ fontSize: 12, color: '#4ade80' }}>● In</span>
+                    : <span style={{ fontSize: 12, color: '#f87171' }}>○ No</span>}
                 </td>
               </tr>
             )
@@ -654,7 +654,7 @@ export function PipelineFunnelCard() {
         marginBottom: 12,
       }}>
         <div style={{ fontWeight: 600, fontSize: 14 }}>Pipeline funnel</div>
-        <div style={{ fontSize: 11, color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+        <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
           {total} leads
         </div>
       </div>
@@ -745,18 +745,18 @@ export function WinRateCard() {
         display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
       }}>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+          <div style={{ fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
             Win rate
           </div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, marginTop: 2 }}>
             {m.winRate == null ? '—' : `${m.winRate}%`}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+          <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
             of {m.wonCount} won
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+          <div style={{ fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
             Avg deal
           </div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, marginTop: 2 }}>
@@ -764,13 +764,13 @@ export function WinRateCard() {
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+          <div style={{ fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
             Projected
           </div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, marginTop: 2, color: 'var(--accent, #FFE600)' }}>
             {fmtLakh(m.projected)}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
+          <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.40))' }}>
             at current pace
           </div>
         </div>
@@ -844,14 +844,14 @@ export function RecentActivityFeedCard({ userId, limit = 8 }) {
               </div>
               {a.notes && (
                 <div style={{
-                  fontSize: 11, color: 'var(--v2-ink-2, rgba(255,255,255,.50))',
+                  fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.50))',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {a.notes}
                 </div>
               )}
             </div>
-            <div style={{ fontSize: 10, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', flexShrink: 0 }}>
+            <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', flexShrink: 0 }}>
               {fmtRelative(a.created_at)}
             </div>
           </div>

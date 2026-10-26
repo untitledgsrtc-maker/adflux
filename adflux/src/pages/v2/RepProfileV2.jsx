@@ -110,7 +110,7 @@ function Tile({ label, value, tone, sub }) {
       }}>{value}</div>
       {sub && (
         <div style={{
-          fontSize: 11, color: 'var(--v2-ink-2, var(--text-subtle))', marginTop: 4,
+          fontSize: 12, color: 'var(--v2-ink-2, var(--text-subtle))', marginTop: 4,
         }}>{sub}</div>
       )}
     </div>
@@ -221,7 +221,7 @@ function RepPerformanceCard({ userId }) {
                 border: '1px solid var(--v2-line, var(--border))',
                 borderRadius: 12, padding: '12px 14px',
               }}>
-                <div style={{ fontSize: 11, color: 'var(--v2-ink-2, var(--text-muted))', marginBottom: 4 }}>{t.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--v2-ink-2, var(--text-muted))', marginBottom: 4 }}>{t.label}</div>
                 <div style={{
                   fontSize: 18, fontWeight: 700,
                   color: t.accent ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-ink-0, var(--text))',
@@ -936,7 +936,7 @@ export default function RepProfileV2() {
             color: 'var(--v2-ink-1, var(--text))',
             whiteSpace: 'pre-wrap',
           }}>
-            <span style={{ color: 'var(--v2-ink-2, var(--text-muted))', fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', display: 'block', marginBottom: 4, fontWeight: 600 }}>
+            <span style={{ color: 'var(--v2-ink-2, var(--text-muted))', fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase', display: 'block', marginBottom: 4, fontWeight: 600 }}>
               HR note
             </span>
             {user.hr_acceptance_note}
@@ -980,7 +980,7 @@ export default function RepProfileV2() {
           {/* TODAY row */}
           <div>
             <div style={{
-              fontSize: 11, color: 'var(--text-muted)', letterSpacing: '.12em',
+              fontSize: 12, color: 'var(--text-muted)', letterSpacing: '.12em',
               textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
             }}>Today</div>
             <div style={{
@@ -998,7 +998,7 @@ export default function RepProfileV2() {
           {/* WEEK row */}
           <div>
             <div style={{
-              fontSize: 11, color: 'var(--text-muted)', letterSpacing: '.12em',
+              fontSize: 12, color: 'var(--text-muted)', letterSpacing: '.12em',
               textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
             }}>This week</div>
             <div style={{
@@ -1012,7 +1012,7 @@ export default function RepProfileV2() {
           {/* MONTH row */}
           <div>
             <div style={{
-              fontSize: 11, color: 'var(--text-muted)', letterSpacing: '.12em',
+              fontSize: 12, color: 'var(--text-muted)', letterSpacing: '.12em',
               textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
             }}>This month ({monthLabel})</div>
             <div style={{
@@ -1069,7 +1069,7 @@ export default function RepProfileV2() {
         {salaryPayouts.length > 0 && (
           <div style={{ marginTop: 18 }}>
             <div style={{
-              fontSize: 11, color: 'var(--text-muted)', letterSpacing: '.12em',
+              fontSize: 12, color: 'var(--text-muted)', letterSpacing: '.12em',
               textTransform: 'uppercase', fontWeight: 700, marginBottom: 8,
             }}>Last 12 salary payouts</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

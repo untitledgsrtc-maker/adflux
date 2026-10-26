@@ -639,7 +639,7 @@ function DuplicatesPanel({ clients, userMap, isOpen, onToggle, onChanged }) {
           <GitMerge size={14} /> Find duplicate clients
           {groups.length > 0 && (
             <span style={{
-              padding: '1px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+              padding: '1px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700,
               background: 'rgba(245,158,11,.15)', color: 'var(--v2-amber, #F59E0B)',
               textTransform: 'uppercase', letterSpacing: '.06em',
             }}>
@@ -647,7 +647,7 @@ function DuplicatesPanel({ clients, userMap, isOpen, onToggle, onChanged }) {
             </span>
           )}
         </span>
-        <span style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>
+        <span style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>
           {isOpen ? 'Hide' : 'Show'}
         </span>
       </button>
@@ -662,7 +662,7 @@ function DuplicatesPanel({ clients, userMap, isOpen, onToggle, onChanged }) {
               <div key={g.key} style={{
                 padding: '12px 14px', borderBottom: '1px solid var(--v2-line)',
               }}>
-                <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginBottom: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginBottom: 8 }}>
                   {g.rows.length} clients share {g.key.startsWith('co:') ? `company "${g.key.slice(3)}"` : `phone ${g.key}`}
                   — pick the one to KEEP. The others are merged into it.
                 </div>
@@ -684,7 +684,7 @@ function DuplicatesPanel({ clients, userMap, isOpen, onToggle, onChanged }) {
                             <span style={{ fontWeight: 400, color: 'var(--v2-ink-2)', fontSize: 12 }}> · {c.name}</span>
                           )}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 2 }}>
                           {c.phone || '—'} · {c.quote_count || 0} quotes · owner: {userMap[c.created_by] || '—'}
                         </div>
                       </div>

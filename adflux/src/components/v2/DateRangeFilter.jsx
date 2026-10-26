@@ -298,7 +298,7 @@ export default function DateRangeFilter({ value, onChange }) {
         >
           <div
             style={{
-              fontSize: 10,
+              fontSize: 12,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
               color: 'var(--text-muted)',
@@ -330,7 +330,7 @@ export default function DateRangeFilter({ value, onChange }) {
 
           <div
             style={{
-              fontSize: 10,
+              fontSize: 12,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
               color: 'var(--text-muted)',
@@ -342,7 +342,7 @@ export default function DateRangeFilter({ value, onChange }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
             <div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Start</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Start</div>
               <input
                 type="date"
                 value={customFrom}
@@ -361,7 +361,7 @@ export default function DateRangeFilter({ value, onChange }) {
               />
             </div>
             <div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>End</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>End</div>
               <input
                 type="date"
                 value={customTo}

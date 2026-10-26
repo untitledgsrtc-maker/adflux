@@ -1399,7 +1399,7 @@ export default function TeamDashboardV2() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <div style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,.7)' }}>
+          <div style={{ fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,.7)' }}>
             <span className="lead-live-dot" />&nbsp;&nbsp;Field activity · live
           </div>
           <span style={{ fontSize: 12, color: 'rgba(255,255,255,.7)' }}>{niceTime} IST</span>
@@ -1425,7 +1425,7 @@ export default function TeamDashboardV2() {
               Updates as reps ping in. Tap a dot to see who.
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'var(--text-muted)' }}>
             <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 999, background: '#10B981', marginRight: 4 }} />fresh</span>
             <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 999, background: '#F59E0B', marginRight: 4 }} />5-30min</span>
             <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 999, background: '#EF4444', marginRight: 4 }} />stale</span>
@@ -1612,7 +1612,7 @@ export default function TeamDashboardV2() {
                     </div>
                     <div className="lbl">
                       Calls
-                      {' '}<span style={{ color: 'var(--v2-ink-2, #94a3b8)', fontSize: 9 }}>
+                      {' '}<span style={{ color: 'var(--v2-ink-2, #94a3b8)', fontSize: 12 }}>
                         · {connHere} connected
                       </span>
                     </div>
@@ -1871,7 +1871,7 @@ export default function TeamDashboardV2() {
                           style={{
                             display: 'inline-flex', alignItems: 'center',
                             padding: '3px 8px', borderRadius: 999,
-                            fontSize: 10, fontWeight: 600, letterSpacing: '.04em',
+                            fontSize: 12, fontWeight: 600, letterSpacing: '.04em',
                             textTransform: 'uppercase',
                             border: webOnly ? '1px solid var(--warning, #F59E0B)' : '1px solid var(--v2-line, #334155)',
                             background: webOnly ? 'var(--warning-soft, rgba(245,158,11,0.12))' : 'var(--v2-bg-2, rgba(148,163,184,0.10))',
@@ -1930,7 +1930,7 @@ export default function TeamDashboardV2() {
                     style={{
                       background: 'transparent', border: 0,
                       color: 'var(--accent, #FFE600)',
-                      fontSize: 11, fontWeight: 600,
+                      fontSize: 12, fontWeight: 600,
                       cursor: 'pointer', padding: 0,
                       textDecoration: 'underline',
                     }}

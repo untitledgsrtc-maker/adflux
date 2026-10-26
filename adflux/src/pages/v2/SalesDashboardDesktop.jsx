@@ -750,20 +750,20 @@ function LbRow({ rank, row, isYou, total }) {
       <UserAvatar className="v2d-lb-avatar" name={row.name} userId={row.id} />
       <div className="v2d-lb-name">
         {row.name}{isYou && <span className="v2d-lb-you">· you</span>}
-        <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 2 }}>
           {row.sent} sent · {row.wonPaid} won &amp; paid
           {row.wonUnpaid > 0 && <span style={{ opacity: .8 }}> · +{row.wonUnpaid} awaiting payment</span>}
         </div>
       </div>
       {/* Won & paid value — deals with an approved payment this period */}
-      <div style={{ textAlign: 'right', minWidth: 90 }}>
-        <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase' }}>Won &amp; paid</div>
+      <div style={{ textAlign: 'right', minWidth: 100 }}>
+        <div style={{ fontSize: 12, letterSpacing: '.04em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase' }}>Won &amp; paid</div>
         <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13, color: 'var(--v2-green)' }}>
           <Money value={row.wonPaidAmt} />
         </div>
       </div>
       <div className="v2d-lb-val" style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>Converted</div>
+        <div style={{ fontSize: 12, letterSpacing: '.04em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>Converted</div>
         {row.conv == null ? '—' : `${row.conv}%`}
       </div>
       <div className="v2d-lb-pct">{pct}%</div>
@@ -868,7 +868,7 @@ function TodayActionsPanel({ actions, onOpen, onAll }) {
             <div className="v2d-q-body">
               <div className="v2d-q-t">
                 {a.title}
-                <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--v2-ink-2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--v2-ink-2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>
                   {meta.label}
                 </span>
               </div>

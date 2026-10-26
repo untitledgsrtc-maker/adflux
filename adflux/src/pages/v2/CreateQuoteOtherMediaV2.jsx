@@ -479,7 +479,7 @@ export default function CreateQuoteOtherMediaV2() {
           })}
         </div>
 
-        <div style={{ marginTop: 12, fontSize: 11, color: 'var(--v2-ink-2)' }}>
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--v2-ink-2)' }}>
           <Newspaper size={11} style={{ verticalAlign: '-1px', marginRight: 4 }} />
           Media options are managed in <strong>Master → Media Types</strong>. Pick from the list or type a one-off name.
         </div>

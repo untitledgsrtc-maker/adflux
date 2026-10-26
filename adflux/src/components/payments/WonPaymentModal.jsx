@@ -259,7 +259,7 @@ export function WonPaymentModal({
                   <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>
                     Work Order / PO copy {workOrderUploaded ? 'uploaded' : '— required'}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                     {workOrderUploaded
                       ? 'Agency-issued Work Order for this proposal — saved with this quote\'s attachments.'
                       : 'The agency-issued Work Order or Purchase Order is the proof of award for THIS proposal. Each quote needs its own WO.'}

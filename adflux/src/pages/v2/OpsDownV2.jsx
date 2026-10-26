@@ -126,7 +126,7 @@ export default function OpsDownV2() {
         <div style={{ flex: 1, background: 'var(--danger-soft, rgba(239,68,68,.12))', borderRadius: 12, padding: '12px 14px' }}>
           <div style={{ fontSize: 12, color: 'var(--danger, #EF4444)', fontWeight: 700 }}>{camera ? t('cameras_off', lang) : t('screens_down', lang)}</div>
           <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--danger, #EF4444)' }}>{numL(downCount, lang)}</div>
-          <div style={{ fontSize: 11, color: 'var(--v2-ink-2, #94a3b8)' }}>{numL(rows.length, lang)} {t('across_stations', lang)}</div>
+          <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)' }}>{numL(rows.length, lang)} {t('across_stations', lang)}</div>
         </div>
       </div>
 
@@ -156,7 +156,7 @@ export default function OpsDownV2() {
             <div style={{ height: 6, background: 'var(--danger-soft, rgba(239,68,68,.12))', borderRadius: 99, marginTop: 8, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${pct}%`, background: 'var(--danger, #EF4444)' }} />
             </div>
-            <div style={{ fontSize: 11, color: 'var(--v2-ink-2, #94a3b8)', marginTop: 6 }}>
+            <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)', marginTop: 6 }}>
               {r.since ? `${t('down_word', lang)} ${ago(r.since)}` : ''}{r.tech ? ` · ${r.tech} ${t('on_it', lang)}` : ` · ${t('nobody_assigned', lang)}`}
             </div>
 
@@ -166,7 +166,7 @@ export default function OpsDownV2() {
                   {r.screens.slice(0, 8).map((s, i) => `${t('screen', lang)} ${numL(i + 1, lang)}`).join(', ')}{r.screens.length > 8 ? '…' : ''}
                 </div>
                 <div style={{ background: 'var(--v2-tint-blue, rgba(59,130,246,.12))', borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, color: 'var(--v2-blue, #3B82F6)', fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Phone size={13} />{t('who_to_call', lang)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--v2-blue, #3B82F6)', fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}><Phone size={13} />{t('who_to_call', lang)}</div>
                   {(contactsByDepot[r.depotId] || []).length === 0
                     ? <div style={{ fontSize: 13, color: 'var(--v2-ink-2, #94a3b8)' }}>{t('no_contacts', lang)}</div>
                     : (contactsByDepot[r.depotId] || []).map(c => (

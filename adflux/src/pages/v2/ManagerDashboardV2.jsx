@@ -339,7 +339,7 @@ function RepCard({ rep, stats, onClick }) {
           {rep.name}
         </div>
         <div style={{
-          fontSize: 11,
+          fontSize: 12,
           padding: '3px 8px',
           borderRadius: 999,
           background: 'rgba(148,163,184,0.10)',
@@ -369,7 +369,7 @@ function RepCard({ rep, stats, onClick }) {
       {rep.role === 'sales' && (
         <div style={{
           marginTop: 10, display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: 11,
+          fontSize: 12,
           color: ageMin == null
                   ? 'var(--v2-rose, #EF4444)'
                   : ageMin > 60
@@ -407,7 +407,7 @@ function Stat({ icon, label, value, sub }) {
         {value}
       </div>
       {sub && (
-        <div style={{ fontSize: 10, color: 'var(--v2-ink-2, #94a3b8)' }}>{sub}</div>
+        <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)' }}>{sub}</div>
       )}
     </div>
   )

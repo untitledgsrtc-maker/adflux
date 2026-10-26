@@ -287,7 +287,7 @@ export default function ProposedIncentiveCard({ compact = false }) {
             padding: '4px 10px', borderRadius: 999,
             background: 'rgba(255,255,255,.10)',
             border: '1px solid rgba(255,255,255,.14)',
-            color: 'inherit', fontSize: 11, fontWeight: 600,
+            color: 'inherit', fontSize: 12, fontWeight: 600,
             cursor: 'pointer',
           }}
         >
@@ -377,7 +377,7 @@ export default function ProposedIncentiveCard({ compact = false }) {
         {slabHasProgress && (
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 11, fontWeight: 700,
+            fontSize: 12, fontWeight: 700,
             // Phase 35.0 — guardian P2: §7 icon stroke 1.6, sizes
             // 14/16/18/22. §5 colour from tokens — brand yellow for
             // "On track", muted white for "Behind".
@@ -418,7 +418,7 @@ export default function ProposedIncentiveCard({ compact = false }) {
             }} />
           </div>
           <div style={{
-            fontSize: 11, fontWeight: 600,
+            fontSize: 12, fontWeight: 600,
             color: 'rgba(255,255,255,0.88)',
             whiteSpace: 'nowrap',
           }}>

@@ -409,7 +409,7 @@ export default function NotificationPanel() {
             position: 'absolute', top: 4, right: 4,
             minWidth: 16, height: 16, padding: '0 4px',
             borderRadius: 999, background: '#EF4444', color: '#fff',
-            fontSize: 9, fontWeight: 700,
+            fontSize: 12, fontWeight: 700,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             border: '2px solid var(--v2-bg-0, #0f172a)',
           }}>
@@ -450,7 +450,7 @@ export default function NotificationPanel() {
                     background: 'transparent',
                     border: '1px solid var(--border, #334155)',
                     color: 'var(--text-muted, #94a3b8)',
-                    fontSize: 11, fontWeight: 600,
+                    fontSize: 12, fontWeight: 600,
                     padding: '5px 10px', borderRadius: 8,
                     cursor: 'pointer', fontFamily: 'inherit',
                     minHeight: 28,
@@ -524,7 +524,7 @@ export default function NotificationPanel() {
                       {extra > 0 && (
                         <span style={{
                           flexShrink: 0,
-                          fontSize: 10, fontWeight: 700,
+                          fontSize: 12, fontWeight: 700,
                           color: 'var(--danger, #EF4444)',
                           background: 'var(--danger-soft, rgba(239,68,68,0.12))',
                           padding: '2px 7px', borderRadius: 999,
@@ -534,7 +534,7 @@ export default function NotificationPanel() {
                       )}
                     </div>
                     <div style={{
-                      fontSize: 11, color: 'var(--text-muted)',
+                      fontSize: 12, color: 'var(--text-muted)',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {it.sub}
@@ -578,7 +578,7 @@ export default function NotificationPanel() {
             style={{
               borderTop: '1px solid var(--border-soft, rgba(255,255,255,.06))',
               padding: '10px 14px',
-              fontSize: 11, color: 'var(--text-muted)',
+              fontSize: 12, color: 'var(--text-muted)',
               cursor: 'pointer', textAlign: 'center',
             }}
           >

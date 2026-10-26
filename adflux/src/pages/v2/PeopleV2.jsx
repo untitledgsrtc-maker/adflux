@@ -194,7 +194,7 @@ export default function PeopleV2() {
               {badge && (
                 <span style={{
                   fontFamily: 'var(--font-mono, JetBrains Mono, monospace)',
-                  fontSize: 10,
+                  fontSize: 12,
                   background: on ? 'var(--v2-yellow-soft, rgba(255,230,0,.14))' : 'var(--v2-bg-2, #141b2d)',
                   border: '1px solid',
                   borderColor: on ? 'transparent' : 'var(--v2-line, #1f2a44)',

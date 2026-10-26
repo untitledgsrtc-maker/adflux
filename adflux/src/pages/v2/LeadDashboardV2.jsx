@@ -234,7 +234,7 @@ export default function LeadDashboardV2() {
       {/* ─── Hero strip — teal gradient with 5 KPI columns ─── */}
       <div className="lead-hero-strip">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <div style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,.7)' }}>
+          <div style={{ fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,.7)' }}>
             <span style={{ color: 'var(--accent)' }}>●</span>&nbsp;&nbsp;Pipeline pulse · live
           </div>
         </div>
@@ -340,7 +340,7 @@ export default function LeadDashboardV2() {
                       )}
                       {lang && (
                         <span style={{
-                          fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
+                          fontSize: 12, fontWeight: 700, letterSpacing: '.08em',
                           color: 'var(--accent)',
                           background: 'var(--accent-soft)',
                           padding: '1px 6px', borderRadius: 999,
@@ -348,13 +348,13 @@ export default function LeadDashboardV2() {
                       )}
                       {outcome && (
                         <span style={{
-                          fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
+                          fontSize: 12, fontWeight: 700, letterSpacing: '.08em',
                           color: outcome === 'positive' ? 'var(--success)'
                                 : outcome === 'negative' ? 'var(--danger)' : 'var(--text-muted)',
                           textTransform: 'uppercase',
                         }}>{outcome}</span>
                       )}
-                      <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
+                      <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
                         {formatRelative(v.created_at)}
                       </span>
                     </div>
@@ -420,7 +420,7 @@ export default function LeadDashboardV2() {
                         <span style={{ fontSize: 12, color: 'var(--text-subtle)' }}>—</span>
                       )}
                     </td>
-                    <td className="mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    <td className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                       {l.last_contact_at ? formatRelative(l.last_contact_at) : '—'}
                     </td>
                     <td className="mono" style={{ fontWeight: 600, fontFamily: 'var(--font-display)', textAlign: 'right' }}>

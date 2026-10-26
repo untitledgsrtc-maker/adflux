@@ -16,7 +16,7 @@ function StatusBadge({ status, rejectionReason }) {
         className="ph-status-badge"
         style={{
           background: 'var(--success-soft)', color: 'var(--success)',
-          padding: '2px 8px', borderRadius: 10, fontSize: 10,
+          padding: '2px 8px', borderRadius: 10, fontSize: 12,
           fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase',
           display: 'inline-flex', alignItems: 'center', gap: 4,
         }}
@@ -32,7 +32,7 @@ function StatusBadge({ status, rejectionReason }) {
         title={rejectionReason ? `Reason: ${rejectionReason}` : 'Rejected'}
         style={{
           background: 'var(--danger-soft)', color: 'var(--danger)',
-          padding: '2px 8px', borderRadius: 10, fontSize: 10,
+          padding: '2px 8px', borderRadius: 10, fontSize: 12,
           fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase',
           display: 'inline-flex', alignItems: 'center', gap: 4,
           cursor: rejectionReason ? 'help' : 'default',
@@ -48,7 +48,7 @@ function StatusBadge({ status, rejectionReason }) {
       className="ph-status-badge"
       style={{
         background: 'var(--warning-soft)', color: 'var(--warning)',
-        padding: '2px 8px', borderRadius: 10, fontSize: 10,
+        padding: '2px 8px', borderRadius: 10, fontSize: 12,
         fontWeight: 600, letterSpacing: '.04em', textTransform: 'uppercase',
         display: 'inline-flex', alignItems: 'center', gap: 4,
       }}

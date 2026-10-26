@@ -106,7 +106,7 @@ export function Step2DateSigner({
                 style={{
                   marginLeft: 8,
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 11, fontWeight: 600,
+                  fontSize: 12, fontWeight: 600,
                   color: 'var(--text-muted)',
                   textTransform: 'none', letterSpacing: 0,
                 }}

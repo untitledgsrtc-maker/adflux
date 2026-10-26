@@ -945,7 +945,7 @@ export default function AdminDashboardDesktop() {
           }}
         >
           <div style={{
-            fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase',
+            fontSize: 12, letterSpacing: '.16em', textTransform: 'uppercase',
             color: 'var(--v2-ink-2)', fontWeight: 700, marginRight: 4,
           }}>
             Filters
@@ -1303,7 +1303,7 @@ function Kpi({ label, value, count, tone, dot, sub, cta }) {
             onClick={cta.onClick}
             style={{
               marginLeft: 'auto', background: 'transparent', border: 0,
-              color: 'var(--v2-yellow)', fontSize: 11, fontWeight: 600,
+              color: 'var(--v2-yellow)', fontSize: 12, fontWeight: 600,
               cursor: 'pointer', padding: 0,
             }}
           >
@@ -1317,7 +1317,7 @@ function Kpi({ label, value, count, tone, dot, sub, cta }) {
       {/* Phase 31E — optional sub line for richer context (e.g. value
           + overdue count under Active Quotes count). */}
       {sub && (
-        <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 4, fontWeight: 500 }}>
+        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 4, fontWeight: 500 }}>
           {sub}
         </div>
       )}
@@ -1360,7 +1360,7 @@ function RevenueTrendPanel({ months, max, onMonthClick }) {
   const PLOT = 220 // px plot height
   const GUTTER = 46 // px y-axis label gutter
 
-  const kSty = { fontSize: 10, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }
+  const kSty = { fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }
   const Stat = ({ k, v, c, first }) => (
     <div style={{ padding: first ? '0 22px 0 0' : '0 22px', borderLeft: first ? 'none' : '1px solid var(--v2-line)' }}>
       <div style={kSty}>{k}</div>
@@ -1368,7 +1368,7 @@ function RevenueTrendPanel({ months, max, onMonthClick }) {
     </div>
   )
   const Swatch = ({ bg, label }) => (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 600 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--v2-ink-2)', fontWeight: 600 }}>
       <span style={{ width: 12, height: 12, borderRadius: 3, background: bg }} /> {label}
     </span>
   )
@@ -1400,7 +1400,7 @@ function RevenueTrendPanel({ months, max, onMonthClick }) {
       <div style={{ display: 'flex', gap: 8 }}>
         <div style={{ position: 'relative', width: GUTTER, height: PLOT, flex: `0 0 ${GUTTER}px` }}>
           {ticks.map((t, i) => (
-            <div key={i} style={{ position: 'absolute', right: 0, bottom: (t / yTop) * PLOT, transform: 'translateY(50%)', fontSize: 9, color: 'var(--v2-ink-2)', fontFamily: 'var(--v2-display)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{axisFmt(t)}</div>
+            <div key={i} style={{ position: 'absolute', right: 0, bottom: (t / yTop) * PLOT, transform: 'translateY(50%)', fontSize: 12, color: 'var(--v2-ink-2)', fontFamily: 'var(--v2-display)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{axisFmt(t)}</div>
           ))}
         </div>
         <div style={{ position: 'relative', flex: 1, height: PLOT }}>
@@ -1427,7 +1427,7 @@ function RevenueTrendPanel({ months, max, onMonthClick }) {
                 >
                   <div style={{ width: 24, maxWidth: '38%', height: wonH, background: YELLOW, borderRadius: '4px 4px 0 0' }} />
                   <div style={{ width: 24, maxWidth: '38%', height: recvH, background: BLUE, borderRadius: '4px 4px 0 0' }} />
-                  {isZero && <span style={{ position: 'absolute', bottom: 2, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: 'var(--v2-ink-2)' }}>₹0</span>}
+                  {isZero && <span style={{ position: 'absolute', bottom: 2, left: 0, right: 0, textAlign: 'center', fontSize: 12, color: 'var(--v2-ink-2)' }}>₹0</span>}
                 </button>
               )
             })}
@@ -1440,7 +1440,7 @@ function RevenueTrendPanel({ months, max, onMonthClick }) {
         <div style={{ width: GUTTER, flex: `0 0 ${GUTTER}px` }} />
         <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${months.length}, 1fr)` }}>
           {months.map((m) => (
-            <div key={m.key} style={{ textAlign: 'center', fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 600 }}>{m.label}</div>
+            <div key={m.key} style={{ textAlign: 'center', fontSize: 12, color: 'var(--v2-ink-2)', fontWeight: 600 }}>{m.label}</div>
           ))}
         </div>
       </div>
@@ -1536,7 +1536,7 @@ function SegmentBadge({ segment }) {
       borderRadius: 999,
       background: 'rgba(100,181,246,.15)',
       color: '#64b5f6',
-      fontSize: 9,
+      fontSize: 12,
       fontWeight: 700,
       letterSpacing: '.06em',
       textTransform: 'uppercase',
@@ -1620,7 +1620,7 @@ function LeaderboardPanel({ rows, max, period }) {
                     more breathing room before truncation triggers. */}
                 <div className="v2d-lb-name" title={r.name}>
                   {r.name}
-                  <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 2 }}>
                     {r.sent} sent · {r.wonPaid} won &amp; paid
                     {r.wonUnpaid > 0 && (
                       <span style={{ color: 'var(--v2-ink-2)', opacity: .8 }}> · +{r.wonUnpaid} awaiting payment</span>
@@ -1628,13 +1628,13 @@ function LeaderboardPanel({ rows, max, period }) {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', minWidth: 90 }}>
-                  <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase' }}>Won &amp; paid</div>
+                  <div style={{ fontSize: 12, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase' }}>Won &amp; paid</div>
                   <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13, color: 'var(--v2-green)' }}>
                     <Money value={r.wonPaidAmt} />
                   </div>
                 </div>
                 <div className="v2d-lb-val" style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 9, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>Converted</div>
+                  <div style={{ fontSize: 12, letterSpacing: '.08em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 1 }}>Converted</div>
                   {r.conv == null ? '—' : `${r.conv}%`}
                 </div>
                 <div className="v2d-lb-pct">{pct}%</div>
@@ -1790,7 +1790,7 @@ function ActionQueueCard({ items, onOpen }) {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: allClear ? 0 : 12 }}>
         <div>
-          <div style={{ fontSize: 11, letterSpacing: '.12em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>
+          <div style={{ fontSize: 12, letterSpacing: '.12em', color: 'var(--v2-ink-2)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>
             Action queue {!allClear && `· ${items.length} item${items.length === 1 ? '' : 's'}`}
           </div>
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--v2-ink-0)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -2152,7 +2152,7 @@ function RepsInFieldCard({ rows = [], salesUsers = [], onOpen }) {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {rows.slice(0, 12).map(r => (
               <span key={r.user_id} style={{
-                fontSize: 11, padding: '4px 10px',
+                fontSize: 12, padding: '4px 10px',
                 background: 'rgba(16,185,129,.14)',
                 color: 'var(--v2-green, #10B981)',
                 borderRadius: 999, fontWeight: 600,
@@ -2161,7 +2161,7 @@ function RepsInFieldCard({ rows = [], salesUsers = [], onOpen }) {
               </span>
             ))}
             {rows.length > 12 && (
-              <span style={{ fontSize: 11, color: 'var(--v2-ink-2)', padding: '4px 6px' }}>
+              <span style={{ fontSize: 12, color: 'var(--v2-ink-2)', padding: '4px 6px' }}>
                 +{rows.length - 12} more
               </span>
             )}
@@ -2238,7 +2238,7 @@ function TopHotLeadsCard({ rows = [], onOpen, onAll }) {
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--v2-ink-0)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {r.company || r.name || '—'}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 2 }}>
                     {r.name || '—'} · {r.stage}
                   </div>
                 </div>
@@ -2306,7 +2306,7 @@ function BriefStat({ label, value, color }) {
       }}>
         {value}
       </div>
-      <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.10em', marginTop: 4, fontWeight: 600 }}>
+      <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.10em', marginTop: 4, fontWeight: 600 }}>
         {label}
       </div>
     </div>

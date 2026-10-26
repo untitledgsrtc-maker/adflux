@@ -854,7 +854,7 @@ export default function LeadUploadV2() {
                 width: 22, height: 22, borderRadius: '50%',
                 background: i < stepIdx ? 'var(--success)' : i === stepIdx ? 'var(--accent)' : 'var(--surface-2)',
                 color: i === stepIdx ? 'var(--accent-fg)' : i < stepIdx ? 'white' : 'var(--text-muted)',
-                display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600,
+                display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 600,
               }}>{i < stepIdx ? '✓' : i + 1}</span>
               <span style={{ fontSize: 12, fontWeight: i === stepIdx ? 600 : 500, whiteSpace: 'nowrap' }}>{s}</span>
             </span>
@@ -896,7 +896,7 @@ export default function LeadUploadV2() {
             <div style={{ marginTop: 22, textAlign: 'left', maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Example file (first row = column names)</div>
               <pre style={{
-                margin: 0, padding: 12, fontSize: 11, lineHeight: 1.5,
+                margin: 0, padding: 12, fontSize: 12, lineHeight: 1.5,
                 background: 'var(--v2-bg-2, var(--surface-2))',
                 border: '1px solid var(--v2-line, var(--border))',
                 borderRadius: 10, overflowX: 'auto', whiteSpace: 'pre',
@@ -1006,7 +1006,7 @@ export default function LeadUploadV2() {
                   <tbody>
                     {selfCheck.items.slice(0, 10).map(it => (
                       <tr key={it.row}>
-                        <td style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>{it.row}</td>
+                        <td style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{it.row}</td>
                         <td><strong>{it.name || '—'}</strong></td>
                         <td style={{ fontSize: 12 }}>{it.phone || '—'}</td>
                         <td style={{ fontSize: 12 }}>{it.company || '—'}</td>
@@ -1014,7 +1014,7 @@ export default function LeadUploadV2() {
                         <td>
                           <span style={{
                             display: 'inline-block', padding: '2px 8px', borderRadius: 999,
-                            fontSize: 11, fontWeight: 600,
+                            fontSize: 12, fontWeight: 600,
                             background: it.status === 'ok' ? 'var(--success-soft, rgba(16,185,129,.12))' : 'var(--warning-soft, rgba(245,158,11,.12))',
                             color: it.status === 'ok' ? 'var(--success, #10B981)' : 'var(--warning, #F59E0B)',
                           }}>
@@ -1030,7 +1030,7 @@ export default function LeadUploadV2() {
                 </table>
               </div>
               {selfCheck.items.length > 10 && (
-                <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 8 }}>
                   Showing the first 10 of {selfCheck.items.length} rows. The checks above cover every row.
                 </div>
               )}
@@ -1151,7 +1151,7 @@ export default function LeadUploadV2() {
                   value={cutoffDays}
                   onChange={e => setCutoffDays(Number(e.target.value) || 0)}
                 />
-                <p style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 4 }}>
+                <p style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 4 }}>
                   Leads older than this get auto-marked Lost/Stale (per master spec §17.5). 0 = disable cutoff.
                 </p>
               </div>
@@ -1189,7 +1189,7 @@ export default function LeadUploadV2() {
                 <tbody>
                   {preview.map((p, i) => (
                     <tr key={i}>
-                      <td><strong>{p.name}</strong>{p.company && <div style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>{p.company}</div>}</td>
+                      <td><strong>{p.name}</strong>{p.company && <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{p.company}</div>}</td>
                       <td style={{ fontFamily: 'inherit', fontSize: 12 }}>{p.phone || '—'}</td>
                       <td>
                         {/* Phase 30A — 5 stages. Lost-with-revisit
@@ -1199,7 +1199,7 @@ export default function LeadUploadV2() {
                             the dead-Lost rows. */}
                         <span style={{
                           display: 'inline-block', padding: '2px 8px', borderRadius: 999,
-                          fontSize: 11, fontWeight: 600,
+                          fontSize: 12, fontWeight: 600,
                           background: p.isNurture ? 'rgba(96,165,250,.12)' :
                                        p.stage === 'Lost' ? 'rgba(248,113,113,.10)' :
                                        p.stage === 'Won' ? 'rgba(74,222,128,.10)' :
@@ -1217,10 +1217,10 @@ export default function LeadUploadV2() {
                           p.parsed?.telecallerName ? <span style={{ color: 'var(--v2-ink-2)' }}>{p.parsed.telecallerName} (no match)</span> :
                           <span style={{ color: 'var(--v2-ink-2)' }}>—</span>}
                       </td>
-                      <td style={{ fontSize: 11, fontFamily: 'inherit', color: 'var(--v2-ink-2)' }}>
+                      <td style={{ fontSize: 12, fontFamily: 'inherit', color: 'var(--v2-ink-2)' }}>
                         {p.parsed?.timestamp ? new Date(p.parsed.timestamp).toLocaleDateString() : '—'}
                       </td>
-                      <td style={{ fontSize: 11, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td style={{ fontSize: 12, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.parsed?.statusText || p.remarks || '—'}
                       </td>
                     </tr>
@@ -1262,15 +1262,15 @@ export default function LeadUploadV2() {
           <div style={{ display: 'flex', gap: 24, justifyContent: 'center', flexWrap: 'wrap', margin: '16px 0' }}>
             <div>
               <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: 'var(--success, #10B981)' }}>{result.imported}</div>
-              <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Imported</div>
+              <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Imported</div>
             </div>
             <div>
               <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: 'var(--warning, #F59E0B)' }}>{result.dupes}</div>
-              <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Duplicates</div>
+              <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Duplicates</div>
             </div>
             <div>
               <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: 'var(--v2-ink-2)' }}>{result.skipped}</div>
-              <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Skipped</div>
+              <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Skipped</div>
             </div>
             {/* Phase 99.C — phone-less rows surfaced as their own
                 tile so admin sees the count without digging. Warning
@@ -1279,12 +1279,12 @@ export default function LeadUploadV2() {
             {result.skippedPhone > 0 && (
               <div>
                 <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: 'var(--warning, #F59E0B)' }}>{result.skippedPhone}</div>
-                <div style={{ fontSize: 11, color: 'var(--warning, #F59E0B)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Missing phone</div>
+                <div style={{ fontSize: 12, color: 'var(--warning, #F59E0B)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Missing phone</div>
               </div>
             )}
             <div>
               <div style={{ fontFamily: 'var(--v2-display)', fontSize: 24, fontWeight: 600, color: '#f87171' }}>{result.errors.length}</div>
-              <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Errors</div>
+              <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Errors</div>
             </div>
           </div>
           {selfMode && result.errors.length > 0 && (

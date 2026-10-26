@@ -96,11 +96,11 @@ export default function CampaignTeamChatsV2() {
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                       <b style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name || 'Unknown'}</b>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted, #94a3b8)', flexShrink: 0 }}>{fmtTime(p.last.at)}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted, #94a3b8)', flexShrink: 0 }}>{fmtTime(p.last.at)}</span>
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted, #94a3b8)' }}>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{p.last.direction === 'out' ? 'You: ' : ''}{p.last.body}</span>
-                      {p.failed > 0 && <span style={{ background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger, #EF4444)', borderRadius: 999, padding: '1px 7px', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{p.failed} failed</span>}
+                      {p.failed > 0 && <span style={{ background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger, #EF4444)', borderRadius: 999, padding: '1px 7px', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{p.failed} failed</span>}
                     </span>
                   </span>
                 </button>
@@ -117,12 +117,12 @@ export default function CampaignTeamChatsV2() {
                 const out = m.direction === 'out'
                 return (
                   <div key={m.id} style={{ alignSelf: out ? 'flex-end' : 'flex-start', maxWidth: '78%' }}>
-                    {out && KIND[m.kind] && <div style={{ fontSize: 10, color: 'var(--text-subtle, #64748b)', textAlign: 'right', marginBottom: 2 }}>{KIND[m.kind]}</div>}
+                    {out && KIND[m.kind] && <div style={{ fontSize: 12, color: 'var(--text-subtle, #64748b)', textAlign: 'right', marginBottom: 2 }}>{KIND[m.kind]}</div>}
                     <div style={{ background: out ? 'var(--accent-soft, rgba(255,230,0,.14))' : 'var(--surface-2, #334155)', color: 'var(--text, #f1f5f9)',
                       border: m.status === 'failed' ? '1px solid var(--danger, #EF4444)' : '1px solid transparent', borderRadius: 14, padding: '8px 12px', fontSize: 13, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                       {m.body}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: out ? 'flex-end' : 'flex-start', gap: 5, fontSize: 10, color: 'var(--text-subtle, #64748b)', marginTop: 2 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: out ? 'flex-end' : 'flex-start', gap: 5, fontSize: 12, color: 'var(--text-subtle, #64748b)', marginTop: 2 }}>
                       {fmtTime(m.at)} {out && <Ticks status={m.status} />}
                       {out && m.status === 'failed' && m.error && <span style={{ color: 'var(--danger, #EF4444)' }}>{m.error}</span>}
                     </div>

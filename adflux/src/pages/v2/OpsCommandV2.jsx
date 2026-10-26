@@ -182,8 +182,8 @@ function Tile({ icon: Icon, n, label, tone = 'muted', sub, note, onClick }) {
     <El onClick={onClick} className="lead-card" style={{ padding: '13px 14px', textAlign: 'left', width: '100%', cursor: onClick ? 'pointer' : 'default', color: 'inherit', display: 'block', minHeight: 84 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--text-muted)', marginBottom: 6 }}><Icon size={15} style={{ color: c }} /><span style={{ fontSize: 12.5 }}>{label}</span></div>
       <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 26, fontWeight: 700, color: c, lineHeight: 1 }}>{n}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
-      {note && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{note}</div>}
+      {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
+      {note && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{note}</div>}
     </El>
   )
 }

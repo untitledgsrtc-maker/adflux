@@ -73,7 +73,7 @@ function StateChip({ state }) {
       display: 'inline-flex', alignItems: 'center',
       padding: '3px 10px',
       borderRadius: 999,
-      fontSize: 11, fontWeight: 600,
+      fontSize: 12, fontWeight: 600,
       background: tone.bg,
       color:      tone.fg,
       border:     `1px solid ${tone.bd}`,

@@ -529,7 +529,7 @@ function TicketCard({ tk, lang, expanded, onToggle, contacts, uid, onChanged }) 
               {isPhoto ? t('photo_request', lang) : (issueLabel || t('fault', lang))}
             </span>
             {tk.source === 'auto_offline' && (
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 999,
+              <span style={{ fontSize: 12, fontWeight: 700, padding: '1px 6px', borderRadius: 999,
                 background: 'var(--v2-tint-blue, rgba(59,130,246,.12))', color: 'var(--v2-blue, #3B82F6)', flexShrink: 0 }}>
                 {t('auto', lang)}
               </span>

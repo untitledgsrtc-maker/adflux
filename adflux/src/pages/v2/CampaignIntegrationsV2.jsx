@@ -103,7 +103,7 @@ export default function CampaignIntegrationsV2() {
             <div style={card}>
               <div style={ihead}><span style={iname}>Justdial</span><Chip c="blue">Email parser</Chip></div>
               <div style={idesc}>No public API. Forward Justdial lead emails to a parser address — they auto-become leads.</div>
-              <div style={irow}><span style={ik}>Parser address</span><span style={{ ...iv, fontSize: 11 }}>(set up later)</span></div>
+              <div style={irow}><span style={ik}>Parser address</span><span style={{ ...iv, fontSize: 12 }}>(set up later)</span></div>
               <div style={irow}><span style={ik}>Last parsed</span><span style={iv}>—</span></div>
             </div>
           </div>
@@ -181,7 +181,7 @@ function Chip({ c, children }) {
     rose: ['var(--v2-rose, #f87171)', 'var(--v2-rose-soft, rgba(248,113,113,0.14))'],
     blue: ['var(--v2-blue, #60a5fa)', 'var(--v2-blue-soft, rgba(96,165,250,0.16))'],
   }[c] || ['var(--v2-ink-2)', 'var(--v2-bg-2)']
-  return <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', padding: '2px 8px', borderRadius: 999, color: map[0], background: map[1], display: 'inline-flex', alignItems: 'center' }}>{children}</span>
+  return <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', padding: '2px 8px', borderRadius: 999, color: map[0], background: map[1], display: 'inline-flex', alignItems: 'center' }}>{children}</span>
 }
 function Tdot({ c }) { return <span style={{ width: 7, height: 7, borderRadius: 999, background: c === 'green' ? 'var(--v2-green, #22c55e)' : 'var(--v2-line-2, #475569)', display: 'inline-block', flexShrink: 0 }} /> }
 function Trow({ k, v, vColor, indent = 0 }) {
@@ -203,7 +203,7 @@ const idesc = { fontSize: 12, color: 'var(--v2-ink-2)', marginBottom: 12, minHei
 const irow = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderTop: '1px solid var(--v2-line)', fontSize: 12, gap: 8 }
 const ik = { color: 'var(--v2-ink-2)' }
 const iv = { color: 'var(--v2-ink-0)', fontSize: 12 }
-const miniSelect = { height: 24, display: 'inline-flex', alignItems: 'center', background: 'var(--v2-bg-2)', border: '1px solid var(--v2-line)', borderRadius: 7, color: 'var(--v2-ink-1)', fontSize: 11, padding: '0 8px' }
+const miniSelect = { height: 24, display: 'inline-flex', alignItems: 'center', background: 'var(--v2-bg-2)', border: '1px solid var(--v2-line)', borderRadius: 7, color: 'var(--v2-ink-1)', fontSize: 12, padding: '0 8px' }
 const btnG = { background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, height: 38, padding: '0 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
-const th = { padding: '11px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--v2-ink-2)', borderBottom: '1px solid var(--v2-line)', background: 'rgba(255,255,255,.02)' }
+const th = { padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--v2-ink-2)', borderBottom: '1px solid var(--v2-line)', background: 'rgba(255,255,255,.02)' }
 const td = { padding: '11px 16px', borderBottom: '1px solid var(--v2-line)', fontSize: 13, color: 'var(--v2-ink-1)' }

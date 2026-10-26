@@ -212,7 +212,7 @@ function CityPhotoUploader({ cityId, value, onChange }) {
               </button>
             </div>
             {err && (
-              <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }}>
                 {err}
               </div>
             )}
@@ -243,7 +243,7 @@ function CityPhotoUploader({ cityId, value, onChange }) {
         </button>
       )}
       {!value && err && (
-        <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 6 }}>
+        <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }}>
           {err}
         </div>
       )}

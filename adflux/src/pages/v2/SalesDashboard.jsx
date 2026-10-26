@@ -461,7 +461,7 @@ function Kpi({ label, value, count, sub, tone, dot }) {
         {value !== undefined ? <Money value={value} /> : <>{count ?? 0}</>}
       </div>
       {sub && (
-        <div style={{ marginTop: 2, fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500 }}>
+        <div style={{ marginTop: 2, fontSize: 12, color: 'var(--v2-ink-2)', fontWeight: 500 }}>
           {sub}
         </div>
       )}
@@ -585,7 +585,7 @@ function Leaderboard({ rows, meId }) {
       <div className="v2-card-h">
         <div>
           <div className="v2-card-t">Team leaderboard · {new Date().toLocaleDateString('en-IN', { month: 'short' })}</div>
-          <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 2 }}>
             Quotes sent vs won &amp; paid · approved payments only
           </div>
         </div>
@@ -615,7 +615,7 @@ function Row({ rank, row, isYou }) {
       <UserAvatar className="v2-lb-avatar" name={row.name} userId={row.id} />
       <div className="v2-lb-name">
         {row.name}{isYou && <span className="v2-lb-you">· you</span>}
-        <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 1 }}>
+        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', fontWeight: 500, marginTop: 1 }}>
           {row.sent} sent · {row.wonPaid} won &amp; paid
           {row.wonUnpaid > 0 && <span style={{ opacity: .8 }}> · +{row.wonUnpaid} awaiting</span>}
         </div>
@@ -625,11 +625,11 @@ function Row({ rank, row, isYou }) {
         <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13, color: 'var(--v2-green)' }}>
           <Money value={row.wonPaidAmt} />
         </div>
-        <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', fontWeight: 600, letterSpacing: '.04em' }}>won &amp; paid</div>
+        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', fontWeight: 600, letterSpacing: '.04em' }}>won &amp; paid</div>
         <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 13, color: 'var(--v2-ink-0)', marginTop: 2 }}>
           {row.conv == null ? '—' : `${row.conv}%`}
         </div>
-        <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', fontWeight: 600, letterSpacing: '.04em' }}>converted</div>
+        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', fontWeight: 600, letterSpacing: '.04em' }}>converted</div>
       </div>
     </div>
   )

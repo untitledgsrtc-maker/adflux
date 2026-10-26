@@ -476,7 +476,7 @@ function PickScreen({ leads, leadId, setLeadId, langHint, setLangHint, onBack, o
                 {selectedLead.company ? ` · ${selectedLead.company}` : ''}
               </div>
               {selectedLead.stage && (
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{selectedLead.stage}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selectedLead.stage}</div>
               )}
             </div>
             <button
@@ -484,7 +484,7 @@ function PickScreen({ leads, leadId, setLeadId, langHint, setLangHint, onBack, o
               onClick={() => setLeadId(null)}
               style={{
                 background: 'transparent', border: 0, color: 'var(--text-muted)',
-                cursor: 'pointer', fontSize: 11, padding: '4px 8px',
+                cursor: 'pointer', fontSize: 12, padding: '4px 8px',
               }}
             >
               Change
@@ -533,18 +533,18 @@ function PickScreen({ leads, leadId, setLeadId, langHint, setLangHint, onBack, o
                   <div style={{ fontWeight: 600 }}>
                     {l.name}{l.company ? ` · ${l.company}` : ''}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                     {l.stage || '—'}{l.phone ? ` · ${l.phone}` : ''}
                   </div>
                 </button>
               ))}
               {filtered.length > 30 && (
-                <div style={{ padding: 8, fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
+                <div style={{ padding: 8, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
                   Showing 30 of {filtered.length}. Type to narrow.
                 </div>
               )}
             </div>
-            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>
               Or leave it empty — you can always file a quick voice note without a lead and link it later.
             </div>
           </>
@@ -613,7 +613,7 @@ function ListeningScreen({ leadName, langLabel, seconds, onStop }) {
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 600, color: 'var(--purple)' }}>
           {fmt(seconds)}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 4, letterSpacing: '.12em', textTransform: 'uppercase' }}>
+        <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 4, letterSpacing: '.12em', textTransform: 'uppercase' }}>
           Tap to stop
         </div>
       </div>
@@ -623,7 +623,7 @@ function ListeningScreen({ leadName, langLabel, seconds, onStop }) {
         <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
           Recording… transcript will appear here once you stop.
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 8 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 8 }}>
           Speak naturally — the system understands Gujarati, Hindi, and English.
         </div>
       </div>
@@ -638,7 +638,7 @@ function SendingScreen() {
       <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 14 }}>
         Transcribing and classifying…
       </div>
-      <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 6 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 6 }}>
         Typically 5–10 seconds.
       </div>
     </div>
@@ -785,7 +785,7 @@ function ConfirmScreen({
                 background: 'var(--surface-3, rgba(255,255,255,.04))',
                 border: '1px solid var(--border)',
                 color: 'var(--text-muted)',
-                padding: '4px 10px', borderRadius: 999, fontSize: 11,
+                padding: '4px 10px', borderRadius: 999, fontSize: 12,
               }}
             >
               <MapPin size={11} />

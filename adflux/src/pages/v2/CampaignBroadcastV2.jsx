@@ -288,7 +288,7 @@ export default function CampaignBroadcastV2() {
         <div style={{ flex: 1 }} />
         <a href="https://business.facebook.com/billing_hub" target="_blank" rel="noreferrer" style={{ ...btnY, textDecoration: 'none' }}>Top up</a>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', margin: '6px 0 18px' }}>Balance + top-up live in WhatsApp Manager / Meta Billing — we never store your card. Est. spend = sent &times; ~{'₹'}0.80 marketing rate.</div>
+      <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', margin: '6px 0 18px' }}>Balance + top-up live in WhatsApp Manager / Meta Billing — we never store your card. Est. spend = sent &times; ~{'₹'}0.80 marketing rate.</div>
 
       {/* selected broadcast — funnel + cards + template preview */}
       {selData && selData.broadcast && (() => {
@@ -322,7 +322,7 @@ export default function CampaignBroadcastV2() {
                   <div style={waImg}>{bc.template_name}</div>
                   <div style={waBody}>{tplBody}</div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 12 }}>Template: <b style={{ color: 'var(--v2-ink-1)' }}>{bc.template_name}</b>{bc.segment_name ? ` · ${bc.segment_name}` : ''}</div>
+                <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 12 }}>Template: <b style={{ color: 'var(--v2-ink-1)' }}>{bc.template_name}</b>{bc.segment_name ? ` · ${bc.segment_name}` : ''}</div>
               </div>
             )}
           </>
@@ -390,7 +390,7 @@ export default function CampaignBroadcastV2() {
               </div>
             </div>
           )}
-          <p style={{ fontSize: 11, color: 'var(--v2-ink-2)', margin: '12px 0 0', lineHeight: 1.5 }}>
+          <p style={{ fontSize: 12, color: 'var(--v2-ink-2)', margin: '12px 0 0', lineHeight: 1.5 }}>
             Marketing messages are billed per send (a payment method must be on the WABA). Send only to your own opted-in leads.
           </p>
         </div>
@@ -404,13 +404,13 @@ export default function CampaignBroadcastV2() {
             <div key={b.id} onClick={() => setSelBcId(b.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderBottom: '1px solid var(--v2-line)', flexWrap: 'wrap', cursor: 'pointer', background: b.id === selBcId ? 'rgba(255,230,0,.05)' : 'transparent' }}>
               <div style={{ flex: 1, minWidth: 150 }}>
                 <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)', fontSize: 13 }}>{b.segment_name || 'Segment'} · {b.template_name}</div>
-                <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 1 }}>{fmtWhen(b.created_at)}</div>
+                <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 1 }}>{fmtWhen(b.created_at)}</div>
               </div>
               <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, color: 'var(--v2-green, #22c55e)' }}>{b.sent}</span>
-              <span style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>sent</span>
+              <span style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>sent</span>
               {b.failed > 0 && <span style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, color: 'var(--v2-rose, #f87171)' }}>{b.failed} failed</span>}
-              <span style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>/ {b.total}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', padding: '2px 8px', borderRadius: 999, color: b.status === 'done' ? 'var(--v2-green, #22c55e)' : 'var(--v2-amber, #F59E0B)', background: b.status === 'done' ? 'var(--v2-green-soft, rgba(34,197,94,0.14))' : 'var(--v2-amber-soft, rgba(245,158,11,0.14))' }}>{b.status}</span>
+              <span style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>/ {b.total}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', padding: '2px 8px', borderRadius: 999, color: b.status === 'done' ? 'var(--v2-green, #22c55e)' : 'var(--v2-amber, #F59E0B)', background: b.status === 'done' ? 'var(--v2-green-soft, rgba(34,197,94,0.14))' : 'var(--v2-amber-soft, rgba(245,158,11,0.14))' }}>{b.status}</span>
             </div>
           ))}
         </div>
@@ -501,7 +501,7 @@ export default function CampaignBroadcastV2() {
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', padding: '2px 8px', borderRadius: 999, color: st.color, background: st.bg }}>
                       <st.Icon size={12} strokeWidth={1.8} /> {st.label}
                     </span>
-                    <span style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>{t.category} · {(t.language || 'en')}</span>
+                    <span style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{t.category} · {(t.language || 'en')}</span>
                   </div>
                   <div style={{ fontSize: 12.5, color: 'var(--v2-ink-2)', marginTop: 6, whiteSpace: 'pre-wrap' }}>{bodyOf(t)}</div>
                 </div>
@@ -518,12 +518,12 @@ export default function CampaignBroadcastV2() {
 
 // ─── inline styles ───────────────────────────────────────────────────────
 const panel = { background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 14, padding: 18 }
-const lbl = { fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 6, display: 'block' }
+const lbl = { fontSize: 12, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 6, display: 'block' }
 const inp = { width: '100%', height: 38, padding: '0 12px', background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
 const btnY = { background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0b1220)', border: 'none', borderRadius: 10, height: 38, padding: '0 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
 const btnG = { background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, height: 38, padding: '0 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
 const billStrip = { display: 'flex', alignItems: 'center', gap: 22, background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 12, padding: '14px 18px', flexWrap: 'wrap' }
-const bk = { fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em' }
+const bk = { fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em' }
 const bnum = { fontFamily: 'var(--v2-display)', fontWeight: 700, color: 'var(--v2-ink-0)', fontSize: 18 }
 const funnelWrap = { display: 'flex', gap: 0, background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 14, overflow: 'hidden', marginBottom: 18 }
 const bcardsWrap = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14, marginBottom: 18 }
@@ -536,15 +536,15 @@ function FunnelStat({ pct: p, cnt, lbl, color, last }) {
   return (
     <div style={{ flex: 1, padding: '16px 18px', borderRight: last ? 'none' : '1px solid var(--v2-line)', minWidth: 90 }}>
       <div style={{ fontFamily: 'var(--v2-display)', fontSize: 22, fontWeight: 700, color: color || 'var(--v2-ink-0)' }}>{p}%</div>
-      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>{(cnt || 0).toLocaleString('en-IN')}</div>
-      <div style={{ fontSize: 11, color: 'var(--v2-ink-1)', marginTop: 6, fontWeight: 600 }}>{lbl}</div>
+      <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{(cnt || 0).toLocaleString('en-IN')}</div>
+      <div style={{ fontSize: 12, color: 'var(--v2-ink-1)', marginTop: 6, fontWeight: 600 }}>{lbl}</div>
     </div>
   )
 }
 function BCard({ k, v, y }) {
   return (
     <div style={{ background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 14, padding: '16px 18px' }}>
-      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600 }}>{k}</div>
+      <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600 }}>{k}</div>
       <div style={{ fontFamily: 'var(--v2-display)', fontSize: 18, fontWeight: 700, color: y ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-ink-0)', marginTop: 6 }}>{v}</div>
     </div>
   )

@@ -78,7 +78,7 @@ export function WhatIfSimulator({ profiles, settings }) {
                 onChange={e => setNewRevenue(Number(e.target.value))}
                 style={{ accentColor: 'var(--accent)', width: '100%' }}
               />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
                 <span>₹0</span>
                 <span>{formatCurrency(maxSlider)}</span>
               </div>
@@ -98,7 +98,7 @@ export function WhatIfSimulator({ profiles, settings }) {
                 onChange={e => setRenewalRevenue(Number(e.target.value))}
                 style={{ accentColor: 'var(--blue)', width: '100%' }}
               />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
                 <span>₹0</span>
                 <span>{formatCurrency(maxSlider)}</span>
               </div>
@@ -114,14 +114,14 @@ export function WhatIfSimulator({ profiles, settings }) {
             <div className="whatif-result-card">
               <div className="whatif-result-label">Threshold</div>
               <div className="whatif-result-value">{formatCurrency(threshold)}</div>
-              <div style={{ fontSize: 11, color: result.slabReached ? 'var(--success)' : 'var(--danger)', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: result.slabReached ? 'var(--success)' : 'var(--danger)', marginTop: 4 }}>
                 {result.slabReached ? '✓ Reached' : '✗ Not reached'}
               </div>
             </div>
             <div className="whatif-result-card">
               <div className="whatif-result-label">Target</div>
               <div className="whatif-result-value">{formatCurrency(target)}</div>
-              <div style={{ fontSize: 11, color: result.targetExceeded ? 'var(--success)' : 'var(--text-muted)', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: result.targetExceeded ? 'var(--success)' : 'var(--text-muted)', marginTop: 4 }}>
                 {result.targetExceeded ? '✓ Exceeded' : `${Math.round(result.progressToTarget * 100)}% done`}
               </div>
             </div>
@@ -129,7 +129,7 @@ export function WhatIfSimulator({ profiles, settings }) {
               <div className="whatif-result-label">Incentive Earned</div>
               <div className="whatif-result-value accent">{formatCurrency(result.incentive)}</div>
               {result.targetExceeded && (
-                <div style={{ fontSize: 11, color: 'var(--success)', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--success)', marginTop: 4 }}>
                   Includes ₹{Number(result.flatBonus).toLocaleString('en-IN')} bonus
                 </div>
               )}
@@ -138,7 +138,7 @@ export function WhatIfSimulator({ profiles, settings }) {
 
           {/* Visual breakdown bar */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
               <span>₹0</span>
               <span>Threshold {formatCurrency(threshold)}</span>
               <span>Target {formatCurrency(target)}</span>

@@ -148,9 +148,9 @@ export default function OpsMyPerformanceV2() {
 function Tile({ label, val, sub }) {
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--font-display, var(--font-sans))', color: 'var(--text)' }}>{val}</div>
-      {sub && <div style={{ fontSize: 10 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12 }}>{sub}</div>}
     </div>
   )
 }

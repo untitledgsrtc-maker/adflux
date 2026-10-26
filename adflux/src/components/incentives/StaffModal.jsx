@@ -251,7 +251,7 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
                 disabled={locked}
                 onChange={e => set('new_client_rate', e.target.value)}
               />
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 e.g. 0.05 = 5%
               </span>
               {errors.new_client_rate && <span className="staff-field-error">{errors.new_client_rate}</span>}
@@ -269,7 +269,7 @@ export function StaffModal({ member, settings, onClose, onSaved }) {
                 disabled={locked}
                 onChange={e => set('renewal_rate', e.target.value)}
               />
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 e.g. 0.02 = 2%
               </span>
               {errors.renewal_rate && <span className="staff-field-error">{errors.renewal_rate}</span>}

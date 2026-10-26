@@ -218,7 +218,7 @@ export default function ProfilePicUploader() {
           )}
         </div>
         {err && (
-          <div style={{ fontSize: 11, color: 'var(--danger, #EF4444)', marginTop: 6 }}>
+          <div style={{ fontSize: 12, color: 'var(--danger, #EF4444)', marginTop: 6 }}>
             {err}
           </div>
         )}

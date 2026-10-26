@@ -82,14 +82,14 @@ export function RingMilestone({ value = 0, target = 1, label = '', sub = '' }) {
           }}
         >
           {v}
-          <span style={{ color: 'var(--text-subtle, #64748b)', fontSize: 10, fontWeight: 500, marginLeft: 1 }}>
+          <span style={{ color: 'var(--text-subtle, #64748b)', fontSize: 12, fontWeight: 500, marginLeft: 1 }}>
             /{safeTarget}
           </span>
         </div>
       </div>
       <div
         style={{
-          fontSize: 10,
+          fontSize: 12,
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
           color: 'var(--text-subtle, #64748b)',
@@ -99,7 +99,7 @@ export function RingMilestone({ value = 0, target = 1, label = '', sub = '' }) {
         {label}
       </div>
       {sub && (
-        <div style={{ fontSize: 10, color: 'var(--text-muted, #94a3b8)', marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted, #94a3b8)', marginTop: 2 }}>
           {sub}
         </div>
       )}

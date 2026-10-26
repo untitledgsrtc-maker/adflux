@@ -98,7 +98,7 @@ export default function V2Hero({
             display: 'inline-flex',
             alignItems: 'center',
             gap: 6,
-            fontSize: 10,
+            fontSize: 12,
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
             color: 'rgba(255,255,255,0.65)',
@@ -144,7 +144,7 @@ export default function V2Hero({
         <div
           style={{
             textAlign: 'right',
-            fontSize: 11,
+            fontSize: 12,
             color: 'rgba(255,255,255,0.7)',
             // Phase 35.0 pass 7 — when the circular ring is rendered
             // (`percent` set) the right column MUST NOT shrink below
@@ -198,7 +198,7 @@ export default function V2Hero({
                 background: 'rgba(255,255,255,0.10)',
                 border: '1px solid rgba(255,255,255,0.18)',
                 color: '#fff',
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: 500,
                 whiteSpace: 'nowrap',
               }}

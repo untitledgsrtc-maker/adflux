@@ -86,7 +86,7 @@ function Kpi({ label, value, count, sub, tone, dot }) {
         {value !== undefined ? <Money value={value} /> : <>{count ?? 0}</>}
       </div>
       {sub && (
-        <div style={{ marginTop: 2, fontSize: 11, color: 'var(--v2-ink-2)', fontWeight: 500 }}>
+        <div style={{ marginTop: 2, fontSize: 12, color: 'var(--v2-ink-2)', fontWeight: 500 }}>
           {sub}
         </div>
       )}
@@ -357,7 +357,7 @@ export default function AgencyHomeView() {
             background: 'var(--accent-soft)',
             color: 'var(--accent-fg)',
             border: '1px solid var(--accent)',
-            fontSize: 11, fontWeight: 700,
+            fontSize: 12, fontWeight: 700,
             letterSpacing: '.06em',
           }}>
             <Wallet size={14} /> {state.pct.toFixed(2)}% AGENCY
@@ -438,7 +438,7 @@ export default function AgencyHomeView() {
             }}
           >
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: 'var(--v2-ink-2)', textTransform: 'uppercase' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.08em', color: 'var(--v2-ink-2)', textTransform: 'uppercase' }}>
                 Follow-ups due
               </div>
               <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 22, color: 'var(--v2-ink-0)', marginTop: 2 }}>

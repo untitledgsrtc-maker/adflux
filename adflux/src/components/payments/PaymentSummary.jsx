@@ -84,7 +84,7 @@ export function PaymentSummary({ totalAmount = 0, totalPaid = 0, hasFinalPayment
           background: 'rgba(245, 158, 11, 0.08)',
           border: '1px solid rgba(245, 158, 11, 0.25)',
           borderRadius: 6,
-          fontSize: 11,
+          fontSize: 12,
           color: 'var(--text-muted)',
           lineHeight: 1.45,
         }}>

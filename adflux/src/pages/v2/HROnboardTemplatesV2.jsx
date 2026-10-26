@@ -202,7 +202,7 @@ function StepEditor({ st, idx, total, onPatch, onDelete, onMove }) {
     <div style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: 'var(--bg, #0f172a)' }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-subtle)', textAlign: 'center' }}>{idx + 1}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-subtle)', textAlign: 'center' }}>{idx + 1}</span>
           <button onClick={() => onMove(st, -1)} disabled={idx === 0} style={miniBtn}><ChevronUp size={14} /></button>
           <button onClick={() => onMove(st, 1)} disabled={idx === total - 1} style={miniBtn}><ChevronDown size={14} /></button>
         </div>

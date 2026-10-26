@@ -244,7 +244,7 @@ export default function HROfferLetterV2() {
           <ArrowLeft size={16} />
         </button>
         <div>
-          <div style={{ fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
             Hiring · Phase 50.3
           </div>
           <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 24, color: 'var(--text)' }}>
@@ -444,7 +444,7 @@ function Card({ title, children }) {
       padding: 18,
     }}>
       <div style={{
-        fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase',
+        fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase',
         color: 'var(--text-muted)', marginBottom: 12,
       }}>{title}</div>
       <div style={{ display: 'grid', gap: 12 }}>
@@ -472,7 +472,7 @@ function Row({ children }) {
 }
 
 const fieldLabel = {
-  fontSize: 11, letterSpacing: 0.4, textTransform: 'uppercase',
+  fontSize: 12, letterSpacing: 0.4, textTransform: 'uppercase',
   color: 'var(--text-muted)',
 }
 const fullInput = {

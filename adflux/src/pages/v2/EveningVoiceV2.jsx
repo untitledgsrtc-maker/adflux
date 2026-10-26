@@ -318,7 +318,7 @@ function ListeningEvening({ seconds, onStop }) {
       <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, color: 'var(--purple)' }}>
         {fmt(seconds)}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 4, letterSpacing: '.12em', textTransform: 'uppercase' }}>
+      <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 4, letterSpacing: '.12em', textTransform: 'uppercase' }}>
         Tap to stop
       </div>
     </div>

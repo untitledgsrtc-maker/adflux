@@ -62,7 +62,7 @@ function StateChip({ state }) {
     <span style={{
       display: 'inline-flex', alignItems: 'center',
       padding: '3px 10px', borderRadius: 999,
-      fontSize: 11, fontWeight: 600,
+      fontSize: 12, fontWeight: 600,
       background: tone.bg, color: tone.fg,
       border: `1px solid ${tone.bd}`,
     }}>{state}</span>
@@ -578,7 +578,7 @@ function EmptyCard({ title, sub }) {
 // Inline tokens — same as SalaryAdminV2 Phase 41.4 toolbar.
 const labelStyle = {
   display: 'block',
-  fontSize: 11, fontWeight: 600,
+  fontSize: 12, fontWeight: 600,
   color: 'var(--v2-ink-2)',
   marginBottom: 4,
   textTransform: 'uppercase',
@@ -603,7 +603,7 @@ const ghostBtnStyle = {
   display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
 }
 const thStyle = {
-  padding: '10px 16px', fontSize: 11, fontWeight: 600,
+  padding: '10px 16px', fontSize: 12, fontWeight: 600,
   whiteSpace: 'nowrap', textTransform: 'uppercase',
   letterSpacing: '0.5px', background: 'var(--surface-2)',
 }

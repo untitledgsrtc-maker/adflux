@@ -577,7 +577,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                 padding: '1px 7px', borderRadius: 999,
                 background: 'var(--accent, #FFE600)',
                 color: 'var(--accent-fg, #0f172a)',
-                fontSize: 11, fontWeight: 700,
+                fontSize: 12, fontWeight: 700,
                 fontFamily: 'var(--font-mono, monospace)',
               }}>{pendingRequests.length}</span>
             </div>
@@ -623,7 +623,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                       <td style={tdStyle}>
                         <span style={{
                           display: 'inline-block', padding: '2px 10px',
-                          borderRadius: 999, fontSize: 11, fontWeight: 600,
+                          borderRadius: 999, fontSize: 12, fontWeight: 600,
                           background: kindMeta.bg,
                           color: kindMeta.fg,
                         }}>
@@ -732,7 +732,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                         <span style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>{c.city_name}</span>
                         {c.is_home && (
                           <span style={{
-                            padding: '1px 7px', borderRadius: 999, fontSize: 9, fontWeight: 700,
+                            padding: '1px 7px', borderRadius: 999, fontSize: 12, fontWeight: 700,
                             background: 'var(--v2-tint-yellow, rgba(255,230,0,0.14))', color: 'var(--accent, #FFE600)',
                             textTransform: 'uppercase', letterSpacing: '.06em',
                           }}>HQ</span>
@@ -764,7 +764,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                 ))}
               </tbody>
             </table>
-            <div style={{ padding: '8px 14px', fontSize: 11, color: 'var(--v2-ink-2)', borderTop: '1px solid var(--v2-line)' }}>
+            <div style={{ padding: '8px 14px', fontSize: 12, color: 'var(--v2-ink-2)', borderTop: '1px solid var(--v2-line)' }}>
               Changes save on blur. Hit <strong>Recompute month</strong> above for ceiling changes to flow into existing TA rows (only pending rows update — approved/paid are preserved).
             </div>
           </div>
@@ -862,7 +862,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
             >
               {o.label}
               <span style={{
-                padding: '1px 7px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+                padding: '1px 7px', borderRadius: 999, fontSize: 12, fontWeight: 700,
                 background: statusFilter === o.key ? 'rgba(0,0,0,.18)' : 'rgba(255,255,255,.06)',
                 color: 'inherit',
               }}>
@@ -880,7 +880,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
             style={{
               padding: '5px 10px', borderRadius: 999, border: '1px solid var(--v2-line)',
               background: 'transparent', color: 'var(--v2-ink-2)',
-              fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
               fontFamily: 'inherit',
             }}
             title={showEmpty ? 'Hide days with no TA earned' : 'Show all days including idle ones'}
@@ -958,7 +958,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                     style={{ borderBottom: '1px solid var(--v2-line)', cursor: 'pointer' }}>
                     <td style={tdStyle}>
                       <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>{fmtDateShort(r.ta_date)}</div>
-                      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)' }}>{fmtDow(r.ta_date)}</div>
+                      <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{fmtDow(r.ta_date)}</div>
                     </td>
                     {fUser === 'ALL' && (
                       <td style={tdStyle}>
@@ -979,7 +979,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                       ) : (
                         <span style={{ color: 'var(--v2-ink-2)' }}>—</span>
                       )}
-                      <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 2 }}>
                         {r.gps_pings_count || 0} GPS pings
                       </div>
                     </td>
@@ -1039,7 +1039,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                           <button
                             onClick={() => setStatus(r, 'paid')}
                             className="v2d-cta"
-                            style={{ padding: '4px 10px', fontSize: 11 }}
+                            style={{ padding: '4px 10px', fontSize: 12 }}
                           >Mark paid</button>
                         )}
                         {(r.status === 'rejected' || r.status === 'paid') && (
@@ -1047,7 +1047,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                             onClick={() => setStatus(r, 'pending')}
                             className="v2d-ghost"
                             title="Re-open"
-                            style={{ fontSize: 11 }}
+                            style={{ fontSize: 12 }}
                           >Re-open</button>
                         )}
                       </div>
@@ -1072,7 +1072,7 @@ function TotalCard({ label, value, kind, suffix, accent }) {
   return (
     <div className="v2d-panel" style={{ padding: '12px 16px' }}>
       <div style={{
-        fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase',
+        fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase',
         fontWeight: 700, color: 'var(--v2-ink-2)',
       }}>{label}</div>
       <div style={{
@@ -1095,7 +1095,7 @@ function statusChipStyle(status) {
   return {
     display: 'inline-block', padding: '2px 10px', borderRadius: 999,
     background: c.bg, color: c.fg,
-    fontSize: 10, fontWeight: 700, letterSpacing: '.08em',
+    fontSize: 12, fontWeight: 700, letterSpacing: '.08em',
     textTransform: 'uppercase',
   }
 }
@@ -1105,14 +1105,14 @@ function catChipStyle(cat) {
   const fg = map[cat] || '#94A3B8'
   return {
     display: 'inline-block', padding: '1px 7px', borderRadius: 999,
-    fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
+    fontSize: 12, fontWeight: 700, letterSpacing: '.06em',
     background: 'rgba(255,255,255,.06)', color: fg,
   }
 }
 
 const labelStyle = {
   display: 'block',
-  fontSize: 11, fontWeight: 600,
+  fontSize: 12, fontWeight: 600,
   color: 'var(--v2-ink-2)',
   marginBottom: 4,
   textTransform: 'uppercase',
@@ -1128,5 +1128,5 @@ const inputStyle = {
   fontSize: 13, outline: 'none',
   fontFamily: 'inherit', height: 38,
 }
-const thStyle = { padding: '10px 14px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.08em' }
+const thStyle = { padding: '10px 14px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.08em' }
 const tdStyle = { padding: '12px 14px', fontSize: 13, color: 'var(--v2-ink-1)', verticalAlign: 'top' }

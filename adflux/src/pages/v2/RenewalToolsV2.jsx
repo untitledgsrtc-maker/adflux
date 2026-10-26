@@ -583,7 +583,7 @@ export default function RenewalToolsV2() {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{
-                        fontSize: 10, fontWeight: 700, letterSpacing: '.08em',
+                        fontSize: 12, fontWeight: 700, letterSpacing: '.08em',
                         textTransform: 'uppercase', padding: '3px 8px', borderRadius: 999,
                         color: st.tone, background: st.soft,
                         display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -598,7 +598,7 @@ export default function RenewalToolsV2() {
                       </span>
                     </div>
                     <div style={{
-                      fontSize: 11, fontWeight: 700, letterSpacing: '.06em',
+                      fontSize: 12, fontWeight: 700, letterSpacing: '.06em',
                       textTransform: 'uppercase', color: 'var(--text-subtle, #64748b)',
                     }}>
                       {media.label}{q.unit_count ? ` · ${q.unit_count} ${media.unit}` : ''}

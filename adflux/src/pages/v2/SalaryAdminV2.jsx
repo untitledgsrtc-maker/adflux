@@ -512,7 +512,7 @@ export default function SalaryAdminV2({ embedded = false }) {
                       <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>
                         {r.user.name}
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                      <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
                         {roleLabel(r.user.role)}
                       </div>
                       {/* Batch B3 — honest chips. Only ever shown for a person whose
@@ -550,7 +550,7 @@ export default function SalaryAdminV2({ embedded = false }) {
                         // Neutral dash: either no computed row, or an ops person with
                         // 0 measured days (the function's default "100%" is not a real score).
                         <span
-                          style={{ fontSize: 11, color: 'var(--text-muted)' }}
+                          style={{ fontSize: 12, color: 'var(--text-muted)' }}
                           title={flags.unmeasured ? 'No measured days this month - no real score yet' : undefined}
                         >
                           —
@@ -558,7 +558,7 @@ export default function SalaryAdminV2({ embedded = false }) {
                       ) : (
                         <span style={{
                           fontFamily: 'inherit',
-                          fontSize: 11,
+                          fontSize: 12,
                           color: (Number(r.score_pct || 0) >= 80) ? 'var(--v2-green, #10B981)'
                                : (Number(r.score_pct || 0) >= 50) ? 'var(--v2-amber, #F59E0B)'
                                :                                    'var(--v2-rose, #EF4444)',
@@ -588,12 +588,12 @@ export default function SalaryAdminV2({ embedded = false }) {
                     <td style={tdNum}>
                       <div style={{
                         fontFamily: 'inherit',
-                        fontSize: 11, color: 'var(--v2-ink-1)',
+                        fontSize: 12, color: 'var(--v2-ink-1)',
                       }}>
                         {flags.missing ? '—' : `${Number(r.leave_days_total || 0).toFixed(1)}d`}
                       </div>
                       {(r.leave_days_unpaid > 0 || r.leave_days_paid > 0) && (
-                        <div style={{ fontSize: 10, color: 'var(--v2-ink-2)' }}>
+                        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>
                           {Number(r.leave_days_paid || 0).toFixed(1)} paid · {Number(r.leave_days_unpaid || 0).toFixed(1)} unpaid
                         </div>
                       )}
@@ -622,11 +622,11 @@ export default function SalaryAdminV2({ embedded = false }) {
                               {pm.paid > 0 ? fmtINR(pm.paid) : '—'}
                             </div>
                             {pm.hasFull ? (
-                              <div style={{ fontSize: 9, color: 'var(--success, #10B981)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                              <div style={{ fontSize: 12, color: 'var(--success, #10B981)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
                                 FULL
                               </div>
                             ) : pending > 0 && pm.paid > 0 ? (
-                              <div style={{ fontSize: 9, color: 'var(--warning, #F59E0B)' }}>
+                              <div style={{ fontSize: 12, color: 'var(--warning, #F59E0B)' }}>
                                 pending {fmtINR(pending)}
                               </div>
                             ) : null}
@@ -702,7 +702,7 @@ export default function SalaryAdminV2({ embedded = false }) {
 
 const labelStyle = {
   display: 'block',
-  fontSize: 11, fontWeight: 600,
+  fontSize: 12, fontWeight: 600,
   color: 'var(--v2-ink-2)',
   marginBottom: 4,
   textTransform: 'uppercase',
@@ -761,7 +761,7 @@ function SummaryCard({ label, value, sub, valueColor }) {
 // incentives.css (owner directive: copy Incentive styling to
 // Salary). th 10/16 + surface2 thead bg + 0.5px letter-spacing,
 // td 13/16 + vertical-align middle, no mono font on currency.
-const thStyle = { padding: '10px 16px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.5px', background: 'var(--surface-2)' }
+const thStyle = { padding: '10px 16px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.5px', background: 'var(--surface-2)' }
 const thNum   = { ...thStyle, textAlign: 'right' }
 const tdStyle = { padding: '13px 16px', fontSize: 13, color: 'var(--text)', verticalAlign: 'middle' }
 const tdNum   = { ...tdStyle, textAlign: 'right' }
@@ -780,7 +780,7 @@ const ghostBtnStyle = {
 const chipWarnStyle = {
   display: 'inline-flex', alignItems: 'center',
   padding: '2px 8px', borderRadius: 999,
-  fontSize: 10, fontWeight: 600, lineHeight: 1.5, whiteSpace: 'nowrap',
+  fontSize: 12, fontWeight: 600, lineHeight: 1.5, whiteSpace: 'nowrap',
   color: 'var(--warning)',
   background: 'var(--tint-warning)',
   border: '1px solid var(--tint-warning-bd)',

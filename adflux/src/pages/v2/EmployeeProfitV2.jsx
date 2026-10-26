@@ -234,7 +234,7 @@ const navBtn = {
   background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)',
   borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600,
 }
-const thS = { padding: '10px 14px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.5px', background: 'var(--surface-2)', color: 'var(--text-muted)', textAlign: 'right' }
+const thS = { padding: '10px 14px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.5px', background: 'var(--surface-2)', color: 'var(--text-muted)', textAlign: 'right' }
 const tdS = { padding: '13px 14px', fontSize: 13, color: 'var(--text)', verticalAlign: 'middle', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 
 function Card({ label, value, sub, valueColor }) {
@@ -282,10 +282,10 @@ function Block({ title, sub, rows, withIncome, onPick }) {
                       onClick={onPick ? () => { onPick(r.id); window.scrollTo({ top: 0, behavior: 'smooth' }) } : undefined}
                       title={onPick ? 'Show month-by-month chart' : undefined}
                     >{r.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                       {roleLabel(r.role)}
                       {withIncome && r.income > 0 && r.cost === 0 && (
-                        <span style={{ marginLeft: 8, padding: '1px 7px', borderRadius: 999, fontSize: 10, fontWeight: 600, color: 'var(--warning)', background: 'var(--tint-warning)', border: '1px solid var(--tint-warning-bd)' }}>No salary on file</span>
+                        <span style={{ marginLeft: 8, padding: '1px 7px', borderRadius: 999, fontSize: 12, fontWeight: 600, color: 'var(--warning)', background: 'var(--tint-warning)', border: '1px solid var(--tint-warning-bd)' }}>No salary on file</span>
                       )}
                     </div>
                   </td>

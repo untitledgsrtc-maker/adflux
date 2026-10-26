@@ -484,7 +484,7 @@ export default function HRNewUserV2() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <button onClick={() => navigate(-1)} style={iconBtn}><ArrowLeft size={18} /></button>
         <div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.10em', fontWeight: 600 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.10em', fontWeight: 600 }}>
             HR · New hire
           </div>
           <h1 style={{ margin: '4px 0 0', fontSize: 22, color: 'var(--text)' }}>Create user</h1>
@@ -577,7 +577,7 @@ export default function HRNewUserV2() {
             borderRadius: 10,
           }}>
             <div style={{
-              fontSize: 11, fontWeight: 700, letterSpacing: '.12em',
+              fontSize: 12, fontWeight: 700, letterSpacing: '.12em',
               color: 'var(--text-muted)', textTransform: 'uppercase',
               marginBottom: 10,
             }}>
@@ -680,7 +680,7 @@ function SelectField({ label, v, onChange, options }) {
 }
 
 const fieldLabel = {
-  fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase',
+  fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase',
   letterSpacing: '.08em', fontWeight: 600,
 }
 const checkRow = {

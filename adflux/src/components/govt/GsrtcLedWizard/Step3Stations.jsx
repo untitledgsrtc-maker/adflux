@@ -357,7 +357,7 @@ export function Step3Stations({ data, onChange }) {
                     onClick={() => resetOverrides(s.id)}
                     style={{
                       marginLeft: 8,
-                      fontSize: 10,
+                      fontSize: 12,
                       padding: '1px 6px',
                       borderRadius: 8,
                       border: '1px solid var(--border)',

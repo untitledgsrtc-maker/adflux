@@ -287,12 +287,12 @@ export default function AdminPushModal({ target, onClose }) {
 
 const labelStyle = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase',
+  fontSize: 12, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase',
   color: 'var(--v2-ink-2, #94a3b8)',
 }
 
 const counterStyle = {
-  fontSize: 10, fontWeight: 600, letterSpacing: 0, textTransform: 'none',
+  fontSize: 12, fontWeight: 600, letterSpacing: 0, textTransform: 'none',
   color: 'var(--v2-ink-2, #64748b)',
 }
 

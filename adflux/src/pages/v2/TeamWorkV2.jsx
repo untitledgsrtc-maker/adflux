@@ -774,7 +774,7 @@ function TimelineTab({ photoOf, memberIds, nameOf, byPerson, from, to, projName 
                 <span />
                 <div style={{ position: 'relative', height: 18 }}>
                   {Array.from({ length: H1 - H0 + 1 }, (_, i) => i).filter((i) => i % 1 === 0).map((i) => (
-                    <span key={i} className="wk-num wk-mu" style={{ position: 'absolute', left: `${pct(H0 + i)}%`, fontSize: 11, transform: 'translateX(-50%)' }}>{String(H0 + i).padStart(2, '0')}</span>
+                    <span key={i} className="wk-num wk-mu" style={{ position: 'absolute', left: `${pct(H0 + i)}%`, fontSize: 12, transform: 'translateX(-50%)' }}>{String(H0 + i).padStart(2, '0')}</span>
                   ))}
                 </div>
               </div>
@@ -801,7 +801,7 @@ function TimelineTab({ photoOf, memberIds, nameOf, byPerson, from, to, projName 
               <div style={{ display: 'grid', gridTemplateColumns: '170px 1fr 70px', gap: 12, marginBottom: 6 }}>
                 <span />
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${days}, 1fr)`, gap: 2 }}>
-                  {dayList.map((d) => <span key={d} className="wk-num wk-mu" style={{ fontSize: 10, textAlign: 'center' }}>{String(Number(d.slice(8))).padStart(2, '0')}</span>)}
+                  {dayList.map((d) => <span key={d} className="wk-num wk-mu" style={{ fontSize: 12, textAlign: 'center' }}>{String(Number(d.slice(8))).padStart(2, '0')}</span>)}
                 </div>
                 <span className="wk-sm" style={{ textAlign: 'right' }}>Total</span>
               </div>

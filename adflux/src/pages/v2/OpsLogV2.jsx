@@ -277,7 +277,7 @@ export default function OpsLogV2() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>{r.issue ? nm(r.issue, 'issue') : (r.cause || t('fault', lang))}</div>
                     {r.notes && <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)' }}>{r.notes}</div>}
-                    <div style={{ fontSize: 11, color: 'var(--v2-ink-2, #94a3b8)', marginTop: 2 }}>{new Date(r.created_at).toLocaleString('en-GB')}{r.photo_path ? ' · photo' : ''}</div>
+                    <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)', marginTop: 2 }}>{new Date(r.created_at).toLocaleString('en-GB')}{r.photo_path ? ' · photo' : ''}</div>
                   </div>
                 </div>
               ))}

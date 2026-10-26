@@ -351,7 +351,7 @@ export default function CampaignClientQrV2() {
                     </div>
                   </div>
                 )}
-                <div style={{ marginTop: 10, fontSize: 11, color: 'var(--v2-ink-2)' }}>
+                <div style={{ marginTop: 10, fontSize: 12, color: 'var(--v2-ink-2)' }}>
                   Code: <b style={{ color: 'var(--v2-ink-1)' }}>{displayCode}</b>
                   {editingId && <span style={{ marginLeft: 8, color: 'var(--v2-ink-2)' }}>· fixed — the printed QR keeps working, no reprint</span>}
                 </div>
@@ -363,7 +363,7 @@ export default function CampaignClientQrV2() {
                 </div>
               </div>
               <div style={{ flex: '0 0 200px', textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 10 }}>Live preview</div>
+                <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 10 }}>Live preview</div>
                 <div ref={previewRef} style={{ background: 'white', borderRadius: 10, padding: 14, display: 'inline-block' }}>
                   {target ? (
                     <Suspense fallback={<div style={{ width: 170, height: 170 }} />}><QRCodeCanvas value={qrValue(displayCode)} size={170} /></Suspense>
@@ -412,7 +412,7 @@ function Dl({ code, qr }) {
 // ─── inline styles ───────────────────────────────────────────────────────
 const panel = { background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 14, padding: 18 }
 const banner = { ...panel, borderColor: 'var(--v2-amber, #F59E0B)', background: 'var(--v2-amber-soft, rgba(245,158,11,0.12))', display: 'flex', gap: 10, alignItems: 'flex-start' }
-const lbl = { fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 6, display: 'block' }
+const lbl = { fontSize: 12, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 6, display: 'block' }
 const inp = { width: '100%', height: 38, padding: '0 12px', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }
 const btnY = { background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0b1220)', border: 'none', borderRadius: 10, height: 38, padding: '0 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
 const btnG = { background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, height: 38, padding: '0 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }
@@ -420,7 +420,7 @@ const seg = { display: 'flex', gap: 4, background: 'var(--v2-bg-2, #1a2742)', bo
 const segBase = { flex: 1, height: 32, borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
 const segOn = { ...segBase, background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0b1220)', fontWeight: 700 }
 const segOff = { ...segBase, background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', fontWeight: 600 }
-const th = { padding: '11px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--v2-ink-2, #6a7590)', borderBottom: '1px solid var(--v2-line, #1f2b47)', whiteSpace: 'nowrap', background: 'rgba(255,255,255,.02)' }
+const th = { padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--v2-ink-2, #6a7590)', borderBottom: '1px solid var(--v2-line, #1f2b47)', whiteSpace: 'nowrap', background: 'rgba(255,255,255,.02)' }
 const td = { padding: '12px 16px', borderBottom: '1px solid var(--v2-line, #1f2b47)', fontSize: 13, color: 'var(--v2-ink-1, #a9b3c7)', verticalAlign: 'middle', position: 'relative' }
 const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 9000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 16px', overflowY: 'auto' }
 const modalBox = { width: '100%', maxWidth: 580, background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 14, boxShadow: '0 24px 60px rgba(0,0,0,.5)' }

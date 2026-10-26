@@ -298,7 +298,7 @@ export default function TrainingOverlay() {
       <div style={overlayCardWrap}>
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontFamily: 'var(--v2-display)', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--v2-yellow, #FFE600)', fontWeight: 700 }}>
+            <span style={{ fontFamily: 'var(--v2-display)', fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--v2-yellow, #FFE600)', fontWeight: 700 }}>
               {t.training} · {t.step} {step + 1} {t.of} {steps.length}
             </span>
             <button style={linkBtn} onClick={exit} aria-label={t.skip}>

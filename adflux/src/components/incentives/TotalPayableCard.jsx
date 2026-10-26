@@ -223,7 +223,7 @@ export default function TotalPayableCard() {
         </span>
       </div>
 
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.6 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.6 }}>
         Approx — base + variable use the live score. "Incentive already paid"
         is what admin has paid out so far this month (proposed/forecast
         appears separately on the Active Campaigns card). TA is the GPS
@@ -258,8 +258,8 @@ function Row({ label, value, sub, muted, negative }) {
     }}>
       <div>
         <div style={{ fontSize: 13, color: 'var(--text)' }}>{label}</div>
-        {sub && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
-        {muted && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic' }}>{muted}</div>}
+        {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
+        {muted && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic' }}>{muted}</div>}
       </div>
       <div style={{
         fontFamily: 'var(--v2-display, "Space Grotesk", system-ui, sans-serif)',

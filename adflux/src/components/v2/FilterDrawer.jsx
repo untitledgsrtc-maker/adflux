@@ -112,7 +112,7 @@ export default function FilterDrawer({ fields = [] }) {
               color: 'var(--accent-fg, #0f172a)',
               borderRadius: 999,
               fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: 700,
               display: 'inline-flex',
               alignItems: 'center',
@@ -152,7 +152,7 @@ export default function FilterDrawer({ fields = [] }) {
         >
           <div
             style={{
-              fontSize: 10,
+              fontSize: 12,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
               color: 'var(--text-muted)',
@@ -167,7 +167,7 @@ export default function FilterDrawer({ fields = [] }) {
               <div key={f.key}>
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: 12,
                     color: 'var(--text-muted)',
                     marginBottom: 4,
                   }}

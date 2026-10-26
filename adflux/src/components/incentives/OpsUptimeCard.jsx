@@ -85,7 +85,7 @@ export default function OpsUptimeCard({ scope = 'exec' }) {
 
   return (
     <div className="lead-card" style={{ padding: 16, marginBottom: 14, background: 'var(--surface)', border: '1px solid var(--border)' }}>
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12 }}>
         This month — {isHead ? 'network uptime' : 'screen uptime'}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
@@ -116,7 +116,7 @@ export default function OpsUptimeCard({ scope = 'exec' }) {
 
       {(
         <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', fontSize: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>What's driving your variable</div>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.12em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>What's driving your variable</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', fontSize: 12 }}>
             <MRow ok={uptime >= UPTIME_FLOOR} label={`${UPTIME_FLOOR}% floor`}
               note={uptime >= UPTIME_FLOOR ? 'Variable unlocked' : `${Math.max(0, UPTIME_FLOOR - uptime).toFixed(0)}% to unlock variable`}
@@ -128,7 +128,7 @@ export default function OpsUptimeCard({ scope = 'exec' }) {
               note={uptime >= UPTIME_MAX ? 'Full variable' : `${Math.max(0, UPTIME_MAX - uptime).toFixed(0)}% to full variable`}
               pendColor="var(--text-muted)" />
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
             {isHead
               ? "Uptime = share of the whole network's screens live during 7 AM–9 PM."
               : 'Uptime = share of your screens live during 7 AM–9 PM, averaged this month.'}

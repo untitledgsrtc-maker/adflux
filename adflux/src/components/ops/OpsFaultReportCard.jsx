@@ -43,7 +43,7 @@ function ScoreChip({ score, lang }) {
   return (
     <div title={l.scoreNote} style={{ textAlign: 'right', flexShrink: 0 }}>
       <div style={{ ...numStyle, fontSize: 24, fontWeight: 700, lineHeight: 1, color: TONE_FG[tone(sc)] }}>{numL(sc, lang)}</div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{l.score}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{l.score}</div>
     </div>
   )
 }

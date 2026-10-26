@@ -831,7 +831,7 @@ export default function GpsTrackV2() {
         alignItems: 'flex-start', marginBottom: 16,
       }}>
         <div>
-          <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)' }}>
+          <div style={{ fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)' }}>
             Rep day track
           </div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600 }}>
@@ -867,20 +867,20 @@ export default function GpsTrackV2() {
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--text-subtle)' }}>
+          <div style={{ fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--text-subtle)' }}>
             Distance
           </div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 600, color: 'var(--accent, #FFE600)' }}>
             {displayKm} <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>km</span>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
             {stats.pings} pings
             {stats.pings !== stats.usablePings && ` · ${stats.pings - stats.usablePings} low-accuracy dropped`}
           </div>
           {/* Phase 34I — show raw vs filtered so owner can audit
               drift. Hidden unless they diverge by 10%+. */}
           {stats.kmRaw && Math.abs(Number(stats.kmRaw) - Number(stats.km)) > Number(stats.km) * 0.1 && (
-            <div style={{ fontSize: 11, color: 'var(--text-subtle)', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 2 }}>
               raw {stats.kmRaw} km · {stats.droppedSegs} drift/spike segments dropped
               {stats.capped ? ' · capped at 600 km' : ''}
             </div>
@@ -890,7 +890,7 @@ export default function GpsTrackV2() {
               off, not because the rep didn't move. Display-only; never feeds km. */}
           {coverage.shiftH > 0.15 && (
             <div style={{
-              fontSize: 11, marginTop: 4, fontWeight: 600,
+              fontSize: 12, marginTop: 4, fontWeight: 600,
               color: coverage.pct >= 80 ? 'var(--success)'
                 : coverage.pct >= 50 ? 'var(--warning)' : 'var(--danger)',
             }}>
@@ -1070,7 +1070,7 @@ function CallHistorySection({ title, sub, rows, navigate, defaultOpen = false })
                 {['Time', 'Direction', 'Lead / phone', 'Duration', 'Outcome', 'Note'].map(h => (
                   <th key={h} style={{
                     textAlign: 'left', padding: '10px 12px',
-                    fontSize: 10, letterSpacing: '.12em',
+                    fontSize: 12, letterSpacing: '.12em',
                     textTransform: 'uppercase', color: 'var(--text-muted)',
                     fontWeight: 700,
                   }}>{h}</th>
@@ -1319,7 +1319,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
                       >
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
                           <span style={{
-                            fontFamily: 'var(--font-mono)', fontSize: 11,
+                            fontFamily: 'var(--font-mono)', fontSize: 12,
                             color: 'var(--text-muted)', minWidth: 44,
                           }}>{t}</span>
                           <span style={{
@@ -1354,7 +1354,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
                       >
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
                           <span style={{
-                            fontFamily: 'var(--font-mono)', fontSize: 11,
+                            fontFamily: 'var(--font-mono)', fontSize: 12,
                             color: 'var(--text-muted)', minWidth: 44,
                           }}>{t}</span>
                           <span style={{
@@ -1387,7 +1387,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
                     >
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
                         <span style={{
-                          fontFamily: 'var(--font-mono)', fontSize: 11,
+                          fontFamily: 'var(--font-mono)', fontSize: 12,
                           color: 'var(--text-muted)', minWidth: 44,
                         }}>{t}</span>
                         <span style={{
@@ -1396,7 +1396,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
                         }}>{a.activity_type}</span>
                         {a.outcome && (
                           <span style={{
-                            fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
+                            fontSize: 12, fontWeight: 700, letterSpacing: '.08em',
                             textTransform: 'uppercase',
                             color: a.outcome === 'positive' ? 'var(--success)'
                                   : a.outcome === 'negative' ? 'var(--danger)' : 'var(--text-muted)',
@@ -1412,7 +1412,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
                         </div>
                       )}
                       {a.next_action && (
-                        <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, marginLeft: 52 }}>
+                        <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 4, marginLeft: 52 }}>
                           Next: {a.next_action}
                         </div>
                       )}
@@ -1451,12 +1451,12 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
                 >
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13 }}>
                     <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 11,
+                      fontFamily: 'var(--font-mono)', fontSize: 12,
                       color: 'var(--text-muted)', minWidth: 44,
                     }}>{t}</span>
                     {lang && (
                       <span style={{
-                        fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
+                        fontSize: 12, fontWeight: 700, letterSpacing: '.08em',
                         color: 'var(--accent)',
                         background: 'var(--accent-soft)',
                         padding: '1px 6px', borderRadius: 999,
@@ -1508,7 +1508,7 @@ function RepDayStat({ label, value, tone }) {
       borderRadius: 10, padding: '10px 14px',
     }}>
       <div style={{
-        fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase',
+        fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase',
         color: 'var(--text-muted)', fontWeight: 700, marginBottom: 4,
       }}>
         {label}

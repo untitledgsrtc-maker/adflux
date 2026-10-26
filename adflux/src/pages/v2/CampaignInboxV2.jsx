@@ -831,7 +831,7 @@ export default function CampaignInboxV2() {
                             {t.customer_name || fmtPhone(t.customer_wa_id)}
                           </span>
                         </span>
-                        <span style={{ fontSize: 11, color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }}>{relTime(t.last_message_at || t.last_inbound_at)}</span>
+                        <span style={{ fontSize: 12, color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }}>{relTime(t.last_message_at || t.last_inbound_at)}</span>
                       </span>
                       <span style={{
                         display: 'block', fontSize: 12.5, color: 'var(--v2-ink-2, #6a7590)', marginTop: 2,
@@ -890,7 +890,7 @@ export default function CampaignInboxV2() {
                     {sel.customer_name || fmtPhone(sel.customer_wa_id)}
                   </span>
                   {sel.customer_name && (
-                    <span style={{ display: 'block', fontSize: 11, color: 'var(--v2-ink-2, #6a7590)' }}>{fmtPhone(sel.customer_wa_id)}</span>
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--v2-ink-2, #6a7590)' }}>{fmtPhone(sel.customer_wa_id)}</span>
                   )}
                   <span style={{ fontSize: 11.5, color: windowOpen(sel.window_expires_at) ? 'var(--v2-green, #22c55e)' : 'var(--v2-ink-2, #6a7590)' }}>
                     {windowOpen(sel.window_expires_at) ? `Window open · ${windowLeft(sel.window_expires_at)}` : 'Window closed — needs a template to re-open'}
@@ -1009,7 +1009,7 @@ export default function CampaignInboxV2() {
                                 : (!m.media_url && !m.media_id && <em style={{ opacity: 0.7 }}>[{m.type || 'media'}]</em>)}
                             </div>
                             <div style={{
-                              fontSize: 10, marginTop: 3, display: 'flex', alignItems: 'center',
+                              fontSize: 12, marginTop: 3, display: 'flex', alignItems: 'center',
                               justifyContent: 'flex-end', gap: 4, color: 'var(--v2-ink-2, #6a7590)',
                             }}>
                               {msgTime(m.at)}
@@ -1330,7 +1330,7 @@ const avBox = {
 }
 const chipBase = {
   display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px',
-  borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+  borderRadius: 999, fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
 }
 const chipG = { ...chipBase, background: 'var(--v2-green-soft, rgba(34,197,94,0.14))', color: 'var(--v2-green, #22c55e)' }
 const chipA = { ...chipBase, background: 'var(--v2-amber-soft, rgba(245,158,11,0.14))', color: 'var(--v2-amber, #F59E0B)' }
@@ -1353,7 +1353,7 @@ const btnY = {
 const miniAv = {
   width: 18, height: 18, borderRadius: 999, flexShrink: 0, marginRight: 2,
   background: 'var(--v2-blue-soft, rgba(96,165,250,0.16))', color: 'var(--v2-blue, #60a5fa)',
-  fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
 }
 const chipYSmall = {
   display: 'inline-flex', alignItems: 'center', padding: '1px 6px', borderRadius: 999,

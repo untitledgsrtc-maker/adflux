@@ -272,7 +272,7 @@ export function PaymentModal({
             <span className="pm-summary-label">Paid So Far</span>
             <span className="pm-summary-value pm-summary-value--paid">{formatCurrency(totalPaid)}</span>
             {pendingAmount > 0 && (
-              <span className="pm-summary-sub" style={{ fontSize: 11, color: 'var(--warning)', marginTop: 2 }}>
+              <span className="pm-summary-sub" style={{ fontSize: 12, color: 'var(--warning)', marginTop: 2 }}>
                 +{formatCurrency(pendingAmount)} pending approval
               </span>
             )}

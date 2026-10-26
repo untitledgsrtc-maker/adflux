@@ -1722,7 +1722,7 @@ export default function GovtProposalDetailV2() {
                   : useLetterhead ? '✓ With letterhead' : 'Without letterhead'}
               </span>
             </label>
-            <span style={{ fontSize: 11, color: 'var(--text-subtle)', flex: '1 1 auto', minWidth: 200 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-subtle)', flex: '1 1 auto', minWidth: 200 }}>
               {!hasLetterhead
                 ? <>No letterhead uploaded for this segment. Go to <strong>Master → Companies</strong> and upload one to enable this toggle.</>
                 : useLetterhead
@@ -1761,7 +1761,7 @@ export default function GovtProposalDetailV2() {
             style={{ maxWidth: 220 }}
           />
           {quote.locked_proposal_pdf_url && (
-            <span style={{ color: 'var(--warning)', fontSize: 11 }}>
+            <span style={{ color: 'var(--warning)', fontSize: 12 }}>
               ⚠ Letter PDF already locked — changes affect future renders only, not the snapshot.
             </span>
           )}
@@ -1875,13 +1875,13 @@ export default function GovtProposalDetailV2() {
               <span style={{ color: c.checked ? 'var(--text)' : 'var(--text-muted)' }}>
                 {c.label}
                 {c.is_required && !isAutoProposal && (
-                  <span style={{ marginLeft: 6, color: 'var(--danger)', fontSize: 11 }}>required</span>
+                  <span style={{ marginLeft: 6, color: 'var(--danger)', fontSize: 12 }}>required</span>
                 )}
                 {isAutoProposal && (
-                  <span style={{ marginLeft: 6, color: '#64b5f6', fontSize: 11 }}>auto on Sent</span>
+                  <span style={{ marginLeft: 6, color: '#64b5f6', fontSize: 12 }}>auto on Sent</span>
                 )}
                 {c.custom && (
-                  <span style={{ marginLeft: 6, color: 'var(--blue)', fontSize: 11 }}>custom</span>
+                  <span style={{ marginLeft: 6, color: 'var(--blue)', fontSize: 12 }}>custom</span>
                 )}
               </span>
 
@@ -1957,7 +1957,7 @@ export default function GovtProposalDetailV2() {
                       </button>
                     )}
                     {hasUrlOnly && (
-                      <span style={{ fontSize: 11, color: 'var(--text-subtle)', fontStyle: 'italic' }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-subtle)', fontStyle: 'italic' }}>
                         legacy URL — re-upload as file
                       </span>
                     )}
@@ -1976,7 +1976,7 @@ export default function GovtProposalDetailV2() {
                       background: 'transparent', border: 'none',
                       color: '#64b5f6', cursor: 'pointer',
                       display: 'inline-flex', alignItems: 'center', gap: 4,
-                      fontSize: 11, fontWeight: 600,
+                      fontSize: 12, fontWeight: 600,
                     }}
                   >
                     <FileText size={12} /> View
@@ -1991,7 +1991,7 @@ export default function GovtProposalDetailV2() {
                       background: 'transparent', border: 'none',
                       color: '#81c784', cursor: 'pointer',
                       display: 'inline-flex', alignItems: 'center', gap: 4,
-                      fontSize: 11, fontWeight: 600,
+                      fontSize: 12, fontWeight: 600,
                     }}
                   >
                     <Download size={12} /> Open
@@ -2252,7 +2252,7 @@ export default function GovtProposalDetailV2() {
                       <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>
                         OC copy {ocUploaded ? '✓ uploaded' : '— required'}
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                         Stamped acknowledgment slip from the government body, brought back by the delivery person.
                       </div>
                     </div>

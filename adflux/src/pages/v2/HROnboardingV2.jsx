@@ -157,7 +157,7 @@ export default function HROnboardingV2() {
                           {isDone ? <CheckCircle2 size={16} style={{ color: 'var(--success)' }} /> : <Circle size={16} style={{ color: 'var(--text-subtle)' }} />}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <span style={{ fontSize: 13, color: 'var(--text)' }}>{s?.title || 'step'}</span>
-                            <span style={{ fontSize: 11, color: 'var(--text-subtle)', marginLeft: 8 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-subtle)', marginLeft: 8 }}>
                               {s?.owner === 'hire' ? 'hire' : s?.owner === 'manager' ? 'manager' : 'HR'}
                               {p.test_passed != null ? ` · test ${p.test_score}%` : ''}
                             </span>

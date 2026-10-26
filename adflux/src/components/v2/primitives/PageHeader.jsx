@@ -58,7 +58,7 @@ export default function PageHeader({
       <div style={{ minWidth: 0 }}>
         {eyebrow && (
           <div style={{
-            fontSize: 10,
+            fontSize: 12,
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
             color: 'var(--v2-ink-2, var(--text-muted))',

@@ -62,7 +62,7 @@ export default class ErrorBoundary extends Component {
         <div style={{ marginBottom: 10, fontWeight: 600 }}>{msg}</div>
         <pre style={{
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          fontSize: 11, color: 'var(--text-muted, #94a3b8)',
+          fontSize: 12, color: 'var(--text-muted, #94a3b8)',
           background: 'var(--surface-2, #334155)', padding: 10,
           borderRadius: 10, margin: 0, maxHeight: 260, overflow: 'auto',
         }}>{stack}{comp ? `\n\ncomponent stack:${comp}` : ''}</pre>

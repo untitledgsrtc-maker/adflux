@@ -182,7 +182,7 @@ export function PeriodPicker({ period, onChange }) {
                 border: '1px solid var(--v2-line, rgba(255,255,255,.1))',
                 borderRadius: 8,
                 padding: '6px 12px', fontWeight: 600,
-                fontSize: 11, cursor: 'pointer',
+                fontSize: 12, cursor: 'pointer',
               }}
             >
               Reset to this month
@@ -214,7 +214,7 @@ function PresetBtn({ onClick, label }) {
         border: '1px solid var(--v2-line, rgba(255,255,255,.08))',
         color: 'var(--v2-ink-1, rgba(255,255,255,.85))',
         fontFamily: 'var(--v2-sans)',
-        fontSize: 11, fontWeight: 600,
+        fontSize: 12, fontWeight: 600,
         padding: '7px 10px',
         borderRadius: 999,
         cursor: 'pointer',
@@ -229,14 +229,14 @@ function PresetBtn({ onClick, label }) {
 }
 
 const sectionLabel = {
-  fontSize: 10, letterSpacing: '0.14em', fontWeight: 700,
+  fontSize: 12, letterSpacing: '0.14em', fontWeight: 700,
   color: 'var(--v2-ink-2, rgba(255,255,255,.55))',
   textTransform: 'uppercase',
   marginBottom: 8,
 }
 
 const miniLabel = {
-  fontSize: 10, color: 'var(--v2-ink-2, rgba(255,255,255,.55))',
+  fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.55))',
   textTransform: 'uppercase', letterSpacing: '0.1em',
   marginBottom: 4, fontWeight: 700,
 }

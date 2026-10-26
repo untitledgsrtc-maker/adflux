@@ -224,7 +224,7 @@ export default function CopilotModal({ open, onClose }) {
           {!result && !error && !busy && (
             <div>
               <div style={{
-                fontSize: 11, color: 'var(--v2-ink-2)',
+                fontSize: 12, color: 'var(--v2-ink-2)',
                 textTransform: 'uppercase', letterSpacing: '.14em',
                 marginBottom: 10,
               }}>
@@ -245,7 +245,7 @@ export default function CopilotModal({ open, onClose }) {
                     }}
                   >
                     <div>{s.gu}</div>
-                    <div style={{ fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 2 }}>
                       {s.en}
                     </div>
                   </button>
@@ -259,7 +259,7 @@ export default function CopilotModal({ open, onClose }) {
         <div style={{
           padding: '10px 20px',
           borderTop: '1px solid var(--v2-line, rgba(255,255,255,.06))',
-          fontSize: 11, color: 'var(--v2-ink-2)',
+          fontSize: 12, color: 'var(--v2-ink-2)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span>Powered by Claude Haiku · costs ~₹0.30 per query</span>

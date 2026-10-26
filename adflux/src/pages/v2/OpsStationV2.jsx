@@ -20,7 +20,7 @@ import { normalizeIndianPhone } from '../../utils/phone'
 import { t, getOpsLang } from '../../utils/opsStrings'
 
 const card = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }
-const label = { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-muted)', fontWeight: 700 }
+const label = { fontSize: 12, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-muted)', fontWeight: 700 }
 const field = { background: 'var(--surface-2, var(--bg))', color: 'var(--text)', border: '1px solid var(--border-strong, var(--border))', borderRadius: 6, padding: '7px 9px', fontSize: 13, width: '100%', boxSizing: 'border-box' }
 
 // each screen's board state from real data: green working / amber in-progress / red down
@@ -202,10 +202,10 @@ export default function OpsStationV2() {
                 return <button key={s.id} type="button"
                   onClick={() => depotId && nav(`/ops-log?depot=${depotId}&screen=${s.id}`)}
                   title={`${s.name} — ${STATE_LABEL[st]} · tap to log an issue`}
-                  style={{ width: 34, height: 34, borderRadius: 6, background: STATE_COLOR[st], color: 'var(--accent-fg, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, border: 'none', padding: 0, cursor: 'pointer' }}>{i + 1}</button>
+                  style={{ width: 34, height: 34, borderRadius: 6, background: STATE_COLOR[st], color: 'var(--accent-fg, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, border: 'none', padding: 0, cursor: 'pointer' }}>{i + 1}</button>
               })}
             </div>}
-        <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 11, color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', gap: 16, marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
           {[['working', 'Working'], ['down', 'Down / Open'], ['progress', 'In progress']].map(([k, t]) =>
             <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: STATE_COLOR[k] }} />{t}</span>)}
         </div>

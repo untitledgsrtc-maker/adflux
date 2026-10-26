@@ -19,7 +19,7 @@ import { estVariable } from '../../utils/opsPay'
 import { isOnHours } from '../../utils/opsHours'
 import UserAvatar from '../../components/common/UserAvatar'
 
-const eyebrow = { fontSize: 11, fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--text-muted)' }
+const eyebrow = { fontSize: 12, fontWeight: 600, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--text-muted)' }
 const th = { textAlign: 'left', ...eyebrow, padding: '9px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }
 const td = { fontSize: 14, color: 'var(--text)', padding: '11px 12px', borderBottom: '1px solid var(--border)' }
 const TONES = {

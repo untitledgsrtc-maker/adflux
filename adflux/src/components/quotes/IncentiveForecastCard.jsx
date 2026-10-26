@@ -128,7 +128,7 @@ export default function IncentiveForecastCard({ quote }) {
         gap: 8,
         marginBottom: 10,
         color: 'var(--text-muted, #94a3b8)',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 600,
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
@@ -165,7 +165,7 @@ export default function IncentiveForecastCard({ quote }) {
             background: 'rgba(245,158,11,0.12)',
             border: '1px solid var(--warning, #F59E0B)',
             color: 'var(--warning, #F59E0B)',
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 600,
           }}>
             Won't cross slab yet ({formatCurrency(after.threshold - after.total)} short)
@@ -178,7 +178,7 @@ export default function IncentiveForecastCard({ quote }) {
             background: 'rgba(16,185,129,0.12)',
             border: '1px solid var(--success, #10B981)',
             color: 'var(--success, #10B981)',
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 600,
           }}>
             UNLOCKS slab — first incentive ₹ this month
@@ -191,7 +191,7 @@ export default function IncentiveForecastCard({ quote }) {
             background: 'rgba(255,230,0,0.18)',
             border: '1px solid var(--accent, #FFE600)',
             color: 'var(--accent, #FFE600)',
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 700,
           }}>
             + ₹{Number(incentiveProfile.flat_bonus || 10000).toLocaleString('en-IN')} bonus (crosses target)
@@ -202,7 +202,7 @@ export default function IncentiveForecastCard({ quote }) {
           borderRadius: 999,
           background: 'var(--surface-2, #334155)',
           color: 'var(--text-muted, #94a3b8)',
-          fontSize: 11,
+          fontSize: 12,
         }}>
           <TrendingUp size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} />
           Month so far: {formatCurrency(before.total)}
