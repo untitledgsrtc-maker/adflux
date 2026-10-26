@@ -229,7 +229,7 @@ export default function LeadsCollectedChart({ onDayClick }) {
                 }}>
                   <div style={styles.barValue}>{r.count > 0 ? r.count : '0'}</div>
                 </div>
-                <div style={styles.dayLabel}>{(i % (rows.length > 18 ? 4 : rows.length > 9 ? 2 : 1) === 0 || i === rows.length - 1) ? fmtDayLabel(r.date) : '\u00a0'}</div>
+                <div style={styles.dayLabel}>{(i === rows.length - 1 || (i % (rows.length > 18 ? 4 : rows.length > 9 ? 2 : 1) === 0 && rows.length - 1 - i >= (rows.length > 18 ? 3 : rows.length > 9 ? 2 : 1))) ? fmtDayLabel(r.date) : '\u00a0'}</div>
               </button>
             )
           })}
