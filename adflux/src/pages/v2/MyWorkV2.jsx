@@ -580,6 +580,17 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
   }, [evening, onShared])
   if (!evening) return null
   const finished = items.filter((i) => i.status === 'finished' && i.finishedDay === today).length   // finished TODAY only
+  // Phase 518: day score = tasks finished today WITH a due date that were on time (same test as work_ontime_stats: finished before the due
+  // day, or on the due day at/before the due time). Display only, never touches pay. No due date = not counted.
+  const scored = items.filter((i) => i.status === 'finished' && i.finishedDay === today && i.due)
+  const onTimeToday = scored.filter((i) => {
+    if (i.finishedDay < i.due) return true
+    if (i.finishedDay > i.due) return false
+    if (!i.dueTime) return true
+    const ft = new Date(i.finishedAt).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour12: false })
+    return ft <= String(i.dueTime).slice(0, 8).padEnd(8, ':00')
+  }).length
+  const dayScore = scored.length ? Math.round(onTimeToday / scored.length * 100) : null
   const proc = items.filter((i) => i.status === 'in_process').length
   const late = items.filter((i) => i.status !== 'finished' && i.status !== 'postponed' && dueState(i.due, i.status).cls === 'bad').length
   // The WhatsApp window MUST open straight from the tap: iPhone blocks a link opened after an
@@ -608,6 +619,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         `• Finished:   ${finished}`,
         `• In process: ${proc}${proc ? ' 🟡' : ''}`,
         `• Late:       ${late}${late ? ' 🔴' : ''}`,
+        ...(dayScore != null ? [`⭐ *DAY SCORE: ${dayScore}%* (${onTimeToday} of ${scored.length} finished on time)`] : []),
         '',
         '⏱ *TIME*',
         `• Clock in:  ${rows[0] ? fmtTimeIST(rows[0].started_at) : '-'}`,
@@ -644,6 +656,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
           <div className="wk-row"><span className="wk-mu">Finished</span><span className="wk-num">{finished}</span></div>
           <div className="wk-row"><span className="wk-mu">In process</span><span className="wk-num">{proc}</span></div>
           <div className="wk-row"><span className="wk-mu">Late</span><span className="wk-num" style={{ color: late ? 'var(--danger)' : undefined }}>{late}</span></div>
+          <div className="wk-row"><span className="wk-mu">Day score</span><span className="wk-num">{dayScore == null ? '-' : `${dayScore}% · ${onTimeToday} of ${scored.length} on time`}</span></div>
         </div>
         <div className="wk-field" style={{ margin: 0 }}><label htmlFor="ev-note">Note (optional)</label>
           <textarea id="ev-note" className="wk-input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="Anything the team should know" /></div>

@@ -46,3 +46,7 @@ State after this session (all pushed to `untitled-os`, last commit `a4b8506f` + 
 ## 517 · My Work hours: app card now matches the shared report (26-10-2026)
 
 MyWorkV2 `doneSecs` did not subtract `break_seconds` for finished sessions, while `runSecs`, the WhatsApp share text and the server reports (Phase 382) did. Result: in-app 'Hours today' ran longer than the shared Day Summary (Safika: 7h 50m vs 7h 33m = 17m away time). Fixed doneSecs. Frontend only; hours do not change pay.
+
+## 518 · Day score in the Work evening report (26-10-2026)
+
+MyWorkV2 EveningCard + WhatsApp Day Summary show 'Day score: X% (N of M finished on time)'. Counts tasks finished TODAY that have a due date; on time = finished before the due day, or on the due day at/before due_time (mirrors work_ontime_stats, so the two cannot disagree). No due date = not counted. Display only, never touches pay (pay rule stays monthly_score -> work_ontime_stats). Frontend only.
