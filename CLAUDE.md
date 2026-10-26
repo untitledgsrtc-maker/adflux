@@ -25,3 +25,7 @@ supabase_phase514_work_reopen_own.sql: work_move_part now lets the assignee move
 ## 515 · Team Work: Overdue only filter (26-10-2026)
 
 TeamWorkV2 Tasks board gets an 'Overdue only (N)' toggle beside the person/client filters: shows open, non-postponed tasks past due date. Pure frontend, no SQL.
+
+## 515.1 · Overdue tile in Team Work hero is tappable (26-10-2026)
+
+HeroSegs entries accept optional [label, value, sub, onClick, active]; the Overdue tile toggles the same onlyLate filter as the button. Frontend only.

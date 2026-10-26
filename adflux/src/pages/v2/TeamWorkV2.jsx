@@ -355,7 +355,7 @@ export default function TeamWorkV2() {
           <HeroSegs eyebrow="Board · filtered" segs={[
             ['In process', String(items.filter((i) => i.status === 'in_process').length), 'Being worked on'],
             ['Assigned', String(items.filter((i) => i.status === 'assigned').length), 'Not started'],
-            ['Overdue', String(lateParts.length), 'Past due date'],
+            ['Overdue', String(lateParts.length), onlyLate ? 'Showing overdue only' : 'Tap to filter', () => setOnlyLate((v) => !v), onlyLate],
           ]} />
           <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
             <select className="wk-input" style={{ width: 220 }} value={fPerson} onChange={(e) => setFPerson(e.target.value)} aria-label="Filter by person">
@@ -465,8 +465,10 @@ function HeroSegs({ eyebrow, segs, live, action, ring }) {
     <>
       <span className="wk-row" style={{ alignItems: 'center' }}><span className="wk-grp">{live && <span className="wk-ldot" aria-hidden="true" />}<span className="wk-eyb">{eyebrow}</span></span>{action}</span>
       <div className="wk-hsegs" style={{ gridTemplateColumns: `repeat(${segs.length}, minmax(0, 1fr))` }}>
-        {segs.map(([l, v, sub], i) => (
-          <div key={l} className="wk-hseg">
+        {segs.map(([l, v, sub, onClick, active], i) => (
+          <div key={l} className="wk-hseg"
+            {...(onClick ? { role: 'button', tabIndex: 0, 'aria-pressed': !!active, onClick, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } } : {})}
+            style={onClick ? { cursor: 'pointer', outline: active ? '2px solid var(--accent)' : undefined, outlineOffset: -2, borderRadius: 12 } : undefined}>
             <div className="wk-hs">{l}</div>
             <div className="wk-num" style={{ fontSize: i === 0 ? 34 : 26, fontWeight: 600, color: i === 0 ? 'var(--accent)' : '#fff' }}>{v}</div>
             {sub && <div className="wk-hs">{sub}</div>}
