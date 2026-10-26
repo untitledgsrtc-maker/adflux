@@ -139,7 +139,7 @@ export default function NearbyLeadsCard({ userId, onCallLead, refreshKey }) {
         <div
           style={{
             marginLeft: 'auto',
-            fontSize: 11, fontWeight: 600,
+            fontSize: 12, fontWeight: 600,
             color: 'var(--v2-ink-2, #94a3b8)',
             background: 'var(--v2-bg-0, rgba(15,19,32,0.6))',
             padding: '3px 9px', borderRadius: 999,
@@ -183,7 +183,7 @@ export default function NearbyLeadsCard({ userId, onCallLead, refreshKey }) {
                 </div>
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: 12,
                     color: 'var(--v2-ink-2, #94a3b8)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}
@@ -204,7 +204,7 @@ export default function NearbyLeadsCard({ userId, onCallLead, refreshKey }) {
                   background: 'transparent',
                   color: 'var(--v2-yellow, #FFE600)',
                   border: '1px solid var(--v2-yellow, #FFE600)',
-                  fontWeight: 600, fontSize: 11,
+                  fontWeight: 600, fontSize: 12,
                   textDecoration: 'none',
                   fontFamily: 'inherit',
                   flexShrink: 0,
@@ -231,7 +231,7 @@ export default function NearbyLeadsCard({ userId, onCallLead, refreshKey }) {
                   background: 'var(--v2-yellow, #FFE600)',
                   color: 'var(--accent-fg, #0f172a)',
                   border: 'none', cursor: 'pointer',
-                  fontWeight: 700, fontSize: 11,
+                  fontWeight: 700, fontSize: 12,
                   fontFamily: 'inherit',
                   flexShrink: 0,
                   opacity: (!onCallLead || !row.phone) ? 0.5 : 1,

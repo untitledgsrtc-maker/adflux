@@ -975,7 +975,7 @@ export default function LeadsV2() {
           marginBottom: 10, alignItems: 'center',
         }}>
           <span style={{
-            fontSize: 11, fontWeight: 700, letterSpacing: '.1em',
+            fontSize: 12, fontWeight: 700, letterSpacing: '.1em',
             textTransform: 'uppercase', color: 'var(--text-muted)',
             marginRight: 4,
           }}>
@@ -1360,7 +1360,7 @@ export default function LeadsV2() {
                             padding: '2px 6px',
                             borderRadius: 999,
                             border: '1px solid var(--border)',
-                            fontSize: 11,
+                            fontSize: 12,
                           }}
                         >Call</a>
                         <a
@@ -1387,7 +1387,7 @@ export default function LeadsV2() {
                             padding: '2px 6px',
                             borderRadius: 999,
                             border: '1px solid var(--border)',
-                            fontSize: 11,
+                            fontSize: 12,
                           }}
                         >WA</a>
                         </>)}
@@ -1404,7 +1404,7 @@ export default function LeadsV2() {
                           background: 'var(--warning-soft, rgba(245,158,11,0.14))',
                           border: '1px solid var(--warning, #F59E0B)',
                           color: 'var(--warning, #F59E0B)',
-                          fontSize: 10, fontWeight: 600,
+                          fontSize: 12, fontWeight: 600,
                           textTransform: 'uppercase', letterSpacing: '.06em',
                         }}
                         title="No phone on file — call / WhatsApp won't work"
@@ -1445,7 +1445,7 @@ export default function LeadsV2() {
                           <>
                             <LeadAvatar name={l.telecaller.name} userId={l.telecaller.id} />
                             <span style={{ fontSize: 12 }}>{l.telecaller.name}</span>
-                            <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 4 }}>· TC</span>
+                            <span style={{ fontSize: 12, opacity: 0.6, marginLeft: 4 }}>· TC</span>
                           </>
                         ) : (
                           <span style={{ fontSize: 12, color: 'var(--text-subtle)' }}>Unassigned</span>
@@ -1472,7 +1472,7 @@ export default function LeadsV2() {
                             color: 'var(--text-muted)',
                             borderRadius: 999,
                             padding: '3px 8px',
-                            fontSize: 11,
+                            fontSize: 12,
                             cursor: 'pointer',
                             display: 'inline-flex', alignItems: 'center', gap: 4,
                           }}
@@ -1725,7 +1725,7 @@ export default function LeadsV2() {
                       background: 'var(--warning-soft, rgba(245,158,11,0.14))',
                       border: '1px solid var(--warning, #F59E0B)',
                       color: 'var(--warning, #F59E0B)',
-                      fontSize: 11, fontWeight: 600,
+                      fontSize: 12, fontWeight: 600,
                       letterSpacing: '.04em',
                     }}
                   >
@@ -1886,7 +1886,7 @@ function AIBriefingCard({ briefing, onOpenQueue }) {
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-subtle)' }}>now</span>
+        <span style={{ fontSize: 12, color: 'var(--text-subtle)' }}>now</span>
         <button className="lead-btn" onClick={onOpenQueue}>
           <span>Open queue</span>
           <ArrowRight size={12} />

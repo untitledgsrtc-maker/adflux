@@ -49,7 +49,7 @@ import {
 export function StageChip({ stage, sm = false, slaBreached = false }) {
   if (!stage) return null
   const cls = `stage-chip stage-${String(stage).toLowerCase()}`
-  const style = sm ? { fontSize: 10, padding: '2px 7px' } : undefined
+  const style = sm ? { fontSize: 12, padding: '2px 7px' } : undefined
   return (
     <span className={cls} style={style}>
       {stage === 'Working' && slaBreached && <span className="pulse-dot" />}

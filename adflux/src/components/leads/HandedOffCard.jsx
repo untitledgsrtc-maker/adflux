@@ -72,7 +72,7 @@ export default function HandedOffCard({ refreshKey = 0 }) {
                 </div>
               </div>
               <span style={{
-                fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
+                fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
                 color: 'var(--v2-rose, #EF4444)',
                 background: 'var(--v2-rose-soft, rgba(239,68,68,0.12))',
                 border: '1px solid var(--v2-rose, #EF4444)',

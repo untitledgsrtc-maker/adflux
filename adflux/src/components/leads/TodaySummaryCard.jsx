@@ -212,7 +212,7 @@ export default function TodaySummaryCard({ userId, session }) {
         <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>
           All follow-ups done · {highMarkRef.current} closed today
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
           Nothing pending. Send a quote or add a fresh lead while you're free.
         </div>
       </div>
@@ -290,7 +290,7 @@ export default function TodaySummaryCard({ userId, session }) {
               {c.n}
             </div>
             <div style={{
-              fontSize: 9, fontWeight: 700,
+              fontSize: 12, fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '.08em',
               color: 'var(--text-muted)',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -306,7 +306,7 @@ export default function TodaySummaryCard({ userId, session }) {
         was done", so cleared tiles never read as a day of zero work. */}
     {counts.doneToday > 0 && (
       <div style={{
-        marginTop: 8, textAlign: 'center', fontSize: 11,
+        marginTop: 8, textAlign: 'center', fontSize: 12,
         color: 'var(--success, #10B981)', fontWeight: 600,
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
       }}>

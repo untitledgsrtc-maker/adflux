@@ -359,7 +359,7 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
                 {/* Phase 31P — Working renamed to Follow-up in UI. */}
                 Positive on a New lead — also move stage to <b>Follow-up</b>?
               </span>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 You can pick on Save.
               </span>
             </div>
@@ -390,7 +390,7 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
                   key={t}
                   type="button"
                   className="lead-btn lead-btn-sm"
-                  style={{ fontSize: 11, padding: '4px 9px' }}
+                  style={{ fontSize: 12, padding: '4px 9px' }}
                   onClick={() => applyTemplate(t)}
                 >
                   {t}
@@ -442,7 +442,7 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
                   type="button"
                   className={`lead-btn lead-btn-sm ${nextDate === p.date ? 'lead-btn-primary' : ''}`}
                   onClick={() => pickPreset(p.date)}
-                  style={{ fontSize: 11, padding: '6px 11px' }}
+                  style={{ fontSize: 12, padding: '6px 11px' }}
                 >
                   {p.label}
                 </button>
@@ -451,7 +451,7 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
                 type="button"
                 className={`lead-btn lead-btn-sm ${customOpen ? 'lead-btn-primary' : ''}`}
                 onClick={() => setCustomOpen(v => !v)}
-                style={{ fontSize: 11, padding: '6px 11px' }}
+                style={{ fontSize: 12, padding: '6px 11px' }}
               >
                 <Calendar size={11} style={{ marginRight: 4, verticalAlign: 'middle' }} />
                 Custom
@@ -460,7 +460,7 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
                 <button
                   type="button"
                   className="lead-btn lead-btn-sm"
-                  style={{ fontSize: 11, padding: '6px 11px', color: 'var(--text-muted)' }}
+                  style={{ fontSize: 12, padding: '6px 11px', color: 'var(--text-muted)' }}
                   onClick={() => { setNextDate(''); setNextTime(''); setCustomOpen(false) }}
                 >
                   Clear
@@ -497,7 +497,7 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
                   <button
                     type="button"
                     className="lead-btn lead-btn-sm"
-                    style={{ fontSize: 11, padding: '6px 11px', color: 'var(--text-muted)' }}
+                    style={{ fontSize: 12, padding: '6px 11px', color: 'var(--text-muted)' }}
                     onClick={() => setNextTime('')}
                   >
                     No time
@@ -506,7 +506,7 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
               </div>
             )}
             {nextDate && !customOpen && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
                 Follow-up scheduled for{' '}
                 <b style={{ color: 'var(--text)' }}>
                   {nextDate}{nextTime ? ` · ${nextTime}` : ''}
@@ -519,7 +519,7 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
               link, no Capture GPS button. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             {gpsBusy && !gps ? (
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Capturing location…
               </span>
             ) : gps ? (
@@ -534,7 +534,7 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
                   disabled={gpsBusy}
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--text-muted)', fontSize: 11,
+                    color: 'var(--text-muted)', fontSize: 12,
                     display: 'inline-flex', alignItems: 'center', gap: 4,
                   }}
                 >

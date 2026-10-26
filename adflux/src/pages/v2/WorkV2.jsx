@@ -1552,7 +1552,7 @@ function DayStatusSurface(props) {
               value={lateReason}
               onChange={e => setLateReason(e.target.value)}
             />
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
               Cut-off is 9:30 AM. Admin reviews late reasons in the daily summary.
             </div>
           </div>
@@ -1774,7 +1774,7 @@ function PlanTodayBlock(props) {
               placeholder="આજે રાજેશ ને મળવા જવું છે 11 વાગ્યે, પછી 5 cold calls કરવી છે, અને Patel ને quote send કરવી છે…"
               style={{ resize: 'vertical', minHeight: 90 }}
             />
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
               Optional. Use the mic above, or type. We'll turn it into a checklist.
             </div>
           </div>
@@ -1842,7 +1842,7 @@ function EveningReportBlock({ evening, setEvening, submitEvening, busy, navigate
           <span>Speak evening summary</span>
           <span style={{
             fontFamily: 'var(--font-mono, monospace)',
-            fontSize: 11, fontWeight: 600,
+            fontSize: 12, fontWeight: 600,
             color: 'rgba(26,19,0,0.7)',
             background: 'rgba(255,255,255,0.4)',
             padding: '4px 9px', borderRadius: 999,
@@ -1947,7 +1947,7 @@ function SmartTaskSubtitle({ leadId, note, kind }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
       <span style={{
-        fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+        fontSize: 12, fontWeight: 700, letterSpacing: '0.08em',
         padding: '2px 7px', borderRadius: 999,
         color: tag.color,
         background: 'color-mix(in srgb, currentColor 14%, transparent)',
@@ -2031,7 +2031,7 @@ function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDis
         }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontSize: 11, fontWeight: 700,
+            fontSize: 12, fontWeight: 700,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             color: 'var(--accent, #FFE600)',
@@ -2060,7 +2060,7 @@ function NextActionCard({ tone, title, subtitle, meta, primary, secondary, onDis
               // + tokens.css --purple) instead of hardcoded hex.
               background: 'var(--v2-tint-purple, rgba(192,132,252,0.16))',
               color: 'var(--purple, #A78BFA)',
-              fontSize: 10.5, fontWeight: 700,
+              fontSize: 12, fontWeight: 700,
               letterSpacing: '0.04em', textTransform: 'uppercase',
             }}>
               <Sparkles size={14} strokeWidth={1.6} />
@@ -2255,7 +2255,7 @@ function NextActionSurface({ session, smartTasks, navigate, toggleMeetingDone, t
   const p = pick.data
   const meta = (
     <span style={{
-      fontSize: 11, color: 'var(--text-subtle)',
+      fontSize: 12, color: 'var(--text-subtle)',
       textTransform: 'uppercase', letterSpacing: '.08em',
     }}>
       {p.type}{p.due_time ? ` · ${p.due_time}` : ''}

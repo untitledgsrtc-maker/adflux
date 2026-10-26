@@ -264,7 +264,7 @@ export default function DaySummaryCard({
           {/* PLAN vs ACTUAL */}
           <div
             style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: 0.6,
+              fontSize: 12, fontWeight: 600, letterSpacing: 0.6,
               color: 'var(--v2-ink-2, #94a3b8)', textTransform: 'uppercase',
               margin: '4px 0 4px',
             }}
@@ -312,7 +312,7 @@ export default function DaySummaryCard({
           {/* ACTIVITY */}
           <div
             style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: 0.6,
+              fontSize: 12, fontWeight: 600, letterSpacing: 0.6,
               color: 'var(--v2-ink-2, #94a3b8)', textTransform: 'uppercase',
               margin: '12px 0 4px',
             }}
@@ -352,7 +352,7 @@ export default function DaySummaryCard({
           {/* TRACKING */}
           <div
             style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: 0.6,
+              fontSize: 12, fontWeight: 600, letterSpacing: 0.6,
               color: 'var(--v2-ink-2, #94a3b8)', textTransform: 'uppercase',
               margin: '12px 0 4px',
             }}
@@ -401,7 +401,7 @@ export default function DaySummaryCard({
             <>
               <div
                 style={{
-                  fontSize: 11, fontWeight: 600, letterSpacing: 0.6,
+                  fontSize: 12, fontWeight: 600, letterSpacing: 0.6,
                   color: 'var(--v2-ink-2, #94a3b8)', textTransform: 'uppercase',
                   margin: '12px 0 4px',
                 }}
@@ -501,7 +501,7 @@ export default function DaySummaryCard({
                 {checkOutBusy ? 'Capturing GPS…' : 'Check out — end day'}
               </button>
               <div style={{
-                marginTop: 4, fontSize: 10.5,
+                marginTop: 4, fontSize: 12,
                 color: 'var(--v2-ink-2, var(--text-subtle))', textAlign: 'center',
               }}>
                 Stamps your end-of-day GPS + closes the work session.

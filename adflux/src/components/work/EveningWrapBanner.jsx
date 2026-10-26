@@ -166,7 +166,7 @@ export default function EveningWrapBanner() {
         </div>
         <div
           style={{
-            fontSize: 11.5, marginTop: 2,
+            fontSize: 12, marginTop: 2,
             color: 'var(--v2-ink-2, #94a3b8)',
           }}
         >
@@ -176,7 +176,7 @@ export default function EveningWrapBanner() {
       <span
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
-          fontSize: 11, fontWeight: 600,
+          fontSize: 12, fontWeight: 600,
           color: 'var(--warning, #F59E0B)',
           flexShrink: 0,
         }}

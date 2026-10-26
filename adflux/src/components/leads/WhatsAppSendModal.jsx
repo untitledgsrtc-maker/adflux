@@ -226,7 +226,7 @@ const styles = {
     borderBottom: '1px solid var(--v2-line, var(--border))',
   },
   title: { fontSize: 15, fontWeight: 700, color: 'var(--v2-ink-0)' },
-  sub:   { fontSize: 11, color: 'var(--v2-ink-2)', marginTop: 2 },
+  sub:   { fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 2 },
   closeBtn: {
     background: 'transparent', border: 'none',
     color: 'var(--v2-ink-2)', cursor: 'pointer', padding: 4,
@@ -242,7 +242,7 @@ const styles = {
   },
   empty: { padding: 24, textAlign: 'center', color: 'var(--v2-ink-2)', fontSize: 13 },
   label: {
-    fontSize: 11, fontWeight: 600,
+    fontSize: 12, fontWeight: 600,
     color: 'var(--v2-ink-2)',
     textTransform: 'uppercase', letterSpacing: '.10em',
     marginBottom: 8,
@@ -264,7 +264,7 @@ const styles = {
     resize: 'vertical', outline: 'none',
   },
   hint: {
-    fontSize: 11, color: 'var(--v2-ink-2)',
+    fontSize: 12, color: 'var(--v2-ink-2)',
     marginTop: 8, marginBottom: 14,
   },
   sendBtn: {

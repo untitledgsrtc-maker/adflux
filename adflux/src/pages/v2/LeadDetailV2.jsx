@@ -1090,7 +1090,7 @@ export default function LeadDetailV2() {
                     background: 'var(--warning-soft, rgba(245,158,11,0.14))',
                     border: '1px solid var(--warning, #F59E0B)',
                     color: 'var(--warning, #F59E0B)',
-                    fontSize: 10, fontWeight: 600,
+                    fontSize: 12, fontWeight: 600,
                     textTransform: 'uppercase', letterSpacing: '.06em',
                   }}
                   title="No phone on file — Call / WhatsApp won't work. Add a number via Edit."
@@ -1510,7 +1510,7 @@ export default function LeadDetailV2() {
                   onClick={() => { setHereGps(null); setHereCountdown(0) }}
                   style={{
                     background: 'none', border: 0,
-                    color: 'var(--text-muted)', fontSize: 11,
+                    color: 'var(--text-muted)', fontSize: 12,
                     cursor: 'pointer', padding: 4,
                     textDecoration: 'underline',
                   }}
@@ -1612,7 +1612,7 @@ export default function LeadDetailV2() {
                         </div>
                       )}
                       {a.user?.name && (
-                        <div style={{ fontSize: 10, color: 'var(--text-subtle)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '.08em' }}>
                           by {a.user.name}
                         </div>
                       )}
@@ -1726,7 +1726,7 @@ export default function LeadDetailV2() {
                 <span>{lead.created_at ? formatDate(lead.created_at) : '—'}</span>
               </FieldCell>
               <div style={{ gridColumn: '1 / span 2', borderTop: '1px solid var(--border-soft, rgba(255,255,255,.06))', paddingTop: 10, marginTop: 4 }}>
-                <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', marginBottom: 4 }}>
+                <div style={{ fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)', marginBottom: 4 }}>
                   Notes
                 </div>
                 <InlineField
@@ -1749,7 +1749,7 @@ export default function LeadDetailV2() {
                 paddingTop: 12, marginTop: 4,
                 display: 'flex', flexDirection: 'column', gap: 8,
               }}>
-                <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)' }}>
+                <div style={{ fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-subtle)' }}>
                   Contact preferences
                 </div>
                 <ContactPrefRow
@@ -1821,7 +1821,7 @@ export default function LeadDetailV2() {
                         color: overdue ? 'var(--danger, #EF4444)' : 'var(--text-muted)',
                       }}>
                         {fu.follow_up_date ? new Date(fu.follow_up_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
-                        {fu.follow_up_time && <div style={{ fontSize: 10, opacity: 0.8 }}>{String(fu.follow_up_time).slice(0,5)}</div>}
+                        {fu.follow_up_time && <div style={{ fontSize: 12, opacity: 0.8 }}>{String(fu.follow_up_time).slice(0,5)}</div>}
                       </div>
                       <div style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>
                         {fu.note || 'Follow-up scheduled'}
@@ -1830,7 +1830,7 @@ export default function LeadDetailV2() {
                   )
                 })}
                 {openFollowUps.length > 5 && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', marginTop: 2 }}>
                     + {openFollowUps.length - 5} more
                   </div>
                 )}
@@ -1875,7 +1875,7 @@ export default function LeadDetailV2() {
                                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {q.ref || q.id.slice(0,8)}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                           {q.media_type || q.segment || 'Quote'}
                           {q.created_at && ' · ' + new Date(q.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                         </div>
@@ -1889,7 +1889,7 @@ export default function LeadDetailV2() {
                         {q.total_amount ? formatCurrency(q.total_amount) : '—'}
                       </div>
                       <div style={{
-                        fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+                        fontSize: 12, fontWeight: 600, textTransform: 'uppercase',
                         letterSpacing: '.06em',
                         padding: '3px 8px', borderRadius: 999,
                         background: 'transparent', color: statusColor,
@@ -1926,7 +1926,7 @@ export default function LeadDetailV2() {
                         <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>
                           Presented the deck
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                           {p.user?.name ? p.user.name + ' · ' : ''}
                           {p.started_at && new Date(p.started_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                         </div>
@@ -2198,7 +2198,7 @@ function ContactPrefRow({ label, sublabel, active, activeColor, activeBg, onTogg
           {label}
         </div>
         {sublabel && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>
             {sublabel}
           </div>
         )}
@@ -2211,7 +2211,7 @@ function ContactPrefRow({ label, sublabel, active, activeColor, activeBg, onTogg
           flexShrink: 0,
           padding: '5px 12px',
           borderRadius: 999,
-          fontSize: 11, fontWeight: 700, letterSpacing: '.04em',
+          fontSize: 12, fontWeight: 700, letterSpacing: '.04em',
           border: `1px solid ${active ? activeColor : 'var(--border)'}`,
           background: active ? activeBg : 'transparent',
           color: active ? activeColor : 'var(--text-muted)',
@@ -2231,7 +2231,7 @@ function FieldCell({ label, children }) {
     <div>
       <div
         style={{
-          fontSize: 10,
+          fontSize: 12,
           letterSpacing: '.12em',
           textTransform: 'uppercase',
           color: 'var(--text-subtle)',
@@ -2359,18 +2359,18 @@ function InlineField({
     >
       {val || placeholder}
       {status === 'saving' && (
-        <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--text-subtle)' }}>
+        <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--text-subtle)' }}>
           saving…
         </span>
       )}
       {status === 'saved' && (
-        <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--success)' }}>
+        <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--success)' }}>
           saved
         </span>
       )}
       {status === 'error' && (
         <span
-          style={{ marginLeft: 6, fontSize: 10, color: 'var(--danger)' }}
+          style={{ marginLeft: 6, fontSize: 12, color: 'var(--danger)' }}
           title={errMsg}
         >
           save failed — {errMsg}

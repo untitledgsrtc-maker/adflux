@@ -164,7 +164,7 @@ export default function MissedCallsCard({ userId, onCallLead, refreshKey }) {
         <div
           style={{
             marginLeft: 'auto',
-            fontSize: 11, fontWeight: 600,
+            fontSize: 12, fontWeight: 600,
             color: 'var(--danger, #EF4444)',
             background: 'var(--danger-soft, rgba(239,68,68,0.12))',
             padding: '3px 9px', borderRadius: 999,
@@ -209,7 +209,7 @@ export default function MissedCallsCard({ userId, onCallLead, refreshKey }) {
                 </div>
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: 12,
                     color: 'var(--v2-ink-2, #94a3b8)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}

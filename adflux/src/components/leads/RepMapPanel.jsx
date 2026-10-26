@@ -505,7 +505,7 @@ export default function RepMapPanel({ userId, defaultCollapsed = true }) {
           <span style={{ fontSize: 14, fontWeight: 700, display: 'block' }}>
             {headerLabel}
           </span>
-          <span style={{ fontSize: 11.5, color: 'var(--v2-ink-2)', marginTop: 2, display: 'block' }}>
+          <span style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 2, display: 'block' }}>
             {loading ? 'Loading…' : (
               meetingCount > 0 || rawPings.length > 0
                 ? `${meetingCount} meeting${meetingCount === 1 ? '' : 's'} · ${displayKm.toFixed(1)} km`

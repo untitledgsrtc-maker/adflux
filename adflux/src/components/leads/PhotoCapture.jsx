@@ -187,7 +187,7 @@ export default function PhotoCapture({
         )}
       </div>
       {error && (
-        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--danger)' }}>{error}</div>
+        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--danger)' }}>{error}</div>
       )}
       {ocrPreview && (
         <div style={{

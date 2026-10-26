@@ -235,7 +235,7 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
                   <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
               </select>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 Coaching data — admin uses this to see which channels actually close deals.
               </div>
             </div>
@@ -253,7 +253,7 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
                 onChange={e => setRevisitDate(e.target.value)}
                 disabled={saving}
               />
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                 When should this lead come back to your action list?
                 Default is 30 days from today — pick the date the
                 customer suggested.
@@ -289,7 +289,7 @@ export default function ChangeStageModal({ lead, onClose, onSaved }) {
                   disabled={saving}
                   placeholder="Leave blank if dead permanently"
                 />
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
                   Pick a date if you want to revisit this client later
                   (replaces the old Nurture stage).
                 </div>

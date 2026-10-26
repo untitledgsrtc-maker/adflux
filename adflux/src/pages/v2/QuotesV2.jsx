@@ -635,7 +635,7 @@ export default function QuotesV2() {
                         <span style={{
                           marginLeft: 6, padding: '1px 7px', borderRadius: 999,
                           background: 'var(--blue-soft, rgba(59,130,246,0.12))', color: 'var(--blue, #3B82F6)',
-                          fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
+                          fontSize: 12, fontWeight: 700, letterSpacing: '.06em',
                           textTransform: 'uppercase',
                         }}>Govt</span>
                       )}
@@ -731,7 +731,7 @@ export default function QuotesV2() {
                         <span style={{
                           marginLeft: 6, padding: '1px 7px', borderRadius: 999,
                           background: 'var(--blue-soft, rgba(59,130,246,0.12))', color: 'var(--blue, #3B82F6)',
-                          fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
+                          fontSize: 12, fontWeight: 700, letterSpacing: '.06em',
                           textTransform: 'uppercase',
                         }}>Govt</span>
                       )}
@@ -850,7 +850,7 @@ function StatusChip({ status, quote }) {
           Won
           <span style={{
             padding: '1px 6px', borderRadius: 999,
-            fontSize: 9, fontWeight: 700, letterSpacing: '.06em',
+            fontSize: 12, fontWeight: 700, letterSpacing: '.06em',
             textTransform: 'uppercase',
             background: fullyPaid ? 'rgba(16,185,129,.18)' : 'rgba(59,130,246,.18)',
             color:      fullyPaid ? 'var(--success, #10B981)' : '#60A5FA',

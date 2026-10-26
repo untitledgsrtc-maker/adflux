@@ -73,16 +73,16 @@ export default function RepLeaveHistory({ userId, refreshKey = 0 }) {
     midRow: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
     typeTxt: { fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' },
     reasonTxt: {
-      fontSize: 11, color: 'var(--text-muted)',
+      fontSize: 12, color: 'var(--text-muted)',
       lineHeight: 1.45, wordBreak: 'break-word',
     },
     adminNote: {
-      fontSize: 11, color: 'var(--danger, #EF4444)', fontStyle: 'italic',
+      fontSize: 12, color: 'var(--danger, #EF4444)', fontStyle: 'italic',
       lineHeight: 1.45, wordBreak: 'break-word',
     },
     chip: (status) => ({
       display: 'inline-block', padding: '2px 8px', borderRadius: 999,
-      fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+      fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
       flexShrink: 0,
       background:
         status === 'approved' ? 'rgba(16,185,129,.18)'
@@ -95,7 +95,7 @@ export default function RepLeaveHistory({ userId, refreshKey = 0 }) {
     }),
     payChip: (paid) => ({
       display: 'inline-block', padding: '2px 7px', borderRadius: 999,
-      fontSize: 10, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase',
+      fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase',
       background: paid ? 'rgba(43,216,160,.14)' : 'rgba(255,111,97,.14)',
       color:      paid ? '#2BD8A0'              : '#FF6F61',
       border: `1px solid ${paid ? 'rgba(43,216,160,.35)' : 'rgba(255,111,97,.35)'}`,

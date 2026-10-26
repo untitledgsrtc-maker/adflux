@@ -348,7 +348,7 @@ function SuggestedTasks({ userId }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{
-        fontSize: 11, color: 'var(--text-muted)',
+        fontSize: 12, color: 'var(--text-muted)',
         padding: '8px 4px 4px',
       }}>
         Suggested for today — nothing else flagged
@@ -377,7 +377,7 @@ function SuggestedTasks({ userId }) {
               </span>
             </div>
             {it.secondary_text && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
                 {it.secondary_text}
               </div>
             )}

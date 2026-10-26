@@ -909,7 +909,7 @@ export default function TelecallerV2() {
                 <span style={{
                   padding: '2px 8px',
                   borderRadius: 999,
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: 700,
                   letterSpacing: 0.5,
                   textTransform: 'uppercase',
@@ -1069,7 +1069,7 @@ export default function TelecallerV2() {
                 {c.n}
               </div>
               <div style={{
-                fontSize: 9, fontWeight: 700,
+                fontSize: 12, fontWeight: 700,
                 textTransform: 'uppercase', letterSpacing: '.08em',
                 color: 'var(--text-muted)',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -1125,7 +1125,7 @@ export default function TelecallerV2() {
               >
                 <div style={{ minWidth: 0, cursor: 'pointer' }} onClick={() => navigate(`/leads/${lead.id}`)}>
                   <div style={{ fontWeight: 500, fontSize: 13 }}>{lead.name || '—'}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-subtle)' }}>
                     {lead.company || '—'}{cb.note ? ` · ${cb.note.slice(0, 60)}` : ''}
                   </div>
                 </div>
@@ -1202,7 +1202,7 @@ export default function TelecallerV2() {
               <HeatDot heat="hot" />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 13 }}>{l.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-subtle)' }}>
                   {l.company || '—'} · {l.last_contact_at
                     ? `${formatRelative(l.last_contact_at)} since last touch`
                     : 'never contacted'}
@@ -1294,7 +1294,7 @@ export default function TelecallerV2() {
                 <HeatDot heat={l.heat} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 500, fontSize: 13 }}>{l.name}</div>
-                  <div className="mono" style={{ fontSize: 11, color: 'var(--text-subtle)' }}>{l.phone || '—'}</div>
+                  <div className="mono" style={{ fontSize: 12, color: 'var(--text-subtle)' }}>{l.phone || '—'}</div>
                 </div>
                 {/* Phase 47.3 — quick heat picker per queue row. */}
                 <span onClick={(e) => e.stopPropagation()}>

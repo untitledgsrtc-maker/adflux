@@ -146,7 +146,7 @@ function OvernightToggle({ userId, workDate }) {
       </span>
       {on && (
         <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '.08em',
+          fontSize: 12, fontWeight: 700, letterSpacing: '.08em',
           padding: '2px 8px', borderRadius: 999,
           background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)',
           textTransform: 'uppercase',
@@ -255,7 +255,7 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
         </div>
 
         <div>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
             Start date
           </label>
           <input
@@ -272,7 +272,7 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
         </div>
         {/* Phase 121 — optional range end. Blank = single day. */}
         <div>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
             End date (optional)
           </label>
           <input
@@ -289,7 +289,7 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
           />
         </div>
         <div>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
             Type
           </label>
           <select
@@ -308,7 +308,7 @@ export function RequestLeaveModal({ userId, onClose, onSaved }) {
           </select>
         </div>
         <div>
-          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+          <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '.08em', textTransform: 'uppercase' }}>
             Reason (optional)
           </label>
           <input
@@ -499,7 +499,7 @@ function EnableNotificationsButton({ userId }) {
       </button>
       {msg && (
         <div style={{
-          fontSize: 11, lineHeight: 1.4,
+          fontSize: 12, lineHeight: 1.4,
           color: state === 'failed' ? 'var(--danger)' : 'var(--text-muted)',
           marginTop: 6, paddingLeft: 4,
         }}>
@@ -551,7 +551,7 @@ function TestPushButton({ userId }) {
         {busy ? 'Sending test push…' : 'Send test push to my device'}
       </button>
       {msg && (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, paddingLeft: 4 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, paddingLeft: 4 }}>
           {msg}
         </div>
       )}

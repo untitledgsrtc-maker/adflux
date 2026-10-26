@@ -862,7 +862,7 @@ export default function PostCallOutcomeModal({
                       }}
                     >
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{o.label}</div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{o.sub}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{o.sub}</div>
                     </button>
                   )
                 })}
@@ -921,7 +921,7 @@ export default function PostCallOutcomeModal({
                   "Price problem" filter reads it). Tap again to clear. */}
               <div className="lead-card-pad" style={{ paddingTop: 0 }}>
                 <div style={{
-                  fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
+                  fontSize: 12, fontWeight: 600, color: 'var(--text-muted)',
                   marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em',
                 }}>
                   Reason <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span>
@@ -1044,7 +1044,7 @@ export default function PostCallOutcomeModal({
               {wantsDate && (
                 <div style={{ marginTop: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <label className="lead-fld-label" style={{ margin: 0, fontSize: 11, minWidth: 36 }}>
+                    <label className="lead-fld-label" style={{ margin: 0, fontSize: 12, minWidth: 36 }}>
                       Date
                     </label>
                     <input
@@ -1059,7 +1059,7 @@ export default function PostCallOutcomeModal({
                       disabled={saving}
                       style={{ maxWidth: 180 }}
                     />
-                    <label className="lead-fld-label" style={{ margin: 0, fontSize: 11, minWidth: 36 }}>
+                    <label className="lead-fld-label" style={{ margin: 0, fontSize: 12, minWidth: 36 }}>
                       Time
                     </label>
                     <input
@@ -1081,7 +1081,7 @@ export default function PostCallOutcomeModal({
                         disabled={saving}
                         style={{
                           background: 'transparent', border: 0,
-                          color: 'var(--text-muted)', fontSize: 11,
+                          color: 'var(--text-muted)', fontSize: 12,
                           cursor: 'pointer', textDecoration: 'underline',
                         }}
                       >
@@ -1102,7 +1102,7 @@ export default function PostCallOutcomeModal({
                       style={{
                         marginTop: 6,
                         background: 'transparent', border: 0,
-                        color: 'var(--text-muted)', fontSize: 11,
+                        color: 'var(--text-muted)', fontSize: 12,
                         cursor: 'pointer', textDecoration: 'underline',
                       }}
                     >

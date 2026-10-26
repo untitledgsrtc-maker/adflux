@@ -520,7 +520,7 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
                     disabled={saving}
                   />
                   {dupBusy && (
-                    <div style={{ fontSize: 11, color: 'var(--text-muted, #94a3b8)', marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted, #94a3b8)', marginTop: 4 }}>
                       Checking for existing lead…
                     </div>
                   )}
@@ -594,7 +594,7 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
                       }}
                     >
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{o.label}</div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                         {o.sub}
                       </div>
                     </button>

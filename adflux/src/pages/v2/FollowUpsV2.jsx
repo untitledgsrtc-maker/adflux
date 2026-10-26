@@ -798,7 +798,7 @@ export default function FollowUpsV2() {
         <div style={{
           marginTop: 24, marginBottom: 8, paddingTop: 16,
           borderTop: '1px dashed var(--border)',
-          fontSize: 11, fontWeight: 700, letterSpacing: '.16em',
+          fontSize: 12, fontWeight: 700, letterSpacing: '.16em',
           textTransform: 'uppercase', color: 'var(--text-muted)',
         }}>
           Nurture · Ready to revisit
@@ -939,7 +939,7 @@ function Section({ title, rows, tone, icon, onCall, onWhatsApp, onDone, onSnooze
         {icon}
         <span style={{ flex: 1 }}>{title}</span>
         <span style={{
-          fontSize: 10, color: 'var(--text)',
+          fontSize: 12, color: 'var(--text)',
           background: 'var(--surface-2)', padding: '2px 9px', borderRadius: 999,
           fontWeight: 700, letterSpacing: 0, textTransform: 'none',
         }}>
@@ -995,7 +995,7 @@ function Row({ row, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busy, navi
           )}
           {row.auto_generated && (
             <span style={{
-              marginLeft: 8, fontSize: 10, fontWeight: 600,
+              marginLeft: 8, fontSize: 12, fontWeight: 600,
               color: 'var(--accent-fg)', background: 'var(--accent)',
               padding: '2px 6px', borderRadius: 6,
             }}>
@@ -1003,7 +1003,7 @@ function Row({ row, onCall, onWhatsApp, onDone, onSnooze, onPushDays, busy, navi
             </span>
           )}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
           {dateLabel}{time ? ` · ${time}` : ''}
           {/* Phase 33D.6 — show sequence + cadence type */}
           {row.sequence && row.cadence_type && (
@@ -1145,14 +1145,14 @@ function NurtureSection({ title, rows, tone, icon, onCall, onWhatsApp, onReactiv
     <section style={{ marginBottom: 16 }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        fontSize: 11, fontWeight: 700, letterSpacing: '.1em',
+        fontSize: 12, fontWeight: 700, letterSpacing: '.1em',
         textTransform: 'uppercase', color: toneColor,
         marginBottom: 8, padding: '0 4px',
       }}>
         {icon}
         <span>{title}</span>
         <span style={{
-          fontSize: 10, color: 'var(--text-muted)',
+          fontSize: 12, color: 'var(--text-muted)',
           background: 'var(--surface-2)', padding: '1px 7px', borderRadius: 999,
         }}>
           {rows.length}
@@ -1190,7 +1190,7 @@ function NurtureRow({ lead, onCall, onWhatsApp, onReactivate, busy, navigate, re
             <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 13 }}> · {lead.company}</span>
           )}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
           Nurture · revisit {dateLabel}
         </div>
       </div>

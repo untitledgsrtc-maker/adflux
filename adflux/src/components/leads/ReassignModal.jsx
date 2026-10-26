@@ -218,7 +218,7 @@ export default function ReassignModal({ lead, onClose, onSaved }) {
                   background: 'var(--warning-soft, rgba(245,158,11,0.14))',
                   border: '1px solid var(--warning, #F59E0B)',
                   color: 'var(--warning, #F59E0B)',
-                  fontSize: 11, fontWeight: 600,
+                  fontSize: 12, fontWeight: 600,
                   letterSpacing: '.04em',
                 }}
               >

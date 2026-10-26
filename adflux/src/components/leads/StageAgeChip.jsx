@@ -71,7 +71,7 @@ export function StageAgeChip({ stage, stageChangedAt, compact = false }) {
         background: bg,
         color: fg,
         border: `1px solid ${bd}`,
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 600,
         whiteSpace: 'nowrap',
       }}

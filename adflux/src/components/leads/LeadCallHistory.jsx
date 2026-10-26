@@ -102,7 +102,7 @@ export default function LeadCallHistory({ leadId }) {
     <div className="lead-card">
       <div className="lead-card-head">
         <div className="lead-card-title">Call history</div>
-        <div className="lead-card-sub" style={{ fontSize: 11, color: 'var(--text-subtle)' }}>
+        <div className="lead-card-sub" style={{ fontSize: 12, color: 'var(--text-subtle)' }}>
           <PhoneOutgoing size={11} strokeWidth={1.6} style={{ verticalAlign: 'middle' }} /> {counts.outgoing || 0}
           {'  '}
           <PhoneIncoming size={11} strokeWidth={1.6} style={{ verticalAlign: 'middle' }} /> {counts.incoming || 0}
@@ -261,7 +261,7 @@ function OutcomeChipLite({ outcome }) {
               : outcome === 'negative' || outcome === 'no_answer' ? 'var(--danger)'
               : outcome === 'callback' || outcome === 'callback_requested' ? 'var(--warning)'
               : 'var(--text-muted)'
-  return <span style={{ color, fontSize: 11, fontWeight: 600 }}>{outcome}</span>
+  return <span style={{ color, fontSize: 12, fontWeight: 600 }}>{outcome}</span>
 }
 
 function pillBase(color) {
@@ -271,7 +271,7 @@ function pillBase(color) {
     gap: 4,
     padding: '2px 8px',
     borderRadius: 999,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 700,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
@@ -284,7 +284,7 @@ function pillBase(color) {
 function Th({ children }) {
   return (
     <th style={{
-      fontSize: 10,
+      fontSize: 12,
       fontWeight: 700,
       letterSpacing: '.10em',
       textTransform: 'uppercase',

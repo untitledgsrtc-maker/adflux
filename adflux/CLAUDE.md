@@ -21919,3 +21919,6 @@ Owner: "I want same as work." SUPERSEDES the "Ask for work" rename (Phase 393) a
 
 ## 511 · Tiny text raised to 12 px (2026-10-26)
 203 `font-size: 9/10/11px` declarations in 16 CSS files (v2, leads, work, followups, globals, dashboard, team, incentives, quotes, payments, wizard, cities, govt, legacy-compat, work-glass, ops2) are now 12px (Design Rules minimum). Guardian: no frozen contract broken; to protect layout the bottom-nav label letter-spacing was cut to 0.02em (v2.css `.v2d-mnav-item`, globals.css `.mobile-nav-item`) and `.v2-mini-tab` is min-width 24px. NOT changed: ~600 inline `fontSize: 9/10/11` in jsx (Master, Finance, Cockpit, etc.) and PDF files (print sizes are separate on purpose).
+
+### 511.1 Inline tiny text raised to 12 px in daily-use files (2026-10-26)
+111 inline `fontSize: 9/10/11` (incl. fractional) -> 12 in 29 jsx files (FollowUpsV2, LeadsV2, WorkV2, TelecallerV2, LeadDetailV2, QuotesV2, MyWorkV2, V2AppShell, components/leads, components/work). Guardian: only font-size changed, no frozen contract touched. Left alone: `LeadsCollectedChart` (axis labels would overlap), PDF files, Master/Finance/Cockpit/ops inline sizes (~450 remain). Watch on a 375 px phone: uppercase KPI tile labels (TodaySummaryCard, TelecallerV2 ~1072) may ellipsize; MyWorkV2 timeline hour axis is tight; the `sm` StageChip is now close to the normal chip.

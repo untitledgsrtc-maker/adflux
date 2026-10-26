@@ -870,7 +870,7 @@ function DayStrip({ entries, projName, showNow = true }) {
       <div style={{ minWidth: 560 }}>
         <div style={{ position: 'relative', height: 18, marginBottom: 6 }}>
           {Array.from({ length: H1 - H0 + 1 }, (_, i) => (
-            <span key={i} className="wk-num wk-mu" style={{ position: 'absolute', left: `${pct(H0 + i)}%`, fontSize: 11, transform: 'translateX(-50%)' }}>{String(H0 + i).padStart(2, '0')}</span>
+            <span key={i} className="wk-num wk-mu" style={{ position: 'absolute', left: `${pct(H0 + i)}%`, fontSize: 12, transform: 'translateX(-50%)' }}>{String(H0 + i).padStart(2, '0')}</span>
           ))}
         </div>
         <div style={{ position: 'relative', height: 28, background: 'var(--w-hov)', borderRadius: 6 }}>
