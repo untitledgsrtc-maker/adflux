@@ -34,7 +34,7 @@
 .ox .card{background:var(--card);border:1px solid var(--bd);border-radius:16px}
 .ox .ch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-bottom:1px solid var(--bd);min-height:58px}
 .ox .ch h3{margin:0;font:600 15px 'DM Sans','Noto Sans Gujarati',sans-serif}
-.ox .lbl,.ox .thead{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--mu)}
+.ox .lbl,.ox .thead{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--mu)}
 .ox .tech .lbl{font-size:12px;letter-spacing:.06em}
 .ox .pill{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;font-size:13px;font-weight:500;white-space:nowrap}
 .ox .t-n{background:var(--nTint);color:var(--nT)}
@@ -102,7 +102,7 @@
 .ox .push{position:absolute;inset:0;z-index:15;background:var(--bg);display:flex;flex-direction:column}
 .ox .stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .ox .stp{display:grid;justify-items:center;gap:4px;text-align:center;font-size:14px;color:var(--mu)}
-.ox .stp .bi .e{font-size:11px}
+.ox .stp .bi .e{font-size:12px}
 .ox .sc{width:30px;height:30px;border-radius:999px;display:grid;place-items:center;border:1.6px solid var(--bd2);font:600 13px 'Space Grotesk'}
 .ox .stp.done .sc{background:var(--ok);border-color:var(--ok);color:#0f172a}
 .ox .stp.cur .sc{background:var(--y);border-color:var(--y);color:#0f172a}

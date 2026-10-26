@@ -35,7 +35,7 @@
   gap: 6px;
 }
 .sc-lbl {
-  font-size: 11px;
+  font-size:12px;
   letter-spacing: 0.06em;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -106,7 +106,7 @@
 }
 .fg label {
   display: block;
-  font-size: 11px;
+  font-size:12px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -178,7 +178,7 @@ input.fg:focus, select.fg:focus, textarea.fg:focus {
   color: var(--text); line-height: 1.1;
 }
 .logo-t small {
-  display: block; font-size: 10px; font-weight: 500;
+  display: block; font-size:12px; font-weight: 500;
   color: var(--text-muted); letter-spacing: 0.06em;
   text-transform: uppercase; margin-top: 3px;
 }
@@ -191,4 +191,4 @@ input.fg:focus, select.fg:focus, textarea.fg:focus {
   padding: 9px 12px; border-radius: 8px;
   font-size: 12px; margin: 8px 0;
 }
-.login-footer { font-size: 11px; color: var(--text-muted); text-align: center; }
+.login-footer { font-size:12px; color: var(--text-muted); text-align: center; }

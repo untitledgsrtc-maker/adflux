@@ -47,7 +47,7 @@
 @keyframes wkg-draw { to { stroke-dashoffset: var(--wkg-off, 238.8); } }
 .wkg-ring .mid { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
 .wkg-ring .mid b { font: 700 20px var(--font-display); color: #fff; line-height: 1; }
-.wkg-ring .mid span { font-size: 10px; color: rgba(255, 255, 255, .72); margin-top: 2px; }
+.wkg-ring .mid span { font-size:12px; color: rgba(255, 255, 255, .72); margin-top: 2px; }
 .wkg-herow { display: flex; align-items: center; gap: 18px; }
 .wkg-herow > .wkg-main { flex: 1; min-width: 0; }
 @media (max-width: 640px) { .wkg-ring { width: 72px; height: 72px; } .wkg-ring .mid b { font-size: 16px; } }

@@ -116,7 +116,7 @@
 .staff-table th {
   padding: 10px 16px;
   text-align: left;
-  font-size: 11px;
+  font-size:12px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -180,7 +180,7 @@
 .slab-bar-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size:12px;
   color: var(--text-muted);
 }
 
@@ -269,10 +269,10 @@
 }
 .staff-input:focus { outline: none; border-color: var(--accent); }
 .staff-input.error { border-color: var(--danger); }
-.staff-field-error { font-size: 11px; color: var(--danger); }
+.staff-field-error { font-size:12px; color: var(--danger); }
 
 .staff-divider {
-  font-size: 11px;
+  font-size:12px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -344,7 +344,7 @@
   padding: 14px 16px;
 }
 .whatif-result-label {
-  font-size: 11px;
+  font-size:12px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -484,7 +484,7 @@
   padding: 14px;
 }
 .perf-breakdown-label {
-  font-size: 11px;
+  font-size:12px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -532,7 +532,7 @@
 .perf-history-table th {
   padding: 10px 16px;
   text-align: left;
-  font-size: 11px;
+  font-size:12px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;

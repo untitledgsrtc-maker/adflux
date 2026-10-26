@@ -49,7 +49,7 @@
 .stage-chip {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 3px 9px; border-radius: 999px;
-  font-size: 11px; font-weight: 500;
+  font-size:12px; font-weight: 500;
   border: 1px solid transparent; white-space: nowrap;
 }
 .stage-chip .pulse-dot {
@@ -91,7 +91,7 @@
 .seg-chip {
   display: inline-flex; align-items: center;
   padding: 2px 8px; border-radius: 999px;
-  font-size: 10px; font-weight: 600;
+  font-size:12px; font-weight: 600;
   letter-spacing: .04em; text-transform: uppercase;
 }
 .seg-govt {
@@ -111,7 +111,7 @@
 .lead-avatar {
   width: 28px; height: 28px; border-radius: 50%;
   display: grid; place-items: center;
-  font-family: var(--font-display); font-weight: 600; font-size: 11px;
+  font-family: var(--font-display); font-weight: 600; font-size:12px;
   flex-shrink: 0;
 }
 .lead-avatar.av-1 { background: #fef3c7; color: #92400e; }
@@ -122,7 +122,7 @@
 .lead-avatar.av-6 { background: #fbcfe8; color: #9d174d; }
 
 /* ─── Outcome chip (timeline) ─── */
-.outcome { font-size: 10px; padding: 1px 6px; border-radius: 999px; font-weight: 500; }
+.outcome { font-size:12px; padding: 1px 6px; border-radius: 999px; font-weight: 500; }
 .outcome-pos { background: var(--success-soft, rgba(16,185,129,.12)); color: var(--success); }
 .outcome-neu { background: var(--surface-2);                          color: var(--text-muted); }
 .outcome-neg { background: var(--danger-soft, rgba(239,68,68,.12));   color: var(--danger); }
@@ -131,7 +131,7 @@
 .pill {
   display: inline-flex; align-items: center;
   padding: 2px 8px; border-radius: 999px;
-  font-size: 11px;
+  font-size:12px;
   background: var(--surface-2); color: var(--text-muted);
 }
 .pill-success { background: var(--success-soft, rgba(16,185,129,.12)); color: var(--success); }
@@ -248,7 +248,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   padding: 14px 16px;
   box-shadow: var(--shadow);
 }
-.lead-stat-eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+.lead-stat-eyebrow { font-size:12px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
 .lead-stat-num     { font-family: var(--font-display); font-weight: 600; font-size: 22px; margin-top: 4px; }
 .lead-stat-meta    { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
 
@@ -289,7 +289,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   border-radius: 999px;
   /* Phase 41.6 — fallback cleaned. --font-mono now resolves to Space Grotesk. */
   font-family: var(--font-mono, "Space Grotesk", system-ui, sans-serif);
-  font-size: 10px; font-weight: 700;
+  font-size:12px; font-weight: 700;
   color: var(--text);
   line-height: 1;
 }
@@ -346,7 +346,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 .lead-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .lead-table th {
   text-align: left; font-weight: 500;
-  font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  font-size:12px; letter-spacing: .12em; text-transform: uppercase;
   color: var(--text-subtle);
   padding: 10px 12px;
   border-bottom: 1px solid var(--border-soft, rgba(255,255,255,.06));
@@ -360,7 +360,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 .lead-table tr:hover td { background: var(--surface-2); cursor: pointer; }
 .lead-table .name-cell { display: flex; align-items: center; gap: 10px; }
 .lead-table .name-cell .name    { font-weight: 500; }
-.lead-table .name-cell .company { font-size: 11px; color: var(--text-subtle); }
+.lead-table .name-cell .company { font-size:12px; color: var(--text-subtle); }
 
 /* ─── AI briefing card (purple+blue gradient) ─── */
 .lead-ai-card {
@@ -383,7 +383,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 }
 .lead-ai-eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
-  font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+  font-size:12px; letter-spacing: .16em; text-transform: uppercase;
   color: var(--text-muted); margin-bottom: 6px;
 }
 .lead-ai-eyebrow .pulse {
@@ -394,7 +394,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 .lead-ai-recap b { font-weight: 600; }
 .lead-ai-list { display: flex; flex-direction: column; gap: 6px; }
 .lead-ai-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-.lead-ai-item .meta { color: var(--text-subtle); margin-left: auto; font-size: 11px; }
+.lead-ai-item .meta { color: var(--text-subtle); margin-left: auto; font-size:12px; }
 
 /* ─── Activity timeline ─── */
 .lead-timeline { padding: 6px 0; }
@@ -419,7 +419,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 .tl-time  { color: var(--text-muted); font-size: 12px; font-weight: 600; font-family: var(--font-mono); margin-left: auto; }
 .tl-body  { font-size: 13px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
 .tl-next  { font-size: 12px; color: var(--warning); margin-top: 6px; display: inline-flex; gap: 6px; align-items: center; font-weight: 600; }
-.tl-gps   { font-size: 10px; color: var(--text-subtle); font-family: var(--font-mono); margin-top: 4px; display: inline-flex; gap: 4px; align-items: center; }
+.tl-gps   { font-size:12px; color: var(--text-subtle); font-family: var(--font-mono); margin-top: 4px; display: inline-flex; gap: 4px; align-items: center; }
 
 /* ─── Modal (lead-scoped to not collide with existing .modal) ─── */
 .lead-modal-back {
@@ -483,7 +483,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 }
 .m-greet { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
 .m-greet .hello { font-family: var(--font-display); font-size: 22px; font-weight: 600; }
-.m-greet .date  { font-size: 11px; color: var(--text-subtle); margin-top: 2px; }
+.m-greet .date  { font-size:12px; color: var(--text-subtle); margin-top: 2px; }
 
 .m-card {
   background: var(--surface);
@@ -724,7 +724,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 }
 .m-count .num { font-family: var(--font-display); font-weight: 600; font-size: 20px; }
 .m-count .num .target { color: var(--text-subtle); font-size: 14px; }
-.m-count .lbl { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-subtle); margin-top: 4px; }
+.m-count .lbl { font-size:12px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-subtle); margin-top: 4px; }
 
 /* Quick action tiles (mobile + responsive) */
 .m-quick {
@@ -742,7 +742,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   border-radius: 12px;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 6px;
-  font-size: 11px; color: var(--text-muted); cursor: pointer;
+  font-size:12px; color: var(--text-muted); cursor: pointer;
   padding: 6px; text-align: center; line-height: 1.2;
 }
 .m-quick .tile:hover {
@@ -769,7 +769,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 .m-meeting-row .time { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); width: 50px; flex-shrink: 0; }
 .m-meeting-row .info { flex: 1; min-width: 0; }
 .m-meeting-row .info .who   { font-weight: 500; font-size: 13px; }
-.m-meeting-row .info .where { font-size: 11px; color: var(--text-subtle); }
+.m-meeting-row .info .where { font-size:12px; color: var(--text-subtle); }
 
 /* ─── Telecaller hero call card ─── */
 .tc-hero {
@@ -852,10 +852,10 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   content: ""; position: absolute; left: -2px; top: 8px; bottom: 8px;
   width: 1px; background: rgba(255,255,255,.10);
 }
-.lead-hero-stat .lbl   { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.6); margin-bottom: 8px; }
+.lead-hero-stat .lbl   { font-size:12px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.6); margin-bottom: 8px; }
 .lead-hero-stat .val   { font-family: var(--font-display); font-weight: 600; font-size: 28px; line-height: 1.1; letter-spacing: -.02em; }
 .lead-hero-stat .val.acc { color: var(--accent); }
-.lead-hero-stat .delta { font-size: 11px; margin-top: 6px; color: rgba(255,255,255,.7); }
+.lead-hero-stat .delta { font-size:12px; margin-top: 6px; color: rgba(255,255,255,.7); }
 .lead-hero-stat .delta.up   { color: #86efac; }
 .lead-hero-stat .delta.down { color: #fca5a5; }
 
@@ -871,9 +871,9 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   padding: 12px 12px 10px;
   position: relative; overflow: hidden;
 }
-.lead-stage-col .top { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-subtle); }
+.lead-stage-col .top { font-size:12px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-subtle); }
 .lead-stage-col .num { font-family: var(--font-display); font-weight: 700; font-size: 24px; margin-top: 4px; }
-.lead-stage-col .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.lead-stage-col .sub { font-size:12px; color: var(--text-muted); margin-top: 2px; }
 .lead-stage-col::before {
   content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
 }
@@ -912,7 +912,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   font-family: var(--font-display); font-weight: 700; font-size: 15px;
 }
 .lead-rep-name   { font-weight: 600; font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
-.lead-rep-meta   { font-size: 11px; color: var(--text-subtle); }
+.lead-rep-meta   { font-size:12px; color: var(--text-subtle); }
 .lead-rep-status { margin-left: auto; order: 2; flex: 0 0 auto; }
 .lead-rep-kpis {
   display: grid; grid-template-columns: repeat(3, 1fr);
@@ -923,7 +923,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 .lead-rep-kpi .num.acc { color: var(--accent); }
 .lead-rep-kpi .num.suc { color: var(--success); }
 .lead-rep-kpi .num.dng { color: var(--danger); }
-.lead-rep-kpi .lbl { font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-subtle); margin-top: 2px; }
+.lead-rep-kpi .lbl { font-size:12px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-subtle); margin-top: 2px; }
 .lead-rep-progress {
   height: 5px; background: var(--surface-2);
   border-radius: 3px; overflow: hidden; margin-bottom: 8px;
@@ -931,7 +931,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 .lead-rep-progress > span { display: block; height: 100%; background: var(--success); border-radius: 3px; }
 .lead-rep-progress > span.warn { background: var(--warning); }
 .lead-rep-progress > span.dng  { background: var(--danger); }
-.lead-rep-foot { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+.lead-rep-foot { font-size:12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
 
 /* Live badge */
 .lead-live-dot {
@@ -956,7 +956,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   padding: 3px 10px; border-radius: 999px;
   background: var(--tint-purple-bg);
   color: var(--purple);
-  font-size: 11px; font-weight: 500;
+  font-size:12px; font-weight: 500;
   border: 1px solid var(--tint-purple-bd);
 }
 .voice-pill .mic {
@@ -978,7 +978,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 .guj-quote .en {
   display: block;
   font-family: var(--font-sans);
-  font-size: 11px; color: var(--text-subtle);
+  font-size:12px; color: var(--text-subtle);
   margin-top: 6px; font-style: italic;
 }
 .wave { display: flex; align-items: center; gap: 2px; height: 22px; }
@@ -1050,7 +1050,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 }
 .lead-tasks-eye {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  font-size:12px; letter-spacing: .14em; text-transform: uppercase;
   color: var(--accent); margin-bottom: 2px;
 }
 .lead-tasks-sub {
@@ -1125,7 +1125,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   line-height: 1.4;
 }
 .lead-task-meta {
-  font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle);
+  font-family: var(--font-mono); font-size:12px; color: var(--text-subtle);
 }
 
 /* Actions sit immediately after the body so they're scannable next to
@@ -1151,7 +1151,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 
 .lead-tasks-overflow {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 11px; color: var(--text-subtle);
+  font-size:12px; color: var(--text-subtle);
   padding: 8px 4px 0; text-transform: uppercase; letter-spacing: .08em;
 }
 
@@ -1221,7 +1221,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   background: rgba(255,255,255,0.04);
 }
 .lead-hero-heat-label {
-  font-size: 10px;
+  font-size:12px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1240,7 +1240,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 
 .lead-hero-value { text-align: right; }
 .lead-hero-value-label {
-  font-size: 10px;
+  font-size:12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-subtle);

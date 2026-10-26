@@ -19,7 +19,7 @@
 }
 
 .govt-chooser__kicker {
-  font-size: 11px;
+  font-size:12px;
   letter-spacing: 0.18em;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -132,7 +132,7 @@
   border-radius: 999px;
   background: var(--surface-3);
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size:12px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -176,7 +176,7 @@
 }
 
 .govt-wiz__kicker {
-  font-size: 11px;
+  font-size:12px;
   letter-spacing: 0.18em;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -402,7 +402,7 @@
 .govt-list__row:last-child { border-bottom: none; }
 .govt-list__row--head {
   background: var(--surface-3);
-  font-size: 11px;
+  font-size:12px;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -609,7 +609,7 @@
     page-break-after: always;
     color: #000;
   }
-  .govt-letter__table { font-size: 11.5px; }
+  .govt-letter__table { font-size:12px; }
 }
 
 
@@ -630,7 +630,7 @@
   margin-bottom: 22px;
 }
 
-.govt-master__kicker { font-size: 11px; letter-spacing: 0.18em; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+.govt-master__kicker { font-size:12px; letter-spacing: 0.18em; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
 .govt-master__title  { font-family: var(--font-display); font-weight: 700; font-size: 22px; margin: 4px 0 0; color: var(--text); }
 .govt-master__sub    { font-size: 13.5px; color: var(--text-muted); margin-top: 2px; }
 
@@ -670,7 +670,7 @@
 }
 .govt-table th {
   background: var(--surface-2);
-  font-size: 11px;
+  font-size:12px;
   font-weight: 700;
   color: var(--text-muted);
   letter-spacing: 0.08em;
@@ -687,7 +687,7 @@
   display: inline-block;
   padding: 2px 9px;
   border-radius: 999px;
-  font-size: 11.5px;
+  font-size:12px;
   font-weight: 600;
 }
 .govt-pill--A { background: var(--success-soft); color: var(--success); }

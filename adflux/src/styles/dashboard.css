@@ -64,7 +64,7 @@
   height: 20px;
   padding: 0 6px;
   border-radius: 10px;
-  font-size: 11px;
+  font-size:12px;
   font-weight: 700;
 }
 .db-badge--danger  { background: rgba(239,68,68,0.15);  color: var(--danger); }
@@ -238,7 +238,7 @@
   gap: 4px;
 }
 .db-kpi-label {
-  font-size: 11px;
+  font-size:12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
@@ -347,7 +347,7 @@
   font-weight: 400;
 }
 .db-outstanding-quote {
-  font-size: 11px;
+  font-size:12px;
   color: var(--text-muted);
   margin-top: 2px;
 }
@@ -377,7 +377,7 @@
   transition: width 0.3s;
 }
 .db-outstanding-pct {
-  font-size: 10px;
+  font-size:12px;
   color: var(--text-muted);
 }
 
@@ -526,7 +526,7 @@
   font-weight: 500;
 }
 .db-activity-meta {
-  font-size: 11px;
+  font-size:12px;
   color: var(--text-muted);
   margin-top: 2px;
 }
@@ -534,7 +534,7 @@
 .db-activity-quote  { color: var(--blue); }
 .db-activity-actor  { color: var(--text-muted); }
 .db-activity-time {
-  font-size: 11px;
+  font-size:12px;
   color: var(--text-muted);
   white-space: nowrap;
   flex-shrink: 0;
@@ -576,12 +576,12 @@
   font-size: 12px;
 }
 .db-fu-assignee {
-  font-size: 11px;
+  font-size:12px;
   color: var(--blue);
   margin-top: 2px;
 }
 .db-fu-note {
-  font-size: 11px;
+  font-size:12px;
   color: var(--text-muted);
   margin-top: 2px;
   white-space: nowrap;
@@ -589,7 +589,7 @@
   text-overflow: ellipsis;
 }
 .db-fu-date {
-  font-size: 11px;
+  font-size:12px;
   flex-shrink: 0;
   margin-top: 2px;
 }
