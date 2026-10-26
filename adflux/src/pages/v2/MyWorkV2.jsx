@@ -208,7 +208,7 @@ export default function MyWorkV2() {
   // Phase 406: the shown time skips minutes she was away (break_seconds) and stands still while the "Still working?" question is open.
   const runSecs = running ? Math.max(0, ((idleFreeze ? new Date(idleFreeze).getTime() : now + skew) - new Date(running.started_at).getTime()) / 1000 - (running.break_seconds || 0)) : 0
   const doneSecs = entries.filter((e) => e.ended_at && e.status === 'approved')
-    .reduce((s, e) => s + (new Date(e.ended_at) - new Date(e.started_at)) / 1000, 0)
+    .reduce((s, e) => s + Math.max(0, (new Date(e.ended_at) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0)), 0)   // Phase 517: finished sessions also skip away time (break_seconds), same as runSecs + the shared WhatsApp text
   const todaySecs = doneSecs + runSecs
   const firstIn = entries.find((e) => e.status === 'approved')?.started_at
   const lateCount = items.filter((i) => isOpen(i) && dueState(i.due, i.status).cls === 'bad').length
