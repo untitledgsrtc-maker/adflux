@@ -50,3 +50,7 @@ MyWorkV2 `doneSecs` did not subtract `break_seconds` for finished sessions, whil
 ## 518 · Day score in the Work evening report (26-10-2026)
 
 MyWorkV2 EveningCard + WhatsApp Day Summary show 'Day score: X% (N of M finished on time)'. Counts tasks finished TODAY that have a due date; on time = finished before the due day, or on the due day at/before due_time (mirrors work_ontime_stats, so the two cannot disagree). No due date = not counted. Display only, never touches pay (pay rule stays monthly_score -> work_ontime_stats). Frontend only.
+
+## 519 · Add-forgotten-time asks AM or PM (26-10-2026)
+
+Root cause of wrong Clock-in (Piyush 02:10 am, 26 Oct): 'Add forgotten time' uses type=time; people typed meeting times (2:10 PM / 6:30 PM) without PM, head approved, and the 02:10 entry became the day's first clock-in. Found 8 such 'added_later' rows in 30 days (4 on 26 Oct: Rana, Piyush, Khushbu, Akshar at ~02:10; 4 on 22 Oct at ~06:15-06:30). MyWorkV2 submit now asks 'Is this AM or PM?' when start is 01:00-06:59 (Change to PM shifts start/end +12 h; Keep AM sends as typed). Existing bad rows are NOT auto-fixed (history, owner decision). Frontend only.
