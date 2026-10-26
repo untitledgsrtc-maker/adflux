@@ -142,6 +142,11 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
                           <Play size={14} aria-hidden="true" /> Resume
                         </button>
                       )}
+                      {mine && it.status === 'finished' && it.assigneeId === uid && (
+                        <button className="wk-btn sm" onClick={(e) => { e.stopPropagation(); onMove(it.id, 'in_process') }}>
+                          Reopen
+                        </button>
+                      )}
                       {mine && it.status === 'in_process' && onFinish && (
                         <button className="wk-btn g sm" onClick={(e) => { e.stopPropagation(); onFinish(it) }}>
                           <Check size={14} aria-hidden="true" /> Finish
