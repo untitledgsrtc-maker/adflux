@@ -222,7 +222,14 @@ export default function MyWorkV2() {
   const showLunch = !!running && istNowMin >= 12 * 60 + 55 && istNowMin <= 13 * 60 + 30 && !lunchHidden && !lunchGone
   const onStart = (it) => rpc('work_clock_start', { p_project: null, p_label: null, p_part: it.id })
   const onFinish = (it) => rpc('work_finish_part', { p_part: it.id, p_note: null }, 'Finished. The person who asked is told.')
-  const onMove = (id, to) => rpc('work_move_part', { p_part: id, p_to: to })
+  // Phase 521: a non-head cannot move a finished task back after 2 days - the pay rule (work_ontime_stats) reads finished_at, so an old reopen would rewrite a closed month.
+  const onMove = (id, to) => {
+    const it = items.find((x) => x.id === id)
+    if (!isHead && it?.status === 'finished' && it.finishedAt && Date.now() - Date.parse(it.finishedAt) > 48 * 3600 * 1000) {
+      return toastError('', 'This task was finished more than 2 days ago. Ask your head to reopen it.')
+    }
+    return rpc('work_move_part', { p_part: id, p_to: to })
+  }
 
   if (!uid) return null
 
@@ -580,14 +587,15 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
   }, [evening, onShared])
   if (!evening) return null
   const finished = items.filter((i) => i.status === 'finished' && i.finishedDay === today).length   // finished TODAY only
-  // Phase 518: day score = tasks finished today WITH a due date that were on time (same test as work_ontime_stats: finished before the due
-  // day, or on the due day at/before the due time). Display only, never touches pay. No due date = not counted.
+  // Phase 518: day score (ESTIMATE) = tasks finished today WITH a due date that were on time (finished before the due day, or on the due day
+  // at/before the due time - the on-time test of work_ontime_stats). Unlike the pay rule it does not skip declined / sent-back tasks or approved
+  // leave days. Display only, never touches pay. No due date = not counted.
   const scored = items.filter((i) => i.status === 'finished' && i.finishedDay === today && i.due)
   const onTimeToday = scored.filter((i) => {
     if (i.finishedDay < i.due) return true
     if (i.finishedDay > i.due) return false
     if (!i.dueTime) return true
-    const ft = new Date(i.finishedAt).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour12: false })
+    const ft = new Date(i.finishedAt).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hourCycle: 'h23' })
     return ft <= String(i.dueTime).slice(0, 8).padEnd(8, ':00')
   }).length
   const dayScore = scored.length ? Math.round(onTimeToday / scored.length * 100) : null
@@ -619,7 +627,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         `• Finished:   ${finished}`,
         `• In process: ${proc}${proc ? ' 🟡' : ''}`,
         `• Late:       ${late}${late ? ' 🔴' : ''}`,
-        ...(dayScore != null ? [`⭐ *DAY SCORE: ${dayScore}%* (${onTimeToday} of ${scored.length} finished on time)`] : []),
+        ...(dayScore != null ? [`⭐ *DAY SCORE (estimate): ${dayScore}%* (${onTimeToday} of ${scored.length} finished on time)`] : []),
         '',
         '⏱ *TIME*',
         `• Clock in:  ${rows[0] ? fmtTimeIST(rows[0].started_at) : '-'}`,
@@ -656,7 +664,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
           <div className="wk-row"><span className="wk-mu">Finished</span><span className="wk-num">{finished}</span></div>
           <div className="wk-row"><span className="wk-mu">In process</span><span className="wk-num">{proc}</span></div>
           <div className="wk-row"><span className="wk-mu">Late</span><span className="wk-num" style={{ color: late ? 'var(--danger)' : undefined }}>{late}</span></div>
-          <div className="wk-row"><span className="wk-mu">Day score</span><span className="wk-num">{dayScore == null ? '-' : `${dayScore}% · ${onTimeToday} of ${scored.length} on time`}</span></div>
+          <div className="wk-row"><span className="wk-mu">Day score (estimate)</span><span className="wk-num">{dayScore == null ? '-' : `${dayScore}% · ${onTimeToday} of ${scored.length} on time`}</span></div>
         </div>
         <div className="wk-field" style={{ margin: 0 }}><label htmlFor="ev-note">Note (optional)</label>
           <textarea id="ev-note" className="wk-input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="Anything the team should know" /></div>
@@ -773,13 +781,25 @@ function HoursTab({ uid, entries: todayEntries, projects, projName, onAddManual,
     const hh = (t) => Number((t || '').slice(0, 2))
     if (from && hh(from) < 7) {
       const pm = (t) => `${String(hh(t) + 12).padStart(2, '0')}${(t || '').slice(2)}`
-      const flip = await confirmDialog({
-        title: 'Is this AM or PM?',
-        message: `The start time is ${from} in the early morning. If you meant ${pm(from)} (PM), change it. Otherwise keep it as AM.`,
-        confirmLabel: 'Change to PM', cancelLabel: 'Keep AM',
-      })
-      if (flip) { fromT = pm(from); if (to && hh(to) < 12) toT = pm(to) }
-      else earlyOk = true   // Phase 520: the server refuses a start before 7 AM unless AM was confirmed
+      if (to && hh(to) >= 12) {
+        earlyOk = true   // Phase 521: an entry that runs past noon can only be AM-start work, so there is nothing to ask
+      } else {
+        const flip = await confirmDialog({
+          title: 'Is this AM or PM?',
+          message: `The start time is ${from} in the early morning. If you meant PM, this becomes ${pm(from)} to ${to ? pm(to) : '-'}.`,
+          confirmLabel: 'Change to PM', cancelLabel: 'No, it is AM',
+        })
+        if (flip) { fromT = pm(from); toT = to ? pm(to) : to }
+        else {
+          // Phase 521: closing the box (Escape / tap outside) also returns false, so AM needs its own explicit yes; otherwise nothing is sent.
+          const keep = await confirmDialog({
+            title: 'Send as AM?', message: `${from} AM is early morning. Only send it if you really worked then.`,
+            confirmLabel: 'Yes, it is AM', cancelLabel: 'Go back',
+          })
+          if (!keep) return
+          earlyOk = true   // Phase 520: the server refuses a start before 7 AM unless AM was confirmed
+        }
+      }
     }
     await onAddManual({
       p_project: project, p_label: label.trim(),

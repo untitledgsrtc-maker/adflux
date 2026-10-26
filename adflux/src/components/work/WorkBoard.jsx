@@ -142,7 +142,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
                           <Play size={14} aria-hidden="true" /> Resume
                         </button>
                       )}
-                      {mine && it.status === 'finished' && it.assigneeId === uid && (
+                      {mine && it.status === 'finished' && it.assigneeId === uid && it.finishedAt && Date.now() - Date.parse(it.finishedAt) <= 48 * 3600 * 1000 && (   // Phase 521: older finished tasks are head-only (pay rule reads finished_at)
                         <button className="wk-btn sm" onClick={(e) => { e.stopPropagation(); onMove(it.id, 'in_process') }}>
                           Reopen
                         </button>

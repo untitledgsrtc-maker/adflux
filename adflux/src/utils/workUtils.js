@@ -28,6 +28,9 @@ export const fmtDateShort = (ymd) => {
   return d.toLocaleDateString('en-GB', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 export const istHour = () => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: false }).format(new Date()))
+// IST hour (0-23) of any timestamp; h23 so midnight is 0, never '24'
+const IST_H23 = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hourCycle: 'h23' })
+export const istHourOf = (iso) => Number(IST_H23.format(new Date(iso)))
 export const initialsOf = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 export const todayIST = istTodayISO
 export const STATUS_LABEL = { assigned: 'Assigned', in_process: 'In process', finished: 'Finished', postponed: 'Postponed' }

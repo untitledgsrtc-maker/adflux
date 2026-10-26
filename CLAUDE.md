@@ -13,9 +13,6 @@ V2Hero added to PendingApprovalsV2 (pending amount), CallLogsV2 (calls in range)
 
 ## 513.1 · Clients stat boxes wrap on phone (26-10-2026)
 
-ClientsV2 stat strip: repeat(3,1fr) -> auto-fit minmax(min(150px,100
-## 513.1 · Clients stat boxes wrap on phone (26-10-2026)
-
 ClientsV2 stat strip: repeat(3,1fr) -> auto-fit minmax(min(150px,100%),1fr); the third box was cut off at 375 px.
 
 ## 514 · Staff can reopen their own finished work task (26-10-2026)
@@ -58,3 +55,7 @@ Root cause of wrong Clock-in (Piyush 02:10 am, 26 Oct): 'Add forgotten time' use
 ## 520 · Early-time guard for forgotten time (26-10-2026)
 
 Three layers so 'PM typed as AM' cannot recur: (1) app asks AM/PM for starts before 7 AM (Phase 519); (2) `supabase_phase520_work_manual_time_early_guard.sql` makes work_add_manual_time REFUSE a start before 07:00 IST unless `p_early_ok=true` (sent only when the person taps Keep AM); old 5-arg function dropped so it cannot bypass; (3) Team Work approval card shows a red 'Starts at ... check it was not meant as PM' line. Frontend sends p_early_ok only when true, so the app works before and after the SQL. SQL STATUS: written, NOT yet applied (classifier blocked the live write; owner to approve or paste). Existing 8 bad rows untouched, awaiting owner choice.
+
+## 521 · Code-review fixes for Phases 514-520 (26-10-2026)
+
+SQL 520 wrapped in BEGIN/COMMIT (+ header note that p_early_ok is an accident guard, head approval stays the real control; STILL NOT APPLIED live). AM/PM box: dismissing no longer means AM (explicit 'Yes, it is AM' second step; entries that run past noon skip the question). Non-head reopen limited to 48 h after finish (WorkBoard button + MyWorkV2.onMove). Team Work Overdue tile/button count comes from the filtered board items. Day score labelled 'estimate' and uses hourCycle h23. Approval early-start warning uses new workUtils.istHourOf (h23). `.wk-hseg[role=button]:focus-visible` ring. Removed the truncated duplicate 513.1 fragment.

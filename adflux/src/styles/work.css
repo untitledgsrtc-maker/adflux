@@ -54,6 +54,7 @@
 .wk-timer { font-family: var(--font-display); font-variant-numeric: tabular-nums; font-size: 72px; font-weight: 600; line-height: 1.05; letter-spacing: -.02em; margin: 8px 0 4px; color: var(--accent); }
 .wk-timer.paused { color: #fff; }
 .wk-hsegs { display: grid; margin-top: 14px; }
+.wk-hseg[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .wk-hseg { padding: 4px 20px; } .wk-hseg:first-child { padding-left: 0; } .wk-hseg + .wk-hseg { border-left: 1px solid rgba(255, 255, 255, .16); }
 
 /* buttons - pill shaped, 40px (44 on touch) */

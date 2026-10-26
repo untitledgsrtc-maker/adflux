@@ -13,7 +13,7 @@ import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { istTodayISO } from '../../utils/istDate'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
-import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, dueState, initialsOf, clientColor, istHour } from '../../utils/workUtils'
+import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, dueState, initialsOf, clientColor, istHour, istHourOf } from '../../utils/workUtils'
 import WorkCalendar from '../../components/work/WorkCalendar'
 import ActivityTab from '../../components/work/ActivityTab'
 import InsightsTab from '../../components/work/InsightsTab'
@@ -187,6 +187,7 @@ export default function TeamWorkV2() {
     if (p.task_id && p.assignee_id) { const a = (taskPeople[p.task_id] = taskPeople[p.task_id] || []); if (!a.includes(p.assignee_id)) a.push(p.assignee_id) }
   })
   const openCount = parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed').length
+  const lateOnBoard = items.filter((i) => i.status !== 'finished' && i.status !== 'postponed' && dueState(i.due, i.status).cls === 'bad').length   // Phase 521: same filtered list the board shows
   const lateParts = parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed' && dueState(p.due_date || p.task?.due_date, p.status).cls === 'bad')
   // Phase 485: the Finished tile and the ring follow the date filter (they were always "since 00:00 today", so Today and Yesterday showed the same 43%)
   const isTodayRange = from === today && to === today
@@ -355,7 +356,7 @@ export default function TeamWorkV2() {
           <HeroSegs eyebrow="Board · filtered" segs={[
             ['In process', String(items.filter((i) => i.status === 'in_process').length), 'Being worked on'],
             ['Assigned', String(items.filter((i) => i.status === 'assigned').length), 'Not started'],
-            ['Overdue', String(lateParts.length), onlyLate ? 'Showing overdue only' : 'Tap to filter', () => setOnlyLate((v) => !v), onlyLate],
+            ['Overdue', String(lateOnBoard), onlyLate ? 'Showing overdue only' : 'Tap to filter', () => setOnlyLate((v) => !v), onlyLate],
           ]} />
           <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
             <select className="wk-input" style={{ width: 220 }} value={fPerson} onChange={(e) => setFPerson(e.target.value)} aria-label="Filter by person">
@@ -364,9 +365,9 @@ export default function TeamWorkV2() {
             <select className="wk-input" style={{ width: 240 }} value={fClient} onChange={(e) => setFClient(e.target.value)} aria-label="Filter by client">
               <option value="">All clients</option>{activeProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <span className="wk-sm">{canCost ? '₹ Cost shows for admin and accounts only · ' : ''}{items.filter((i) => i.status !== 'finished' && i.status !== 'postponed').length} open · {lateParts.length} overdue</span>
+            <span className="wk-sm">{canCost ? '₹ Cost shows for admin and accounts only · ' : ''}{items.filter((i) => i.status !== 'finished' && i.status !== 'postponed').length} open · {lateOnBoard} overdue</span>
             <button className={`wk-btn sm ${onlyLate ? 'y' : 'o'}`} aria-pressed={onlyLate} onClick={() => setOnlyLate((v) => !v)}>
-              <AlertTriangle size={14} aria-hidden="true" /> {onlyLate ? 'Showing overdue only' : `Overdue only (${lateParts.length})`}
+              <AlertTriangle size={14} aria-hidden="true" /> {onlyLate ? 'Showing overdue only' : `Overdue only (${lateOnBoard})`}
             </button>
             {(laterCount > 0 || showLater) && (
               <button className="wk-btn o sm" onClick={() => setShowLater((v) => !v)}>
@@ -430,7 +431,7 @@ export default function TeamWorkV2() {
                         {e.note || e.task_label}
                         {(() => { const n = claims.filter((c) => c.user_id === e.user_id).length; const d = claims.filter((c) => c.user_id === e.user_id && c.status === 'declined').length
                           return String(e.note || '').startsWith('Said working while idle') && n >= 3 ? <div style={{ color: 'var(--w-wat, #FBBF24)', marginTop: 4 }}>{n} idle claims in 7 days{d ? ` (${d} declined)` : ''}</div> : null })()}
-                        {Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: false }).format(new Date(e.started_at))) < 7 && (
+                        {istHourOf(e.started_at) < 7 && (
                           <div style={{ color: 'var(--danger)', marginTop: 4 }}>Starts at {fmtTimeIST(e.started_at)} (early morning). Check it was not meant as PM before you approve.</div>
                         )}
                       </span>
