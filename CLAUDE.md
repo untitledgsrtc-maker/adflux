@@ -21,3 +21,7 @@ ClientsV2 stat strip: repeat(3,1fr) -> auto-fit minmax(min(150px,100%),1fr); the
 ## 514 · Staff can reopen their own finished work task (26-10-2026)
 
 supabase_phase514_work_reopen_own.sql: work_move_part now lets the assignee move finished -> in_process (reopen clears finish time, cost, seconds; logged as 'reopened'). Back to 'assigned' stays head-only. WorkBoard.jsx gets a Reopen button on the person's own finished cards (phone has no drag). Owner must paste the SQL in Supabase; until then the button shows the old 'only the head' error.
+
+## 515 · Team Work: Overdue only filter (26-10-2026)
+
+TeamWorkV2 Tasks board gets an 'Overdue only (N)' toggle beside the person/client filters: shows open, non-postponed tasks past due date. Pure frontend, no SQL.

@@ -61,6 +61,7 @@ export default function TeamWorkV2() {
   const [fPerson, setFPerson] = useState('')
   const [fClient, setFClient] = useState('')
   const [postponing, setPostponing] = useState(null)   // item being postponed (Postpone box)
+  const [onlyLate, setOnlyLate] = useState(false)   // Phase 515: board shows only overdue open tasks
   const [showLater, setShowLater] = useState(false)   // Tasks board: also show open tasks due after the chosen range
   const [busy, setBusy] = useState(false)
   const latch = useRef(false)
@@ -163,7 +164,7 @@ export default function TeamWorkV2() {
       return showLater || p.status === 'in_process' || !d || d <= addDaysISO(to, 2) || isNewPart(p)
     }
     return parts
-      .filter((p) => inRange(p) && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient))
+      .filter((p) => inRange(p) && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient) && (!onlyLate || (p.status !== 'finished' && p.status !== 'postponed' && dueState(p.due_date || p.task?.due_date, p.status).cls === 'bad')))
       .map((p) => ({
         postponedUntil: p.postponed_until, postponeCount: p.postpone_count || 0,
         postponedBy: [...(p.postponed_by_users || []).map((id) => nameOf(id)), p.postponed_by_client ? `${p.postponed_by_client} (client)` : ''].filter(Boolean).join(', '),
@@ -172,7 +173,7 @@ export default function TeamWorkV2() {
         assigneeName: nameOf(p.assignee_id), assigneePhoto: users.find((u) => u.id === p.assignee_id)?.profile_image_url || null, partsTotal: total[p.task_id] || 1, partsDone: done[p.task_id] || 0,
         seconds: taskCostByTask[p.task_id]?.seconds ?? p.seconds, cost: taskCostByTask[p.task_id]?.cost ?? null,
       }))
-  }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask, users, from, to, showLater, today])
+  }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask, users, from, to, showLater, today, onlyLate])
   const laterCount = useMemo(() => showLater ? 0 : parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed' && p.status !== 'in_process' && (p.due_date || p.task?.due_date) > addDaysISO(to, 2) && !(!p.task?.is_auto && p.created_at && new Date(p.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === today) && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient)).length, [parts, to, today, showLater, fPerson, fClient])
 
   if (authLoading || !uid) return null
@@ -364,6 +365,9 @@ export default function TeamWorkV2() {
               <option value="">All clients</option>{activeProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <span className="wk-sm">{canCost ? '₹ Cost shows for admin and accounts only · ' : ''}{items.filter((i) => i.status !== 'finished' && i.status !== 'postponed').length} open · {lateParts.length} overdue</span>
+            <button className={`wk-btn sm ${onlyLate ? 'y' : 'o'}`} aria-pressed={onlyLate} onClick={() => setOnlyLate((v) => !v)}>
+              <AlertTriangle size={14} aria-hidden="true" /> {onlyLate ? 'Showing overdue only' : `Overdue only (${lateParts.length})`}
+            </button>
             {(laterCount > 0 || showLater) && (
               <button className="wk-btn o sm" onClick={() => setShowLater((v) => !v)}>
                 {showLater ? 'Hide later tasks' : `Show ${laterCount} later task${laterCount === 1 ? '' : 's'}`}
