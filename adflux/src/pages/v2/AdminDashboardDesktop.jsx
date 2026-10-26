@@ -40,6 +40,7 @@ import { istTodayISO } from '../../utils/istDate'
 import { thisMonth } from '../../utils/period'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import WaBillingBanner from '../../components/v2/WaBillingBanner'
+import AiKeyBanner from '../../components/v2/AiKeyBanner'
 import DailyCheckinCard from '../../components/work/DailyCheckinCard'
 // Phase 360 - private-LED quote prices below Rs 600/screen waiting on admin.
 import QuotePriceBanner from '../../components/quotes/QuotePriceBanner'
@@ -1018,6 +1019,7 @@ export default function AdminDashboardDesktop() {
             {/* WhatsApp API billing/eligibility failure (Meta 131042) — surfaced
                 up top with a one-tap "Fix billing" link. Self-renders null when clean. */}
             <WaBillingBanner />
+            <AiKeyBanner />
             <QuotePriceBanner />
 
             {/* Action Queue — demoted from hero to an inline notification.

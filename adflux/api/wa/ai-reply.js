@@ -357,7 +357,13 @@ export default async function handler(req) {
       headers: { 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({ model: MODEL, max_tokens: 300, system, messages: turns }),
     })
-    if (!ar.ok) return nope('claude_' + ar.status, 502)
+    if (!ar.ok) {
+      // Phase 524: record WHY Claude refused (credit finished / bad key / overloaded) so the admin dashboard can warn.
+      let detail = ''
+      try { detail = (await ar.text()).slice(0, 300) } catch {}
+      await sb('ai_failures', { method: 'POST', headers: { 'content-type': 'application/json', prefer: 'return=minimal' }, body: JSON.stringify({ http_status: ar.status, detail }) }).catch(() => {})
+      return nope('claude_' + ar.status, 502)
+    }
     const data = await ar.json()
     reply = (data?.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim()
   } catch (e) { return nope('claude_error', 502) }

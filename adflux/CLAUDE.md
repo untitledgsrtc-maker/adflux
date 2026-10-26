@@ -21929,3 +21929,11 @@ At 320-375 px the "Leads" title touched the New Lead button and the Leads Collec
 ## 523 · The 8 bad AM/PM time entries fixed (26-10-2026)
 
 `supabase_phase523_fix_am_pm_time_entries.sql` (APPLIED live, previewed first): of the 8 hand-added entries saved as AM that were meant as PM, 2 had no overlap (22 Oct Akshar, Piyush) and were shifted +12 h; 6 would have double counted time already in the person's timers and were DECLINED (reversible: set status back to 'approved'). Verified: 0 approved hand-added entries before 07:00 IST in the last 30 days. Notes on each row say '[Phase 523 ...]'. Hours have no pay effect.
+
+## 524 · Claude API key swapped to the owner's $200 credit + AI failure banner (26-10-2026)
+
+Owner got $200 promotional Claude API credit (Anthropic console, Default workspace; applies to API / Agent SDK, EXPIRES 31 Oct 2026). New key `untitled-app` (expires 25 Nov 2026) set in Vercel `ANTHROPIC_API_KEY` (Production, redeployed) and Supabase Edge Function secret `ANTHROPIC_API_KEY` (visiting-card Scan, tested OK). Add a payment method in the Anthropic console before 31 Oct or the AI and Scan stop.
+Incident: the old credit finished ~17:37 IST on 26 Oct, 9 WhatsApp customers on 98982 got no AI reply and nothing warned anyone. Re-armed 7 chats (`ai_recovery_at` NULL, recovery cron answered at 21:22); 2 older than 3 h needed a human.
+Fix: `supabase_phase524_ai_failures.sql` (APPLIED live): table `ai_failures` (admin/co_owner read, written only by api/wa/ai-reply.js with the service key). `ai-reply.js` logs every non-OK Claude response (status + first 300 chars). `AiKeyBanner.jsx` on the admin dashboard shows a red banner for a failure in the last 24 h unless a later outbound WhatsApp message exists (AI working again); text says credit finished / key invalid / rate limit / unavailable, link to platform.claude.com/settings/billing.
+Not covered: network errors to Anthropic (no HTTP status) and the other Claude callers (resume parse, team assistant, Scan) do not write to `ai_failures`.
+Foot-gun: never paste an example key from chat into a terminal command; a literal placeholder was saved as the secret twice (Supabase), fix by setting the real key via dashboard.
