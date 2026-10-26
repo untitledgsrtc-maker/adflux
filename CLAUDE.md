@@ -54,3 +54,7 @@ MyWorkV2 EveningCard + WhatsApp Day Summary show 'Day score: X% (N of M finished
 ## 519 · Add-forgotten-time asks AM or PM (26-10-2026)
 
 Root cause of wrong Clock-in (Piyush 02:10 am, 26 Oct): 'Add forgotten time' uses type=time; people typed meeting times (2:10 PM / 6:30 PM) without PM, head approved, and the 02:10 entry became the day's first clock-in. Found 8 such 'added_later' rows in 30 days (4 on 26 Oct: Rana, Piyush, Khushbu, Akshar at ~02:10; 4 on 22 Oct at ~06:15-06:30). MyWorkV2 submit now asks 'Is this AM or PM?' when start is 01:00-06:59 (Change to PM shifts start/end +12 h; Keep AM sends as typed). Existing bad rows are NOT auto-fixed (history, owner decision). Frontend only.
+
+## 520 · Early-time guard for forgotten time (26-10-2026)
+
+Three layers so 'PM typed as AM' cannot recur: (1) app asks AM/PM for starts before 7 AM (Phase 519); (2) `supabase_phase520_work_manual_time_early_guard.sql` makes work_add_manual_time REFUSE a start before 07:00 IST unless `p_early_ok=true` (sent only when the person taps Keep AM); old 5-arg function dropped so it cannot bypass; (3) Team Work approval card shows a red 'Starts at ... check it was not meant as PM' line. Frontend sends p_early_ok only when true, so the app works before and after the SQL. SQL STATUS: written, NOT yet applied (classifier blocked the live write; owner to approve or paste). Existing 8 bad rows untouched, awaiting owner choice.

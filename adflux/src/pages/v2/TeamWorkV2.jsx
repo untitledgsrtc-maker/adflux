@@ -430,6 +430,9 @@ export default function TeamWorkV2() {
                         {e.note || e.task_label}
                         {(() => { const n = claims.filter((c) => c.user_id === e.user_id).length; const d = claims.filter((c) => c.user_id === e.user_id && c.status === 'declined').length
                           return String(e.note || '').startsWith('Said working while idle') && n >= 3 ? <div style={{ color: 'var(--w-wat, #FBBF24)', marginTop: 4 }}>{n} idle claims in 7 days{d ? ` (${d} declined)` : ''}</div> : null })()}
+                        {Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: false }).format(new Date(e.started_at))) < 7 && (
+                          <div style={{ color: 'var(--danger)', marginTop: 4 }}>Starts at {fmtTimeIST(e.started_at)} (early morning). Check it was not meant as PM before you approve.</div>
+                        )}
                       </span>
                       <span style={{ whiteSpace: 'nowrap', display: 'flex', gap: 8 }}>
                         <button className="wk-btn o sm" disabled={busy} onClick={() => rpc('work_decide_time', { p_entry: e.id, p_approve: false }, 'Declined.')}><X size={14} aria-hidden="true" /> Decline</button>

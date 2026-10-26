@@ -769,9 +769,9 @@ function HoursTab({ uid, entries: todayEntries, projects, projName, onAddManual,
     if (!project || !label.trim()) return toastError('', 'Pick a client and say what you did.')
     // Phase 519: a time before 7 AM is almost always "2:10" typed without PM (4 meeting entries went in as 02:10 AM on 26 Oct and became the
     // clock-in). Ask once; "Change to PM" shifts start and end by 12 h, "Keep AM" sends it as typed.
-    let fromT = from, toT = to
+    let fromT = from, toT = to, earlyOk = false
     const hh = (t) => Number((t || '').slice(0, 2))
-    if (from && hh(from) < 7 && hh(from) >= 1) {
+    if (from && hh(from) < 7) {
       const pm = (t) => `${String(hh(t) + 12).padStart(2, '0')}${(t || '').slice(2)}`
       const flip = await confirmDialog({
         title: 'Is this AM or PM?',
@@ -779,10 +779,11 @@ function HoursTab({ uid, entries: todayEntries, projects, projName, onAddManual,
         confirmLabel: 'Change to PM', cancelLabel: 'Keep AM',
       })
       if (flip) { fromT = pm(from); if (to && hh(to) < 12) toT = pm(to) }
+      else earlyOk = true   // Phase 520: the server refuses a start before 7 AM unless AM was confirmed
     }
     await onAddManual({
       p_project: project, p_label: label.trim(),
-      p_start: `${day}T${fromT}:00+05:30`, p_end: `${day}T${toT}:00+05:30`, p_note: note.trim() || null,
+      p_start: `${day}T${fromT}:00+05:30`, p_end: `${day}T${toT}:00+05:30`, p_note: note.trim() || null, ...(earlyOk ? { p_early_ok: true } : {}),   // only sent when AM was confirmed, so the app also works before Phase 520 SQL is applied
     })
     setLabel(''); setNote('')
   }
