@@ -21925,3 +21925,7 @@ Owner: "I want same as work." SUPERSEDES the "Ask for work" rename (Phase 393) a
 
 ### 511.2 Leads page phone crowding (2026-10-26)
 At 320-375 px the "Leads" title touched the New Lead button and the Leads Collected chart date labels overlapped. `.lead-page-head` now wraps with a gap; the chart shows every 2nd (10-18 bars) or 4th (19+ bars) day label, always the last. Display only. Live phone check of /work, /my-work, /quotes at 375 px: fine.
+
+## 523 · The 8 bad AM/PM time entries fixed (26-10-2026)
+
+`supabase_phase523_fix_am_pm_time_entries.sql` (APPLIED live, previewed first): of the 8 hand-added entries saved as AM that were meant as PM, 2 had no overlap (22 Oct Akshar, Piyush) and were shifted +12 h; 6 would have double counted time already in the person's timers and were DECLINED (reversible: set status back to 'approved'). Verified: 0 approved hand-added entries before 07:00 IST in the last 30 days. Notes on each row say '[Phase 523 ...]'. Hours have no pay effect.
