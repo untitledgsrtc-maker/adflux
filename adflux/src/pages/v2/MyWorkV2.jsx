@@ -15,7 +15,7 @@ import { toastError, toastSuccess, pushToast } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { openWhatsAppShare } from '../../utils/whatsappSummary'
 import { openExternalUrl } from '../../utils/openExternal'
-import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, istHour, dueState, initialsOf, clientColor } from '../../utils/workUtils'
+import { fmtDur, fmtClock, dayStartISO, addDaysISO, fmtTimeIST, fmtDateShort, istHour, istHourOf, dueState, initialsOf, clientColor } from '../../utils/workUtils'
 import WorkBoard from '../../components/work/WorkBoard'
 import NewTaskModal from '../../components/work/NewTaskModal'
 import PostponeModal from '../../components/work/PostponeModal'
@@ -210,7 +210,9 @@ export default function MyWorkV2() {
   const doneSecs = entries.filter((e) => e.ended_at && e.status === 'approved')
     .reduce((s, e) => s + Math.max(0, (new Date(e.ended_at) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0)), 0)   // Phase 517: finished sessions also skip away time (break_seconds), same as runSecs + the shared WhatsApp text
   const todaySecs = doneSecs + runSecs
-  const firstIn = entries.find((e) => e.status === 'approved')?.started_at
+  // Phase 522: a hand-added entry before 7 AM (a PM typed as AM) never counts as the clock-in
+  const isClockInEntry = (e) => e.status === 'approved' && !(e.source === 'added_later' && istHourOf(e.started_at) < 7)
+  const firstIn = entries.find(isClockInEntry)?.started_at
   const lateCount = items.filter((i) => isOpen(i) && dueState(i.due, i.status).cls === 'bad').length
 
   // Phase 450: lunch is 1 PM - from 12:55 to 1:30 PM a running timer gets a "pause before you go" bar (once a day it can be dismissed)
@@ -615,6 +617,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         total += s; byProj.set(e.project_id, (byProj.get(e.project_id) || 0) + s)
       })
       const running = rows.some((e) => !e.ended_at)
+      const inRow = rows.find((e) => !(e.source === 'added_later' && istHourOf(e.started_at) < 7)) || rows[0]   // Phase 522: early hand-added entry is not the clock-in
       const last = rows.filter((e) => e.ended_at).slice(-1)[0]
       const dateLbl = new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })
       const proj = [...byProj.entries()].sort((x, y) => y[1] - x[1])
@@ -630,7 +633,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         ...(dayScore != null ? [`⭐ *DAY SCORE (estimate): ${dayScore}%* (${onTimeToday} of ${scored.length} finished on time)`] : []),
         '',
         '⏱ *TIME*',
-        `• Clock in:  ${rows[0] ? fmtTimeIST(rows[0].started_at) : '-'}`,
+        `• Clock in:  ${inRow ? fmtTimeIST(inRow.started_at) : '-'}`,
         `• Clock out: ${running ? `${fmtTimeIST(new Date().toISOString())} (timer still running)` : (last ? fmtTimeIST(last.ended_at) : '-')}`,
         `• Hours:     ${fmtDur(total)}`,
         '',

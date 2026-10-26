@@ -59,3 +59,7 @@ Three layers so 'PM typed as AM' cannot recur: (1) app asks AM/PM for starts bef
 ## 521 · Code-review fixes for Phases 514-520 (26-10-2026)
 
 SQL 520 wrapped in BEGIN/COMMIT (+ header note that p_early_ok is an accident guard, head approval stays the real control; STILL NOT APPLIED live). AM/PM box: dismissing no longer means AM (explicit 'Yes, it is AM' second step; entries that run past noon skip the question). Non-head reopen limited to 48 h after finish (WorkBoard button + MyWorkV2.onMove). Team Work Overdue tile/button count comes from the filtered board items. Day score labelled 'estimate' and uses hourCycle h23. Approval early-start warning uses new workUtils.istHourOf (h23). `.wk-hseg[role=button]:focus-visible` ring. Removed the truncated duplicate 513.1 fragment.
+
+## 522 · Clock-in ignores early hand-added entries (26-10-2026)
+
+MyWorkV2 `firstIn` and the shared Day Summary 'Clock in' skip `source='added_later'` entries that start before 07:00 IST (a PM typed as AM). Hours are unchanged. The 8 existing bad rows (22 and 26 Oct: Rana, Piyush, Khushbu, Akshar) are NOT edited: 6 of 8 would overlap time those people already have if shifted +12 h (double count), so a data fix is held for an owner choice (shift the 2 clean ones, decline or leave the 6).
