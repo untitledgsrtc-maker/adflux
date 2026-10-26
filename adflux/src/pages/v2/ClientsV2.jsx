@@ -344,7 +344,7 @@ export default function ClientsV2() {
               label={`won from ${scoped.length} client${scoped.length === 1 ? '' : 's'}`}
             />
           )}
-          <section className="v2d-kpi-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <section className="v2d-kpi-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))' }}>
             <StatCard label="Total clients" value={scoped.length} />
             <StatCard label="Quotes on record" value={scoped.reduce((s, c) => s + (c.quote_count || 0), 0)} />
             <StatCard

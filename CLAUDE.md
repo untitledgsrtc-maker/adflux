@@ -10,3 +10,10 @@ LeadsCollectedChart: the always-shown last label now hides the previous stepped 
 ## 513 · Hero cards, admin batch 1 (26-10-2026)
 
 V2Hero added to PendingApprovalsV2 (pending amount), CallLogsV2 (calls in range), ClientsV2 (won total). Skipped on purpose: pages that already carry their own hero/KPI block (Finance, Dashboard) and embedded People tabs. Rule: one hero per screen, only where the headline number is already loaded.
+
+## 513.1 · Clients stat boxes wrap on phone (26-10-2026)
+
+ClientsV2 stat strip: repeat(3,1fr) -> auto-fit minmax(min(150px,100
+## 513.1 · Clients stat boxes wrap on phone (26-10-2026)
+
+ClientsV2 stat strip: repeat(3,1fr) -> auto-fit minmax(min(150px,100%),1fr); the third box was cut off at 375 px.
