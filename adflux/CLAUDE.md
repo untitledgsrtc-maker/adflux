@@ -21922,3 +21922,6 @@ Owner: "I want same as work." SUPERSEDES the "Ask for work" rename (Phase 393) a
 
 ### 511.1 Inline tiny text raised to 12 px in daily-use files (2026-10-26)
 111 inline `fontSize: 9/10/11` (incl. fractional) -> 12 in 29 jsx files (FollowUpsV2, LeadsV2, WorkV2, TelecallerV2, LeadDetailV2, QuotesV2, MyWorkV2, V2AppShell, components/leads, components/work). Guardian: only font-size changed, no frozen contract touched. Left alone: `LeadsCollectedChart` (axis labels would overlap), PDF files, Master/Finance/Cockpit/ops inline sizes (~450 remain). Watch on a 375 px phone: uppercase KPI tile labels (TodaySummaryCard, TelecallerV2 ~1072) may ellipsize; MyWorkV2 timeline hour axis is tight; the `sm` StageChip is now close to the normal chip.
+
+### 511.2 Leads page phone crowding (2026-10-26)
+At 320-375 px the "Leads" title touched the New Lead button and the Leads Collected chart date labels overlapped. `.lead-page-head` now wraps with a gap; the chart shows every 2nd (10-18 bars) or 4th (19+ bars) day label, always the last. Display only. Live phone check of /work, /my-work, /quotes at 375 px: fine.
