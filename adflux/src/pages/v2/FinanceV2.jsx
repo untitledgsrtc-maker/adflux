@@ -9,13 +9,15 @@ import { useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard, ListChecks, Upload, TrendingUp, TrendingDown, BarChart3,
   AlertTriangle, Loader2, Search, IndianRupee, Home, CheckSquare, Clock,
-  RefreshCw, Wallet, PiggyBank, Boxes, ArrowLeftRight, Trash2, CheckCircle2, Plus,
+  RefreshCw, Wallet, PiggyBank, Boxes, ArrowLeftRight, Trash2, CheckCircle2, Plus, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { istTodayISO } from '../../utils/istDate'
+import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
+import SegmentToggle, { segmentKeyToValue } from '../../components/v2/SegmentToggle'
 
 /* ── helpers ── */
 function fmtINR(n) {
@@ -83,7 +85,7 @@ export default function FinanceV2() {
         })}
       </div>
 
-      {tab === 'pnl' && <PnlTab seg="all" />}
+      {tab === 'pnl' && <PnlTab />}
       {tab === 'home' && <HomeTab onReview={() => setTab('register')} />}
       {tab === 'reconcile' && <ReconcileTab />}
       {tab === 'tasks' && <TasksTab />}
@@ -132,19 +134,38 @@ const selStyle = { background: 'var(--surface-2, #334155)', border: '1px solid v
 const Dot = ({ c }) => <span style={{ width: 9, height: 9, borderRadius: 9, background: c, display: 'inline-block' }} />
 
 /* ── P&L dashboard ── */
-function PnlTab({ seg }) {
+function PnlTab() {
+  // Same filter row as /quotes (date range + All/Private/Government + Reset). Media filter is not here yet:
+  // finance_pnl_summary has no media parameter.
+  const [range, setRange] = useState(() => presetToRange('all'))
+  const [segKey, setSegKey] = useState('all')
+  const seg = segKey === 'all' ? 'all' : segmentKeyToValue(segKey)
+  const filtered = range.preset !== 'all' || segKey !== 'all'
   const [d, setD] = useState(null); const [loading, setLoading] = useState(true); const [err, setErr] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   useEffect(() => {
     let alive = true; setLoading(true); setErr(null)
-    supabase.rpc('finance_pnl_summary', { p_from: null, p_to: null, p_segment: seg === 'all' ? null : seg })
+    supabase.rpc('finance_pnl_summary', { p_from: range.from || null, p_to: range.to || null, p_segment: seg === 'all' ? null : seg })
       .then(({ data, error }) => { if (!alive) return; if (error) setErr(error.message); else setD(data || {}); setLoading(false) })
     return () => { alive = false }
-  }, [seg, refreshKey])
+  }, [seg, range.from, range.to, refreshKey])
 
-  if (loading) return <Spin />
-  if (err) return <Card style={{ borderColor: 'var(--danger)' }}><span style={{ color: 'var(--danger)' }}>Could not load P&amp;L: {err}</span></Card>
-  if (!d || d.operating_profit == null) return <Card>No finance data yet — run the Phase 1–3 SQL.</Card>
+  const filterBar = (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+      <DateRangeFilter value={range} onChange={setRange} />
+      <SegmentToggle value={segKey} onChange={setSegKey} style={{ marginBottom: 0 }} />
+      {filtered && (
+        <button type="button" onClick={() => { setRange(presetToRange('all')); setSegKey('all') }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, minHeight: 44, padding: '0 14px', borderRadius: 999, cursor: 'pointer',
+            color: 'var(--text-muted)', background: 'var(--surface, #1e293b)', border: '1px solid var(--border-strong, #475569)' }}>
+          <X size={14} /> Reset
+        </button>
+      )}
+    </div>
+  )
+  if (loading) return <div style={{ display: 'grid', gap: 14 }}>{filterBar}<Spin /></div>
+  if (err) return <div style={{ display: 'grid', gap: 14 }}>{filterBar}<Card style={{ borderColor: 'var(--danger)' }}><span style={{ color: 'var(--danger)' }}>Could not load P&amp;L: {err}</span></Card></div>
+  if (!d || d.operating_profit == null) return <div style={{ display: 'grid', gap: 14 }}>{filterBar}<Card>No finance data yet — run the Phase 1–3 SQL.</Card></div>
 
   const profit = Number(d.operating_profit) || 0, income = Number(d.income) || 0
   const bprofit = d.business_profit != null ? Number(d.business_profit) : profit   // revenue − running costs (§168, incl govt-team commission)
@@ -171,7 +192,8 @@ function PnlTab({ seg }) {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        {filterBar}
         <button onClick={() => setRefreshKey(k => k + 1)} disabled={loading}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
             padding: '7px 12px', borderRadius: 10, cursor: loading ? 'default' : 'pointer',

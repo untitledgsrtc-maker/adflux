@@ -21953,3 +21953,7 @@ Owner: costing lines should be quantity x price; vendor 2's quantity must be wha
 Note (526 follow-up): the Costing card margin = quote value ex-GST - cost lines - commission - TDS (both read from approved payments of that quote). Card only: the Finance P&L still counts TDS inside revenue (section 218) and already deducts commission, so Finance profit is unchanged by TDS.
 
 Note (526 follow-up 2): Costing card commission now covers agency deals too: for a quote created by an agency user it is (approved payments / quote total) x subtotal x that user's agency_commission_percent (default 5), the same rule as finance_pnl_summary; team deals still use the commission typed on the payments. UA/AUTO/2026-27/0118 (Hamesh Modi, 40%) = Rs 16,50,000.
+
+## 527 · Finance Owner P&L filter row (28-10-2026)
+
+Owner asked for the /quotes filter row on Finance -> Owner P&L. `PnlTab` now has the same date pill (`DateRangeFilter`, default All time) + All / Private / Government pill + Reset; they feed the existing `finance_pnl_summary(p_from, p_to, p_segment)`, so no SQL. Vishal's server-side government lock is unchanged. NOT built: the media pill (All media / Auto Hood / GSRTC LED): the function has no media parameter and org-wide costs (common expense, loans, tax) have no media, so it needs a deliberate allocation rule + shadow-compare first.
