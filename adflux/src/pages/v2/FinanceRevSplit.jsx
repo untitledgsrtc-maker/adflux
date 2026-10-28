@@ -12,6 +12,7 @@ const dmy = (s) => { if (!s) return ''; const [y, m, d] = String(s).slice(0, 10)
 const th = { padding: '10px 10px', fontSize: 12, textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' }
 const td = { padding: '10px 10px', fontSize: 13, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }
 const tdR = { ...td, textAlign: 'right', fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums' }
+const MEDIA_LBL = { AUTO_HOOD: 'Auto Hood', GSRTC_LED: 'GSRTC LED', LED_OTHER: 'Pvt LED' }
 const chunk = (a, n) => { const o = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o }
 
 async function pagedQuotes() {
@@ -19,7 +20,7 @@ async function pagedQuotes() {
   for (;;) {
     const { data, error } = await supabase.from('quotes')
       .select('id, quote_number, client_company, client_name, media_type, subtotal, total_amount, created_by, campaign_start_date, campaign_end_date')
-      .eq('segment', 'GOVERNMENT').eq('status', 'won').in('media_type', ['AUTO_HOOD', 'GSRTC_LED'])
+      .eq('status', 'won').or('and(segment.eq.GOVERNMENT,media_type.in.(AUTO_HOOD,GSRTC_LED)),and(segment.eq.PRIVATE,media_type.eq.LED_OTHER)')
       .order('created_at', { ascending: true }).range(from, from + PAGE - 1)
     if (error) throw error
     all = all.concat(data || [])
@@ -56,7 +57,7 @@ export default function FinanceRevSplit() {
       }
       // direct costs paid from the bank per media (GSRTC capital investment + lump sums etc.); not tied to one deal
       const { data: bk, error: bke } = await supabase.from('finance_transactions').select('media_type, amount')
-        .eq('direction', 'out').eq('bucket', 'direct_cost').in('media_type', ['AUTO_HOOD', 'GSRTC_LED']).limit(5000)
+        .eq('direction', 'out').eq('bucket', 'direct_cost').in('media_type', ['AUTO_HOOD', 'GSRTC_LED', 'LED_OTHER']).limit(5000)
       if (bke) throw bke
       setBank((bk || []).reduce((m, r) => ((m[r.media_type] = (m[r.media_type] || 0) + (Number(r.amount) || 0)), m), {}))
       const creators = [...new Set(qs.map(q => q.created_by).filter(Boolean))]
@@ -94,8 +95,8 @@ export default function FinanceRevSplit() {
   const sel = shown.filter(d => isOn(d.id))
   const sum = (k) => sel.reduce((s, d) => s + d[k], 0)
   const tot = { order: sum('order'), comm: sum('comm'), vendor: sum('vendor'), tds: sum('tds'), profit: sum('profit') }
-  const mediaOn = ['AUTO_HOOD', 'GSRTC_LED'].filter(m => sel.some(d => d.media === m))
-  const expLines = mediaOn.map(m => [m === 'AUTO_HOOD' ? 'Auto Hood bank expenses' : 'GSRTC LED bank expenses', bank[m] || 0])
+  const mediaOn = ['AUTO_HOOD', 'GSRTC_LED', 'LED_OTHER'].filter(m => sel.some(d => d.media === m))
+  const expLines = mediaOn.map(m => [(MEDIA_LBL[m]) + ' bank expenses', bank[m] || 0])
   const exp = expLines.reduce((s, l) => s + l[1], 0)
   const net = tot.profit - exp
   const v = Math.min(100, Math.max(0, Number(vishal) || 0))
@@ -104,7 +105,7 @@ export default function FinanceRevSplit() {
   async function exportXlsx() {
     const XLSX = await import('xlsx')
     const head = ['No', 'Quote', 'Department', 'Media', 'Quantity', 'Start date', 'End date', 'Order amount (ex-GST)', 'Dept expense', 'Dept exp %', 'Vendor', 'TDS', 'Profit', 'Last payment', 'Status']
-    const rows = sel.map((d, i) => [i + 1, d.no, d.dept, d.media === 'AUTO_HOOD' ? 'Auto Hood' : 'GSRTC LED', d.qty, dmy(d.start), dmy(d.end), Math.round(d.order), Math.round(d.comm), Math.round(d.commPct * 10) / 10 + '%', Math.round(d.vendor), Math.round(d.tds), Math.round(d.profit), dmy(d.last), d.status])
+    const rows = sel.map((d, i) => [i + 1, d.no, d.dept, MEDIA_LBL[d.media], d.qty, dmy(d.start), dmy(d.end), Math.round(d.order), Math.round(d.comm), Math.round(d.commPct * 10) / 10 + '%', Math.round(d.vendor), Math.round(d.tds), Math.round(d.profit), dmy(d.last), d.status])
     const ws = XLSX.utils.aoa_to_sheet([head, ...rows, [],
       ['', '', 'TOTAL', '', '', '', '', Math.round(tot.order), Math.round(tot.comm), '', Math.round(tot.vendor), Math.round(tot.tds), Math.round(tot.profit)],
       ...expLines.map(l => ['', '', l[0], '', '', '', '', '', '', '', '', '', -Math.round(l[1])]),
@@ -124,7 +125,7 @@ export default function FinanceRevSplit() {
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        {[['all', 'All Government'], ['AUTO_HOOD', 'Auto Hood'], ['GSRTC_LED', 'GSRTC LED']].map(([k, l]) => <button key={k} type="button" style={chip(media === k)} onClick={() => setMedia(k)}>{l}</button>)}
+        {[['all', 'All deals'], ['AUTO_HOOD', 'Auto Hood'], ['GSRTC_LED', 'GSRTC LED'], ['LED_OTHER', 'Pvt LED']].map(([k, l]) => <button key={k} type="button" style={chip(media === k)} onClick={() => setMedia(k)}>{l}</button>)}
         <span style={{ width: 1, height: 24, background: 'var(--border)' }} />
         {[['all', 'Any payment'], ['Paid', 'Paid only'], ['Part paid', 'Part paid'], ['Not paid', 'Not paid']].map(([k, l]) => <button key={k} type="button" style={chip(pay === k)} onClick={() => setPay(k)}>{l}</button>)}
         <span style={{ flex: 1 }} />
@@ -143,7 +144,7 @@ export default function FinanceRevSplit() {
             {shown.map(d => (
               <tr key={d.id} style={{ opacity: isOn(d.id) ? 1 : 0.45 }}>
                 <td style={td}><input type="checkbox" checked={isOn(d.id)} onChange={() => toggle(d.id)} aria-label={'Include ' + d.no} /></td>
-                <td style={{ ...td, whiteSpace: 'normal', minWidth: 220 }}>{d.dept}<div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>{d.no} · {d.media === 'AUTO_HOOD' ? 'Auto Hood' : 'GSRTC LED'}</div></td>
+                <td style={{ ...td, whiteSpace: 'normal', minWidth: 220 }}>{d.dept}<div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>{d.no} · {MEDIA_LBL[d.media]}</div></td>
                 <td style={tdR}>{d.qty || '—'}</td><td style={td}>{dmy(d.start) || '—'}</td><td style={td}>{dmy(d.end) || '—'}</td>
                 <td style={tdR}>{money(d.order)}</td>
                 <td style={tdR}>{money(d.comm)}<div style={{ fontSize: 11, color: 'var(--text-subtle)' }}>{Math.round(d.commPct)}%</div></td>
@@ -153,7 +154,7 @@ export default function FinanceRevSplit() {
                 <td style={td}><span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 12, background: d.status === 'Paid' ? 'var(--success-soft)' : 'var(--warning-soft)', color: d.status === 'Paid' ? 'var(--success)' : 'var(--warning)' }}>{d.status}</span></td>
               </tr>
             ))}
-            {!shown.length && <tr><td style={{ ...td, textAlign: 'center', color: 'var(--text-subtle)' }} colSpan={12}>No won Government deals yet.</td></tr>}
+            {!shown.length && <tr><td style={{ ...td, textAlign: 'center', color: 'var(--text-subtle)' }} colSpan={12}>No won deals yet.</td></tr>}
           </tbody>
         </table>
       </div>
