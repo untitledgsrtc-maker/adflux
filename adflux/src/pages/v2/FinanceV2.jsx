@@ -140,27 +140,40 @@ function PnlTab() {
   const [range, setRange] = useState(() => presetToRange('all'))
   const [segKey, setSegKey] = useState('all')
   const seg = segKey === 'all' ? 'all' : segmentKeyToValue(segKey)
-  const filtered = range.preset !== 'all' || segKey !== 'all'
+  const [mediaKey, setMediaKey] = useState('all')
+  const MEDIA_ALL = [{ k: 'all', label: 'All media' }, { k: 'AUTO_HOOD', label: 'Auto Hood' }, { k: 'GSRTC_LED', label: 'GSRTC LED' },
+    { k: 'LED_OTHER', label: 'Pvt LED' }, { k: 'OTHER_MEDIA', label: 'Other Media' }]
+  // only the media that exist in the chosen segment (Government = Auto Hood + GSRTC LED; Private = LED + Other Media)
+  const mediaOpts = MEDIA_ALL.filter(o => o.k === 'all' || segKey === 'all'
+    || (segKey === 'government' ? ['AUTO_HOOD', 'GSRTC_LED'].includes(o.k) : ['LED_OTHER', 'OTHER_MEDIA'].includes(o.k)))
+  useEffect(() => { if (!mediaOpts.some(o => o.k === mediaKey)) setMediaKey('all') }, [segKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const filtered = range.preset !== 'all' || segKey !== 'all' || mediaKey !== 'all'
   const [d, setD] = useState(null); const [loading, setLoading] = useState(true); const [err, setErr] = useState(null)
   const [refreshKey, setRefreshKey] = useState(0)
   useEffect(() => {
     let alive = true; setLoading(true); setErr(null)
-    supabase.rpc('finance_pnl_summary', { p_from: range.from || null, p_to: range.to || null, p_segment: seg === 'all' ? null : seg })
+    supabase.rpc('finance_pnl_summary', { p_from: range.from || null, p_to: range.to || null, p_segment: seg === 'all' ? null : seg, p_media: mediaKey === 'all' ? null : mediaKey })
       .then(({ data, error }) => { if (!alive) return; if (error) setErr(error.message); else setD(data || {}); setLoading(false) })
     return () => { alive = false }
-  }, [seg, range.from, range.to, refreshKey])
+  }, [seg, mediaKey, range.from, range.to, refreshKey])
 
   const filterBar = (
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
       <DateRangeFilter value={range} onChange={setRange} />
       <SegmentToggle value={segKey} onChange={setSegKey} style={{ marginBottom: 0 }} />
+      <SegmentToggle value={mediaKey} onChange={setMediaKey} opts={mediaOpts} style={{ marginBottom: 0 }} />
       {filtered && (
-        <button type="button" onClick={() => { setRange(presetToRange('all')); setSegKey('all') }}
+        <button type="button" onClick={() => { setRange(presetToRange('all')); setSegKey('all'); setMediaKey('all') }}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, minHeight: 44, padding: '0 14px', borderRadius: 999, cursor: 'pointer',
             color: 'var(--text-muted)', background: 'var(--surface, #1e293b)', border: '1px solid var(--border-strong, #475569)' }}>
           <X size={14} /> Reset
         </button>
       )}
+    </div>
+  )
+  const mediaNote = mediaKey !== 'all' && (
+    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+      {mediaOpts.find(o => o.k === mediaKey)?.label} only: office costs are shared by this line's share of income. Loans, tax, drawings and assets belong to no media, so they show 0 here.
     </div>
   )
   if (loading) return <div style={{ display: 'grid', gap: 14 }}>{filterBar}<Spin /></div>
@@ -193,7 +206,7 @@ function PnlTab() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        {filterBar}
+        <div style={{ display: 'grid', gap: 6 }}>{filterBar}{mediaNote}</div>
         <button onClick={() => setRefreshKey(k => k + 1)} disabled={loading}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
             padding: '7px 12px', borderRadius: 10, cursor: loading ? 'default' : 'pointer',

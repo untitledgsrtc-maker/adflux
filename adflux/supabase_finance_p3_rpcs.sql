@@ -79,8 +79,29 @@ $crm$;
 REVOKE EXECUTE ON FUNCTION public.finance_crm_income_rows(date,date,text) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.finance_crm_income_rows(date,date,text) TO service_role;
 
+-- Phase 512 - internal row source for finance_pnl_summary. No media filter: the table unchanged.
+-- With a media filter: only that media's direct-cost rows + ALL common-expense rows scaled by p_f (the media's income
+-- share); every other bucket (loans, tax, drawings, assets, sweep, review, income) is dropped.
+CREATE OR REPLACE FUNCTION public.finance_txn_scoped(p_media text, p_f numeric)
+  RETURNS SETOF public.finance_transactions
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public','pg_temp'
+AS $sc$
+  SELECT t.* FROM public.finance_transactions t WHERE p_media IS NULL
+  UNION ALL
+  SELECT t.id, t.bank_account_id, t.txn_date, t.ref_no, t.description,
+         CASE WHEN t.bucket = 'common_expense' THEN round(t.amount * COALESCE(p_f,0), 2) ELSE t.amount END,
+         t.direction, t.bucket, t.company, t.segment, t.media_type, t.expense_head_id, t.matched_payment_id,
+         t.raw_tag, t.source, t.import_batch_id, t.dedupe_key, t.note, t.created_by, t.created_at, t.updated_at, t.reconcile_ignored
+    FROM public.finance_transactions t
+   WHERE p_media IS NOT NULL
+     AND ((t.bucket = 'direct_cost' AND t.media_type = p_media) OR t.bucket = 'common_expense');
+$sc$;
+REVOKE EXECUTE ON FUNCTION public.finance_txn_scoped(text,numeric) FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.finance_txn_scoped(text,numeric) TO service_role;
+
+DROP FUNCTION IF EXISTS public.finance_pnl_summary(date,date,text);
 CREATE OR REPLACE FUNCTION public.finance_pnl_summary(
-  p_from date DEFAULT NULL, p_to date DEFAULT NULL, p_segment text DEFAULT NULL
+  p_from date DEFAULT NULL, p_to date DEFAULT NULL, p_segment text DEFAULT NULL, p_media text DEFAULT NULL
 ) RETURNS jsonb
   LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public','pg_temp'
 AS $fn$
@@ -99,6 +120,8 @@ DECLARE
   v_qcost numeric;   -- Phase 510: Govt Auto Hood per-deal costing lines (quote_costs)
   v_tin numeric; v_tout numeric; v_bprofit numeric;
   v_out jsonb;
+  v_media text := NULLIF(p_media,'');   -- Phase 512: media filter (AUTO_HOOD / GSRTC_LED / LED_OTHER / OTHER_MEDIA)
+  v_f numeric := 1; itot_all numeric;   -- share of org-wide cost allocated to the media (1 = no media filter)
 BEGIN
   IF COALESCE(v_role,'') NOT IN ('admin','accounts') THEN
     IF v_gp THEN v_seg := 'GOVERNMENT'; ELSE RETURN '{}'::jsonb; END IF;
@@ -110,31 +133,38 @@ BEGIN
     COALESCE(SUM(amount) FILTER (WHERE segment = 'GOVERNMENT'),0),
     COALESCE(SUM(amount) FILTER (WHERE segment = 'PRIVATE'),0)
     INTO ig, ip
-    FROM public.finance_crm_income_rows(p_from, p_to, NULL);
+    FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, NULL) WHERE v_media IS NULL OR media_type=v_media) cr;
   IF v_seg='GOVERNMENT' THEN ip:=0; ELSIF v_seg='PRIVATE' THEN ig:=0; END IF;
   -- itot = FULL CRM income in range (same row set money_in scans, so Σ money_in
   -- still ties to total_in); ig/ip stay the Govt/Pvt split.
-  SELECT COALESCE(SUM(amount),0) INTO itot FROM public.finance_crm_income_rows(p_from, p_to, v_seg);
+  SELECT COALESCE(SUM(amount),0) INTO itot FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr;
+  -- Phase 512: under a media filter, org-wide COMMON expense is allocated by this media's income share
+  -- (same method the by-business-line table uses). Cash-only items (loans, tax, drawings, assets, sweep, review)
+  -- belong to no media and read 0.
+  IF v_media IS NOT NULL THEN
+    SELECT COALESCE(SUM(amount),0) INTO itot_all FROM public.finance_crm_income_rows(p_from, p_to, v_seg);
+    v_f := CASE WHEN itot_all > 0 THEN itot / itot_all ELSE 0 END;
+  END IF;
 
   SELECT COALESCE(SUM(amount) FILTER (WHERE segment='GOVERNMENT'),0),
          COALESCE(SUM(amount) FILTER (WHERE segment='PRIVATE'),0)
     INTO dg, dp
-    FROM public.finance_transactions
+    FROM public.finance_txn_scoped(v_media, v_f)
    WHERE bucket='direct_cost' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
      AND (v_seg IS NULL OR segment=v_seg);
   -- dtot = FULL direct cost in range (same row set money_out groups, so a NULL-segment
   -- direct_cost row can't overstate business_profit or break Σ money_out=total_out);
   -- dg/dp stay the Govt/Pvt split for by_segment/per_company.
-  SELECT COALESCE(SUM(amount),0) INTO dtot FROM public.finance_transactions
+  SELECT COALESCE(SUM(amount),0) INTO dtot FROM public.finance_txn_scoped(v_media, v_f)
    WHERE bucket='direct_cost' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
      AND (v_seg IS NULL OR segment=v_seg);
 
-  SELECT COALESCE(SUM(amount),0) INTO ctot FROM public.finance_transactions
+  SELECT COALESCE(SUM(amount),0) INTO ctot FROM public.finance_txn_scoped(v_media, v_f)
    WHERE bucket='common_expense' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to);
 
   -- commission = common_expense rows tagged head 'Commission' (real running cost, from the bank)
   SELECT COALESCE(SUM(ft.amount),0) INTO v_comm
-    FROM public.finance_transactions ft
+    FROM public.finance_txn_scoped(v_media, v_f) ft
     JOIN public.finance_expense_heads h ON h.id=ft.expense_head_id
    WHERE ft.bucket='common_expense' AND h.name='Commission'
      AND (p_from IS NULL OR ft.txn_date>=p_from) AND (p_to IS NULL OR ft.txn_date<=p_to);
@@ -151,6 +181,7 @@ BEGIN
     LEFT JOIN public.users u ON u.id = q.created_by
    WHERE q.segment = 'GOVERNMENT' AND q.status = 'won'
      AND COALESCE(p.commission_amount,0) > 0
+     AND (v_media IS NULL OR q.media_type = v_media)
      AND COALESCE(u.role,'') <> 'agency'
      AND p.approval_status = 'approved'
      AND (p_from IS NULL OR p.payment_date>=p_from) AND (p_to IS NULL OR p.payment_date<=p_to);
@@ -175,6 +206,7 @@ BEGIN
      AND COALESCE(u.role,'') = 'agency'
      AND p.approval_status = 'approved'
      AND (v_seg IS NULL OR q.segment = v_seg)
+     AND (v_media IS NULL OR q.media_type = v_media)
      AND (p_from IS NULL OR p.payment_date>=p_from) AND (p_to IS NULL OR p.payment_date<=p_to);
 
   -- Govt Auto Hood COSTING (owner 2026-10-26): cost lines typed on the proposal page
@@ -182,7 +214,7 @@ BEGIN
   -- its own Money-Out line. Govt-only, so 0 in a PRIVATE view. No bank double-count today
   -- (0 bank Auto Hood debits); if vendor debits are later tagged AUTO HOOD in the bank
   -- import they would count twice - tag them differently or skip the costing line.
-  SELECT COALESCE(SUM(amount),0) INTO v_qcost FROM public.finance_quote_cost_rows(p_from, p_to, v_seg);
+  SELECT COALESCE(SUM(amount),0) INTO v_qcost FROM (SELECT * FROM public.finance_quote_cost_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) qc;
 
   -- excluded-from-profit scalars for the cash view
   SELECT
@@ -195,7 +227,7 @@ BEGIN
     COALESCE(SUM(amount) FILTER (WHERE bucket='review' AND direction='out'),0),
     COALESCE(SUM(amount) FILTER (WHERE bucket='review' AND direction='in'),0)
     INTO v_loan_in, v_loan_out, v_draw, v_tax, v_sweep, v_asset, v_review_out, v_review_in
-    FROM public.finance_transactions
+    FROM public.finance_txn_scoped(v_media, v_f)
    WHERE (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to);
 
   -- COMMISSION MODEL (owner 2026-08-07): the commission COST = the two accruals
@@ -225,7 +257,7 @@ BEGIN
                       THEN (CASE WHEN segment='GOVERNMENT' THEN 'Govt' ELSE 'Pvt' END)||' · '||media_type
                       ELSE COALESCE(company,'Other income') END AS lbl,
                  amount AS amt
-            FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
+            FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
           UNION ALL SELECT 'Loan from friend', v_loan_in
           UNION ALL SELECT 'Unsorted credits (review)', v_review_in
         ) mi GROUP BY lbl
@@ -242,7 +274,7 @@ BEGIN
                                  WHEN 'OTHER_MEDIA' THEN 'Other Media' WHEN 'LED_OTHER' THEN 'Pvt LED'
                                  ELSE COALESCE(media_type,'Other direct cost') END AS lbl,
                  amount AS amt, true AS pnl
-            FROM public.finance_transactions
+            FROM public.finance_txn_scoped(v_media, v_f)
            WHERE bucket='direct_cost' AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
              AND (v_seg IS NULL OR segment=v_seg)
           UNION ALL SELECT 'Common expense',          ctot - v_comm, true
@@ -277,16 +309,16 @@ BEGIN
                SUM(inc) AS inc, SUM(dcost) AS dcost
         FROM (
           SELECT segment AS seg, media_type AS med, amount AS inc, 0::numeric AS dcost   -- CRM income
-            FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
+            FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
           UNION ALL
           SELECT segment AS seg, media_type AS med, 0::numeric AS inc, amount AS dcost   -- bank direct cost
-            FROM public.finance_transactions
+            FROM public.finance_txn_scoped(v_media, v_f)
            WHERE bucket='direct_cost'
              AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
              AND (v_seg IS NULL OR segment=v_seg)
           UNION ALL
           SELECT segment AS seg, media_type AS med, 0::numeric AS inc, amount AS dcost   -- Auto Hood costing lines (quote_costs, Phase 510)
-            FROM public.finance_quote_cost_rows(p_from, p_to, v_seg)
+            FROM (SELECT * FROM public.finance_quote_cost_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) qc
         ) u
         GROUP BY seg, med
       ) x), '[]'::jsonb),
@@ -305,16 +337,16 @@ BEGIN
                COALESCE(SUM(inc),0) AS inc, COALESCE(SUM(dcost),0) AS dcost
           FROM (
             SELECT company AS comp, amount AS inc, 0::numeric AS dcost   -- CRM income
-              FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
+              FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
             UNION ALL
             SELECT company AS comp, 0::numeric AS inc, amount AS dcost   -- bank direct cost
-              FROM public.finance_transactions
+              FROM public.finance_txn_scoped(v_media, v_f)
              WHERE bucket='direct_cost'
                AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
                AND (v_seg IS NULL OR segment=v_seg)
             UNION ALL
             SELECT company AS comp, 0::numeric AS inc, amount AS dcost   -- Auto Hood costing lines (Phase 510)
-              FROM public.finance_quote_cost_rows(p_from, p_to, v_seg)
+              FROM (SELECT * FROM public.finance_quote_cost_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) qc
           ) u GROUP BY 1
       ) pc), '[]'::jsonb),
     'revenue_mix', COALESCE((
@@ -325,27 +357,27 @@ BEGIN
                    THEN (CASE WHEN segment='GOVERNMENT' THEN 'Govt' ELSE 'Pvt' END)||' · '||media_type
                    ELSE COALESCE(company,'Other') END AS lbl,
               SUM(amount) amt
-              FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
+              FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
              GROUP BY 1) m), '[]'::jsonb),
     'monthly', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('month', mth, 'income', COALESCE(inc,0), 'cost', COALESCE(cst,0)) ORDER BY mth)
       FROM (SELECT to_char(m,'YYYY-MM') mth, SUM(inc) inc, SUM(cst) cst
               FROM (
                 SELECT txn_date AS m, amount AS inc, 0::numeric AS cst   -- CRM income
-                  FROM public.finance_crm_income_rows(p_from, p_to, v_seg)
+                  FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
                 UNION ALL
                 SELECT txn_date AS m, 0::numeric AS inc, amount AS cst   -- bank costs
-                  FROM public.finance_transactions
+                  FROM public.finance_txn_scoped(v_media, v_f)
                  WHERE bucket IN ('direct_cost','common_expense')
                    AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
                    AND (v_seg IS NULL OR segment=v_seg OR segment IS NULL)
                 UNION ALL
                 SELECT txn_date AS m, 0::numeric AS inc, amount AS cst   -- Auto Hood costing lines (Phase 510)
-                  FROM public.finance_quote_cost_rows(p_from, p_to, v_seg)
+                  FROM (SELECT * FROM public.finance_quote_cost_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) qc
               ) x GROUP BY 1) mm), '[]'::jsonb),
     'by_head', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('head', COALESCE(h.name,'Unclassified'), 'amount', s.amt) ORDER BY s.amt DESC)
-      FROM (SELECT expense_head_id, SUM(amount) amt FROM public.finance_transactions
+      FROM (SELECT expense_head_id, SUM(amount) amt FROM public.finance_txn_scoped(v_media, v_f)
              WHERE bucket IN ('direct_cost','common_expense')
                AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
                AND (v_seg IS NULL OR segment=v_seg OR (segment IS NULL AND bucket='common_expense'))
@@ -353,11 +385,11 @@ BEGIN
       LEFT JOIN public.finance_expense_heads h ON h.id=s.expense_head_id), '[]'::jsonb),
     'assets', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('date', txn_date, 'remark', description, 'type', bucket, 'amount', amount) ORDER BY txn_date DESC)
-      FROM public.finance_transactions
+      FROM public.finance_txn_scoped(v_media, v_f)
        WHERE bucket IN ('investment','asset')
          AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)), '[]'::jsonb),
     'excluded', COALESCE((SELECT jsonb_object_agg(bucket, amt) FROM (
-        SELECT bucket, SUM(amount) amt FROM public.finance_transactions
+        SELECT bucket, SUM(amount) amt FROM public.finance_txn_scoped(v_media, v_f)
          WHERE bucket IN ('internal_transfer','loan_in','loan_out','owner_drawings','investment','asset','tax')
            AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
          GROUP BY bucket) e), '{}'::jsonb),
@@ -374,7 +406,7 @@ BEGIN
                             WHEN company='Untitled Adflux Pvt Ltd' THEN 'Untitled Adflux Pvt Ltd'
                             ELSE 'Untitled Advertising' END AS cat,
                        amount AS inflow, 0::numeric AS outflow, 1 AS n
-                  FROM public.finance_crm_income_rows(p_from, p_to, v_seg)   -- §152: scope to the caller's segment
+                  FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr   -- §152: scope to the caller's segment
                 UNION ALL
                 -- everything EXCEPT income, from the bank ledger
                 SELECT CASE
@@ -393,18 +425,20 @@ BEGIN
                        CASE WHEN direction='in'  THEN amount ELSE 0 END AS inflow,
                        CASE WHEN direction='out' THEN amount ELSE 0 END AS outflow,
                        1 AS n
-                  FROM public.finance_transactions
+                  FROM public.finance_txn_scoped(v_media, v_f)
                  WHERE bucket <> 'income'
                    AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
                    AND (v_seg IS NULL OR segment=v_seg OR segment IS NULL)   -- §152: keep org-wide (null-seg) rows, drop other-segment
               ) u GROUP BY 1) t), '[]'::jsonb),
     'review', (SELECT jsonb_build_object('count', count(*), 'amount', COALESCE(SUM(amount),0))
-        FROM public.finance_transactions WHERE bucket='review'
+        FROM public.finance_txn_scoped(v_media, v_f) WHERE bucket='review'
           AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to))
   );
   RETURN v_out;
 END $fn$;
-GRANT EXECUTE ON FUNCTION public.finance_pnl_summary(date,date,text) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.finance_pnl_summary(date,date,text,text) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.finance_pnl_summary(date,date,text,text) TO authenticated, service_role;
+
 
 -- ---- Accounts Home (receivables from CRM quotes−payments; empty until CRM has data) --
 CREATE OR REPLACE FUNCTION public.finance_accounts_home()
