@@ -36,6 +36,7 @@ export default function FinanceRevSplit() {
   const [picked, setPicked] = useState(null)       // Set of quote ids; null = all
   const [vishal, setVishal] = useState(35)
   const [media, setMedia] = useState('all')
+  const [bank, setBank] = useState({})            // media -> bank direct cost (vendor / capital / lump sums)
 
   const load = useCallback(async () => {
     setLoading(true); setErr(false)
@@ -52,6 +53,11 @@ export default function FinanceRevSplit() {
         if (p.error || c.error || l.error) throw (p.error || c.error || l.error)
         pays.push(...(p.data || [])); costs.push(...(c.data || [])); lines.push(...(l.data || []))
       }
+      // direct costs paid from the bank per media (GSRTC capital investment + lump sums etc.); not tied to one deal
+      const { data: bk, error: bke } = await supabase.from('finance_transactions').select('media_type, amount')
+        .eq('direction', 'out').eq('bucket', 'direct_cost').in('media_type', ['AUTO_HOOD', 'GSRTC_LED']).limit(5000)
+      if (bke) throw bke
+      setBank((bk || []).reduce((m, r) => ((m[r.media_type] = (m[r.media_type] || 0) + (Number(r.amount) || 0)), m), {}))
       const creators = [...new Set(qs.map(q => q.created_by).filter(Boolean))]
       const { data: us } = creators.length ? await supabase.from('users').select('id, role, agency_commission_percent').in('id', creators) : { data: [] }
       const uMap = Object.fromEntries((us || []).map(u => [u.id, u]))
@@ -87,8 +93,12 @@ export default function FinanceRevSplit() {
   const sel = shown.filter(d => isOn(d.id))
   const sum = (k) => sel.reduce((s, d) => s + d[k], 0)
   const tot = { order: sum('order'), comm: sum('comm'), vendor: sum('vendor'), tds: sum('tds'), profit: sum('profit') }
+  const mediaOn = ['AUTO_HOOD', 'GSRTC_LED'].filter(m => sel.some(d => d.media === m))
+  const expLines = mediaOn.map(m => [m === 'AUTO_HOOD' ? 'Auto Hood bank expenses' : 'GSRTC LED bank expenses', bank[m] || 0])
+  const exp = expLines.reduce((s, l) => s + l[1], 0)
+  const net = tot.profit - exp
   const v = Math.min(100, Math.max(0, Number(vishal) || 0))
-  const vShare = tot.profit * v / 100, bShare = tot.profit - vShare
+  const vShare = net * v / 100, bShare = net - vShare
 
   async function exportXlsx() {
     const XLSX = await import('xlsx')
@@ -96,6 +106,8 @@ export default function FinanceRevSplit() {
     const rows = sel.map((d, i) => [i + 1, d.no, d.dept, d.media === 'AUTO_HOOD' ? 'Auto Hood' : 'GSRTC LED', d.qty, dmy(d.start), dmy(d.end), Math.round(d.order), Math.round(d.comm), Math.round(d.commPct * 10) / 10 + '%', Math.round(d.vendor), Math.round(d.tds), Math.round(d.profit), dmy(d.last), d.status])
     const ws = XLSX.utils.aoa_to_sheet([head, ...rows, [],
       ['', '', 'TOTAL', '', '', '', '', Math.round(tot.order), Math.round(tot.comm), '', Math.round(tot.vendor), Math.round(tot.tds), Math.round(tot.profit)],
+      ...expLines.map(l => ['', '', l[0], '', '', '', '', '', '', '', '', '', -Math.round(l[1])]),
+      ['', '', 'PROFIT AFTER EXPENSES', '', '', '', '', '', '', '', '', '', Math.round(net)],
       [], ['', '', 'VISHAL', v + '%', Math.round(vShare)], ['', '', 'BRIJESH', (100 - v) + '%', Math.round(bShare)]])
     ws['!cols'] = [6, 22, 40, 11, 10, 12, 12, 18, 14, 10, 14, 12, 14, 13, 10].map(w => ({ wch: w }))
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Rev split')
@@ -144,7 +156,7 @@ export default function FinanceRevSplit() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px,100%),1fr))', gap: 10 }}>
-        {[['Order value', tot.order, 'var(--text)'], ['Dept expense', tot.comm, 'var(--warning)'], ['Vendor', tot.vendor, 'var(--warning)'], ['TDS', tot.tds, 'var(--warning)'], ['Total profit', tot.profit, tot.profit >= 0 ? 'var(--success)' : 'var(--danger)']].map(([l, n, c]) => (
+        {[['Order value', tot.order, 'var(--text)'], ['Dept expense', tot.comm, 'var(--warning)'], ['Vendor', tot.vendor, 'var(--warning)'], ['TDS', tot.tds, 'var(--warning)'], ['Deals profit', tot.profit, tot.profit >= 0 ? 'var(--success)' : 'var(--danger)'], ...expLines.map(l => [l[0], l[1], 'var(--warning)']), ['Profit after expenses', net, net >= 0 ? 'var(--success)' : 'var(--danger)']].map(([l, n, c]) => (
           <div key={l} className="lead-card" style={{ padding: '12px 14px' }}>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: c, fontVariantNumeric: 'tabular-nums' }}>{money(n)}</div>
@@ -158,7 +170,7 @@ export default function FinanceRevSplit() {
         <div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Vishal gets</div><div style={{ fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--accent)' }}>{money(vShare)}</div></div>
         <div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Brijesh gets</div><div style={{ fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--accent)' }}>{money(bShare)}</div></div>
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-subtle)' }}>Profit = order value (ex-GST) − dept expense (commission) − vendor costing − TDS withheld, on payments received so far. Vendor lines come from the Costing card on each Auto Hood quote; GSRTC LED has none yet.</div>
+      <div style={{ fontSize: 12, color: 'var(--text-subtle)' }}>Profit = order value (ex-GST) − dept expense (commission) − vendor costing − TDS withheld, on payments received so far. Bank expenses = direct costs paid from the bank for that media (e.g. the GSRTC capital investment and lump sums), taken off once as a whole because they are not tied to one deal. Office / common expenses are not taken off.</div>
     </div>
   )
 }
