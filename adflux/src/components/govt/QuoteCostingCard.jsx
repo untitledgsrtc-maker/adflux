@@ -33,6 +33,7 @@ export default function QuoteCostingCard({ quote, canEdit }) {
   const [qty, setQty] = useState('')
   const [price, setPrice] = useState('')
   const [totalQty, setTotalQty] = useState(0)
+  const [pay, setPay] = useState({ comm: 0, tds: 0 })
   const [date, setDate] = useState(istTodayISO())
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -45,6 +46,13 @@ export default function QuoteCostingCard({ quote, canEdit }) {
     setLoadErr(!!error)
     // total rickshaws on the quote = what the vendors share between them
     const { data: lines } = await supabase.from('quote_cities').select('qty').eq('quote_id', quote.id)
+    // commission + TDS already recorded on approved payments of this deal (taken off the margin)
+    const { data: pays } = await supabase.from('payments').select('commission_amount, tds_amount')
+      .eq('quote_id', quote.id).eq('approval_status', 'approved')
+    setPay({
+      comm: (pays || []).reduce((s, p) => s + (Number(p.commission_amount) || 0), 0),
+      tds: (pays || []).reduce((s, p) => s + (Number(p.tds_amount) || 0), 0),
+    })
     setTotalQty((lines || []).reduce((s, l) => s + (Number(l.qty) || 0), 0))
     if (!error) setRows(data || [])
     setLoading(false)
@@ -58,7 +66,7 @@ export default function QuoteCostingCard({ quote, canEdit }) {
   const lineAmount = (Number(qty) || 0) * (Number(price) || 0)
   const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0)
   const value = Number(quote?.subtotal) || 0
-  const margin = value - total
+  const margin = value - total - pay.comm - pay.tds
   const pct = value > 0 ? Math.round((margin / value) * 1000) / 10 : null
 
   async function add() {
@@ -103,7 +111,9 @@ export default function QuoteCostingCard({ quote, canEdit }) {
         {[
           ['Quote value (ex-GST)', formatCurrency(value), 'var(--text)'],
           ['Total cost', formatCurrency(total), 'var(--warning)'],
-          ['Margin', `${formatCurrency(margin)}${pct !== null ? ` · ${pct}%` : ''}`, margin >= 0 ? 'var(--success)' : 'var(--danger)'],
+          ['Commission', formatCurrency(pay.comm), 'var(--warning)'],
+          ['TDS withheld', formatCurrency(pay.tds), 'var(--warning)'],
+          ['Margin (after cost, commission, TDS)', `${formatCurrency(margin)}${pct !== null ? ` · ${pct}%` : ''}`, margin >= 0 ? 'var(--success)' : 'var(--danger)'],
         ].map(([l, v, c]) => (
           <div key={l} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 12px' }}>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
