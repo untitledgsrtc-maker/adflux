@@ -47,10 +47,21 @@ export default function QuoteCostingCard({ quote, canEdit }) {
     // total rickshaws on the quote = what the vendors share between them
     const { data: lines } = await supabase.from('quote_cities').select('qty').eq('quote_id', quote.id)
     // commission + TDS already recorded on approved payments of this deal (taken off the margin)
-    const { data: pays } = await supabase.from('payments').select('commission_amount, tds_amount')
+    const { data: pays } = await supabase.from('payments').select('commission_amount, tds_amount, amount_received')
       .eq('quote_id', quote.id).eq('approval_status', 'approved')
+    // agency-made deal: commission = share of each approved payment x subtotal x the agency user's % (default 5),
+    // the same rule the Finance P&L uses (finance_pnl_summary). Team deals use the % typed on the payment.
+    let agencyComm = 0
+    if (quote.created_by) {
+      const { data: cu } = await supabase.from('users').select('role, agency_commission_percent').eq('id', quote.created_by).maybeSingle()
+      if (cu?.role === 'agency' && Number(quote.total_amount) > 0) {
+        const pct = cu.agency_commission_percent ?? 5
+        agencyComm = (pays || []).reduce((s, p) =>
+          s + (Number(p.amount_received) / Number(quote.total_amount)) * (Number(quote.subtotal) || 0) * pct / 100, 0)
+      }
+    }
     setPay({
-      comm: (pays || []).reduce((s, p) => s + (Number(p.commission_amount) || 0), 0),
+      comm: agencyComm || (pays || []).reduce((s, p) => s + (Number(p.commission_amount) || 0), 0),
       tds: (pays || []).reduce((s, p) => s + (Number(p.tds_amount) || 0), 0),
     })
     setTotalQty((lines || []).reduce((s, l) => s + (Number(l.qty) || 0), 0))
