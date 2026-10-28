@@ -21974,3 +21974,5 @@ Follow-up (28-10-2026): owner said GSRTC expense / commission were not being rem
 Follow-up (28-10-2026): Rev split gets a payment filter (Any payment / Paid only / Part paid / Not paid) next to the media pills; Tick all and the totals follow it.
 
 Follow-up (28-10-2026): Rev split also lists won PRIVATE LED (LED_OTHER) deals, with a Pvt LED pill and a Pvt LED bank-expenses line. Private deals carry no TDS; commission only via the agency formula (no govt commission on private). Other Media still not included.
+
+Follow-up (28-10-2026): Rev split has a 'Deduct common expense' tick (default on). Common (office) expense = the P&L's common_expense total (Rs 28.8 lakh today) x the share of collected income (ex-GST) the ticked deals brought in, same allocation rule as the P&L. Known: that P&L total still includes bank commission settlements, so a little commission can count twice with the per-deal commission column.

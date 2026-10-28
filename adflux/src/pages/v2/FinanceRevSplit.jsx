@@ -38,6 +38,8 @@ export default function FinanceRevSplit() {
   const [vishal, setVishal] = useState(35)
   const [media, setMedia] = useState('all')
   const [pay, setPay] = useState('all')          // all | Paid | Part paid | Not paid
+  const [common, setCommon] = useState({ cost: 0, income: 0 })   // org-wide office expense + total collected income (from the P&L)
+  const [useCommon, setUseCommon] = useState(true)
   const [bank, setBank] = useState({})            // media -> bank direct cost (vendor / capital / lump sums)
 
   const load = useCallback(async () => {
@@ -60,6 +62,8 @@ export default function FinanceRevSplit() {
         .eq('direction', 'out').eq('bucket', 'direct_cost').in('media_type', ['AUTO_HOOD', 'GSRTC_LED', 'LED_OTHER']).limit(5000)
       if (bke) throw bke
       setBank((bk || []).reduce((m, r) => ((m[r.media_type] = (m[r.media_type] || 0) + (Number(r.amount) || 0)), m), {}))
+      const { data: pl } = await supabase.rpc('finance_pnl_summary', { p_from: null, p_to: null, p_segment: null, p_media: null })
+      setCommon({ cost: Number(pl?.common_expense) || 0, income: Number(pl?.income) || 0 })
       const creators = [...new Set(qs.map(q => q.created_by).filter(Boolean))]
       const { data: us } = creators.length ? await supabase.from('users').select('id, role, agency_commission_percent').in('id', creators) : { data: [] }
       const uMap = Object.fromEntries((us || []).map(u => [u.id, u]))
@@ -79,6 +83,7 @@ export default function FinanceRevSplit() {
         const last = pp.map(r => r.payment_date).filter(Boolean).sort().pop() || ''
         const status = !pp.length ? 'Not paid' : received >= Number(q.total_amount) * 0.999 ? 'Paid' : 'Part paid'
         return {
+          inc: Number(q.total_amount) > 0 ? received * order / Number(q.total_amount) : 0,
           id: q.id, no: q.quote_number, dept: q.client_company || q.client_name || '—', media: q.media_type,
           qty: (L[q.id] || []).reduce((s, r) => s + (Number(r.qty) || 0), 0), start: q.campaign_start_date, end: q.campaign_end_date,
           order, comm, commPct: order > 0 ? (comm / order) * 100 : 0, vendor, tds, profit: order - comm - vendor - tds, last, status,
@@ -98,7 +103,9 @@ export default function FinanceRevSplit() {
   const mediaOn = ['AUTO_HOOD', 'GSRTC_LED', 'LED_OTHER'].filter(m => sel.some(d => d.media === m))
   const expLines = mediaOn.map(m => [(MEDIA_LBL[m]) + ' bank expenses', bank[m] || 0])
   const exp = expLines.reduce((s, l) => s + l[1], 0)
-  const net = tot.profit - exp
+  const incSel = sel.reduce((s, d) => s + d.inc, 0)
+  const commonShare = useCommon && common.income > 0 ? common.cost * Math.min(1, incSel / common.income) : 0
+  const net = tot.profit - exp - commonShare
   const v = Math.min(100, Math.max(0, Number(vishal) || 0))
   const vShare = net * v / 100, bShare = net - vShare
 
@@ -109,6 +116,7 @@ export default function FinanceRevSplit() {
     const ws = XLSX.utils.aoa_to_sheet([head, ...rows, [],
       ['', '', 'TOTAL', '', '', '', '', Math.round(tot.order), Math.round(tot.comm), '', Math.round(tot.vendor), Math.round(tot.tds), Math.round(tot.profit)],
       ...expLines.map(l => ['', '', l[0], '', '', '', '', '', '', '', '', '', -Math.round(l[1])]),
+      ...(commonShare ? [['', '', 'Common expense share', '', '', '', '', '', '', '', '', '', -Math.round(commonShare)]] : []),
       ['', '', 'PROFIT AFTER EXPENSES', '', '', '', '', '', '', '', '', '', Math.round(net)],
       [], ['', '', 'VISHAL', v + '%', Math.round(vShare)], ['', '', 'BRIJESH', (100 - v) + '%', Math.round(bShare)]])
     ws['!cols'] = [6, 22, 40, 11, 10, 12, 12, 18, 14, 10, 14, 12, 14, 13, 10].map(w => ({ wch: w }))
@@ -129,6 +137,7 @@ export default function FinanceRevSplit() {
         <span style={{ width: 1, height: 24, background: 'var(--border)' }} />
         {[['all', 'Any payment'], ['Paid', 'Paid only'], ['Part paid', 'Part paid'], ['Not paid', 'Not paid']].map(([k, l]) => <button key={k} type="button" style={chip(pay === k)} onClick={() => setPay(k)}>{l}</button>)}
         <span style={{ flex: 1 }} />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}><input type="checkbox" checked={useCommon} onChange={e => setUseCommon(e.target.checked)} /> Deduct common expense</label>
         <button type="button" className="lead-btn lead-btn-sm" onClick={() => setPicked(new Set(shown.map(d => d.id)))}>Tick all</button>
         <button type="button" className="lead-btn lead-btn-sm" onClick={() => setPicked(new Set())}>Untick all</button>
         <button type="button" className="lead-btn lead-btn-sm" onClick={load}><RefreshCw size={14} /> Refresh</button>
@@ -160,7 +169,7 @@ export default function FinanceRevSplit() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px,100%),1fr))', gap: 10 }}>
-        {[['Order value', tot.order, 'var(--text)'], ['Dept expense', tot.comm, 'var(--warning)'], ['Vendor', tot.vendor, 'var(--warning)'], ['TDS', tot.tds, 'var(--warning)'], ['Deals profit', tot.profit, tot.profit >= 0 ? 'var(--success)' : 'var(--danger)'], ...expLines.map(l => [l[0], l[1], 'var(--warning)']), ['Profit after expenses', net, net >= 0 ? 'var(--success)' : 'var(--danger)']].map(([l, n, c]) => (
+        {[['Order value', tot.order, 'var(--text)'], ['Dept expense', tot.comm, 'var(--warning)'], ['Vendor', tot.vendor, 'var(--warning)'], ['TDS', tot.tds, 'var(--warning)'], ['Deals profit', tot.profit, tot.profit >= 0 ? 'var(--success)' : 'var(--danger)'], ...expLines.map(l => [l[0], l[1], 'var(--warning)']), ...(useCommon ? [['Common expense share', commonShare, 'var(--warning)']] : []), ['Profit after expenses', net, net >= 0 ? 'var(--success)' : 'var(--danger)']].map(([l, n, c]) => (
           <div key={l} className="lead-card" style={{ padding: '12px 14px' }}>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: c, fontVariantNumeric: 'tabular-nums' }}>{money(n)}</div>
@@ -174,7 +183,7 @@ export default function FinanceRevSplit() {
         <div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Vishal gets</div><div style={{ fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--accent)' }}>{money(vShare)}</div></div>
         <div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Brijesh gets</div><div style={{ fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--accent)' }}>{money(bShare)}</div></div>
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-subtle)' }}>Profit = order value (ex-GST) − dept expense (commission) − vendor costing − TDS withheld, on payments received so far. Bank expenses = direct costs paid from the bank for that media (e.g. the GSRTC capital investment and lump sums), taken off once as a whole because they are not tied to one deal. Office / common expenses are not taken off.</div>
+      <div style={{ fontSize: 12, color: 'var(--text-subtle)' }}>Profit = order value (ex-GST) − dept expense (commission) − vendor costing − TDS withheld, on payments received so far. Bank expenses = direct costs paid from the bank for that media (e.g. the GSRTC capital investment and lump sums), taken off once as a whole because they are not tied to one deal. Common (office) expense is the P&L's total, taken in the share of income these deals brought in.</div>
     </div>
   )
 }
