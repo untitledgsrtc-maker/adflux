@@ -24,6 +24,7 @@ import { usePayments } from '../../hooks/usePayments'
 import { PaymentModal } from '../../components/payments/PaymentModal'
 import { PaymentHistory } from '../../components/payments/PaymentHistory'
 import { PaymentSummary } from '../../components/payments/PaymentSummary'
+import QuoteCostingCard from '../../components/govt/QuoteCostingCard'
 import { WonPaymentModal } from '../../components/payments/WonPaymentModal'
 import { FollowUpList } from '../../components/followups/FollowUpList'
 import { openWhatsApp, shortenUrl } from '../../utils/whatsapp'
@@ -2134,6 +2135,11 @@ export default function GovtProposalDetailV2() {
           </div>
         )}
       </div>
+
+      {/* Phase 510 - Auto Hood costing: admin + accounts edit, a government partner reads. Deducts in Finance. */}
+      {quote.media_type === 'AUTO_HOOD' && (isAdmin || profile?.role === 'accounts' || profile?.team_role === 'government_partner') && (
+        <QuoteCostingCard quote={quote} canEdit={isAdmin || profile?.role === 'accounts'} />
+      )}
 
       {/* Add Payment modal */}
       {showPaymentModal && (

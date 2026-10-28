@@ -96,6 +96,7 @@ DECLARE
   v_loan_in numeric; v_loan_out numeric; v_draw numeric; v_tax numeric;
   v_sweep numeric; v_asset numeric; v_comm numeric; v_review_out numeric; v_review_in numeric;
   v_govt_comm numeric; v_agency_comm numeric;
+  v_qcost numeric;   -- Phase 510: Govt Auto Hood per-deal costing lines (quote_costs)
   v_tin numeric; v_tout numeric; v_bprofit numeric;
   v_out jsonb;
 BEGIN
@@ -176,6 +177,13 @@ BEGIN
      AND (v_seg IS NULL OR q.segment = v_seg)
      AND (p_from IS NULL OR p.payment_date>=p_from) AND (p_to IS NULL OR p.payment_date<=p_to);
 
+  -- Govt Auto Hood COSTING (owner 2026-10-26): cost lines typed on the proposal page
+  -- (quote_costs). A real running cost of that deal; reduces Business Profit and shows as
+  -- its own Money-Out line. Govt-only, so 0 in a PRIVATE view. No bank double-count today
+  -- (0 bank Auto Hood debits); if vendor debits are later tagged AUTO HOOD in the bank
+  -- import they would count twice - tag them differently or skip the costing line.
+  SELECT COALESCE(SUM(amount),0) INTO v_qcost FROM public.finance_quote_cost_rows(p_from, p_to, v_seg);
+
   -- excluded-from-profit scalars for the cash view
   SELECT
     COALESCE(SUM(amount) FILTER (WHERE bucket='loan_in'),0),
@@ -196,9 +204,9 @@ BEGIN
   -- cost — netted out of Business Profit (add v_comm back) and out of cash-out
   -- (drop it from v_tout), leaving the accruals as the commission figure
   -- everywhere. No double-count, no manual guard.
-  v_bprofit := itot - dtot - ctot + v_comm - v_govt_comm - v_agency_comm;  -- revenue − running costs (bank commission = settlement, added back; both accruals are the cost)
+  v_bprofit := itot - dtot - ctot + v_comm - v_govt_comm - v_agency_comm - v_qcost;  -- revenue − running costs (bank commission = settlement, added back; both accruals are the cost)
   v_tin     := itot + v_loan_in + v_review_in;                       -- cash IN  (revenue + borrowed + unsorted credits)
-  v_tout    := dtot + (ctot - v_comm) + v_govt_comm + v_agency_comm + v_asset + v_loan_out + v_draw + v_tax + v_review_out;  -- cash OUT (bank commission netted; accruals stand in; SWEEP excluded)
+  v_tout    := dtot + (ctot - v_comm) + v_govt_comm + v_agency_comm + v_qcost + v_asset + v_loan_out + v_draw + v_tax + v_review_out;  -- cash OUT (bank commission netted; accruals stand in; SWEEP excluded)
 
   v_out := jsonb_build_object(
     'income', itot, 'income_gov', ig, 'income_pvt', ip,
@@ -208,7 +216,7 @@ BEGIN
     'margin_pct', CASE WHEN itot>0 THEN round(v_bprofit/itot*100,1) ELSE 0 END,
     -- ---- CASH VIEW (owner spec §168): money in / out / net cash + commission + sweep ----
     'total_in', v_tin, 'total_out', v_tout, 'net_cash', v_tin - v_tout,
-    'commission', v_govt_comm + v_agency_comm, 'commission_govt', v_govt_comm, 'commission_agency', v_agency_comm, 'sweep', v_sweep,
+    'commission', v_govt_comm + v_agency_comm, 'commission_govt', v_govt_comm, 'commission_agency', v_agency_comm, 'sweep', v_sweep, 'quote_costing', v_qcost,
     'money_in', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('label', lbl, 'amount', amt) ORDER BY amt DESC)
       FROM (
@@ -240,6 +248,7 @@ BEGIN
           UNION ALL SELECT 'Common expense',          ctot - v_comm, true
           UNION ALL SELECT 'Commission — govt team',  v_govt_comm,   true
           UNION ALL SELECT 'Commission — agency',     v_agency_comm, true
+          UNION ALL SELECT 'Auto Hood costing',       v_qcost,       true
           UNION ALL SELECT 'Assets / equipment',      v_asset,       false
           UNION ALL SELECT 'Loan repaid',             v_loan_out,    false
           UNION ALL SELECT 'Personal',                v_draw,        false
@@ -275,6 +284,9 @@ BEGIN
            WHERE bucket='direct_cost'
              AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
              AND (v_seg IS NULL OR segment=v_seg)
+          UNION ALL
+          SELECT segment AS seg, media_type AS med, 0::numeric AS inc, amount AS dcost   -- Auto Hood costing lines (quote_costs, Phase 510)
+            FROM public.finance_quote_cost_rows(p_from, p_to, v_seg)
         ) u
         GROUP BY seg, med
       ) x), '[]'::jsonb),
@@ -300,6 +312,9 @@ BEGIN
              WHERE bucket='direct_cost'
                AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
                AND (v_seg IS NULL OR segment=v_seg)
+            UNION ALL
+            SELECT company AS comp, 0::numeric AS inc, amount AS dcost   -- Auto Hood costing lines (Phase 510)
+              FROM public.finance_quote_cost_rows(p_from, p_to, v_seg)
           ) u GROUP BY 1
       ) pc), '[]'::jsonb),
     'revenue_mix', COALESCE((
@@ -324,6 +339,9 @@ BEGIN
                  WHERE bucket IN ('direct_cost','common_expense')
                    AND (p_from IS NULL OR txn_date>=p_from) AND (p_to IS NULL OR txn_date<=p_to)
                    AND (v_seg IS NULL OR segment=v_seg OR segment IS NULL)
+                UNION ALL
+                SELECT txn_date AS m, 0::numeric AS inc, amount AS cst   -- Auto Hood costing lines (Phase 510)
+                  FROM public.finance_quote_cost_rows(p_from, p_to, v_seg)
               ) x GROUP BY 1) mm), '[]'::jsonb),
     'by_head', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('head', COALESCE(h.name,'Unclassified'), 'amount', s.amt) ORDER BY s.amt DESC)
