@@ -36,6 +36,7 @@ export default function FinanceRevSplit() {
   const [picked, setPicked] = useState(null)       // Set of quote ids; null = all
   const [vishal, setVishal] = useState(35)
   const [media, setMedia] = useState('all')
+  const [pay, setPay] = useState('all')          // all | Paid | Part paid | Not paid
   const [bank, setBank] = useState({})            // media -> bank direct cost (vendor / capital / lump sums)
 
   const load = useCallback(async () => {
@@ -87,7 +88,7 @@ export default function FinanceRevSplit() {
   }, [])
   useEffect(() => { load() }, [load])
 
-  const shown = useMemo(() => deals.filter(d => media === 'all' || d.media === media), [deals, media])
+  const shown = useMemo(() => deals.filter(d => (media === 'all' || d.media === media) && (pay === 'all' || d.status === pay)), [deals, media, pay])
   const isOn = (id) => (picked ? picked.has(id) : true)
   const toggle = (id) => setPicked(prev => { const s = new Set(prev || deals.map(d => d.id)); s.has(id) ? s.delete(id) : s.add(id); return s })
   const sel = shown.filter(d => isOn(d.id))
@@ -124,6 +125,8 @@ export default function FinanceRevSplit() {
     <div style={{ display: 'grid', gap: 14 }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         {[['all', 'All Government'], ['AUTO_HOOD', 'Auto Hood'], ['GSRTC_LED', 'GSRTC LED']].map(([k, l]) => <button key={k} type="button" style={chip(media === k)} onClick={() => setMedia(k)}>{l}</button>)}
+        <span style={{ width: 1, height: 24, background: 'var(--border)' }} />
+        {[['all', 'Any payment'], ['Paid', 'Paid only'], ['Part paid', 'Part paid'], ['Not paid', 'Not paid']].map(([k, l]) => <button key={k} type="button" style={chip(pay === k)} onClick={() => setPay(k)}>{l}</button>)}
         <span style={{ flex: 1 }} />
         <button type="button" className="lead-btn lead-btn-sm" onClick={() => setPicked(new Set(shown.map(d => d.id)))}>Tick all</button>
         <button type="button" className="lead-btn lead-btn-sm" onClick={() => setPicked(new Set())}>Untick all</button>
