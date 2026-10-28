@@ -30,7 +30,9 @@ export default function QuoteCostingCard({ quote, canEdit }) {
   const [kind, setKind] = useState('vendor')
   const [vendor, setVendor] = useState('')
   const [note, setNote] = useState('')
-  const [amount, setAmount] = useState('')
+  const [qty, setQty] = useState('')
+  const [price, setPrice] = useState('')
+  const [totalQty, setTotalQty] = useState(0)
   const [date, setDate] = useState(istTodayISO())
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -41,11 +43,19 @@ export default function QuoteCostingCard({ quote, canEdit }) {
     const { data, error } = await supabase.from('quote_costs').select('*')
       .eq('quote_id', quote.id).order('cost_date', { ascending: true }).order('created_at', { ascending: true })
     setLoadErr(!!error)
+    // total rickshaws on the quote = what the vendors share between them
+    const { data: lines } = await supabase.from('quote_cities').select('qty').eq('quote_id', quote.id)
+    setTotalQty((lines || []).reduce((s, l) => s + (Number(l.qty) || 0), 0))
     if (!error) setRows(data || [])
     setLoading(false)
   }, [quote?.id])
   useEffect(() => { load() }, [load])
 
+  const CAPPED = ['vendor', 'printing', 'installation']
+  const usedQty = rows.filter(r => r.kind === kind).reduce((s, r) => s + (Number(r.qty) || 0), 0)
+  const capped = CAPPED.includes(kind) && totalQty > 0
+  const remaining = capped ? Math.max(0, totalQty - usedQty) : null
+  const lineAmount = (Number(qty) || 0) * (Number(price) || 0)
   const total = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0)
   const value = Number(quote?.subtotal) || 0
   const margin = value - total
@@ -53,16 +63,17 @@ export default function QuoteCostingCard({ quote, canEdit }) {
 
   async function add() {
     if (savingRef.current) return
-    const amt = Number(amount)
-    if (!(amt > 0)) { toastError(null, 'Type an amount above 0.'); return }
+    const q = Number(qty), pr = Number(price)
+    if (!(q > 0) || !(pr > 0)) { toastError(null, 'Type the quantity and the price per piece.'); return }
+    if (capped && q > remaining) { toastError(null, `Only ${remaining} of ${totalQty} are left for ${kindLabel(kind)}. Lower the quantity.`); return }
     savingRef.current = true; setSaving(true)
     const { error } = await supabase.from('quote_costs').insert({
       quote_id: quote.id, kind, vendor: vendor.trim() || null, note: note.trim() || null,
-      amount: amt, cost_date: date || istTodayISO(),
+      qty: q, unit_price: pr, amount: Math.round(q * pr * 100) / 100, cost_date: date || istTodayISO(),
     })
     savingRef.current = false; setSaving(false)
     if (error) { toastError(error, 'Could not save the cost.'); return }
-    setVendor(''); setNote(''); setAmount('')
+    setVendor(''); setNote(''); setQty(''); setPrice('')
     toastSuccess('Cost added. It now reduces Business Profit in Finance.')
     load()
   }
@@ -114,7 +125,7 @@ export default function QuoteCostingCard({ quote, canEdit }) {
           {rows.map(r => (
             <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid var(--border)' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, color: 'var(--text)' }}>{kindLabel(r.kind)}{r.vendor ? ` - ${r.vendor}` : ''}</div>
+                <div style={{ fontSize: 14, color: 'var(--text)' }}>{kindLabel(r.kind)}{r.vendor ? ` - ${r.vendor}` : ''}{r.unit_price ? ` · ${Number(r.qty)} × ${formatCurrency(r.unit_price)}` : ''}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                   {r.cost_date ? `${r.cost_date.slice(8, 10)}/${r.cost_date.slice(5, 7)}/${r.cost_date.slice(0, 4)}` : ''}{r.note ? ` · ${r.note}` : ''}
                 </div>
@@ -136,9 +147,15 @@ export default function QuoteCostingCard({ quote, canEdit }) {
             {KINDS.map(k => <option key={k.key} value={k.key}>{k.label}</option>)}
           </select>
           <input value={vendor} onChange={e => setVendor(e.target.value)} placeholder="Vendor name (optional)" style={box} />
-          <input value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="Amount (Rs)" style={box} />
+          <input value={qty} onChange={e => setQty(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal"
+            placeholder={capped ? `Qty (max ${remaining})` : 'Qty'} style={box} aria-label="Quantity" />
+          <input value={price} onChange={e => setPrice(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal" placeholder="Price per piece (Rs)" style={box} aria-label="Price per piece" />
           <DateField value={date} onChange={e => setDate(e.target.value)} style={{ ...box, display: 'block' }} className="" />
           <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optional)" style={{ ...box, gridColumn: '1 / -1' }} />
+          <div style={{ gridColumn: '1 / -1', fontSize: 13, color: 'var(--text-muted)' }}>
+            {capped && <>{kindLabel(kind)} so far: {usedQty} of {totalQty} · <b style={{ color: remaining === 0 ? 'var(--danger)' : 'var(--text)' }}>{remaining} left</b>. </>}
+            {lineAmount > 0 && <>This line = {qty} × {formatCurrency(Number(price))} = <b style={{ color: 'var(--text)' }}>{formatCurrency(lineAmount)}</b></>}
+          </div>
           <button type="button" className="lead-btn lead-btn-primary" onClick={add} disabled={saving} style={{ minHeight: 44, gridColumn: '1 / -1' }}>
             <Plus size={14} /> {saving ? 'Saving...' : 'Add cost'}
           </button>
