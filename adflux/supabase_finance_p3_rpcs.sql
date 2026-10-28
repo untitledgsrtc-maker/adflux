@@ -79,6 +79,33 @@ $crm$;
 REVOKE EXECUTE ON FUNCTION public.finance_crm_income_rows(date,date,text) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.finance_crm_income_rows(date,date,text) TO service_role;
 
+-- Phase 513 - OLD (pre-CRM) payments. A bank credit received before the CRM was used has no payment row, so the
+-- CRM income source never sees it. The accountant ticks such a Register income row 'Old payment (before CRM)';
+-- finance_pnl_summary then counts it as revenue AS TYPED (no GST strip - the accountant enters it ex-GST).
+-- finance_crm_income_rows itself is untouched, so Reconcile (CRM receipts) is unaffected.
+ALTER TABLE public.finance_transactions ADD COLUMN IF NOT EXISTS counts_as_revenue boolean NOT NULL DEFAULT false;
+
+CREATE OR REPLACE FUNCTION public.finance_income_rows(
+  p_from date DEFAULT NULL, p_to date DEFAULT NULL, p_seg text DEFAULT NULL
+) RETURNS TABLE(segment text, media_type text, company text, amount numeric, txn_date date)
+  LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public','pg_temp'
+AS $ir$
+  SELECT c.segment, c.media_type, c.company, c.amount, c.txn_date
+    FROM public.finance_crm_income_rows(p_from, p_to, p_seg) c
+  UNION ALL
+  SELECT t.segment, t.media_type,
+         COALESCE(t.company, CASE t.segment WHEN 'GOVERNMENT' THEN 'Untitled Advertising'
+                                            WHEN 'PRIVATE' THEN 'Untitled Adflux Pvt Ltd' END),
+         t.amount, t.txn_date
+    FROM public.finance_transactions t
+   WHERE t.bucket = 'income' AND t.direction = 'in' AND t.counts_as_revenue
+     AND (p_from IS NULL OR t.txn_date >= p_from)
+     AND (p_to   IS NULL OR t.txn_date <= p_to)
+     AND (p_seg  IS NULL OR t.segment = p_seg);
+$ir$;
+REVOKE EXECUTE ON FUNCTION public.finance_income_rows(date,date,text) FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.finance_income_rows(date,date,text) TO service_role;
+
 -- Phase 512 - internal row source for finance_pnl_summary. No media filter: the table unchanged.
 -- With a media filter: only that media's direct-cost rows + ALL common-expense rows scaled by p_f (the media's income
 -- share); every other bucket (loans, tax, drawings, assets, sweep, review, income) is dropped.
@@ -91,7 +118,7 @@ AS $sc$
   SELECT t.id, t.bank_account_id, t.txn_date, t.ref_no, t.description,
          CASE WHEN t.bucket = 'common_expense' THEN round(t.amount * COALESCE(p_f,0), 2) ELSE t.amount END,
          t.direction, t.bucket, t.company, t.segment, t.media_type, t.expense_head_id, t.matched_payment_id,
-         t.raw_tag, t.source, t.import_batch_id, t.dedupe_key, t.note, t.created_by, t.created_at, t.updated_at, t.reconcile_ignored
+         t.raw_tag, t.source, t.import_batch_id, t.dedupe_key, t.note, t.created_by, t.created_at, t.updated_at, t.reconcile_ignored, t.counts_as_revenue
     FROM public.finance_transactions t
    WHERE p_media IS NOT NULL
      AND ((t.bucket = 'direct_cost' AND t.media_type = p_media) OR t.bucket = 'common_expense');
@@ -133,16 +160,16 @@ BEGIN
     COALESCE(SUM(amount) FILTER (WHERE segment = 'GOVERNMENT'),0),
     COALESCE(SUM(amount) FILTER (WHERE segment = 'PRIVATE'),0)
     INTO ig, ip
-    FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, NULL) WHERE v_media IS NULL OR media_type=v_media) cr;
+    FROM (SELECT * FROM public.finance_income_rows(p_from, p_to, NULL) WHERE v_media IS NULL OR media_type=v_media) cr;
   IF v_seg='GOVERNMENT' THEN ip:=0; ELSIF v_seg='PRIVATE' THEN ig:=0; END IF;
   -- itot = FULL CRM income in range (same row set money_in scans, so Σ money_in
   -- still ties to total_in); ig/ip stay the Govt/Pvt split.
-  SELECT COALESCE(SUM(amount),0) INTO itot FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr;
+  SELECT COALESCE(SUM(amount),0) INTO itot FROM (SELECT * FROM public.finance_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr;
   -- Phase 512: under a media filter, org-wide COMMON expense is allocated by this media's income share
   -- (same method the by-business-line table uses). Cash-only items (loans, tax, drawings, assets, sweep, review)
   -- belong to no media and read 0.
   IF v_media IS NOT NULL THEN
-    SELECT COALESCE(SUM(amount),0) INTO itot_all FROM public.finance_crm_income_rows(p_from, p_to, v_seg);
+    SELECT COALESCE(SUM(amount),0) INTO itot_all FROM public.finance_income_rows(p_from, p_to, v_seg);
     v_f := CASE WHEN itot_all > 0 THEN itot / itot_all ELSE 0 END;
   END IF;
 
@@ -257,7 +284,7 @@ BEGIN
                       THEN (CASE WHEN segment='GOVERNMENT' THEN 'Govt' ELSE 'Pvt' END)||' · '||media_type
                       ELSE COALESCE(company,'Other income') END AS lbl,
                  amount AS amt
-            FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
+            FROM (SELECT * FROM public.finance_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
           UNION ALL SELECT 'Loan from friend', v_loan_in
           UNION ALL SELECT 'Unsorted credits (review)', v_review_in
         ) mi GROUP BY lbl
@@ -309,7 +336,7 @@ BEGIN
                SUM(inc) AS inc, SUM(dcost) AS dcost
         FROM (
           SELECT segment AS seg, media_type AS med, amount AS inc, 0::numeric AS dcost   -- CRM income
-            FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
+            FROM (SELECT * FROM public.finance_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
           UNION ALL
           SELECT segment AS seg, media_type AS med, 0::numeric AS inc, amount AS dcost   -- bank direct cost
             FROM public.finance_txn_scoped(v_media, v_f)
@@ -337,7 +364,7 @@ BEGIN
                COALESCE(SUM(inc),0) AS inc, COALESCE(SUM(dcost),0) AS dcost
           FROM (
             SELECT company AS comp, amount AS inc, 0::numeric AS dcost   -- CRM income
-              FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
+              FROM (SELECT * FROM public.finance_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
             UNION ALL
             SELECT company AS comp, 0::numeric AS inc, amount AS dcost   -- bank direct cost
               FROM public.finance_txn_scoped(v_media, v_f)
@@ -357,14 +384,14 @@ BEGIN
                    THEN (CASE WHEN segment='GOVERNMENT' THEN 'Govt' ELSE 'Pvt' END)||' · '||media_type
                    ELSE COALESCE(company,'Other') END AS lbl,
               SUM(amount) amt
-              FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
+              FROM (SELECT * FROM public.finance_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
              GROUP BY 1) m), '[]'::jsonb),
     'monthly', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('month', mth, 'income', COALESCE(inc,0), 'cost', COALESCE(cst,0)) ORDER BY mth)
       FROM (SELECT to_char(m,'YYYY-MM') mth, SUM(inc) inc, SUM(cst) cst
               FROM (
                 SELECT txn_date AS m, amount AS inc, 0::numeric AS cst   -- CRM income
-                  FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
+                  FROM (SELECT * FROM public.finance_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr
                 UNION ALL
                 SELECT txn_date AS m, 0::numeric AS inc, amount AS cst   -- bank costs
                   FROM public.finance_txn_scoped(v_media, v_f)
@@ -406,7 +433,7 @@ BEGIN
                             WHEN company='Untitled Adflux Pvt Ltd' THEN 'Untitled Adflux Pvt Ltd'
                             ELSE 'Untitled Advertising' END AS cat,
                        amount AS inflow, 0::numeric AS outflow, 1 AS n
-                  FROM (SELECT * FROM public.finance_crm_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr   -- §152: scope to the caller's segment
+                  FROM (SELECT * FROM public.finance_income_rows(p_from, p_to, v_seg) WHERE v_media IS NULL OR media_type=v_media) cr   -- §152: scope to the caller's segment
                 UNION ALL
                 -- everything EXCEPT income, from the bank ledger
                 SELECT CASE

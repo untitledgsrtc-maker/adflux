@@ -1095,7 +1095,7 @@ function RegisterTab() {
     const PAGE = 1000; let all = []; let from = 0
     for (;;) {
       const { data, error } = await supabase.from('finance_transactions')
-        .select('id, txn_date, ref_no, description, amount, direction, bucket, company, segment, media_type, expense_head_id, bank_account_id, raw_tag, note')
+        .select('id, txn_date, ref_no, description, amount, direction, bucket, company, segment, media_type, expense_head_id, bank_account_id, raw_tag, note, counts_as_revenue')
         .order('txn_date', { ascending: false }).range(from, from + PAGE - 1)
       if (error) { toastError(error, 'Could not load.'); break }
       all = all.concat(data || [])
@@ -1188,7 +1188,8 @@ function RegisterTab() {
     const c = classifyImport(tag, r.direction, r.description, '', bankco, [])
     const headByName = Object.fromEntries(heads.map(h => [h.name, h.id]))
     patch(r.id, { bucket: c.bucket, company: c.company, segment: c.segment, media_type: c.media_type,
-      expense_head_id: c.head ? (headByName[c.head] || null) : null, raw_tag: tag || null })
+      expense_head_id: c.head ? (headByName[c.head] || null) : null, raw_tag: tag || null,
+      ...(c.bucket !== 'income' ? { counts_as_revenue: false } : {}) })
   }
 
   const months = useMemo(() => [...new Set(rows.map(r => (r.txn_date || '').slice(0, 7)).filter(Boolean))].sort((a, b) => b.localeCompare(a)), [rows])
@@ -1297,6 +1298,12 @@ function RegisterTab() {
                     <td style={tdL}>
                       <select value={tagOf(r, headById[r.expense_head_id])} onChange={e => retag(r, e.target.value)} style={selStyle}><option value="">Review / to sort</option>{MANUAL_TAGS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                       <div style={{ fontSize: 10.5, color: 'var(--text-subtle)', marginTop: 2 }}>{bHint}</div>
+                      {r.bucket === 'income' && r.direction === 'in' && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-muted)', marginTop: 3, cursor: 'pointer' }} title="A payment received before the CRM was used: count it as revenue (amount as typed, no GST removed)">
+                          <input type="checkbox" checked={!!r.counts_as_revenue} onChange={e => patch(r.id, { counts_as_revenue: e.target.checked, reconcile_ignored: e.target.checked ? true : r.reconcile_ignored })} />
+                          Old payment (before CRM) - count as revenue
+                        </label>
+                      )}
                     </td>
                     <td style={tdL}><select value={r.bank_account_id || ''} onChange={e => patch(r.id, { bank_account_id: e.target.value })} style={selStyle}>{banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></td>
                     <td style={tdL}><span onClick={() => del(r)} style={{ cursor: 'pointer', color: 'var(--text-subtle)', display: 'inline-flex' }} title="Delete"><Trash2 size={15} /></span></td>
