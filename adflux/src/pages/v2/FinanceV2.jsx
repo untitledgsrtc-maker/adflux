@@ -18,6 +18,7 @@ import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { istTodayISO } from '../../utils/istDate'
 import DateRangeFilter, { presetToRange } from '../../components/v2/DateRangeFilter'
 import SegmentToggle, { segmentKeyToValue } from '../../components/v2/SegmentToggle'
+import FinanceRevSplit from './FinanceRevSplit'
 
 /* ── helpers ── */
 function fmtINR(n) {
@@ -58,6 +59,7 @@ export default function FinanceV2() {
     { key: 'tasks', label: 'Tasks', icon: CheckSquare },
     { key: 'import', label: 'Import', icon: Upload },
     { key: 'register', label: 'Register', icon: ListChecks },
+    ...(profile?.role === 'co_owner' ? [] : [{ key: 'revsplit', label: 'Rev split', icon: IndianRupee }]),
   ]
 
   return (
@@ -91,6 +93,7 @@ export default function FinanceV2() {
       {tab === 'tasks' && <TasksTab />}
       {tab === 'import' && <ImportTab />}
       {tab === 'register' && <RegisterTab />}
+      {tab === 'revsplit' && profile?.role !== 'co_owner' && <FinanceRevSplit />}
     </div>
   )
 }
