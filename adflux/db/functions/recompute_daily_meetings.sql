@@ -54,7 +54,7 @@ BEGIN
     FROM public.lead_activities
    WHERE created_by = p_user
      AND activity_type IN ('meeting', 'site_visit')
-     AND created_at::date = p_date
+     AND (created_at AT TIME ZONE 'Asia/Kolkata')::date = p_date
      AND (notes IS NULL OR notes NOT LIKE 'I''m here · auto-check-in%')
      AND (notes IS NULL OR notes NOT LIKE 'Meeting scheduled%');
   INSERT INTO public.work_sessions (user_id, work_date, daily_counters)

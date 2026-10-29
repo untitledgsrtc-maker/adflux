@@ -28,6 +28,7 @@ import { Loader } from '@googlemaps/js-api-loader'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { formatDate } from '../../utils/formatters'
+import { istTodayISO } from '../../utils/istDate'
 
 // Phase 34Z.6 — haversine + summariseTrack live in src/utils/
 // gpsDistance.js so /work uses the same filter rules.
@@ -134,7 +135,7 @@ async function fetchAllPings(userId, start, end) {
 export default function GpsTrackV2() {
   const navigate = useNavigate()
   const { userId, date } = useParams()
-  const targetDate = date || new Date().toISOString().slice(0, 10)
+  const targetDate = date || istTodayISO()
   const profile = useAuthStore(s => s.profile)
   const isPrivileged = ['admin', 'co_owner', 'hr', 'accounts', 'office_admin'].includes(profile?.role) // +hr 2026-08-03: attendance/GPS view (RLS hides sales — calls/activities blank for HR). +accounts 2026-09-01 (§275): open a day's route from the TA table to verify km before approving.
   // Phase 194 — a per-user team viewer (can_view_team_dashboard) can open a
@@ -196,8 +197,8 @@ export default function GpsTrackV2() {
     setLoading(true)
     setError('')
     ;(async () => {
-      const start = `${targetDate}T00:00:00`
-      const end   = `${targetDate}T23:59:59`
+      const start = `${targetDate}T00:00:00+05:30`
+      const end   = `${targetDate}T23:59:59+05:30`
       // Phase 194 — a flagged viewer (own-only RLS) reads the whole rep day-track
       // through ONE gated RPC, mapped into the same *Res shapes; every line after
       // is untouched. Admin keeps the exact Promise.all (else) — byte-unchanged.
@@ -969,8 +970,8 @@ export default function GpsTrackV2() {
               at least one meeting logged without a captured location.
               Banner saves the admin from thinking pins are missing. */}
           {(() => {
-            const meetingTotalToday = activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && !isAutoCheckinRow(a) && !isScheduledMeetingRow(a)).length
-            const meetingWithGps    = activities.filter(a => (a.activity_type === 'meeting' || a.activity_type === 'site_visit') && a.gps_lat && a.gps_lng && !isAutoCheckinRow(a) && !isScheduledMeetingRow(a)).length
+            const meetingTotalToday = uniqueMeetingCount(activities)
+            const meetingWithGps    = uniqueMeetingCount(activities, true)
             const noGpsCount        = meetingTotalToday - meetingWithGps
             if (noGpsCount <= 0) return null
             return (

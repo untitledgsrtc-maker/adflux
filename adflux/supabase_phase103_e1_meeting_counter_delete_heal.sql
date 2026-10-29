@@ -63,7 +63,10 @@ SET search_path = public, pg_temp
 AS $function$
 BEGIN
   IF OLD.activity_type IN ('meeting', 'site_visit') THEN
-    PERFORM public.recompute_daily_meetings(OLD.created_by, OLD.created_at::date);
+    PERFORM public.recompute_daily_meetings(
+      OLD.created_by,
+      (OLD.created_at AT TIME ZONE 'Asia/Kolkata')::date
+    );
   END IF;
   RETURN OLD;
 END

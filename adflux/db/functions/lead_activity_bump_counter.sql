@@ -107,13 +107,18 @@ BEGIN
     -- Phase 93.7 — revisit detection. Walk-ins (lead_id IS NULL) always
     -- bump (can't be dedupe'd).
     IF NEW.lead_id IS NOT NULL THEN
+      -- Serialise same-lead inserts so two same-tick rows can't both see 0
+      -- prior visits (ghost-click race, §47). Released at transaction end.
+      PERFORM pg_advisory_xact_lock(
+        hashtext(NEW.created_by::text || NEW.lead_id::text));
       SELECT count(*)
         INTO v_already_today
         FROM public.lead_activities prev
        WHERE prev.created_by      = NEW.created_by
          AND prev.lead_id         = NEW.lead_id
          AND prev.activity_type   IN ('meeting', 'site_visit')
-         AND prev.created_at::date = NEW.created_at::date
+         AND (prev.created_at AT TIME ZONE 'Asia/Kolkata')::date
+             = (NEW.created_at AT TIME ZONE 'Asia/Kolkata')::date
          AND prev.id              <> NEW.id
          -- Phase 127 — a "prior visit" that makes THIS row a revisit must
          -- itself be a DONE meeting. A booking ("Meeting scheduled%") or
@@ -129,7 +134,13 @@ BEGIN
       END IF;
     END IF;
 
-    PERFORM public.bump_daily_counter(NEW.created_by, 'meetings', 1);
+    PERFORM public.bump_daily_counter(
+      NEW.created_by,
+      'meetings',
+      1,
+      (COALESCE(NEW.created_at, now())
+         AT TIME ZONE 'Asia/Kolkata')::date
+    );
     RETURN NEW;
   END IF;
 
