@@ -185,7 +185,7 @@ export default function OpsTechApp() {
   const header = (
     <div className="row" style={{ justifyContent: 'space-between', padding: '8px 16px', minHeight: 56 }}>
       <span className="row" style={{ gap: 10 }}><Btn kind="gh" icon="menu" title="Menu" onClick={() => window.dispatchEvent(new Event('open-shell-drawer'))} /><span className="logo">A</span><Bi g="ઓપરેશન" e={profile?.name || ''} /></span>
-      <span className="row" style={{ gap: 6 }}><span className="ltsm"><LangToggle /></span>{!online && <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}<span style={{ position: 'relative' }}><Btn kind="gh" icon="bell" title="Alerts" onClick={() => setBell(true)} />{alerts.length > 0 && <span className="num" style={{ position: 'absolute', top: 2, right: 2, minWidth: 18, height: 18, borderRadius: 999, background: 'var(--r, #ef4444)', color: '#fff', fontSize: 12, display: 'grid', placeItems: 'center', padding: '0 4px', pointerEvents: 'none' }}>{alerts.length > 9 ? '9+' : alerts.length}</span>}</span></span>
+      <span className="row" style={{ gap: 6 }}><span className="ltsm"><LangToggle /></span>{!online && <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}<span style={{ position: 'relative' }}><Btn kind="gh" icon="bell" title="Alerts" onClick={() => setBell(true)} />{alerts.length > 0 && <span className="num" style={{ position: 'absolute', top: 9, right: 3, minWidth: 18, height: 18, borderRadius: 999, background: 'var(--r, #ef4444)', color: '#fff', fontSize: 12, display: 'grid', placeItems: 'center', padding: '0 4px', pointerEvents: 'none' }}>{alerts.length > 9 ? '9+' : alerts.length}</span>}</span></span>
     </div>)
 
   let body
@@ -284,7 +284,7 @@ function ReasonGrid({ issues, value, onPick }) {
 }
 
 function CallBtn({ c, onCall }) {
-  return <button className="callb" onClick={() => onCall(c)}><span className="calli"><Ic n="phone" s={22} /></span><span style={{ flex: 1, textAlign: 'left', minWidth: 0 }}><span style={{ display: 'block', fontWeight: 600 }}>{c.name || c.role_en}</span><span style={{ display: 'block', fontSize: 15, opacity: .85 }}><Bi g={c.role_gu || c.role_en} e={c.role_en || c.role_gu} /></span></span><span className="mono" style={{ fontSize: 14, opacity: .85 }}>{c.phone}</span></button>
+  return <button className="callb" onClick={() => onCall(c)}><span className="calli"><Ic n="phone" s={22} /></span><span style={{ flex: 1, textAlign: 'left', minWidth: 0 }}><span style={{ display: 'block', fontWeight: 600 }}>{c.name || c.role_en || c.role_gu}</span>{c.name && (c.role_en || c.role_gu) && <span style={{ display: 'block', fontSize: 15, opacity: .85 }}>{c.role_gu && c.role_en && c.role_gu !== c.role_en ? <Bi g={c.role_gu} e={c.role_en} /> : (c.role_en || c.role_gu)}</span>}</span><span className="mono" style={{ fontSize: 14, opacity: .85 }}>{c.phone}</span></button>
 }
 
 async function uploadPhoto(depotId, prefix, file) {
