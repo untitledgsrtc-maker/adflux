@@ -6,7 +6,7 @@
 // fill the rest of the form. Free typing always works; if the search endpoint
 // is unavailable the dropdown just never shows (no error, no blocking).
 //
-// Search goes through /api/places-search (server key, same-origin only). Only
+// Search goes through /api/directions?places=1 (server key, same-origin only). Only
 // text the rep actually types is searched, never a prefilled or scanned value.
 
 import { useEffect, useRef, useState } from 'react'
@@ -43,7 +43,7 @@ export default function PlaceSuggest({ value, onChange, onPick, near, placeholde
         if (Number.isFinite(nearLat) && Number.isFinite(nearLng)) {
           qs.set('lat', String(nearLat)); qs.set('lng', String(nearLng))
         }
-        const r = await fetch(`/api/places-search?${qs.toString()}`, { signal: ctrl.signal })
+        const r = await fetch(`/api/directions?places=1&${qs.toString()}`, { signal: ctrl.signal })
         if (!r.ok) { brokenRef.current = true; setResults([]); return }
         const j = await r.json()
         setResults(Array.isArray(j.results) ? j.results : [])
@@ -65,7 +65,7 @@ export default function PlaceSuggest({ value, onChange, onPick, near, placeholde
     onChange(p.name)
     typedRef.current = false   // the fill below must not trigger another search
     try {
-      const r = await fetch(`/api/places-search?id=${encodeURIComponent(p.id)}`)
+      const r = await fetch(`/api/directions?places=1&id=${encodeURIComponent(p.id)}`)
       if (r.ok) {
         const { place } = await r.json()
         // National number -> bare digits; drop a leading trunk 0 (0265... / 098...).

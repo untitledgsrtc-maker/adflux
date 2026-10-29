@@ -76,6 +76,93 @@ function guardProxy(req, res) {
   return true
 }
 
+// ── Places (New) lookup for the Log Meeting company search ─────────────
+// Lives in this file on purpose: the Hobby plan caps a deployment at 12
+// serverless functions, and a separate api/places-search.js made the whole
+// deploy fail (exceeded_serverless_functions_per_deployment, 29 Oct 2026).
+// GET /api/directions?places=1&q=<text>[&lat=&lng=]  -> { results: [{id,name,address}] }
+// GET /api/directions?places=1&id=<placeId>           -> { place: {name,address,city,phone,website} }
+// Needs "Places API (New)" enabled + allowed on the ROADS_KEY_SERVER key.
+const PLACE_ID_RE = /^[A-Za-z0-9_-]{10,200}$/
+
+function componentOf(components, type) {
+  const c = (components || []).find(x => (x.types || []).includes(type))
+  return c?.longText || ''
+}
+
+async function placesHandler(req, res, key) {
+  const { q, id, lat, lng } = req.query || {}
+
+  try {
+    // ── Details for one picked place ──
+    if (id) {
+      if (!PLACE_ID_RE.test(String(id))) {
+        res.status(400).json({ error: 'bad place id' })
+        return
+      }
+      const r = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(String(id))}`, {
+        headers: {
+          'X-Goog-Api-Key': key,
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,addressComponents,nationalPhoneNumber,websiteUri',
+        },
+        signal: AbortSignal.timeout(8000),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        res.status(502).json({ error: j?.error?.message || `Places ${r.status}` })
+        return
+      }
+      res.status(200).json({
+        place: {
+          name:    j.displayName?.text || '',
+          address: j.formattedAddress || '',
+          city:    componentOf(j.addressComponents, 'locality')
+                   || componentOf(j.addressComponents, 'administrative_area_level_2'),
+          phone:   j.nationalPhoneNumber || '',
+          website: j.websiteUri || '',
+        },
+      })
+      return
+    }
+
+    // ── Search ──
+    const text = String(q || '').trim().slice(0, 100)
+    if (text.length < 3) {
+      res.status(400).json({ error: 'q must be at least 3 characters' })
+      return
+    }
+    const body = { textQuery: text, regionCode: 'IN', languageCode: 'en', maxResultCount: 5 }
+    const la = Number(lat), ln = Number(lng)
+    if (Number.isFinite(la) && Number.isFinite(ln) && Math.abs(la) <= 90 && Math.abs(ln) <= 180) {
+      body.locationBias = { circle: { center: { latitude: la, longitude: ln }, radius: 50000 } }
+    }
+    const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': key,
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) {
+      res.status(502).json({ error: j?.error?.message || `Places ${r.status}` })
+      return
+    }
+    res.status(200).json({
+      results: (j.places || []).slice(0, 5).map(p => ({
+        id:      p.id,
+        name:    p.displayName?.text || '',
+        address: p.formattedAddress || '',
+      })),
+    })
+  } catch (e) {
+    res.status(502).json({ error: e?.message || 'upstream failure' })
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'GET only' })
@@ -89,6 +176,8 @@ export default async function handler(req, res) {
     res.status(500).json({ error: 'ROADS_KEY_SERVER not configured' })
     return
   }
+
+  if (req.query?.places) return placesHandler(req, res, key)
 
   const { origin, destination, waypoints, mode } = req.query || {}
   if (!origin || !destination) {
