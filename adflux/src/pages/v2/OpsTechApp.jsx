@@ -195,7 +195,7 @@ export default function OpsTechApp() {
     const plan = live.filter(f => f.src !== 'photo').sort((a, b) => (b.status === 'open') - (a.status === 'open') || b.scr.length - a.scr.length || b.age - a.age)
     const jobs = live.filter(f => f.src === 'photo')
     const uptime = d.pay?.has_data === false ? null : d.pay?.uptime_pct
-    body = <div style={{ display: 'grid', gap: 14 }}>
+    body = <div style={{ display: 'grid', gap: 10 }}>
       {!onHours
         ? <Hero icon="moon" eyebrow="આજનો ચાલુ સમય · Uptime" value={uptime != null ? `${Number(uptime).toFixed(1)}%` : '—'} sub="7 AM – 9 PM · રાત્રે સ્ક્રીન આરામ કરે છે" />
         : <Hero icon="monoff" eyebrow="બંધ સ્ક્રીન · Screens off" value={offN} unit={`/ ${totalScr}`} sub={<><span className="num">{new Set(plan.map(f => f.st)).size}</span> <G t="સ્ટેશન · stations to visit" /></>} />}
@@ -240,7 +240,7 @@ export default function OpsTechApp() {
     <div className="ox"><div className="tech">
       {header}
       {!online && <div className="offb"><Ic n="wifioff" /><Bi g="નેટવર્ક નથી. સેવ થશે નહીં." e="No signal. Changes cannot be saved until signal returns." /></div>}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>{body}</div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>{body}</div>
       <nav className="bnav">{[['today', 'home', 'આજે', 'Today'], ['faults', 'list', 'ફોલ્ટ', 'Faults'], ['me', 'user', 'મારું', 'Me']].map(([k, i, g, e]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => { setTab(k); setOpenId(null) }} aria-current={tab === k}><Ic n={i} s={22} /><Bi g={g} e={e} center /></button>)}</nav>
       {openFault && <FaultPage key={openFault.id} f={openFault} st={stById[openFault.st]} d={d} uid={uid} onHours={onHours} back={() => setOpenId(null)} reload={load} show={show} setTabFixed={() => { setOpenId(null); setFt('fixed'); setTab('faults') }} />}
       {sheet && sheet.k === 'log' && <LogSheet stations={stations} issues={d.issues} uid={uid} onClose={() => setSheet(null)} onDone={() => { setSheet(null); show({ t: 'નોંધાયું · Fault logged' }); load() }} show={show} />}
@@ -262,9 +262,10 @@ function VisitCard({ f, i, st, onOpen }) {
   return <button className={'card vcard v-' + tone} onClick={onOpen}>
     {i != null ? <span className="vnum num">{i + 1}</span> : <Tile n={SRC[f.src][2]} tone={tone} s={40} />}
     <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 6 }}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}><span style={{ display: 'grid', gap: 2, minWidth: 0 }}><span className="h" style={{ fontSize: 20, fontWeight: 600 }}>{st.name}</span><span className="mu sm"><Bi g={SRC[f.src][0]} e={SRC[f.src][1]} /></span></span>{!job && f.scr.length > 0 && <Pill tone={tone} icon={f.src === 'cam' ? 'camoff' : 'monoff'}><span className="num">{f.scr.length}</span>/<span className="num">{st.n}</span></Pill>}</div>
-      {job && <div style={{ fontSize: 16 }}><Bi g={SRC.photo[0]} e={SRC.photo[1]} /> <span className="mu">· {f.note}</span></div>}
-      <div className="row mu" style={{ gap: 12, flexWrap: 'wrap', fontSize: 15 }}>{f.age > 0 && <span className="row" style={{ gap: 4 }}><Ic n="clock" s={14} /><span className="num">{age(f.age)}</span></span>}<Pill tone={STAT[f.status][2]} icon={STAT[f.status][3]}><Bi g={STAT[f.status][0]} e={STAT[f.status][1]} /></Pill></div>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}><span style={{ display: 'grid', gap: 2, minWidth: 0 }}><span className="h" style={{ fontSize: 15, fontWeight: 600 }}>{st.name}</span><span className="mu sm"><Bi g={SRC[f.src][0]} e={SRC[f.src][1]} /></span></span>{!job && f.scr.length > 0 && <Pill tone={tone} icon={f.src === 'cam' ? 'camoff' : 'monoff'}><span className="num">{f.scr.length}</span>/<span className="num">{st.n}</span></Pill>}</div>
+      {!job && st.n > 0 && <div className="vboxes" aria-hidden="true">{Array.from({ length: st.n }, (_, k) => <i key={k} className={k < f.scr.length ? (f.src === 'cam' ? 'cam' : 'off') : ''} />)}</div>}
+      {job && <div style={{ fontSize: 14 }}><Bi g={SRC.photo[0]} e={SRC.photo[1]} /> <span className="mu">· {f.note}</span></div>}
+      <div className="row mu" style={{ gap: 10, flexWrap: 'wrap', fontSize: 13 }}>{f.age > 0 && <span className="row" style={{ gap: 4 }}><Ic n="clock" s={14} /><span className="num">{age(f.age)}</span></span>}<Pill tone={STAT[f.status][2]} icon={STAT[f.status][3]}><Bi g={STAT[f.status][0]} e={STAT[f.status][1]} /></Pill></div>
     </div></button>
 }
 

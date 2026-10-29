@@ -192,3 +192,32 @@
   .ox .head>header nav{height:auto!important;width:100%;overflow-x:auto;flex-wrap:nowrap;order:3}
   .ox .head>header nav .htab{height:44px;white-space:nowrap}
 }
+
+/* Technician phone app: compact sizes (owner 29 Oct 2026: fonts and tiles were too big).
+   Scoped to .tech so the head console and desktop are unchanged. */
+.ox .tech{font-size:14px}
+.ox .tech .btn{min-height:44px;font-size:14px}
+.ox .tech .btn.lg{min-height:50px;font-size:15px}
+.ox .tech .btn.ic{width:44px}
+.ox .tech .pill{font-size:12px;height:24px;padding:0 8px}
+.ox .tech .hero{padding:14px 16px}
+.ox .tech .hv{font-size:32px}
+.ox .tech .hu{font-size:14px}
+.ox .tech .hs{font-size:13px}
+.ox .tech .stt{padding:10px}
+.ox .tech .stv{font-size:18px}
+.ox .tech .seg button{min-height:42px;font-size:13px}
+.ox .tech .vcard{padding:10px 12px;gap:10px}
+.ox .tech .vnum{width:26px;height:26px;font-size:13px}
+.ox .tech .bnav button{min-height:54px}
+.ox .tech .bnav .bi .g{font-size:13px}
+.ox .tech .bi.big .g{font-size:16px}
+.ox .tech .stile{min-height:44px;font:600 15px 'Space Grotesk'}
+.ox .tech .rbtn{min-height:50px}
+.ox .tech .rrow{min-height:48px}
+.ox .tech .inp{height:44px;font-size:14px}
+/* one small box per screen on a station card */
+.ox .vboxes{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;margin-top:2px}
+.ox .vboxes i{height:7px;border-radius:2px;background:rgba(16,185,129,.55)}
+.ox .vboxes i.off{background:var(--da)}
+.ox .vboxes i.cam{background:var(--wa)}
