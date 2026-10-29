@@ -221,3 +221,13 @@
 .ox .vboxes i{height:7px;border-radius:2px;background:rgba(16,185,129,.55)}
 .ox .vboxes i.off{background:var(--da)}
 .ox .vboxes i.cam{background:var(--wa)}
+
+/* Android phones draw the app under the system bars: keep the top bar, the fault page and the buttons clear of them. */
+@media(max-width:560px){
+  .ox .tech{padding-top:max(env(safe-area-inset-top,0px),30px)}
+  .ox .push{padding-top:max(env(safe-area-inset-top,0px),30px);padding-bottom:max(env(safe-area-inset-bottom,0px),26px)}
+  .ox .tech .bnav{padding-bottom:max(env(safe-area-inset-bottom,0px),22px)}
+  .ox .sheet{padding-bottom:max(env(safe-area-inset-bottom,0px),22px)}
+}
+/* the Start-training pill must never cover a button while a fault page or sheet is open */
+body:has(.ox .push) .tour-launch,body:has(.ox .scrim) .tour-launch{display:none!important}

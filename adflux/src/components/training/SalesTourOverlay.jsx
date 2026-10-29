@@ -254,7 +254,7 @@ export default function TrainingOverlay() {
     if (doneLS || dismissed) return null
     const pl = L[TRACKS[pillTrack].lang]
     return (
-      <div style={pillTrack === 'ops' ? { ...launchWrap, bottom: 'calc(104px + env(safe-area-inset-bottom, 0px))' } : launchWrap}>
+      <div className="tour-launch" style={pillTrack === 'ops' ? { ...launchWrap, bottom: 'calc(104px + env(safe-area-inset-bottom, 0px))' } : launchWrap}>
         <button style={launchBtn} onClick={() => navigate(routeWith(pillTrack, 0))} aria-label={pl.launch}>
           <GraduationCap size={16} strokeWidth={2} /> {pl.launch}
         </button>
