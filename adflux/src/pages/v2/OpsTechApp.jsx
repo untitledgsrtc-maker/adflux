@@ -27,6 +27,8 @@ const age = m => m >= 1440 ? `${Math.floor(m / 1440)}d ${Math.floor(m % 1440 / 6
 const inr = n => 'Rs ' + Math.round(n).toLocaleString('en-IN')
 const hhmm = iso => (iso ? new Date(iso).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) : '')
 const dd = iso => (iso ? new Date(iso).toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' }) : '')
+// Last word of the CMS screen name ("ANKLESHWAR P2" -> "P2", "DWARKA 10" -> "10").
+const scrTag = name => String(name || '').trim().split(/\s+/).pop()
 const numSort = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true })
 
 const SRC = {
@@ -108,7 +110,7 @@ export default function OpsTechApp() {
 
   // ───────── derived: stations, faults ─────────
   const stations = useMemo(() => d.depots.map(dep => {
-    const scr = d.screens.filter(s => s.depot_id === dep.id).sort(numSort).map((s, i) => ({ ...s, n: i + 1 }))
+    const scr = d.screens.filter(s => s.depot_id === dep.id).sort(numSort).map((s, i) => ({ ...s, n: i + 1, lbl: scrTag(s.name) || String(i + 1) }))
     return { ...dep, scr, n: scr.length }
   }), [d.depots, d.screens])
   const stById = useMemo(() => Object.fromEntries(stations.map(s => [s.id, s])), [stations])
@@ -258,12 +260,14 @@ export default function OpsTechApp() {
 function VisitCard({ f, i, st, onOpen }) {
   if (!st) return null
   const job = f.src === 'photo'
-  const tone = f.status === 'cant' ? 'wa' : job ? 'in' : f.scr.length >= 3 ? 'da' : 'wa'
+  // in-process ticket: count only screens still offline (the rest came back)
+  const nBad = f.status === 'work' ? f.scrIds.filter(id => st.scr.find(x => x.id === id)?.status !== 'online').length : f.scr.length
+  const tone = f.status === 'cant' ? 'wa' : job ? 'in' : nBad >= 3 ? 'da' : 'wa'
   return <button className={'card vcard v-' + tone} onClick={onOpen}>
     {i != null ? <span className="vnum num">{i + 1}</span> : <Tile n={SRC[f.src][2]} tone={tone} s={40} />}
     <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 6 }}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}><span style={{ display: 'grid', gap: 2, minWidth: 0 }}><span className="h" style={{ fontSize: 15, fontWeight: 600 }}>{st.name}</span><span className="mu sm"><Bi g={SRC[f.src][0]} e={SRC[f.src][1]} /></span></span>{!job && f.scr.length > 0 && <Pill tone={tone} icon={f.src === 'cam' ? 'camoff' : 'monoff'}><span className="num">{f.scr.length}</span>/<span className="num">{st.n}</span></Pill>}</div>
-      {!job && st.n > 0 && <div className="vboxes" aria-hidden="true">{Array.from({ length: st.n }, (_, k) => <i key={k} className={k < f.scr.length ? (f.src === 'cam' ? 'cam' : 'off') : ''} />)}</div>}
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}><span style={{ display: 'grid', gap: 2, minWidth: 0 }}><span className="h" style={{ fontSize: 15, fontWeight: 600 }}>{st.name}</span><span className="mu sm"><Bi g={SRC[f.src][0]} e={SRC[f.src][1]} /></span></span>{!job && nBad > 0 && <Pill tone={tone} icon={f.src === 'cam' ? 'camoff' : 'monoff'}><span className="num">{nBad}</span>/<span className="num">{st.n}</span></Pill>}</div>
+      {!job && st.n > 0 && <div className="vboxes" aria-hidden="true">{Array.from({ length: st.n }, (_, k) => <i key={k} className={k < nBad ? (f.src === 'cam' ? 'cam' : 'off') : ''} />)}</div>}
       {job && <div style={{ fontSize: 14 }}><Bi g={SRC.photo[0]} e={SRC.photo[1]} /> <span className="mu">· {f.note}</span></div>}
       <div className="row mu" style={{ gap: 10, flexWrap: 'wrap', fontSize: 13 }}>{f.age > 0 && <span className="row" style={{ gap: 4 }}><Ic n="clock" s={14} /><span className="num">{age(f.age)}</span></span>}<Pill tone={STAT[f.status][2]} icon={STAT[f.status][3]}><Bi g={STAT[f.status][0]} e={STAT[f.status][1]} /></Pill></div>
     </div></button>
@@ -357,24 +361,25 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
 
   const story = []
   if (f.tickets[0]) story.push([dd(f.tickets[0].created_at) + ' ' + hhmm(f.tickets[0].created_at), 'loader', 'કામ શરૂ', 'Started work'])
-  f.tickets.forEach(t => String(t.notes || '').split('\n').filter(Boolean).forEach(n => story.push([hhmm(t.created_at), /^Called/i.test(n) ? 'phone' : /^Reached/i.test(n) ? 'navi' : 'pencil', n, n])))
+  const seenNote = new Set()
+  f.tickets.forEach(t => String(t.notes || '').split('\n').filter(Boolean).forEach(n => { if (seenNote.has(n)) return; seenNote.add(n); story.push([hhmm(t.created_at), /^Called/i.test(n) ? 'phone' : /^Reached/i.test(n) ? 'navi' : 'pencil', n, n]) }))
   if (f.tickets.some(t => t.cant_fix_reason)) story.push([dd(f.tickets.find(t => t.cant_fix_reason).cant_fix_at) + ' ' + hhmm(f.tickets.find(t => t.cant_fix_reason).cant_fix_at), 'flag', 'ઠીક ન થયું', "Can't fix: " + f.cant])
   if (f.status === 'fixed') story.push([hhmm(f.tickets[0]?.resolved_at), 'checkc', 'ઠીક થયું', 'Fixed'])
 
-  const screensPick = <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="1 · કઈ સ્ક્રીન? Which screens" /></span>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>{st.scr.map(s => { const faulty = f.scrIds.includes(s.id); return <ScrTile key={s.id} n={s.n} st={!onHours && f.src === 'timer' ? (faulty ? 'tm' : 'rest') : faulty ? 'off' : s.status === 'online' ? 'on' : 'off'} sel={faulty && sel.includes(s.id)} onClick={faulty && f.status === 'open' ? () => setSel(sel.includes(s.id) ? sel.filter(x => x !== s.id) : [...sel, s.id]) : null} /> })}</div>
+  const screensPick = <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="કઈ સ્ક્રીન? · Which screens" /></span>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>{st.scr.map(s => { const faulty = f.scrIds.includes(s.id); return <ScrTile key={s.id} n={s.lbl} st={!onHours && f.src === 'timer' ? (faulty ? 'tm' : 'rest') : faulty && !(f.status === 'work' && s.status === 'online') ? 'off' : s.status === 'online' ? 'on' : 'off'} sel={faulty && sel.includes(s.id)} onClick={faulty && f.status === 'open' ? () => setSel(sel.includes(s.id) ? sel.filter(x => x !== s.id) : [...sel, s.id]) : null} /> })}</div>
     <div className="row mu sm" style={{ gap: 14 }}><span className="row" style={{ gap: 6 }}><i className="lg t-da"></i><G t="બંધ · Off" /></span><span className="row" style={{ gap: 6 }}><i className="lg t-ok"></i><G t="ચાલુ · On" /></span></div></section>
 
   return <div className="push">
     <div className="row" style={{ padding: '8px 12px', gap: 8, borderBottom: '1px solid var(--bd)' }}><Btn kind="gh" icon="cl" title="Back" onClick={back} /><div style={{ flex: 1, minWidth: 0 }}><Bi g={st.name} e={`${st.n} screens`} big /></div></div>
     <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'grid', gap: 18, alignContent: 'start' }}>
       {isJob ? <>
-        <Card><div style={{ display: 'grid', gap: 12 }}><span className="row mu sm" style={{ gap: 6 }}><Ic n="camera" s={15} />Live photo</span><div style={{ fontSize: 19, fontWeight: 600 }}>{f.note}</div>{f.scr.length > 0 && <div className="mu"><G t="સ્ક્રીન · Screen " /><span className="num">{f.scr.join(', ')}</span></div>}</div></Card>
+        <Card><div style={{ display: 'grid', gap: 12 }}><span className="row mu sm" style={{ gap: 6 }}><Ic n="camera" s={15} />Live photo</span><div style={{ fontSize: 19, fontWeight: 600 }}>{f.note}</div>{f.scr.length > 0 && <div className="mu"><G t="સ્ક્રીન · Screen " /><span className="num">{f.scr.map(n => st.scr.find(x => x.n === n)?.lbl || n).join(', ')}</span></div>}</div></Card>
         <Photo label={<Bi g="જાહેરાત ચાલુ હોય ત્યારે ફોટો લો" e="Take it while the ad is on screen" />} file={photo} onFile={setPhoto} />
         <Btn kind="pri" lg full icon="send" disabled={!photo || busy} onClick={sendPhoto}><G t="ફોટો મોકલો · Send photo" /></Btn></> : <>
         <Stepper f={f} called={called} />
         {screensPick}
-        {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="2 · શું ખરાબી છે? What is wrong" /></span><ReasonGrid issues={d.issues} value={reason} onPick={setReason} /></section>}
+        {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="શું ખરાબી છે? · What is wrong" /></span><ReasonGrid issues={d.issues} value={reason} onPick={setReason} /></section>}
         {issue && f.status === 'open' && issue.solution_en && <div className="okrow"><Ic n="check" /><Bi g={issue.solution_gu || issue.solution_en} e={issue.solution_en} /></div>}
         {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="row" style={{ justifyContent: 'space-between' }}><span className="lbl"><G t="3 · કોને કૉલ કરવો · Who to call" /></span><Btn sm icon="plus" onClick={() => setAddNum(true)}><G t="નવો નંબર · Add number" /></Btn></span>{(reason ? callList : contacts).length ? (reason ? callList : contacts).map(c => <CallBtn key={c.id} c={c} onCall={doCall} />) : <div className="warnrow"><Ic n="alert" /><Bi g="આ સ્ટેશનનો કોઈ નંબર નથી" e="No number saved for this station. Add one." /></div>}</section>}
         {addNum && <DepotContactsModal depot={{ id: st.id, name: st.name }} lang={(typeof localStorage !== 'undefined' && localStorage.getItem('ops2_lang')) || 'en'} meId={uid} onClose={() => setAddNum(false)} onChanged={() => reload()} />}
@@ -431,7 +436,7 @@ function LogSheet({ stations, issues, uid, onClose, onDone, show }) {
   }
   return <Sheet title={<Bi g="ચાલુ સ્ક્રીનમાં સમસ્યા" e="Problem on a working screen" />} onClose={onClose} footer={<Btn kind="pri" lg full icon="check" disabled={!scr.length || !r || busy} onClick={save}><G t="સાચવો · Save" /></Btn>}>
     <Sel label="Station" value={stId} onChange={v => { setStId(v); setScr([]) }} opts={stations.map(x => [x.id, x.name])} />
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>{(s?.scr || []).map(x => <ScrTile key={x.id} n={x.n} st={x.status === 'offline' ? 'off' : 'on'} sel={scr.includes(x.id)} onClick={() => setScr(scr.includes(x.id) ? scr.filter(y => y !== x.id) : [...scr, x.id])} />)}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>{(s?.scr || []).map(x => <ScrTile key={x.id} n={x.lbl} st={x.status === 'offline' ? 'off' : 'on'} sel={scr.includes(x.id)} onClick={() => setScr(scr.includes(x.id) ? scr.filter(y => y !== x.id) : [...scr, x.id])} />)}</div>
     <ReasonGrid issues={issues} value={r} onPick={setR} /><Photo label={<Bi g="ફોટો" e="Photo" />} file={file} onFile={setFile} /></Sheet>
 }
 
