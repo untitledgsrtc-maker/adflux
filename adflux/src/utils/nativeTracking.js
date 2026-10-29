@@ -14,7 +14,8 @@
 //
 // Events handled
 //   gpsStateChanged   { enabled, atMs }  → upsert gps_off_events
-//   networkStateChanged { online, atMs } → upsert network_off_events
+//   networkStateChanged { online, atMs } → netGapTracker (Phase 531): confirmed gaps
+//                                          written once, complete, to network_off_events
 //   forceStopDetected { lastSeenMs, relaunchMs, gapMs }
 //                                          → insert force_stop_events
 //
@@ -24,6 +25,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { supabase } from '../lib/supabase'
 import { rearmBackgroundGps } from './backgroundGps'
+import { createNetGapTracker } from './netGapTracker'
 
 const Tracking = registerPlugin('UntitledTracking')
 
@@ -33,7 +35,6 @@ let initialised = false
 let heartbeatId = null
 let cachedUserId = null
 let openGpsOffRowId = null
-let openNetOffRowId = null
 let listenerHandles = []
 let authSub = null
 // Phase 102.H.1 (2026-05-29) — role gate for GPS event writes.
@@ -226,18 +227,8 @@ export async function initNativeTracking() {
         openGpsOffRowId = openGps.id
         console.debug('[tracking] recovered openGpsOffRowId=' + openGpsOffRowId)
       }
-      const { data: openNet } = await supabase
-        .from('network_off_events')
-        .select('id')
-        .eq('user_id', cachedUserId)
-        .is('regained_at', null)
-        .order('lost_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      if (openNet?.id) {
-        openNetOffRowId = openNet.id
-        console.debug('[tracking] recovered openNetOffRowId=' + openNetOffRowId)
-      }
+      // Phase 531 — no open network row is ever written now (see netGapTracker.js), so
+      // there is nothing to recover; old open rows are left as history.
     } catch (e) {
       console.warn('[tracking] open row recovery failed:', e?.message || e)
     }
@@ -325,17 +316,10 @@ async function handleGpsStateChanged({ enabled, atMs }) {
 
 async function handleNetworkStateChanged({ online, atMs }) {
   console.debug('[tracking] networkStateChanged online=' + online)
-  const userId = await safeUserId()
-  if (!userId) {
-    await enqueue({ type: 'network', online, atMs })
-    return
-  }
-  if (!online) {
-    const inserted = await insertNetOff(userId, atMs)
-    if (inserted?.id) openNetOffRowId = inserted.id
-  } else if (openNetOffRowId) {
-    await closeNetOff(openNetOffRowId, atMs)
-    openNetOffRowId = null
+  try {
+    await netGapTracker.onNetworkState(!!online, atMs)
+  } catch (e) {
+    console.warn('[tracking] network gap tracker failed:', e?.message || e)
   }
 }
 
@@ -403,52 +387,56 @@ async function closeGpsOff(rowId, atMs) {
   }
 }
 
-async function insertNetOff(userId, atMs) {
-  try {
-    const { data, error } = await supabase
-      .from('network_off_events')
-      .insert([{
-        user_id: userId,
-        lost_at: new Date(atMs).toISOString(),
-      }])
-      .select()
-      .single()
-    if (error) {
-      // Phase 103.A.1 — same dedup as gps_off: partial unique index
-      // uniq_open_net_off_per_user rejects a 2nd open row. The network
-      // callback can fire repeatedly on flaky connectivity; 23505 means
-      // "already flagged offline", no-op, don't enqueue.
-      if (error.code === '23505') {
-        console.debug('[tracking] net_off dup ignored (already open)')
-        return null
-      }
-      console.warn('[tracking] net_off insert error:', error.message)
-      await enqueue({ type: 'network', online: false, atMs })
-      return null
-    }
-    return data
-  } catch (e) {
-    console.warn('[tracking] net_off insert threw:', e?.message || e)
-    await enqueue({ type: 'network', online: false, atMs })
-    return null
-  }
-}
-
-async function closeNetOff(rowId, atMs) {
+// Phase 531 — one COMPLETE row per confirmed outage (written after it ends).
+async function insertNetGap(userId, lostMs, regainedMs) {
   try {
     const { error } = await supabase
       .from('network_off_events')
-      .update({ regained_at: new Date(atMs).toISOString() })
-      .eq('id', rowId)
+      .insert([{
+        user_id: userId,
+        lost_at: new Date(lostMs).toISOString(),
+        regained_at: new Date(regainedMs).toISOString(),
+      }])
     if (error) {
-      console.warn('[tracking] net_off close error:', error.message)
-      await enqueue({ type: 'net_close', rowId, atMs })
+      console.warn('[tracking] net_gap insert error:', error.message)
+      await enqueue({ type: 'net_gap', lostMs, regainedMs })
+      return false
     }
+    return true
   } catch (e) {
-    console.warn('[tracking] net_off close threw:', e?.message || e)
-    await enqueue({ type: 'net_close', rowId, atMs })
+    console.warn('[tracking] net_gap insert threw:', e?.message || e)
+    await enqueue({ type: 'net_gap', lostMs, regainedMs })
+    return false
   }
 }
+
+// Reachability probe: can this app reach the backend right now? Any HTTP answer
+// counts as reachable; only a network failure / timeout counts as offline.
+async function backendReachable() {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), 5000)
+  try {
+    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`, {
+      headers: { apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || '' },
+      cache: 'no-store',
+      signal: ctrl.signal,
+    })
+    return true
+  } catch {
+    return false
+  } finally {
+    clearTimeout(t)
+  }
+}
+
+const netGapTracker = createNetGapTracker({
+  probe: backendReachable,
+  record: async (lostMs, regainedMs) => {
+    const userId = await safeUserId()
+    if (!userId) { await enqueue({ type: 'net_gap', lostMs, regainedMs }); return }
+    await insertNetGap(userId, lostMs, regainedMs)
+  },
+})
 
 async function insertForceStop(userId, lastSeenMs, relaunchMs, gapMs) {
   try {
@@ -529,11 +517,10 @@ async function drainQueue() {
           ok = !!r
         } else if (e.type === 'gps_close') {
           await closeGpsOff(e.rowId, e.atMs); ok = true
-        } else if (e.type === 'network' && !e.online) {
-          const r = await insertNetOff(userId, e.atMs)
-          ok = !!r
-        } else if (e.type === 'net_close') {
-          await closeNetOff(e.rowId, e.atMs); ok = true
+        } else if (e.type === 'net_gap') {
+          ok = await insertNetGap(userId, e.lostMs, e.regainedMs)
+        } else if (e.type === 'network' || e.type === 'net_close') {
+          ok = true   // Phase 531 — legacy open-row entries are dropped (they produced false gaps)
         } else if (e.type === 'force_stop') {
           await insertForceStop(userId, e.lastSeenMs, e.relaunchMs, e.gapMs); ok = true
         }
@@ -662,7 +649,7 @@ export async function teardownNativeTracking() {
   foregroundProbeDone = false
   cachedUserId = null
   openGpsOffRowId = null
-  openNetOffRowId = null
+  netGapTracker.reset()
 }
 
 // ─── Phase 180 — GPS-capture onboarding deep-links (§73 #1) ─────────────
