@@ -185,7 +185,7 @@ export default function OpsTechApp() {
   const header = (
     <div className="row" style={{ justifyContent: 'space-between', padding: '8px 16px', minHeight: 56 }}>
       <span className="row" style={{ gap: 10 }}><Btn kind="gh" icon="menu" title="Menu" onClick={() => window.dispatchEvent(new Event('open-shell-drawer'))} /><span className="logo">A</span><Bi g="ઓપરેશન" e={profile?.name || ''} /></span>
-      <span className="row" style={{ gap: 6 }}><span className="ltsm"><LangToggle /></span>{!online && <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}<span style={{ position: 'relative' }}><Btn kind="gh" icon="bell" title="Alerts" onClick={() => setBell(true)} />{alerts.length > 0 && <span className="num" style={{ position: 'absolute', top: 9, right: 3, minWidth: 18, height: 18, borderRadius: 999, background: 'var(--r, #ef4444)', color: '#fff', fontSize: 12, display: 'grid', placeItems: 'center', padding: '0 4px', pointerEvents: 'none' }}>{alerts.length > 9 ? '9+' : alerts.length}</span>}</span></span>
+      <span className="row" style={{ gap: 6 }}><span className="ltsm"><LangToggle /></span>{!online && <Pill tone="wa" icon="wifioff">નેટ નથી</Pill>}<span style={{ position: 'relative' }}><Btn kind="gh" icon="bell" title="Alerts" onClick={() => setBell(true)} />{alerts.length > 0 && <span className="num" style={{ position: 'absolute', top: 4, right: -4, minWidth: 18, height: 18, borderRadius: 999, background: 'var(--r, #ef4444)', color: '#fff', fontSize: 12, display: 'grid', placeItems: 'center', padding: '0 4px', pointerEvents: 'none' }}>{alerts.length > 9 ? '9+' : alerts.length}</span>}</span></span>
     </div>)
 
   let body
