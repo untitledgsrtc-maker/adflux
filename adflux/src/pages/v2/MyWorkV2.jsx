@@ -630,7 +630,10 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         `• Finished:   ${finished}`,
         `• In process: ${proc}${proc ? ' 🟡' : ''}`,
         `• Late:       ${late}${late ? ' 🔴' : ''}`,
-        ...(dayScore != null ? [`⭐ *DAY SCORE (estimate): ${dayScore}%* (${onTimeToday} of ${scored.length} finished on time)`] : []),
+        // Same line on every report: a person with no finished-with-due-date task today shows '-' instead of silently dropping the line.
+        dayScore != null
+          ? `⭐ *DAY SCORE (estimate): ${dayScore}%* (${onTimeToday} of ${scored.length} finished on time)`
+          : '⭐ *DAY SCORE (estimate): -* (no task finished today with a due date)',
         '',
         '⏱ *TIME*',
         `• Clock in:  ${inRow ? fmtTimeIST(inRow.started_at) : '-'}`,
