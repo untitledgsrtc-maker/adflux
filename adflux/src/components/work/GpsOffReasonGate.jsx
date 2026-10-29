@@ -1,8 +1,9 @@
 // src/components/work/GpsOffReasonGate.jsx
 //
-// Phase 530 — one non-skippable popup when a field rep's GPS has been off for
-// 10+ minutes during the working day. The rep picks a reason and sends it; that
-// releases the popup at once. Admin then marks it Excused / Not excused on
+// Phase 530 / 533 — one non-skippable popup when a field rep's GPS OR internet
+// has been off for 10+ minutes during the working day (one popup, one reason for
+// every unexplained gap of either kind). The rep picks a reason and sends it;
+// that releases the popup at once. Admin then marks it Excused / Not excused on
 // /pending-approvals (a label only: no score, TA or incentive effect).
 //
 // Counts only time inside today's check-in .. check-out window and before 19:00
@@ -23,6 +24,8 @@ const POLL_MS = 60 * 1000
 const REASONS = [
   { value: 'phone_off',             label: 'Phone was switched off' },
   { value: 'battery_dead',          label: 'Battery died' },
+  { value: 'no_signal',             label: 'No network / signal where I was' },
+  { value: 'data_finished',         label: 'Mobile data / recharge finished' },
   { value: 'saving_battery',        label: 'Turned it off to save battery' },
   { value: 'turned_off_by_mistake', label: 'Turned it off by mistake' },
   { value: 'other',                 label: 'Other' },
@@ -35,7 +38,7 @@ const fmtTime = (ms) => new Date(ms).toLocaleTimeString('en-IN', {
 export default function GpsOffReasonGate({ enabled }) {
   const profile = useAuthStore(s => s.profile)
   const uid = profile?.id
-  const [gaps, setGaps] = useState([])          // [{ id, startMs, endMs, open }]
+  const [gaps, setGaps] = useState([])          // [{ id, kind: 'gps'|'net', startMs, endMs, open }]
   const [reason, setReason] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
@@ -67,14 +70,39 @@ export default function GpsOffReasonGate({ enabled }) {
       const long = (events || []).map(e => {
         const startMs = Math.max(new Date(e.toggled_off_at).getTime(), inMs)
         const endMs = Math.min(e.toggled_on_at ? new Date(e.toggled_on_at).getTime() : nowMs, windowEnd)
-        return { id: e.id, startMs, endMs, open: !e.toggled_on_at }
+        return { id: e.id, kind: 'gps', startMs, endMs, open: !e.toggled_on_at }
       }).filter(g => (g.endMs - g.startMs) / 1000 >= MIN_GAP_SECONDS)
-      if (!long.length) { setGaps([]); return }
 
-      const { data: done } = await supabase.from('gps_off_reasons')
-        .select('event_id').in('event_id', long.map(g => g.id))
-      const doneSet = new Set((done || []).map(r => r.event_id))
-      setGaps(long.filter(g => !doneSet.has(g.id) && !sentRef.current.has(g.id)))
+      // Internet gaps (Phase 533). Only rows written by the new tracker count: it inserts a
+      // COMPLETE row after the outage ends (created_at ~ regained_at). Rows from the old
+      // open-row recorder were created at the START of the "gap" and are known to be false.
+      const { data: nets } = await supabase.from('network_off_events')
+        .select('id, lost_at, regained_at, created_at')
+        .eq('user_id', uid)
+        .not('regained_at', 'is', null)
+        .gte('regained_at', ws.check_in_at)
+        .order('lost_at', { ascending: true })
+      const netLong = (nets || [])
+        .filter(n => new Date(n.created_at).getTime() >= new Date(n.regained_at).getTime() - 2 * 60 * 1000)
+        .map(n => {
+          const startMs = Math.max(new Date(n.lost_at).getTime(), inMs)
+          const endMs = Math.min(new Date(n.regained_at).getTime(), windowEnd)
+          return { id: n.id, kind: 'net', startMs, endMs, open: false }
+        }).filter(g => (g.endMs - g.startMs) / 1000 >= MIN_GAP_SECONDS)
+
+      const all = [...long, ...netLong]
+      if (!all.length) { setGaps([]); return }
+
+      const gpsIds = long.map(g => g.id)
+      const netIds = netLong.map(g => g.id)
+      const [gDone, nDone] = await Promise.all([
+        gpsIds.length ? supabase.from('gps_off_reasons').select('event_id').in('event_id', gpsIds) : { data: [] },
+        netIds.length ? supabase.from('net_off_reasons').select('event_id').in('event_id', netIds) : { data: [] },
+      ])
+      const doneSet = new Set([...(gDone.data || []), ...(nDone.data || [])].map(r => r.event_id))
+      setGaps(all
+        .filter(g => !doneSet.has(g.id) && !sentRef.current.has(g.id))
+        .sort((a, b) => a.startMs - b.startMs))
     } catch { /* never break the app shell over this check */ }
   }, [enabled, uid])
 
@@ -108,22 +136,30 @@ export default function GpsOffReasonGate({ enabled }) {
     latchRef.current = true
     setSaving(true)
     setErr('')
-    const rows = gaps.map(g => ({
+    const mk = (g) => ({
       event_id: g.id,
       user_id: uid,
       reason_code: reason,
       reason_note: note.trim() || null,
-    }))
-    const { error } = await supabase.from('gps_off_reasons')
-      .upsert(rows, { onConflict: 'event_id', ignoreDuplicates: true })
+    })
+    const send1 = async (table, list) => {
+      if (!list.length) return null
+      const { error: e } = await supabase.from(table)
+        .upsert(list.map(mk), { onConflict: 'event_id', ignoreDuplicates: true })
+      if (!e) list.forEach(g => sentRef.current.add(g.id))
+      return e
+    }
+    const error = (await send1('gps_off_reasons', gaps.filter(g => g.kind === 'gps')))
+      || (await send1('net_off_reasons', gaps.filter(g => g.kind === 'net')))
     if (error) {
       setErr(error.message || 'Could not send. Try again.')
       setFails(n => n + 1)
       latchRef.current = false
       setSaving(false)
+      // keep only what is still unexplained so a retry doesn't resend the rest
+      setGaps(prev => prev.filter(g => !sentRef.current.has(g.id)))
       return
     }
-    gaps.forEach(g => sentRef.current.add(g.id))
     setFails(0)
     latchRef.current = false
     setSaving(false)
@@ -145,7 +181,7 @@ export default function GpsOffReasonGate({ enabled }) {
     >
       <div
         role="dialog"
-        aria-label="Why was GPS off"
+        aria-label="Why was GPS or internet off"
         style={{
           maxWidth: 440, width: '100%',
           background: 'var(--surface, #1e293b)',
@@ -157,7 +193,9 @@ export default function GpsOffReasonGate({ enabled }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <MapPinOff size={22} style={{ color: 'var(--warning, #F59E0B)' }} />
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text, #f1f5f9)' }}>
-            Your GPS was off
+            {gaps.some(g => g.kind === 'gps') && gaps.some(g => g.kind === 'net')
+              ? 'Your GPS and internet were off'
+              : gaps.some(g => g.kind === 'net') ? 'Your internet was off' : 'Your GPS was off'}
           </h3>
         </div>
         <p style={{ margin: '0 0 12px', fontSize: 13, lineHeight: 1.5, color: 'var(--text-muted, #94a3b8)' }}>
@@ -173,7 +211,7 @@ export default function GpsOffReasonGate({ enabled }) {
                 borderBottom: '1px solid var(--border, #334155)',
               }}
             >
-              {fmtTime(g.startMs)} – {g.open ? 'still off' : fmtTime(g.endMs)}
+              {g.kind === 'net' ? 'Internet' : 'GPS'} · {fmtTime(g.startMs)} – {g.open ? 'still off' : fmtTime(g.endMs)}
               <span style={{ color: 'var(--text-muted, #94a3b8)' }}>
                 {' '}· {Math.round((g.endMs - g.startMs) / 60000)} min
               </span>
