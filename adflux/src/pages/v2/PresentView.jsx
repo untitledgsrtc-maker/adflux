@@ -41,6 +41,14 @@ const navBtn = {
 
 const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/
 
+// "How did it go?" after the deck. Same three levels the meeting log form uses,
+// mapped to lead_activities.outcome (positive / neutral / negative).
+const OUTCOME_CHOICES = [
+  { value: 'good',  label: 'Good',  db: 'positive', color: 'var(--success, #10B981)' },
+  { value: 'maybe', label: 'Maybe', db: 'neutral',  color: 'var(--warning, #F59E0B)' },
+  { value: 'bad',   label: 'Bad',   db: 'negative', color: 'var(--danger, #EF4444)' },
+]
+
 export default function PresentView() {
   const { leadId } = useParams()
   const navigate = useNavigate()
@@ -60,6 +68,14 @@ export default function PresentView() {
   const [emailSending, setEmailSending] = useState(false)
   const [emailErr, setEmailErr] = useState('')
   const endingRef = useRef(false)
+  // After End: re-ask how the meeting went, earlier answer pre-selected.
+  const [leadStage, setLeadStage] = useState('')
+  const [meetingAct, setMeetingAct] = useState(null)       // the meeting row logged before the deck
+  const [outcomeOpen, setOutcomeOpen] = useState(false)
+  const [pickedOutcome, setPickedOutcome] = useState('')
+  const [outcomeSaving, setOutcomeSaving] = useState(false)
+  const [outcomeErr, setOutcomeErr] = useState('')
+  const outcomeSavingRef = useRef(false)
 
   // Phone mode: the deck (same-origin iframe) switches to its phone layout via a
   // media query. When it does, its own floating button bar is hidden (class
@@ -117,9 +133,9 @@ export default function PresentView() {
   useEffect(() => {
     if (!leadId) return
     let alive = true
-    supabase.from('leads').select('email, name').eq('id', leadId).maybeSingle()
+    supabase.from('leads').select('email, name, stage').eq('id', leadId).maybeSingle()
       .then(({ data }) => {
-        if (alive && data) { setLeadEmail(data.email || ''); setLeadName(data.name || '') }
+        if (alive && data) { setLeadEmail(data.email || ''); setLeadName(data.name || ''); setLeadStage(data.stage || '') }
       }, () => {})
     return () => { alive = false }
   }, [leadId])
@@ -166,12 +182,65 @@ export default function PresentView() {
     // The session is already logged + cleared. Offer the thank-you before
     // leaving (only from the End button, only when there's a real lead).
     if (offerThanks && logged && leadId) {
-      setThanksOpen(true)
+      // Re-ask the outcome first, only when this rep logged a meeting on the
+      // lead in the last 12h (never creates a row) and the lead is not Lost
+      // (a Lost lead's stage would disagree with a changed outcome).
+      let act = null
+      if (leadStage !== 'Lost') {
+        try {
+          const { data } = await supabase.from('lead_activities')
+            .select('id, outcome, notes')
+            .eq('lead_id', leadId)
+            .eq('created_by', profile?.id)
+            .in('activity_type', ['meeting', 'site_visit'])
+            .gte('created_at', new Date(Date.now() - 12 * 3600 * 1000).toISOString())
+            .order('created_at', { ascending: false })
+            .limit(5)
+          act = (data || []).find(a => {
+            const n = String(a.notes || '')
+            return !n.startsWith('Meeting scheduled') && !n.startsWith("I'm here · auto-check-in")
+          }) || null
+        } catch { act = null }
+      }
+      if (act) {
+        setMeetingAct(act)
+        setPickedOutcome(OUTCOME_CHOICES.find(o => o.db === act.outcome)?.value || '')
+        setOutcomeOpen(true)
+      } else {
+        setThanksOpen(true)
+      }
       setEnding(false)
       return
     }
     exit()
-  }, [leadId, profile, exit])
+  }, [leadId, profile, exit, leadStage])
+
+  // Save the (possibly changed) outcome on the meeting row, then go on to the
+  // follow-up prompt. Unchanged answer = no write. Errors stay inline (this view
+  // is outside the shell, so a toast wouldn't show) and Skip still works.
+  const saveOutcome = useCallback(async () => {
+    if (outcomeSavingRef.current) return
+    outcomeSavingRef.current = true
+    setOutcomeSaving(true)
+    setOutcomeErr('')
+    try {
+      const next = OUTCOME_CHOICES.find(o => o.value === pickedOutcome)?.db
+      if (next && meetingAct && next !== meetingAct.outcome) {
+        const { error } = await supabase.from('lead_activities')
+          .update({ outcome: next }).eq('id', meetingAct.id)
+        if (error) throw error
+      }
+    } catch (e) {
+      setOutcomeErr(e?.message || 'Could not update the outcome.')
+      outcomeSavingRef.current = false
+      setOutcomeSaving(false)
+      return
+    }
+    outcomeSavingRef.current = false
+    setOutcomeSaving(false)
+    setOutcomeOpen(false)
+    setThanksOpen(true)
+  }, [pickedOutcome, meetingAct])
 
   // Phase 322 — send the "thank you for meeting today" WhatsApp + brochure from
   // the company number. The server (send-template.js, pickKey='meeting_done')
@@ -401,6 +470,88 @@ export default function PresentView() {
           {deckPhone ? 'End' : 'End Presentation'}
         </button>
       </div>
+
+      {/* After "End Presentation": how did the meeting go? The answer given when
+          the meeting was logged is pre-selected; one tap on Confirm keeps it. */}
+      {outcomeOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9100,
+            background: 'rgba(2,6,23,0.72)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 420, width: '100%',
+              background: 'var(--surface, #1e293b)',
+              border: '1px solid var(--border, #334155)',
+              borderRadius: 14,
+              padding: 20,
+              fontFamily: 'var(--font-sans, system-ui)',
+            }}
+          >
+            <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--text, #f1f5f9)' }}>
+              How did the meeting go?
+            </h3>
+            <p style={{ margin: '0 0 14px', fontSize: 14, lineHeight: 1.5, color: 'var(--text-muted, #94a3b8)' }}>
+              Your earlier answer is selected. Change it if the presentation changed things.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {OUTCOME_CHOICES.map(o => {
+                const on = pickedOutcome === o.value
+                return (
+                  <button
+                    key={o.value}
+                    onClick={() => setPickedOutcome(o.value)}
+                    disabled={outcomeSaving}
+                    aria-pressed={on}
+                    style={{
+                      flex: 1, minHeight: 44, borderRadius: 10, cursor: 'pointer',
+                      border: `1px solid ${on ? o.color : 'var(--border-strong, #475569)'}`,
+                      background: on ? 'var(--surface-2, #334155)' : 'transparent',
+                      color: on ? o.color : 'var(--text, #f1f5f9)',
+                      fontSize: 14, fontWeight: 700,
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                )
+              })}
+            </div>
+            {outcomeErr && (
+              <div style={{ marginTop: 10, fontSize: 13, color: 'var(--danger, #EF4444)' }}>{outcomeErr}</div>
+            )}
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button
+                onClick={() => { setOutcomeOpen(false); setThanksOpen(true) }}
+                disabled={outcomeSaving}
+                style={{
+                  flex: 1, minHeight: 44, borderRadius: 10, cursor: 'pointer',
+                  border: '1px solid var(--border, #334155)', background: 'transparent',
+                  color: 'var(--text, #f1f5f9)', fontSize: 14, fontWeight: 600,
+                }}
+              >
+                Skip
+              </button>
+              <button
+                onClick={saveOutcome}
+                disabled={outcomeSaving || !pickedOutcome}
+                style={{
+                  flex: 2, minHeight: 44, borderRadius: 10, border: 'none',
+                  background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)',
+                  fontSize: 14, fontWeight: 700,
+                  cursor: outcomeSaving || !pickedOutcome ? 'default' : 'pointer',
+                  opacity: outcomeSaving || !pickedOutcome ? 0.7 : 1,
+                }}
+              >
+                {outcomeSaving ? 'Saving…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Phase 322 — after "End Presentation", offer to follow up with the
           customer: a WhatsApp thank-you + brochure from the company number, OR
