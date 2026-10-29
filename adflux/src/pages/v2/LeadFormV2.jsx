@@ -23,6 +23,8 @@ import PhotoCapture from '../../components/leads/PhotoCapture'
 import VoiceInput   from '../../components/voice/VoiceInput'
 import CityAutocomplete from '../../components/leads/CityAutocomplete'
 import PlaceSuggest from '../../components/leads/PlaceSuggest'
+import MeetingWrapModal from '../../components/leads/MeetingWrapModal'
+import { guessIndustry } from '../../utils/industryGuess'
 import { findLeadByPhone } from '../../utils/leadDedup'
 
 const SOURCES = [
@@ -102,7 +104,9 @@ export default function LeadFormV2() {
   // outcome). Captures once on mount; rep can hit Refresh on the pill.
   const [gps,    setGps]    = useState(null)   // { lat, lng, acc }
   const [gpsBusy, setGpsBusy] = useState(false)
-  const [outcome, setOutcome] = useState('')   // meeting-mode only
+  // Meeting mode: outcome + notes are asked LAST (MeetingWrapModal), after the
+  // optional presentation. { leadId, activityId, next } while that step is open.
+  const [wrap, setWrap] = useState(null)
 
   async function checkPhoneDup(p) {
     setDupLead(null)
@@ -111,6 +115,14 @@ export default function LeadFormV2() {
   }
 
   function set(k, v) { setForm(prev => ({ ...prev, [k]: v })) }
+
+  // Industry hint from the company name (no API). Only when Industry is empty;
+  // the rep can overwrite it.
+  function fillIndustryFromName() {
+    setForm(prev => (prev.industry || !prev.company)
+      ? prev
+      : { ...prev, industry: guessIndustry({ name: prev.company }) })
+  }
 
   useEffect(() => {
     supabase
@@ -163,7 +175,7 @@ export default function LeadFormV2() {
     // batches state updates, so a second tap while the previous
     // save's `setSaving(true)` is still pending sneaks through.
     // Guard at the top of the handler closes that window.
-    if (savingRef.current || saving) return
+    if (savingRef.current || saving || wrap) return
     setError('')
     if (!form.name.trim()) {
       setError('Person name is required.')
@@ -214,10 +226,6 @@ export default function LeadFormV2() {
       setError('Your profile is not allowed to create Private leads.')
       return
     }
-    if (meetingMode && !outcome) {
-      setError('Pick an outcome — Good / Maybe / Lost.')
-      return
-    }
     // Truth 3c — replicate the Phase 84.4 hard GPS gate here. LogMeetingModal
     // (still mounted on WorkV2 for the floating meeting button) has the gate;
     // this SEPARATE meetingMode entry point was always GPS-optional, so a rep
@@ -263,9 +271,10 @@ export default function LeadFormV2() {
     if (meetingMode) {
       payload.source = 'Field Meeting'
       payload.segment = 'PRIVATE'
-      payload.heat    = outcome === 'good' ? 'warm' : 'cold'
-      payload.stage   = outcome === 'lost' ? 'Lost' : 'Working'
-      if (outcome === 'lost') payload.lost_reason = 'NoNeed'
+      // Outcome is asked last (MeetingWrapModal): start cold / Working here;
+      // Lost + the outcome-driven heat are applied there.
+      payload.heat    = 'cold'
+      payload.stage   = 'Working'
     }
 
     const { data, error: err } = await supabase
@@ -284,42 +293,48 @@ export default function LeadFormV2() {
     // meetingMode. Mirrors LogMeetingModal's insert: outcome maps to
     // lead_activities.outcome enum, GPS coords attached if captured.
     // Trigger Phase 32M bumps daily_counters.meetings server-side.
+    let meetingActId = null
     if (meetingMode) {
-      const activityNotes = [
-        `Field meeting · ${outcome}`,
-        form.notes.trim() || null,
-      ].filter(Boolean).join(' — ')
-      const { error: actErr } = await supabase.from('lead_activities').insert([{
+      // Outcome + notes are filled in later by MeetingWrapModal (outcome null for now).
+      const { data: actRow, error: actErr } = await supabase.from('lead_activities').insert([{
         lead_id:        data.id,
         activity_type:  'meeting',
-        outcome:        outcome === 'good' ? 'positive'
-                        : outcome === 'maybe' ? 'neutral'
-                        : 'negative',
-        notes:          activityNotes,
+        outcome:        null,
+        notes:          'Field meeting',
         created_by:     profile.id,
         gps_lat:        gps?.lat || null,
         gps_lng:        gps?.lng || null,
         gps_accuracy_m: gps?.acc || null,
-      }])
-      if (actErr) {
+      }]).select('id').single()
+      meetingActId = actRow?.id || null
+      if (actErr || !meetingActId) {
         setSaving(false)
         savingRef.current = false   // Phase 113.4 — release latch
-        setError(`Lead saved, but meeting log failed: ${actErr.message}.`)
+        setError(`Lead saved, but meeting log failed: ${actErr?.message || 'no row returned'}.`)
         return
       }
     }
-    setSaving(false)
-    savingRef.current = false   // Phase 113.4 — release latch
+    // Meeting mode keeps the latch held through the presentation prompt and the
+    // outcome screen (it ends by navigating away), so a stray tap can't save twice.
+    if (!(meetingMode && data?.id)) {
+      setSaving(false)
+      savingRef.current = false   // Phase 113.4 — release latch
+    }
     // Phase 181 — after logging a field meeting, offer the in-app GSRTC
     // presentation (logs the time to this lead). "Not now" → /work as before.
-    if (meetingMode && !openAfter && data?.id) {
-      const yes = await confirmDialog({
-        title: 'Meeting logged',
-        message: 'Start the GSRTC presentation now? The time you spend is recorded on this lead.',
-        confirmLabel: 'Start Presentation',
-        cancelLabel: 'Not now',
-      })
-      navigate(yes ? `/present/${data.id}` : '/work')
+    if (meetingMode && data?.id) {
+      if (!openAfter) {
+        const yes = await confirmDialog({
+          title: 'Meeting logged',
+          message: 'Start the GSRTC presentation now? The time you spend is recorded on this lead.',
+          confirmLabel: 'Start Presentation',
+          cancelLabel: 'Not now',
+        })
+        // The presentation screen asks the outcome when it ends.
+        if (yes) { navigate(`/present/${data.id}`); return }
+      }
+      // No presentation: ask the outcome + notes right now.
+      setWrap({ leadId: data.id, activityId: meetingActId, next: openAfter ? `/leads/${data.id}` : '/work' })
       return
     }
     navigate(openAfter ? `/leads/${data.id}` : (meetingMode ? '/work' : '/leads'))
@@ -495,6 +510,7 @@ export default function LeadFormV2() {
                 value={form.company}
                 onChange={v => set('company', v)}
                 near={gps}
+                onBlur={fillIndustryFromName}
                 placeholder="e.g. Sunrise Diagnostics — type to search Google"
                 onPick={place => {
                   setForm(prev => ({
@@ -503,13 +519,14 @@ export default function LeadFormV2() {
                     phone:   prev.phone   || place.phone   || '',
                     city:    prev.city    || place.city    || '',
                     website: prev.website || place.website || '',
+                    industry: prev.industry || guessIndustry({ types: place.types, name: place.name }),
                   }))
                   if (!form.phone && place.phone) checkPhoneDup(place.phone)
                 }}
               />
             </div>
           ) : (
-            <Field label="Company *"      value={form.company}     onChange={v => set('company', v)}     placeholder="e.g. Sunrise Diagnostics" />
+            <Field label="Company *"      value={form.company}     onChange={v => set('company', v)}     onBlur={fillIndustryFromName} placeholder="e.g. Sunrise Diagnostics" />
           )}
           <Field label="Person name *"  value={form.name}        onChange={v => set('name', v)}        placeholder="e.g. Dr. Mehta" />
           <Field label="Designation"    value={form.designation} onChange={v => set('designation', v)} placeholder="e.g. Marketing Manager" />
@@ -652,64 +669,21 @@ export default function LeadFormV2() {
         </div>
       </div>
 
-      {/* Phase 34Z.20 — Outcome section, meeting-mode only. Same three
-          tone buttons LogMeetingModal had. Drives heat + stage on the
-          new lead row and the lead_activities.outcome enum. */}
-      {meetingMode && (
-        <div className="lead-card" style={{ marginBottom: 14 }}>
-          <div className="lead-card-head"><div className="lead-card-title">Outcome *</div></div>
-          <div className="lead-card-pad">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {[
-                { value: 'good',  label: 'Good',  sub: 'Wants quote / more info', tone: 'success' },
-                { value: 'maybe', label: 'Maybe', sub: 'Come back in 30 days',    tone: 'warn'    },
-                { value: 'lost',  label: 'Lost',  sub: 'Politely refused',        tone: 'danger'  },
-              ].map((o) => {
-                const on = outcome === o.value
-                const tint =
-                  o.tone === 'success' ? 'var(--tint-success, rgba(16,185,129,0.14))'
-                  : o.tone === 'warn'  ? 'var(--tint-warning, rgba(245,158,11,0.14))'
-                  :                       'var(--tint-danger, rgba(239,68,68,0.14))'
-                const bd =
-                  o.tone === 'success' ? 'var(--success)'
-                  : o.tone === 'warn'  ? 'var(--warning)'
-                  :                       'var(--danger)'
-                return (
-                  <button
-                    key={o.value}
-                    type="button"
-                    onClick={() => setOutcome(o.value)}
-                    style={{
-                      padding: '10px 12px', borderRadius: 8,
-                      border: `1.5px solid ${on ? bd : 'var(--border-strong)'}`,
-                      background: on ? tint : 'var(--surface-2)',
-                      color: 'var(--text)', cursor: 'pointer',
-                      textAlign: 'left', fontFamily: 'inherit',
-                    }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{o.label}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{o.sub}</div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+      {/* ─── Notes ─── (meeting mode asks notes + outcome last, in MeetingWrapModal) */}
+      {/* Phase 33F (K3) — voice mic on Notes textarea. */}
+      {!meetingMode && (
+        <div className="lead-card lead-card-pad" style={{ marginBottom: 14 }}>
+          <label className="lead-fld-label">Notes</label>
+          <VoiceInput
+            multiline
+            rows={3}
+            value={form.notes}
+            onChange={(v) => set('notes', v)}
+            placeholder="Visited last Diwali, owner met us at the trade fair…"
+            languageHint="gu"
+          />
         </div>
       )}
-
-      {/* ─── Notes ─── */}
-      {/* Phase 33F (K3) — voice mic on Notes textarea. */}
-      <div className="lead-card lead-card-pad" style={{ marginBottom: 14 }}>
-        <label className="lead-fld-label">Notes</label>
-        <VoiceInput
-          multiline
-          rows={3}
-          value={form.notes}
-          onChange={(v) => set('notes', v)}
-          placeholder="Visited last Diwali, owner met us at the trade fair…"
-          languageHint="gu"
-        />
-      </div>
 
       {error && (
         <div
@@ -736,6 +710,14 @@ export default function LeadFormV2() {
             : <><Save size={12} /> {meetingMode ? 'Save meeting' : 'Save Lead'}</>}
         </button>
       </div>
+
+      {wrap && (
+        <MeetingWrapModal
+          leadId={wrap.leadId}
+          activityId={wrap.activityId}
+          onDone={() => navigate(wrap.next, { replace: true })}
+        />
+      )}
     </div>
   )
 }

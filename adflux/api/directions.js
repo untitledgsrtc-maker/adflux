@@ -81,7 +81,7 @@ function guardProxy(req, res) {
 // serverless functions, and a separate api/places-search.js made the whole
 // deploy fail (exceeded_serverless_functions_per_deployment, 29 Oct 2026).
 // GET /api/directions?places=1&q=<text>[&lat=&lng=]  -> { results: [{id,name,address}] }
-// GET /api/directions?places=1&id=<placeId>           -> { place: {name,address,city,phone,website} }
+// GET /api/directions?places=1&id=<placeId>           -> { place: {name,address,city,phone,website,types} }
 // Needs "Places API (New)" enabled + allowed on the ROADS_KEY_SERVER key.
 const PLACE_ID_RE = /^[A-Za-z0-9_-]{10,200}$/
 
@@ -103,7 +103,7 @@ async function placesHandler(req, res, key) {
       const r = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(String(id))}`, {
         headers: {
           'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'id,displayName,formattedAddress,addressComponents,nationalPhoneNumber,websiteUri',
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,addressComponents,nationalPhoneNumber,websiteUri,types',
         },
         signal: AbortSignal.timeout(8000),
       })
@@ -120,6 +120,7 @@ async function placesHandler(req, res, key) {
                    || componentOf(j.addressComponents, 'administrative_area_level_2'),
           phone:   j.nationalPhoneNumber || '',
           website: j.websiteUri || '',
+          types:   Array.isArray(j.types) ? j.types : [],
         },
       })
       return

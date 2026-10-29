@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-export default function PlaceSuggest({ value, onChange, onPick, near, placeholder }) {
+export default function PlaceSuggest({ value, onChange, onPick, onBlur, near, placeholder }) {
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -77,12 +77,13 @@ export default function PlaceSuggest({ value, onChange, onPick, near, placeholde
           city:    place?.city || '',
           phone:   digits.length === 10 ? digits : '',
           website: place?.website || '',
+          types:   Array.isArray(place?.types) ? place.types : [],
         })
       } else {
-        onPick({ name: p.name, address: p.address, city: '', phone: '', website: '' })
+        onPick({ name: p.name, address: p.address, city: '', phone: '', website: '', types: [] })
       }
     } catch {
-      onPick({ name: p.name, address: p.address, city: '', phone: '', website: '' })
+      onPick({ name: p.name, address: p.address, city: '', phone: '', website: '', types: [] })
     }
     setPicking(false)
     pickLatchRef.current = false
@@ -95,6 +96,7 @@ export default function PlaceSuggest({ value, onChange, onPick, near, placeholde
         value={value || ''}
         onChange={(e) => { typedRef.current = true; onChange(e.target.value); setOpen(true) }}
         onFocus={() => { if (results.length) setOpen(true) }}
+        onBlur={onBlur}
         placeholder={placeholder}
         autoComplete="off"
       />
