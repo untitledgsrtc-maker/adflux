@@ -38,6 +38,7 @@ import WindowsAgentBridge from '../work/WindowsAgentBridge'
 import { ToastViewport, pushToast } from './Toast'
 import AppUpdateBanner from './AppUpdateBanner'
 import GpsSetupPrompt from './GpsSetupPrompt'
+import GpsOffReasonGate from '../work/GpsOffReasonGate'
 import { ConfirmDialogViewport } from './ConfirmDialog'
 import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
@@ -1164,6 +1165,9 @@ export function V2AppShell() {
 
       {/* Global toast viewport — bottomGap clears the mobile bottom nav. */}
       <ToastViewport bottomGap={isMobile ? 76 : 16} />
+
+      {/* Phase 530 — one non-skippable "why was GPS off" popup for field sales (10+ min off). */}
+      <GpsOffReasonGate enabled={profile?.role === 'sales' && profile?.team_role !== 'sales_manager'} />
 
       {/* Promise-based confirm dialog viewport. */}
       <ConfirmDialogViewport />
