@@ -353,6 +353,8 @@ function Reports({ d, cp, stations, isAdmin, totalScr, offN, show }) {
 
 function FaultPanel({ f, stations, d, techList, techName, onClose, openScr, show, reload }) {
   const st = stations[f.st] || { name: 'Station', scr: [] }
+  // real screen name from the CMS (e.g. "ANKLESHWAR P2" -> "P2"); a plain number stays "Screen 5"
+  const scrLabel = n => { const nm = (st.scr.find(x => x.n === n)?.name || '').trim(), tok = nm.split(/\s+/).pop(); return !tok ? 'Screen ' + n : /^\d+$/.test(tok) ? 'Screen ' + tok : tok }
   const [busy, setBusy] = useState(false)
   const reasonOf = f.tickets[0]?.cause || d.issues[f.tickets[0]?.issue_type_id]
   const reassign = async (userId) => {
@@ -374,7 +376,7 @@ function FaultPanel({ f, stations, d, techList, techName, onClose, openScr, show
   }
   const phone = d.phones[f.tech]
   return (
-    <Sheet side title={`${st.name} · ${f.scr.length ? 'Screen ' + f.scr.join(', ') : SRC[f.src][0]}`} onClose={onClose}
+    <Sheet side title={`${st.name} · ${f.scr.length ? f.scr.map(scrLabel).join(', ') : SRC[f.src][0]}`} onClose={onClose}
       footer={f.status !== 'fixed' && <>
         <div style={{ width: 200 }}><Sel label="Reassign" value="" onChange={reassign} opts={[['', 'Reassign to...'], ...techList.map(t => [t.id, t.n])]} /></div>
         {phone && <Btn icon="phone" onClick={() => dialPhone(phone)}>Call {first(techName(f.tech))}</Btn>}
@@ -383,7 +385,7 @@ function FaultPanel({ f, stations, d, techList, techName, onClose, openScr, show
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}><StatPill s={f.status} /><SrcTag s={f.src} />{f.age > 0 && <Pill icon="clock"><span className="mono">{age(f.age)}</span></Pill>}</div>
       {f.esc && <div className={f.escT === 'da' ? 'errrow' : 'warnrow'}><Ic n="flag" /><span>{f.esc}</span></div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>{[['Technician', f.tech ? techName(f.tech) : 'None'], ['What is wrong', reasonOf || 'Not picked yet'], ['Opened', f.tickets[0] ? `${dd(f.tickets[0].created_at)} ${hhmm(f.tickets[0].created_at)}` : '–'], ['Notes', f.tickets[0]?.notes || f.note || '–']].map(([l, v]) => <div key={l}><div className="lbl">{l}</div><div>{v}</div></div>)}</div>
-      {f.scr.length > 0 && <div style={{ display: 'grid', gap: 8 }}><span className="lbl">Screens</span><div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>{f.scr.map(n => <Btn key={n} sm icon="mon" onClick={() => openScr(st, n)}>Screen {n}</Btn>)}</div></div>}
+      {f.scr.length > 0 && <div style={{ display: 'grid', gap: 8 }}><span className="lbl">Screens</span><div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>{f.scr.map(n => <Btn key={n} sm icon="mon" onClick={() => openScr(st, n)}>{scrLabel(n)}</Btn>)}</div></div>}
     </Sheet>
   )
 }
