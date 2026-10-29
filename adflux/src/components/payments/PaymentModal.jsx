@@ -14,6 +14,8 @@ import { X, CreditCard, AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
 import { formatCurrency, todayISO } from '../../utils/formatters'
 import { useAuthStore } from '../../store/authStore'
 import { PAYMENT_MODES } from '../../utils/constants'
+import PaymentProofField from './PaymentProofField'
+import { paymentNeedsProof, uploadPaymentProof, removePaymentProof } from '../../utils/paymentProof'
 
 const today = () => todayISO()
 
@@ -52,6 +54,11 @@ export function PaymentModal({
   // Received (closes the deal at quote total) and the withheld part is
   // recorded here. Private flow renders byte-identical (field hidden).
   const isGovt = quote?.segment === 'GOVERNMENT'
+
+  // Phase 529 — a NEW Private payment needs client proof (Google review
+  // screenshot or testimonial video) unless this quote already has one on file.
+  const needsProof = paymentNeedsProof({ quote, existingPayments, isEdit, isAdmin })
+  const [proof, setProof] = useState({ type: 'google_review', file: null })
 
   const [form, setForm] = useState(() => initialPayment ? {
     amount_received:   initialPayment.amount_received ?? '',
@@ -164,6 +171,9 @@ export function PaymentModal({
         `Only ${formatCurrency(effectiveOutstanding)} is left to collect — adjust this amount or wait for admin to approve/reject the pending one.`
     }
     if (!form.payment_date) errs.payment_date = 'Date is required'
+    if (needsProof && !proof.file) {
+      errs.proof = 'Attach the client\'s Google review screenshot or a testimonial video to add this payment.'
+    }
     // Money Truth — TDS is part of the gross, never more than it.
     const tds = parseFloat(form.tds_amount)
     if (form.tds_amount !== '' && (isNaN(tds) || tds < 0)) {
@@ -214,8 +224,21 @@ export function PaymentModal({
     const _camt = isGovt && _cpct > 0 && _amt > 0 ? Math.round(_amt * _ratio * _cpct / 100) : null
     const { commission_pct: _dropCpct, ...formRest } = form
     const commFields = _camt != null ? { commission_pct: _cpct, commission_amount: _camt } : {}
+    // Phase 529 — upload the client proof first; no proof saved = no payment.
+    let proofFields = {}
+    if (needsProof) {
+      try {
+        const path = await uploadPaymentProof(quote.id, proof.file)
+        proofFields = { proof_type: proof.type, proof_path: path }
+      } catch (e) {
+        setSaving(false)
+        setGlobalError(`Could not upload the proof: ${e?.message || 'please try again'}`)
+        return
+      }
+    }
     const { error } = await onSave({
       ...formRest,
+      ...proofFields,
       amount_received: _amt,
       // gross stays in amount_received; TDS is the withheld breakdown
       tds_amount: form.tds_amount === '' ? null : parseFloat(form.tds_amount),
@@ -223,6 +246,7 @@ export function PaymentModal({
     })
     setSaving(false)
     if (error) {
+      if (proofFields.proof_path) removePaymentProof(proofFields.proof_path)
       setGlobalError(error.message || 'Failed to save payment')
       return
     }
@@ -556,6 +580,15 @@ export function PaymentModal({
                     </div>
                   )}
                 </>
+              )}
+
+              {needsProof && (
+                <PaymentProofField
+                  value={proof}
+                  onChange={setProof}
+                  clientPhone={quote?.client_phone}
+                  error={errors.proof}
+                />
               )}
 
               {/* Sales context: explain approval flow */}

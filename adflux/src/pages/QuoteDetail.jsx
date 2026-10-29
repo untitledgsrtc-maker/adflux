@@ -1101,6 +1101,7 @@ export default function QuoteDetail() {
         <WonPaymentModal
           quote={quote}
           totalPaid={totalPaid}
+          hasProof={(hookPayments || []).some(p => p.proof_path && p.approval_status !== 'rejected')}
           onConfirm={handleWonWithPayment}
           onClose={() => setShowWonModal(false)}
         />

@@ -16,6 +16,9 @@ import { useRef, useState, useEffect } from 'react'
 import { CheckCircle2, Paperclip, Upload, Trophy } from 'lucide-react'
 import { formatCurrency, todayISO } from '../../utils/formatters'
 import V2Hero from '../v2/V2Hero'
+import PaymentProofField from './PaymentProofField'
+import { uploadPaymentProof } from '../../utils/paymentProof'
+import { useAuthStore } from '../../store/authStore'
 
 /**
  * Mark-Won pre-flight + payment-capture modal.
@@ -46,6 +49,8 @@ export function WonPaymentModal({
   workOrderUploaded   = false,
   onUploadWorkOrder   = null,
   uploadingWorkOrder  = false,
+  // Phase 529 — true when this quote already has client proof on a payment.
+  hasProof            = false,
 }) {
   const today = todayISO()
   const woFileInput = useRef(null)
@@ -178,6 +183,15 @@ export function WonPaymentModal({
   const balance = Number(quote.total_amount || 0) - Number(totalPaid || 0) - (Number(form.amount_received) || 0)
   const campaignDatesValid = form.campaign_start_date && form.campaign_end_date
   const newAmount = Number(form.amount_received) || 0
+  // Phase 529 — recording a payment on a PRIVATE quote needs client proof (Google
+  // review screenshot / testimonial video) unless the quote already has one.
+  // Marking Won with no payment stays unchanged.
+  const isAdminUser = useAuthStore(s => s.profile?.role) === 'admin'   // admin entries are exempt
+  const needsProof = !isGovt && !isAdminUser && newAmount > 0 && !hasProof
+  const proofBusyRef = useRef(false)
+  const [proof, setProof] = useState({ type: 'google_review', file: null })
+  const [proofErr, setProofErr] = useState('')
+  const [proofBusy, setProofBusy] = useState(false)
   // Phase 273 — commission books this payment's ex-GST share of the quote
   // base (subtotal/total); on full collection the sum = subtotal × %.
   const commBaseRatio = (Number(quote?.subtotal) || 0) > 0 && (Number(quote?.total_amount) || 0) > 0
@@ -191,7 +205,7 @@ export function WonPaymentModal({
   // try to mark Won without the formal award document — the agency's
   // proof of contract closure.
   const woGatePassed = !workOrderRequired || workOrderUploaded
-  const canConfirm   = campaignDatesValid && woGatePassed && !uploadingWorkOrder
+  const canConfirm   = campaignDatesValid && woGatePassed && !uploadingWorkOrder && (!needsProof || !!proof.file) && !proofBusy
 
   function handleWoFilePicked(e) {
     const file = e.target.files?.[0]
@@ -522,12 +536,40 @@ export function WonPaymentModal({
               </label>
             </div>
           )}
+
+          {needsProof && (
+            <PaymentProofField
+              value={proof}
+              onChange={v => { setProof(v); setProofErr('') }}
+              clientPhone={quote?.client_phone}
+              error={proofErr}
+            />
+          )}
         </div>
         <div className="md-f">
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button
             className="btn btn-y"
-            onClick={() => {
+            onClick={async () => {
+              if (proofBusyRef.current) return
+              proofBusyRef.current = true
+              // Phase 529 — upload the client proof first; no proof saved = no payment.
+              let proofFields = {}
+              if (needsProof) {
+                setProofBusy(true)
+                setProofErr('')
+                try {
+                  const path = await uploadPaymentProof(quote.id, proof.file)
+                  proofFields = { proof_type: proof.type, proof_path: path }
+                } catch (e) {
+                  setProofErr(`Could not upload the proof: ${e?.message || 'please try again'}`)
+                  setProofBusy(false)
+                  proofBusyRef.current = false
+                  return
+                }
+                setProofBusy(false)
+              }
+              proofBusyRef.current = false
               // Phase 273 — govt-team commission on this payment (our cost).
               // Only ADD the commission columns when there's a real commission,
               // and drop commission_pct from the spread — so a plain won-payment
@@ -539,6 +581,7 @@ export function WonPaymentModal({
               const commFields = _camt != null ? { commission_pct: _cpct, commission_amount: _camt } : {}
               onConfirm({
                 ...formRest,
+                ...proofFields,
                 // numeric-or-null so the payments insert never sees '' in a
                 // numeric column; TDS capped at the gross it is part of
                 tds_amount: form.tds_amount === '' ? null
@@ -550,7 +593,9 @@ export function WonPaymentModal({
             title={
               !campaignDatesValid
                 ? 'Campaign dates are required to mark Won'
-                : (workOrderRequired && !workOrderUploaded)
+                : (needsProof && !proof.file)
+                  ? 'Attach the client proof (Google review or testimonial video) first'
+                  : (workOrderRequired && !workOrderUploaded)
                   ? 'Upload Work Order / PO copy first'
                   : uploadingWorkOrder
                     ? 'Wait for upload to finish'

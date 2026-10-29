@@ -25,6 +25,7 @@ import { fetchPendingApprovals, fetchApprovedPayments } from '../../hooks/usePay
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { toastError } from '../../components/v2/Toast'
 import V2Hero from '../../components/v2/V2Hero'
+import ProofLink from '../../components/payments/ProofLink'
 // Phase 360 - private-LED quotes priced below Rs 600/screen wait here for the
 // admin (the Sales Head approves from /quote-approvals). Hidden when empty.
 import QuotePriceApprovals from '../../components/quotes/QuotePriceApprovals'
@@ -283,6 +284,7 @@ export default function PendingApprovalsV2() {
                   {row.payment_notes && row.payment_notes.trim().length >= 2 && (
                     <div className="v2d-pa-note">"{row.payment_notes.trim()}"</div>
                   )}
+                  <ProofLink payment={row} style={{ marginTop: 6 }} />
                 </div>
 
                 <div className="v2d-pa-actions">

@@ -8,6 +8,7 @@
 import { Banknote, CheckCircle2, Clock, Edit2, Trash2, XCircle } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { useAuthStore } from '../../store/authStore'
+import ProofLink from './ProofLink'
 
 function StatusBadge({ status, rejectionReason }) {
   if (status === 'approved') {
@@ -144,6 +145,7 @@ export function PaymentHistory({ payments = [], loading, onEdit, onDelete }) {
               {p.payment_notes && (
                 <div className="ph-notes">{p.payment_notes}</div>
               )}
+              <ProofLink payment={p} style={{ marginTop: 6 }} />
               {isRejected && p.rejection_reason && (
                 <div className="ph-notes" style={{ color: 'var(--danger)', marginTop: 4 }}>
                   Rejection reason: {p.rejection_reason}
