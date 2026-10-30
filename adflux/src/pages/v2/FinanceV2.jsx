@@ -47,19 +47,22 @@ export default function FinanceV2() {
   const profile = useAuthStore(s => s.profile)
   const canView = ['admin', 'co_owner', 'accounts'].includes(profile?.role)
   const [sp, setSp] = useSearchParams()
-  const tab = sp.get('tab') || 'pnl'
+  // Phase 537: accounts does not see profit (Owner P&L) or Rev split; she lands on Accounts Home.
+  const isAccounts = profile?.role === 'accounts'
+  const wanted = sp.get('tab') || (isAccounts ? 'home' : 'pnl')
+  const tab = isAccounts && (wanted === 'pnl' || wanted === 'revsplit') ? 'home' : wanted
   const setTab = (t) => { const n = new URLSearchParams(sp); n.set('tab', t); setSp(n, { replace: true }) }
 
   if (!canView) return <div className="v2d-page"><Card>Finance is for admin + accounts only.</Card></div>
 
   const TABS = [
-    { key: 'pnl', label: 'Owner · P&L', icon: LayoutDashboard },
+    ...(isAccounts ? [] : [{ key: 'pnl', label: 'Owner · P&L', icon: LayoutDashboard }]),
     { key: 'home', label: 'Accounts Home', icon: Home },
     { key: 'reconcile', label: 'Reconcile', icon: ArrowLeftRight },
     { key: 'tasks', label: 'Tasks', icon: CheckSquare },
     { key: 'import', label: 'Import', icon: Upload },
     { key: 'register', label: 'Register', icon: ListChecks },
-    ...(profile?.role === 'co_owner' ? [] : [{ key: 'revsplit', label: 'Rev split', icon: IndianRupee }]),
+    ...(profile?.role === 'co_owner' || isAccounts ? [] : [{ key: 'revsplit', label: 'Rev split', icon: IndianRupee }]),
   ]
 
   return (
@@ -68,7 +71,7 @@ export default function FinanceV2() {
         <div>
           <div className="v2d-page-kicker">Untitled Group · Consolidated</div>
           <h1 className="v2d-page-title">Finance</h1>
-          <div className="v2d-page-sub">Income from your won deals (ex-GST), costs from your bank statements. You + Accounts see all · Vishal (co-owner) Government only.</div>
+          <div className="v2d-page-sub">Income from your won deals (ex-GST), costs from your bank statements. You see all · Accounts sees the bank work, not profit · Vishal (co-owner) Government only.</div>
         </div>
       </div>
 
@@ -93,7 +96,7 @@ export default function FinanceV2() {
       {tab === 'tasks' && <TasksTab />}
       {tab === 'import' && <ImportTab />}
       {tab === 'register' && <RegisterTab />}
-      {tab === 'revsplit' && profile?.role !== 'co_owner' && <FinanceRevSplit />}
+      {tab === 'revsplit' && profile?.role !== 'co_owner' && !isAccounts && <FinanceRevSplit />}
     </div>
   )
 }
