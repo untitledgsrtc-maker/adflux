@@ -2138,7 +2138,11 @@ export default function GovtProposalDetailV2() {
 
       {/* Phase 510 - Auto Hood costing: admin + accounts edit, a government partner reads. Deducts in Finance. */}
       {quote.media_type === 'AUTO_HOOD' && (isAdmin || profile?.role === 'accounts' || profile?.team_role === 'government_partner') && (
-        <QuoteCostingCard quote={quote} canEdit={isAdmin || profile?.role === 'accounts'} />
+        <QuoteCostingCard
+          quote={quote}
+          canEdit={isAdmin || profile?.role === 'accounts'}
+          showMargin={isAdmin || profile?.team_role === 'government_partner'}
+        />
       )}
 
       {/* Add Payment modal */}

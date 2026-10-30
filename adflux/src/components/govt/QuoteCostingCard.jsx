@@ -2,6 +2,8 @@
 // Cost lines (vendor / printing / installation / other) typed against ONE proposal. The Finance P&L deducts
 // the total from Business Profit (finance_pnl_summary, supabase_phase510_quote_costs.sql). Admin + accounts
 // edit; a government partner (co_owner) only reads. Money shown ex-GST: margin = quote value (subtotal) - cost.
+// Phase 536 (owner 2026-10-30): accounts types the cost lines but does NOT see commission, TDS or margin
+// (showMargin=false); admin and the government partner see the full picture.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Calculator, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -23,7 +25,7 @@ const box = {
   color: 'var(--text)', padding: '10px 12px', minHeight: 44, fontSize: 14, width: '100%', boxSizing: 'border-box',
 }
 
-export default function QuoteCostingCard({ quote, canEdit }) {
+export default function QuoteCostingCard({ quote, canEdit, showMargin = true }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadErr, setLoadErr] = useState(false)
@@ -47,12 +49,15 @@ export default function QuoteCostingCard({ quote, canEdit }) {
     // total rickshaws on the quote = what the vendors share between them
     const { data: lines } = await supabase.from('quote_cities').select('qty').eq('quote_id', quote.id)
     // commission + TDS already recorded on approved payments of this deal (taken off the margin)
-    const { data: pays } = await supabase.from('payments').select('commission_amount, tds_amount, amount_received')
-      .eq('quote_id', quote.id).eq('approval_status', 'approved')
+    // (only fetched for people who see the margin: accounts never loads commission / TDS here)
+    const { data: pays } = showMargin
+      ? await supabase.from('payments').select('commission_amount, tds_amount, amount_received')
+          .eq('quote_id', quote.id).eq('approval_status', 'approved')
+      : { data: [] }
     // agency-made deal: commission = share of each approved payment x subtotal x the agency user's % (default 5),
     // the same rule the Finance P&L uses (finance_pnl_summary). Team deals use the % typed on the payment.
     let agencyComm = 0
-    if (quote.created_by) {
+    if (showMargin && quote.created_by) {
       const { data: cu } = await supabase.from('users').select('role, agency_commission_percent').eq('id', quote.created_by).maybeSingle()
       if (cu?.role === 'agency' && Number(quote.total_amount) > 0) {
         const pct = cu.agency_commission_percent ?? 5
@@ -67,7 +72,7 @@ export default function QuoteCostingCard({ quote, canEdit }) {
     setTotalQty((lines || []).reduce((s, l) => s + (Number(l.qty) || 0), 0))
     if (!error) setRows(data || [])
     setLoading(false)
-  }, [quote?.id])
+  }, [quote?.id, showMargin])
   useEffect(() => { load() }, [load])
 
   const CAPPED = ['vendor', 'printing', 'installation']
@@ -122,9 +127,11 @@ export default function QuoteCostingCard({ quote, canEdit }) {
         {[
           ['Quote value (ex-GST)', formatCurrency(value), 'var(--text)'],
           ['Total cost', formatCurrency(total), 'var(--warning)'],
-          ['Commission', formatCurrency(pay.comm), 'var(--warning)'],
-          ['TDS withheld', formatCurrency(pay.tds), 'var(--warning)'],
-          ['Margin (after cost, commission, TDS)', `${formatCurrency(margin)}${pct !== null ? ` · ${pct}%` : ''}`, margin >= 0 ? 'var(--success)' : 'var(--danger)'],
+          ...(showMargin ? [
+            ['Commission', formatCurrency(pay.comm), 'var(--warning)'],
+            ['TDS withheld', formatCurrency(pay.tds), 'var(--warning)'],
+            ['Margin (after cost, commission, TDS)', `${formatCurrency(margin)}${pct !== null ? ` · ${pct}%` : ''}`, margin >= 0 ? 'var(--success)' : 'var(--danger)'],
+          ] : []),
         ].map(([l, v, c]) => (
           <div key={l} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 12px' }}>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
