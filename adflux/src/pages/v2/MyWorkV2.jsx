@@ -60,6 +60,8 @@ export default function MyWorkV2() {
   // A person who is not on the timeclock (sales / telecaller asking for work) has no Work tab: open on 'Asked by me'.
   useEffect(() => { if (!loading && !isMember && tab === 'work') setTab('asked') }, [loading, isMember, tab])
 
+  // Phase 525: operations staff have their own evening report on the Ops home, so the Work-page one is hidden for them
+  const isOpsRole = profile?.role === 'operation_executive' || profile?.role === 'operation_head'
   const [att, setAtt] = useState(null)   // Phase 523: today's attendance check-in/out (work_sessions), used when the Work timer was not used
   const load = useCallback(async () => {
     if (!uid) return
@@ -321,11 +323,11 @@ export default function MyWorkV2() {
                       onCreateAndStart={createCardAndStart}
                       onAddProject={addProject}
                       onStart={(project, label) => rpc('work_clock_start', { p_project: project, p_label: label, p_part: null })} />}
-                {istHour() >= 19 && <TodayStrip secs={todaySecs} firstIn={firstIn} />}
+                {!isOpsRole && istHour() >= 19 && <TodayStrip secs={todaySecs} firstIn={firstIn} />}
               </div>
               <div className="wk-c4">
                 <div className="wk-stack">
-                  {istHour() >= 19
+                  {isOpsRole ? null : istHour() >= 19
                     ? <EveningCard hour={istHour()} entries={entries} items={items} secs={todaySecs} name={profile?.name}
                         projName={projName} shared={shared} uid={uid} today={today} firstIn={firstIn} att={att} onShared={load} />
                     : <TodayStrip secs={todaySecs} firstIn={firstIn} />}

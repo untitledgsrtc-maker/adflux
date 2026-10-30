@@ -21997,3 +21997,7 @@ Operations staff (Gulshan, Gohil) check in through attendance (work_sessions) bu
 ## 524 · Day Summary hours from attendance when no Work timer (30-10-2026)
 
 MyWorkV2: when a person has no approved Work-timer entry today, `todaySecs` (and the WhatsApp Hours line) = attendance check-in to check-out (to now while still checked in). Timer entries win when present. Display only: pay and server reports still read work_time_entries. Frontend only.
+
+## 525 · Work-page evening report hidden for operations roles (30-10-2026)
+
+Operations staff (operation_executive / operation_head) already have their own evening report on the Ops home (OpsEveningCard / OpsHeadEveningCard: fixed, still open, km, depot calls, uptime). Gulshan shared the generic Work-page Day Summary instead (empty for him). MyWorkV2 now hides the EveningCard + TodayStrip for those two roles. Verified ops_my_day_report returns real data for Gulshan. Frontend only.
