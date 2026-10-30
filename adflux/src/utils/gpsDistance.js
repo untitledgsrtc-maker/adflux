@@ -269,3 +269,37 @@ export function coverageHours(pings, startISO, endISO, gapMaxS = 360) {
   const pct = shiftH > 0 ? Math.min(100, Math.round((trackedH / shiftH) * 100)) : 0
   return { trackedH, shiftH, pct }
 }
+
+// ─────────────────────────────────────────────────────────────
+// Phase 540 — TRACKING HEALTH (display-only; NEVER feeds km/payout).
+// Plain-language read of how well the phone streamed location during the shift:
+// delay between check-in and the first ping, the longest stretch with no ping from
+// any device, and the share of weak (>100 m) fixes. Pure arithmetic on the pings
+// already fetched. Returns { issues: string[], ok: boolean } or null when there is
+// no shift to judge.
+export function trackingHealth(pings, startISO, endISO, darkMinMin = 10) {
+  if (!startISO) return null
+  const startMs = new Date(startISO).getTime()
+  const endMs = endISO ? new Date(endISO).getTime() : Date.now()
+  if (endMs - startMs < 10 * 60000) return null
+  const times = (pings || [])
+    .map(p => new Date(p.captured_at).getTime())
+    .filter(t => t >= startMs - 60000 && t <= endMs)
+    .sort((a, b) => a - b)
+  const issues = []
+  if (!times.length) {
+    issues.push('No location received since check-in')
+    return { issues, ok: false }
+  }
+  const delayMin = Math.round((times[0] - startMs) / 60000)
+  if (delayMin >= 5) issues.push(`Tracking started ${delayMin} min after check-in`)
+  const pts = [times[0], ...times, endMs]
+  let best = 0
+  for (let i = 1; i < pts.length; i++) best = Math.max(best, pts[i] - pts[i - 1])
+  const darkMin = Math.round(best / 60000)
+  if (darkMin >= darkMinMin) issues.push(`Longest gap with no location: ${darkMin} min`)
+  const weak = (pings || []).filter(p => Number(p.accuracy_m) > 100).length
+  const weakPct = pings && pings.length ? Math.round((weak / pings.length) * 100) : 0
+  if (weakPct >= 25) issues.push(`${weakPct}% of fixes are weak (over 100 m): check precise location / battery saver`)
+  return { issues, ok: issues.length === 0 }
+}

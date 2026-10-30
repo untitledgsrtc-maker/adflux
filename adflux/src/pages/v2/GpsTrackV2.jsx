@@ -33,7 +33,7 @@ import { evaluateMeetingLocation } from '../../utils/meetingLocation'
 
 // Phase 34Z.6 — haversine + summariseTrack live in src/utils/
 // gpsDistance.js so /work uses the same filter rules.
-import { summariseTrack, cleanTrack, detectStops, coverageHours } from '../../utils/gpsDistance'
+import { summariseTrack, cleanTrack, detectStops, coverageHours, trackingHealth } from '../../utils/gpsDistance'
 
 // Phase 93.6 (25 May 2026) — "I'm here · auto-check-in" companion
 // rows are auto-stamped by LogMeetingModal whenever a rep saves a
@@ -410,6 +410,12 @@ export default function GpsTrackV2() {
   // ZERO effect on km/payout (which stay on server daily_ta).
   const coverage = useMemo(
     () => coverageHours(pings, session?.check_in_at, session?.check_out_at),
+    [pings, session],
+  )
+
+  // Phase 540 — tracking health line (display-only, same inputs as coverage).
+  const health = useMemo(
+    () => trackingHealth(pings, session?.check_in_at, session?.check_out_at),
     [pings, session],
   )
 
@@ -898,6 +904,15 @@ export default function GpsTrackV2() {
             }}>
               GPS tracked {coverage.trackedH.toFixed(1)}h of {coverage.shiftH.toFixed(1)}h shift ({coverage.pct}%)
               {coverage.pct < 60 ? ' — km undercounts while GPS is off' : ''}
+            </div>
+          )}
+          {/* Phase 540 — tracking health: why coverage is low, in plain words. */}
+          {health && (
+            <div style={{
+              fontSize: 12, marginTop: 2, fontWeight: 600,
+              color: health.ok ? 'var(--success)' : 'var(--warning)',
+            }}>
+              Tracking health: {health.ok ? 'good, started on time and no long gaps' : health.issues.join(' · ')}
             </div>
           )}
         </div>
