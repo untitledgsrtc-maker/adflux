@@ -30,17 +30,24 @@ export function evaluateMeetingLocation(pin, gps) {
   if (!pin || !Number.isFinite(Number(pin.lat)) || !Number.isFinite(Number(pin.lng))) return { status: 'unverified' }
   if (!gps || !Number.isFinite(Number(gps.lat)) || !Number.isFinite(Number(gps.lng))) return { status: 'unverified' }
   const d = distanceM(Number(gps.lat), Number(gps.lng), Number(pin.lat), Number(pin.lng))
-  const eff = Math.max(0, d - (Number(gps.acc) || 0))
+  // Credit the rep's GPS accuracy, but never more than 150 m: a coarse cell-tower fix (km) must not make a far-away meeting pass.
+  const eff = Math.max(0, d - Math.min(Number(gps.acc) || 0, 150))
   return { status: eff > MEETING_RADIUS_M ? 'blocked' : 'ok', distanceM: d, effectiveM: eff }
 }
 
-// Trusted pin of an existing lead, or null.
-export async function getLeadPin(leadId) {
+// Pin + context of an existing lead for the follow-up path. The pin is dropped (= not checked) for
+// GOVERNMENT leads and when the typed company is not the lead's company (a phone match can be a
+// different branch of the same chain).
+const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, '')
+export async function getFollowUpPin(leadId, typedCompany) {
   if (!leadId) return null
   const { data, error } = await supabase.from('leads')
-    .select('lat, lng, geocode_source').eq('id', leadId).maybeSingle()
-  if (error || !data || data.geocode_source !== 'google_place') return null
-  if (data.lat == null || data.lng == null) return null
+    .select('lat, lng, geocode_source, segment, company').eq('id', leadId).maybeSingle()
+  if (error || !data) return null
+  if (data.geocode_source !== 'google_place' || data.lat == null || data.lng == null) return null
+  if (data.segment === 'GOVERNMENT') return null
+  const a = norm(data.company), b = norm(typedCompany)
+  if (a.length < 4 || b.length < 4 || !(a.includes(b) || b.includes(a))) return null
   return { lat: Number(data.lat), lng: Number(data.lng) }
 }
 

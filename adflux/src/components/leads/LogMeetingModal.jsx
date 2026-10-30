@@ -39,7 +39,7 @@ import { toastError } from '../v2/Toast'
 import WhatsAppPromptModal from './WhatsAppPromptModal'
 import { findLeadByPhone } from '../../utils/leadDedup'
 import MeetingLocationBlock from './MeetingLocationBlock'
-import { getLeadPin, checkMeetingLocation } from '../../utils/meetingLocation'
+import { getFollowUpPin, checkMeetingLocation } from '../../utils/meetingLocation'
 
 // Outcome → (stage, lost_reason) mapping. Locked in this file because
 // the modal owns the cold-meeting flow end-to-end. If you change these
@@ -258,12 +258,13 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
     if (dup) {
       // Phase 535 — a follow-up meeting on an existing lead must also be within 100 m of that
       // lead's Google pin (when it has one). No pin = allowed. A blocked rep can request approval.
-      const dupPin = await getLeadPin(dup.id)
+      const dupPin = await getFollowUpPin(dup.id, company)
       const chk = await checkMeetingLocation({ userId: profile.id, pin: dupPin, gps })
       if (!chk.allow) {
         setSaving(false)
         savingRef.current = false
         setLocBlock({ ...chk, leadId: dup.id, company: dup.company || dup.name, pin: dupPin })
+        fail(`You are ${chk.distanceM} m from the client. A meeting must be logged within 100 m — see the message above.`)
         return
       }
       setLocBlock(null)

@@ -47,12 +47,17 @@ export default function MeetingLocationBlock({ block, company, leadId, userId, p
           Your request is with admin. You will get a notification. Tap Save again once it is approved.
         </div>
       )}
-      {status === 'rejected' && (
-        <div style={{ marginTop: 10, fontSize: 13, color: 'var(--text-muted, #94a3b8)' }}>
-          Admin did not approve this request. Go to the client's location, or ask admin.
+      {Number(gps?.acc) > 150 && (
+        <div style={{ marginTop: 10, fontSize: 13, color: 'var(--text)' }}>
+          Your GPS is not precise right now (±{Math.round(gps.acc)} m). Tap Refresh GPS, wait for a better fix and save again.
         </div>
       )}
-      {!status && (
+      {status === 'rejected' && (
+        <div style={{ marginTop: 10, fontSize: 13, color: 'var(--text-muted, #94a3b8)' }}>
+          Admin did not approve the last request. Go to the client's location, or send a new request with a better reason.
+        </div>
+      )}
+      {status !== 'pending' && (
         <div style={{ marginTop: 12 }}>
           <label className="lead-fld-label" style={{ display: 'block' }}>Not possible to be there? Ask admin to approve</label>
           <textarea

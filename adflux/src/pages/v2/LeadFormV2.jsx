@@ -251,7 +251,11 @@ export default function LeadFormV2() {
     // A blocked rep can request admin approval (shown below); approval is valid 12 h.
     if (meetingMode && placePin) {
       const chk = await checkMeetingLocation({ userId: profile.id, pin: placePin, gps })
-      if (!chk.allow) { setLocBlock(chk); return }
+      if (!chk.allow) {
+        setLocBlock(chk)
+        setError(`You are ${chk.distanceM} m from the client. A meeting must be logged within 100 m — see the message below.`)
+        return
+      }
       setLocBlock(null)
     }
     // Phase 113.4 — latch here: after validation, before the leads insert.

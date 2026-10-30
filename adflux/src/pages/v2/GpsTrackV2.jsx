@@ -1430,7 +1430,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
                             ? { lat: a.gps_lat, lng: a.gps_lng, acc: a.gps_accuracy_m } : null)
                           const label = ev.status === 'unverified' ? 'Location not verified'
                             : ev.status === 'ok' ? `At the client · ${ev.distanceM} m`
-                            : `Away from the client · ${ev.distanceM} m (approved)`
+                            : `Away from the client · ${ev.distanceM} m`
                           const color = ev.status === 'ok' ? 'var(--success)'
                             : ev.status === 'blocked' ? 'var(--danger)' : 'var(--text-muted)'
                           return (
