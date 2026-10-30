@@ -38,6 +38,8 @@ import CityAutocomplete from './CityAutocomplete'
 import { toastError } from '../v2/Toast'
 import WhatsAppPromptModal from './WhatsAppPromptModal'
 import { findLeadByPhone } from '../../utils/leadDedup'
+import MeetingLocationBlock from './MeetingLocationBlock'
+import { getLeadPin, checkMeetingLocation } from '../../utils/meetingLocation'
 
 // Outcome → (stage, lost_reason) mapping. Locked in this file because
 // the modal owns the cold-meeting flow end-to-end. If you change these
@@ -118,6 +120,7 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
   // WhatsAppSendModal fix.
   const savingRef = useRef(false)
   const [error, setError]     = useState('')
+  const [locBlock, setLocBlock] = useState(null)   // Phase 535: too far from the existing lead's Google pin
   // Phase 33D.5 — post-save WhatsApp prompt. After successful save we
   // stash the new lead row here and render WhatsAppPromptModal on top.
   // The outer modal stays open behind it so the rep can review their
@@ -253,6 +256,17 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
     // a lead_activities row tied to that lead and short-circuit out.
     const dup = await findLeadByPhone(phone)
     if (dup) {
+      // Phase 535 — a follow-up meeting on an existing lead must also be within 100 m of that
+      // lead's Google pin (when it has one). No pin = allowed. A blocked rep can request approval.
+      const dupPin = await getLeadPin(dup.id)
+      const chk = await checkMeetingLocation({ userId: profile.id, pin: dupPin, gps })
+      if (!chk.allow) {
+        setSaving(false)
+        savingRef.current = false
+        setLocBlock({ ...chk, leadId: dup.id, company: dup.company || dup.name, pin: dupPin })
+        return
+      }
+      setLocBlock(null)
       const activityPayload = {
         lead_id:        dup.id,
         activity_type:  'meeting',
@@ -617,6 +631,17 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
               languageHint="gu"
             />
           </div>
+
+          {locBlock && (
+            <MeetingLocationBlock
+              block={locBlock}
+              company={locBlock.company}
+              leadId={locBlock.leadId}
+              userId={profile.id}
+              pin={locBlock.pin}
+              gps={gps}
+            />
+          )}
 
           {error && (
             <div

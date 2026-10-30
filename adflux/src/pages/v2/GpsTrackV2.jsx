@@ -29,6 +29,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { formatDate } from '../../utils/formatters'
 import { istTodayISO } from '../../utils/istDate'
+import { evaluateMeetingLocation } from '../../utils/meetingLocation'
 
 // Phase 34Z.6 — haversine + summariseTrack live in src/utils/
 // gpsDistance.js so /work uses the same filter rules.
@@ -232,7 +233,7 @@ export default function GpsTrackV2() {
         // date. created_at filtered to the IST day window so the
         // timeline matches the chosen date.
         supabase.from('lead_activities')
-          .select('id, created_at, activity_type, outcome, notes, next_action, gps_lat, gps_lng, lead:lead_id(id, name, company)')
+          .select('id, created_at, activity_type, outcome, notes, next_action, gps_lat, gps_lng, gps_accuracy_m, lead:lead_id(id, name, company, lat, lng, geocode_source)')
           .eq('created_by', userId)
           .gte('created_at', start)
           .lte('created_at', end)
@@ -1417,6 +1418,25 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
                           Next: {a.next_action}
                         </div>
                       )}
+                      {/* Phase 535 — how far the rep was from the client's Google pin when the meeting was
+                          logged. No trusted pin = "not verified" (allowed, never blocked). Shown only when
+                          the lead's pin fields were loaded (the team-view RPC does not carry them). */}
+                      {(a.activity_type === 'meeting' || a.activity_type === 'site_visit')
+                        && !isAutoCheckinRow(a) && !isScheduledMeetingRow(a)
+                        && a.lead && 'geocode_source' in a.lead && (() => {
+                          const pin = a.lead.geocode_source === 'google_place' && a.lead.lat != null
+                            ? { lat: Number(a.lead.lat), lng: Number(a.lead.lng) } : null
+                          const ev = evaluateMeetingLocation(pin, a.gps_lat != null
+                            ? { lat: a.gps_lat, lng: a.gps_lng, acc: a.gps_accuracy_m } : null)
+                          const label = ev.status === 'unverified' ? 'Location not verified'
+                            : ev.status === 'ok' ? `At the client · ${ev.distanceM} m`
+                            : `Away from the client · ${ev.distanceM} m (approved)`
+                          const color = ev.status === 'ok' ? 'var(--success)'
+                            : ev.status === 'blocked' ? 'var(--danger)' : 'var(--text-muted)'
+                          return (
+                            <div style={{ fontSize: 12, fontWeight: 600, color, marginTop: 4, marginLeft: 52 }}>{label}</div>
+                          )
+                        })()}
                     </div>
                   )
                 })}

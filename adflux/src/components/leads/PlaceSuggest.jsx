@@ -78,6 +78,8 @@ export default function PlaceSuggest({ value, onChange, onPick, onBlur, near, pl
           phone:   digits.length === 10 ? digits : '',
           website: place?.website || '',
           types:   Array.isArray(place?.types) ? place.types : [],
+          lat:     Number.isFinite(place?.lat) ? place.lat : null,
+          lng:     Number.isFinite(place?.lng) ? place.lng : null,
         })
       } else {
         onPick({ name: p.name, address: p.address, city: '', phone: '', website: '', types: [] })

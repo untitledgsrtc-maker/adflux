@@ -27,6 +27,7 @@ import { toastError } from '../../components/v2/Toast'
 import V2Hero from '../../components/v2/V2Hero'
 import ProofLink from '../../components/payments/ProofLink'
 import GpsOffReasonApprovals from '../../components/work/GpsOffReasonApprovals'
+import MeetingLocationRequests from '../../components/work/MeetingLocationRequests'
 // Phase 360 - private-LED quotes priced below Rs 600/screen wait here for the
 // admin (the Sales Head approves from /quote-approvals). Hidden when empty.
 import QuotePriceApprovals from '../../components/quotes/QuotePriceApprovals'
@@ -206,6 +207,7 @@ export default function PendingApprovalsV2() {
 
       <QuotePriceApprovals hideWhenEmpty />
       <GpsOffReasonApprovals />
+      <MeetingLocationRequests />
       {!loading && (
         <V2Hero
           eyebrow="Waiting for your approval"

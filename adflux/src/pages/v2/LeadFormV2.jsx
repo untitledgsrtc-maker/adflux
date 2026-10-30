@@ -24,6 +24,8 @@ import VoiceInput   from '../../components/voice/VoiceInput'
 import CityAutocomplete from '../../components/leads/CityAutocomplete'
 import PlaceSuggest from '../../components/leads/PlaceSuggest'
 import MeetingWrapModal from '../../components/leads/MeetingWrapModal'
+import MeetingLocationBlock from '../../components/leads/MeetingLocationBlock'
+import { checkMeetingLocation } from '../../utils/meetingLocation'
 import { guessIndustry } from '../../utils/industryGuess'
 import { findLeadByPhone } from '../../utils/leadDedup'
 
@@ -107,6 +109,9 @@ export default function LeadFormV2() {
   // Meeting mode: outcome + notes are asked LAST (MeetingWrapModal), after the
   // optional presentation. { leadId, activityId, next } while that step is open.
   const [wrap, setWrap] = useState(null)
+  // Google listing pin of the picked company (Phase 535). The meeting must be logged within 100 m of it.
+  const [placePin, setPlacePin] = useState(null)   // { lat, lng } | null
+  const [locBlock, setLocBlock] = useState(null)   // set when the rep is too far from the pin
 
   async function checkPhoneDup(p) {
     setDupLead(null)
@@ -241,6 +246,14 @@ export default function LeadFormV2() {
       setError('GPS required to log a meeting. Tap "Refresh GPS" or turn on Location and retry.')
       return
     }
+    // Phase 535 — a meeting must be logged within 100 m of the client. Only checked when the
+    // company was picked from Google (that pin is the client's location); no pin = allowed.
+    // A blocked rep can request admin approval (shown below); approval is valid 12 h.
+    if (meetingMode && placePin) {
+      const chk = await checkMeetingLocation({ userId: profile.id, pin: placePin, gps })
+      if (!chk.allow) { setLocBlock(chk); return }
+      setLocBlock(null)
+    }
     // Phase 113.4 — latch here: after validation, before the leads insert.
     // findLeadByPhone above is the first await, so re-check the ref (a
     // ghost-click that passed the top guard before this point bails now).
@@ -266,6 +279,8 @@ export default function LeadFormV2() {
       assigned_to:   form.assigned_to || null,
       telecaller_id: form.telecaller_id || null,
       created_by:    profile.id,
+      // Phase 535 — the Google listing pin becomes the lead's trusted location.
+      ...(placePin ? { lat: placePin.lat, lng: placePin.lng, geocoded_at: new Date().toISOString(), geocode_source: 'google_place' } : {}),
     }
     // Phase 34Z.20 — meeting-mode pins source + segment overrides.
     if (meetingMode) {
@@ -507,7 +522,7 @@ export default function LeadFormV2() {
             <label className="lead-fld-label">Company *</label>
             <PlaceSuggest
               value={form.company}
-              onChange={v => set('company', v)}
+              onChange={v => { set('company', v); setPlacePin(null); setLocBlock(null) }}
               near={gps}
               onBlur={fillIndustryFromName}
               placeholder="e.g. Sunrise Diagnostics — type to search Google"
@@ -521,6 +536,7 @@ export default function LeadFormV2() {
                   industry: prev.industry || guessIndustry({ types: place.types, name: place.name }),
                 }))
                 if (!form.phone && place.phone) checkPhoneDup(place.phone)
+                setPlacePin(place.lat != null && place.lng != null ? { lat: place.lat, lng: place.lng } : null)
               }}
             />
           </div>
@@ -679,6 +695,16 @@ export default function LeadFormV2() {
             languageHint="gu"
           />
         </div>
+      )}
+
+      {locBlock && (
+        <MeetingLocationBlock
+          block={locBlock}
+          company={form.company}
+          userId={profile.id}
+          pin={placePin}
+          gps={gps}
+        />
       )}
 
       {error && (

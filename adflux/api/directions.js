@@ -81,7 +81,7 @@ function guardProxy(req, res) {
 // serverless functions, and a separate api/places-search.js made the whole
 // deploy fail (exceeded_serverless_functions_per_deployment, 29 Oct 2026).
 // GET /api/directions?places=1&q=<text>[&lat=&lng=]  -> { results: [{id,name,address}] }
-// GET /api/directions?places=1&id=<placeId>           -> { place: {name,address,city,phone,website,types} }
+// GET /api/directions?places=1&id=<placeId>           -> { place: {name,address,city,phone,website,types,lat,lng} }
 // Needs "Places API (New)" enabled + allowed on the ROADS_KEY_SERVER key.
 const PLACE_ID_RE = /^[A-Za-z0-9_-]{10,200}$/
 
@@ -103,7 +103,7 @@ async function placesHandler(req, res, key) {
       const r = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(String(id))}`, {
         headers: {
           'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'id,displayName,formattedAddress,addressComponents,nationalPhoneNumber,websiteUri,types',
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,addressComponents,nationalPhoneNumber,websiteUri,types,location',
         },
         signal: AbortSignal.timeout(8000),
       })
@@ -121,6 +121,8 @@ async function placesHandler(req, res, key) {
           phone:   j.nationalPhoneNumber || '',
           website: j.websiteUri || '',
           types:   Array.isArray(j.types) ? j.types : [],
+          lat:     Number.isFinite(j.location?.latitude) ? j.location.latitude : null,
+          lng:     Number.isFinite(j.location?.longitude) ? j.location.longitude : null,
         },
       })
       return
