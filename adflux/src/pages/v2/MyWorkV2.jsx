@@ -212,7 +212,10 @@ export default function MyWorkV2() {
   const runSecs = running ? Math.max(0, ((idleFreeze ? new Date(idleFreeze).getTime() : now + skew) - new Date(running.started_at).getTime()) / 1000 - (running.break_seconds || 0)) : 0
   const doneSecs = entries.filter((e) => e.ended_at && e.status === 'approved')
     .reduce((s, e) => s + Math.max(0, (new Date(e.ended_at) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0)), 0)   // Phase 517: finished sessions also skip away time (break_seconds), same as runSecs + the shared WhatsApp text
-  const todaySecs = doneSecs + runSecs
+  // Phase 524: no Work-timer entry today (operations staff who only check in) = hours run from attendance check-in to check-out (to now while still checked in). Display only.
+  const attSecs = att?.check_in_at ? Math.max(0, ((att.check_out_at ? new Date(att.check_out_at).getTime() : now + skew) - new Date(att.check_in_at).getTime()) / 1000) : 0
+  const hasTimer = entries.some((e) => e.status === 'approved')
+  const todaySecs = hasTimer ? doneSecs + runSecs : attSecs
   // Phase 522: a hand-added entry before 7 AM (a PM typed as AM) never counts as the clock-in
   const isClockInEntry = (e) => e.status === 'approved' && !(e.source === 'added_later' && istHourOf(e.started_at) < 7)
   const firstIn = entries.find(isClockInEntry)?.started_at
@@ -619,6 +622,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         const s = Math.max(0, ((e.ended_at ? new Date(e.ended_at) : new Date()) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0))
         total += s; byProj.set(e.project_id, (byProj.get(e.project_id) || 0) + s)
       })
+      if (!rows.length) total = secs   // Phase 524: attendance-based hours when no timer entries
       const running = rows.some((e) => !e.ended_at)
       const inRow = rows.find((e) => !(e.source === 'added_later' && istHourOf(e.started_at) < 7)) || rows[0]   // Phase 522: early hand-added entry is not the clock-in
       const last = rows.filter((e) => e.ended_at).slice(-1)[0]

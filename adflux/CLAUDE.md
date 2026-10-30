@@ -21993,3 +21993,7 @@ Note (532 follow-up 2, 29-10-2026): the head fault panel (OpsHeadApp FaultPanel)
 ## 523 · Day Summary uses attendance check-in when the Work timer was not used (30-10-2026)
 
 Operations staff (Gulshan, Gohil) check in through attendance (work_sessions) but never start a Work timer, so the shared Day Summary showed Clock in/out as '-'. MyWorkV2 now reads today's work_sessions row (own-row RLS `work_sessions_own`) and falls back to its check_in_at / check_out_at for the Clock in / Clock out lines (card + WhatsApp text). Timer entries still win when present. Hours and pay unchanged. Frontend only.
+
+## 524 · Day Summary hours from attendance when no Work timer (30-10-2026)
+
+MyWorkV2: when a person has no approved Work-timer entry today, `todaySecs` (and the WhatsApp Hours line) = attendance check-in to check-out (to now while still checked in). Timer entries win when present. Display only: pay and server reports still read work_time_entries. Frontend only.
