@@ -35,6 +35,31 @@ const fmtTime = (ms) => new Date(ms).toLocaleTimeString('en-IN', {
   timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,
 })
 
+// A rep can be logged in on two devices (phone + tablet). If either one kept sending
+// location pings during a gap, the rep was reachable, so that stretch is not "dark".
+// Returns the gap trimmed to its longest stretch with no ping from ANY device, or null
+// when that stretch is under 10 minutes.
+async function trimToDark(g) {
+  if ((g.endMs - g.startMs) / 1000 < MIN_GAP_SECONDS) return null
+  const uid = useAuthStore.getState().profile?.id
+  const { data, error } = await supabase.from('gps_pings')
+    .select('captured_at')
+    .eq('user_id', uid)
+    .gte('captured_at', new Date(g.startMs).toISOString())
+    .lte('captured_at', new Date(g.endMs).toISOString())
+    .order('captured_at', { ascending: true })
+    .limit(1000)
+  if (error) return g                                   // cannot tell: keep the gap
+  if ((data || []).length >= 1000) return null          // 1000+ pings inside the gap: not dark
+  const pts = [g.startMs, ...(data || []).map(r => new Date(r.captured_at).getTime()), g.endMs]
+  let best = null
+  for (let i = 1; i < pts.length; i++) {
+    if (!best || pts[i] - pts[i - 1] > best[1] - best[0]) best = [pts[i - 1], pts[i]]
+  }
+  if (!best || (best[1] - best[0]) / 1000 < MIN_GAP_SECONDS) return null
+  return { ...g, startMs: best[0], endMs: best[1] }
+}
+
 export default function GpsOffReasonGate({ enabled }) {
   const profile = useAuthStore(s => s.profile)
   const uid = profile?.id
@@ -67,11 +92,11 @@ export default function GpsOffReasonGate({ enabled }) {
         .eq('user_id', uid)
         .gte('created_at', ws.check_in_at)
         .order('toggled_off_at', { ascending: true })
-      const long = (events || []).map(e => {
+      const long = (await Promise.all((events || []).map(e => {
         const startMs = Math.max(new Date(e.toggled_off_at).getTime(), inMs)
         const endMs = Math.min(e.toggled_on_at ? new Date(e.toggled_on_at).getTime() : nowMs, windowEnd)
-        return { id: e.id, kind: 'gps', startMs, endMs, open: !e.toggled_on_at }
-      }).filter(g => (g.endMs - g.startMs) / 1000 >= MIN_GAP_SECONDS)
+        return trimToDark({ id: e.id, kind: 'gps', startMs, endMs, open: !e.toggled_on_at })
+      }))).filter(Boolean)
 
       // Internet gaps (Phase 533). Only rows written by the new tracker count: it inserts a
       // COMPLETE row after the outage ends (created_at ~ regained_at). Rows from the old
@@ -82,13 +107,13 @@ export default function GpsOffReasonGate({ enabled }) {
         .not('regained_at', 'is', null)
         .gte('regained_at', ws.check_in_at)
         .order('lost_at', { ascending: true })
-      const netLong = (nets || [])
+      const netLong = (await Promise.all((nets || [])
         .filter(n => new Date(n.created_at).getTime() >= new Date(n.regained_at).getTime() - 2 * 60 * 1000)
         .map(n => {
           const startMs = Math.max(new Date(n.lost_at).getTime(), inMs)
           const endMs = Math.min(new Date(n.regained_at).getTime(), windowEnd)
-          return { id: n.id, kind: 'net', startMs, endMs, open: false }
-        }).filter(g => (g.endMs - g.startMs) / 1000 >= MIN_GAP_SECONDS)
+          return trimToDark({ id: n.id, kind: 'net', startMs, endMs, open: false })
+        }))).filter(Boolean)
 
       const all = [...long, ...netLong]
       if (!all.length) { setGaps([]); return }
