@@ -60,6 +60,7 @@ export default function MyWorkV2() {
   // A person who is not on the timeclock (sales / telecaller asking for work) has no Work tab: open on 'Asked by me'.
   useEffect(() => { if (!loading && !isMember && tab === 'work') setTab('asked') }, [loading, isMember, tab])
 
+  const [att, setAtt] = useState(null)   // Phase 523: today's attendance check-in/out (work_sessions), used when the Work timer was not used
   const load = useCallback(async () => {
     if (!uid) return
     setErr('')
@@ -94,6 +95,8 @@ export default function MyWorkV2() {
     // Phase 484: tasks someone nudged me about in the last 2 days stay on today's board (best effort)
     supabase.from('work_task_nudges').select('part_id').eq('user_id', uid).gte('created_at', dayStartISO(addDaysISO(today, -2)))
       .then(({ data }) => setNudgedIds((data || []).map((r) => r.part_id)))
+    supabase.from('work_sessions').select('check_in_at,check_out_at').eq('user_id', uid).eq('work_date', today).maybeSingle()
+      .then(({ data }) => setAtt(data || null))
     supabase.from('work_task_parts').select('id,assignee_id,postponed_until,postponed_by_client,task:work_tasks(title)')
       .eq('status', 'postponed').contains('postponed_by_users', [uid]).limit(30)
       .then(({ data }) => setTagged(data || []))
@@ -321,7 +324,7 @@ export default function MyWorkV2() {
                 <div className="wk-stack">
                   {istHour() >= 19
                     ? <EveningCard hour={istHour()} entries={entries} items={items} secs={todaySecs} name={profile?.name}
-                        projName={projName} shared={shared} uid={uid} today={today} firstIn={firstIn} onShared={load} />
+                        projName={projName} shared={shared} uid={uid} today={today} firstIn={firstIn} att={att} onShared={load} />
                     : <TodayStrip secs={todaySecs} firstIn={firstIn} />}
                 </div>
               </div>
@@ -574,7 +577,7 @@ function StartForm({ projects, busy, entries, openCards, onStartCard, onResume, 
   )
 }
 
-function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, today, firstIn, onShared }) {
+function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, today, firstIn, att, onShared }) {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const evening = hour >= 19
@@ -636,8 +639,8 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
           : '⭐ *DAY SCORE (estimate): -* (no task finished today with a due date)',
         '',
         '⏱ *TIME*',
-        `• Clock in:  ${inRow ? fmtTimeIST(inRow.started_at) : '-'}`,
-        `• Clock out: ${running ? `${fmtTimeIST(new Date().toISOString())} (timer still running)` : (last ? fmtTimeIST(last.ended_at) : '-')}`,
+        `• Clock in:  ${inRow ? fmtTimeIST(inRow.started_at) : (att?.check_in_at ? fmtTimeIST(att.check_in_at) : '-')}`,
+        `• Clock out: ${running ? `${fmtTimeIST(new Date().toISOString())} (timer still running)` : (last ? fmtTimeIST(last.ended_at) : (att?.check_out_at ? fmtTimeIST(att.check_out_at) : '-'))}`,
         `• Hours:     ${fmtDur(total)}`,
         '',
         '📊 *BY CLIENT*',
@@ -659,10 +662,10 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
       <div style={{ padding: 18, display: 'grid', gap: 12 }}>
         <div className="wk-rep">
           <div className="wk-row"><span className="wk-mu">Hours</span><span className="wk-num">{fmtDur(secs)}</span></div>
-          <div className="wk-row"><span className="wk-mu">Clock-in</span><span className="wk-num">{firstIn ? fmtTimeIST(firstIn) : '-'}</span></div>
+          <div className="wk-row"><span className="wk-mu">Clock-in</span><span className="wk-num">{firstIn ? fmtTimeIST(firstIn) : (att?.check_in_at ? fmtTimeIST(att.check_in_at) : '-')}</span></div>
           <div className="wk-row"><span className="wk-mu">Clock-out</span><span className="wk-num">{(() => {
             const ap = (entries || []).filter((e) => e.status === 'approved')
-            if (!ap.length) return '-'
+            if (!ap.length) return att?.check_out_at ? fmtTimeIST(att.check_out_at) : '-'
             if (ap.some((e) => !e.ended_at)) return 'still working'
             const l = ap.filter((e) => e.ended_at).slice(-1)[0]
             return l ? fmtTimeIST(l.ended_at) : '-'

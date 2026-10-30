@@ -21989,3 +21989,7 @@ Note (532 follow-up, 29-10-2026): Android phones draw the app under the status a
 Note (532 follow-up 2, 29-10-2026): the head fault panel (OpsHeadApp FaultPanel) now shows the real CMS screen names (P2, W1) instead of Screen 1..10; a name that is just a number stays Screen N.
 
 - Phase 516 (29-10-2026): technician fault page shows real screen names (P2, W1), in-process tiles/counts use live online state, "Reached station" listed once, step labels no longer split on the leading number.
+
+## 523 · Day Summary uses attendance check-in when the Work timer was not used (30-10-2026)
+
+Operations staff (Gulshan, Gohil) check in through attendance (work_sessions) but never start a Work timer, so the shared Day Summary showed Clock in/out as '-'. MyWorkV2 now reads today's work_sessions row (own-row RLS `work_sessions_own`) and falls back to its check_in_at / check_out_at for the Clock in / Clock out lines (card + WhatsApp text). Timer entries still win when present. Hours and pay unchanged. Frontend only.
