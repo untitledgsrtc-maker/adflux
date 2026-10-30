@@ -500,34 +500,30 @@ export default function LeadFormV2() {
               double mic-on-every-field added visual noise. Voice
               still available on the Notes textarea below where
               free-text actually benefits from dictation. */}
-          {meetingMode ? (
-            /* Log Meeting only: type 3+ letters, pick the Google listing, and
-               company / phone / city / website fill in (only where still empty).
-               A picked phone also runs the existing duplicate-lead check. */
-            <div>
-              <label className="lead-fld-label">Company *</label>
-              <PlaceSuggest
-                value={form.company}
-                onChange={v => set('company', v)}
-                near={gps}
-                onBlur={fillIndustryFromName}
-                placeholder="e.g. Sunrise Diagnostics — type to search Google"
-                onPick={place => {
-                  setForm(prev => ({
-                    ...prev,
-                    company: place.name || prev.company,
-                    phone:   prev.phone   || place.phone   || '',
-                    city:    prev.city    || place.city    || '',
-                    website: prev.website || place.website || '',
-                    industry: prev.industry || guessIndustry({ types: place.types, name: place.name }),
-                  }))
-                  if (!form.phone && place.phone) checkPhoneDup(place.phone)
-                }}
-              />
-            </div>
-          ) : (
-            <Field label="Company *"      value={form.company}     onChange={v => set('company', v)}     onBlur={fillIndustryFromName} placeholder="e.g. Sunrise Diagnostics" />
-          )}
+          {/* Type 3+ letters, pick the Google listing, and company / phone / city / website
+              fill in (only where still empty). A picked phone also runs the existing
+              duplicate-lead check. Both Add Lead and Log Meeting. */}
+          <div>
+            <label className="lead-fld-label">Company *</label>
+            <PlaceSuggest
+              value={form.company}
+              onChange={v => set('company', v)}
+              near={gps}
+              onBlur={fillIndustryFromName}
+              placeholder="e.g. Sunrise Diagnostics — type to search Google"
+              onPick={place => {
+                setForm(prev => ({
+                  ...prev,
+                  company: place.name || prev.company,
+                  phone:   prev.phone   || place.phone   || '',
+                  city:    prev.city    || place.city    || '',
+                  website: prev.website || place.website || '',
+                  industry: prev.industry || guessIndustry({ types: place.types, name: place.name }),
+                }))
+                if (!form.phone && place.phone) checkPhoneDup(place.phone)
+              }}
+            />
+          </div>
           <Field label="Person name *"  value={form.name}        onChange={v => set('name', v)}        placeholder="e.g. Dr. Mehta" />
           <Field label="Designation"    value={form.designation} onChange={v => set('designation', v)} placeholder="e.g. Marketing Manager" />
           <Field

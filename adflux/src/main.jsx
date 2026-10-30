@@ -55,6 +55,9 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     const t = setInterval(() => {
       const el = document.activeElement
       const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+      // Never reload during an in-app presentation: the deck is an iframe, so swipes inside it do not reach
+      // lastActive above, and a reload sends the deck back to slide 1 in front of the client. The banner stays.
+      if (window.location.pathname === '/present' || window.location.pathname.startsWith('/present/')) return
       if (Date.now() - lastActive > 20000 && !typing) { clearInterval(t); window.location.reload() }
     }, 5000)
   })
