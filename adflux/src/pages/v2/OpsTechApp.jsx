@@ -390,7 +390,7 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
         {(f.status === 'work' || f.status === 'cant') && <div style={{ display: 'grid', gap: 10 }}>
           {f.tickets.some(t => /Reached station/i.test(t.notes || '')) ? <div className="okrow"><Ic n="navi" /><Bi g="સ્ટેશને પહોંચ્યા" e="Reached station" /></div> : <Btn lg full icon="navi" disabled={busy} onClick={reached}><G t="હું સ્ટેશને પહોંચ્યો · I reached" /></Btn>}
           <div className="mu sm" style={{ textAlign: 'center' }}>{f.scrIds.filter(id => st.scr.find(s => s.id === id)?.status === 'online').length} / {f.scrIds.length} પાછા ચાલુ · back online. 30 મિનિટ ચાલુ રહે તો આપમેળે ઠીક.</div>
-          {f.status === 'work' && <Btn kind="pri" lg full icon="camera" onClick={() => setSheet('fix')}><G t="ઠીક થયું – ફોટો લો · Fixed" /></Btn>}
+          {f.status === 'work' && <Btn kind="pri" lg full icon="camera" onClick={() => setSheet('fix')}><G t="ઠીક થયું · Fixed" /></Btn>}
           {callList.length > 0 || contacts.length > 0 ? <Btn lg full icon="phone" onClick={() => contacts[0] && doCall(contacts[0])}><G t="ફરી કૉલ કરો · Call again" /></Btn> : null}
           {f.status === 'work' && <Btn kind="wa" lg full icon="flag" onClick={() => setSheet('cant')}><G t="ઠીક ન થાય – ઓફિસને કહો · Can’t fix" /></Btn>}</div>}
         {f.status === 'cant' && <div className="warnrow"><Ic n="flag" s={22} /><Bi g="ઓફિસને મોકલ્યું" e={f.cant || 'Sent to the office'} /></div>}
@@ -405,8 +405,8 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
 
 function FixSheet({ onClose, onSave, busy }) {
   const [p, setP] = useState(null)
-  return <Sheet title={<Bi g="ઠીક થયું" e="Fixed" />} onClose={onClose} footer={<Btn kind="pri" lg full icon="check" disabled={!p || busy} onClick={() => onSave(p)}><G t="સાચવો · Save" /></Btn>}>
-    <Photo label={<Bi g="પછીનો ફોટો (જરૂરી)" e="After photo (needed)" />} file={p} onFile={setP} /><div className="mu"><G t="હેડ અને માલિક આ ફોટો જોઈ શકે છે · Head and owner can see this photo." /></div></Sheet>
+  return <Sheet title={<Bi g="ઠીક થયું" e="Fixed" />} onClose={onClose} footer={<Btn kind="pri" lg full icon="check" disabled={busy} onClick={() => onSave(p)}><G t="સાચવો · Save" /></Btn>}>
+    <Photo label={<Bi g="પછીનો ફોટો (વૈકલ્પિક)" e="After photo (optional)" />} file={p} onFile={setP} /><div className="mu"><G t="હેડ અને માલિક આ ફોટો જોઈ શકે છે · Head and owner can see this photo." /></div></Sheet>
 }
 function CantSheet({ onClose, onSave, busy }) {
   const [w, setW] = useState(null); const [note, setNote] = useState('')

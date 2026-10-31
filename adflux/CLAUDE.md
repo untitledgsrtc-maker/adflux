@@ -22001,3 +22001,7 @@ MyWorkV2: when a person has no approved Work-timer entry today, `todaySecs` (and
 ## 525 · Work-page evening report hidden for operations roles (30-10-2026)
 
 Operations staff (operation_executive / operation_head) already have their own evening report on the Ops home (OpsEveningCard / OpsHeadEveningCard: fixed, still open, km, depot calls, uptime). Gulshan shared the generic Work-page Day Summary instead (empty for him). MyWorkV2 now hides the EveningCard + TodayStrip for those two roles. Verified ops_my_day_report returns real data for Gulshan. Frontend only.
+
+## 526 · Ops "Fixed" photo is optional (31-10-2026)
+
+OpsTechApp FixSheet: the after-fix photo no longer blocks Save (label now "optional"; the Fixed button no longer says "take photo"). `fix()` already skipped the upload when no file, and `ops_ticket_resolve` takes only the ticket id, so no server change. If a photo is given it is still saved to fix_photo_path. Frontend only.
