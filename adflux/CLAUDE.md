@@ -22013,3 +22013,7 @@ Technicians only use OpsTechApp (/ops-home); OpsEveningCard was mounted only in 
 ## 528 · Work tasks in the Ops evening report (31-10-2026)
 
 Ops staff also get Work-page tasks ("other tasks"); the Ops evening report only counted tickets, so those were missing (and Phase 525 hid the Work Day Summary that showed them). OpsEveningCard now reads the person's own work_task_parts (done today / open / late) client-side, shows an "Other tasks" row and adds a line to the WhatsApp text. No SQL; ops_my_day_report untouched. If the task query fails the row is simply omitted.
+
+## 529 · Ops: Camera faulty reason + central call numbers (31-10-2026)
+
+New ops_issue_types row "Camera faulty" (supabase_phase529, applied). OpsTechApp shows two office numbers on top of the per-depot contacts: damage/display/blank/camera -> Hardware / screen service 6353774918; bill -> Accounts 8980880889 (CENTRAL list in OpsTechApp.jsx; change the number there). Camera faulty uses the hardware number (assumed). Depot contacts still follow after them.

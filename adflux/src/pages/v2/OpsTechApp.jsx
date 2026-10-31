@@ -37,11 +37,18 @@ const SRC = {
   timer: ['રાત્રે ચાલુ', 'On after 9 PM', 'moon'], photo: ['લાઇવ ફોટો', 'Live photo', 'camera'], manual: ['જાતે નોંધ્યું', 'Logged by tech', 'pencil'],
 }
 const STAT = { open: ['ખુલ્લું', 'Open', 'da', 'circle'], work: ['કામ ચાલુ', 'In process', 'in', 'loader'], cant: ['ઠીક ન થયું', "Can't fix", 'wa', 'flag'], fixed: ['ઠીક થયું', 'Fixed', 'ok', 'checkc'] }
-const ICON_FOR = [[/power|electric|વીજ|પાવર/i, 'zap'], [/bill|બિલ/i, 'rupee'], [/soft|સોફ્ટ/i, 'mon'], [/wir|વાયર/i, 'plug'], [/internet|ethernet|net/i, 'wifi'], [/timer|ટાઈમર/i, 'clock'], [/bird|nest|pigeon|પક્ષી/i, 'feather'], [/switch|સ્વિચ/i, 'toggle'], [/display|damage|blank|તૂટ/i, 'monoff'], [/clean|dust|સફાઈ/i, 'drop']]
+const ICON_FOR = [[/power|electric|વીજ|પાવર/i, 'zap'], [/bill|બિલ/i, 'rupee'], [/soft|સોફ્ટ/i, 'mon'], [/wir|વાયર/i, 'plug'], [/internet|ethernet|net/i, 'wifi'], [/timer|ટાઈમર/i, 'clock'], [/bird|nest|pigeon|પક્ષી/i, 'feather'], [/switch|સ્વિચ/i, 'toggle'], [/display|damage|blank|તૂટ/i, 'monoff'], [/camera|કેમેરા/i, 'camera'], [/clean|dust|સફાઈ/i, 'drop']]
 const iconOf = (en) => (ICON_FOR.find(([re]) => re.test(en || '')) || [0, 'alert'])[1]
 // Which kind of person to call for which problem (same rule as the old station screen).
 const CALL_RULES = [[/clean|bird|pigeon|nest|dust/i, /clean|safai|સફાઈ/i], [/bill|internet|ethernet|software|network/i, /depot|ડેપો|office/i], [/./, /electric|ઇલેક્ટ્રિશિયન/i]]
-function contactsFor(issueEn, contacts) {
+// Office numbers that apply to every station (not saved per depot): hardware / screen service and accounts.
+const CENTRAL = [
+  [/damage|display|blank|camera/i, { id: 'central-hw', name: 'Hardware / screen service', role_en: 'Hardware / screen service', role_gu: 'હાર્ડવેર / સ્ક્રીન સર્વિસ', phone: '6353774918' }],
+  [/bill/i, { id: 'central-acc', name: 'Accounts', role_en: 'Accounts', role_gu: 'એકાઉન્ટ્સ', phone: '8980880889' }],
+]
+const centralFor = issueEn => CENTRAL.filter(([re]) => re.test(issueEn || '')).map(([, c]) => c)
+const contactsFor = (issueEn, contacts) => [...centralFor(issueEn), ...depotContactsFor(issueEn, contacts)]
+function depotContactsFor(issueEn, contacts) {
   if (!contacts.length) return []
   for (const [issueRe, roleRe] of CALL_RULES) {
     if (!issueRe.test(issueEn || '')) continue
