@@ -22009,3 +22009,7 @@ OpsTechApp FixSheet: the after-fix photo no longer blocks Save (label now "optio
 ## 527 · Evening report added to the live Ops app (31-10-2026)
 
 Technicians only use OpsTechApp (/ops-home); OpsEveningCard was mounted only in the classic OpsHomeV2, so they had no evening report. Mounted OpsEveningCard at the bottom of the OpsTechApp Today tab (shows from 19:00 IST, small preview button before). Reads ops_my_day_report, view + share only. Frontend only.
+
+## 528 · Work tasks in the Ops evening report (31-10-2026)
+
+Ops staff also get Work-page tasks ("other tasks"); the Ops evening report only counted tickets, so those were missing (and Phase 525 hid the Work Day Summary that showed them). OpsEveningCard now reads the person's own work_task_parts (done today / open / late) client-side, shows an "Other tasks" row and adds a line to the WhatsApp text. No SQL; ops_my_day_report untouched. If the task query fails the row is simply omitted.

@@ -17,6 +17,8 @@
 // States: loading skeleton, error + Retry (last data kept on a failed refresh),
 // denied/empty (the RPC answered without ok:true). Gujarati-first (opsStrings).
 
+import { useEffect, useState } from 'react'
+import { supabase } from '../../lib/supabase'
 import { stampEveningShared } from '../../utils/eveningStamp'
 import { useAuthStore } from '../../store/authStore'
 import { Activity, AlertTriangle, CheckCircle2, Phone, Route } from 'lucide-react'
@@ -109,6 +111,16 @@ export function OpsEveningView({ data, loading, error, denied, refetch, lang, ca
             sub={`${fmtInt(c.depot_answered, lang)} ${t('answered_word', lang)}`} tone={noCalls ? 'warning' : 'neutral'} />
         </div>
         <UptimeRow up={d.uptime} lang={lang} />
+        {d.tasks ? (
+          <div style={{ marginTop: 10, padding: '12px 12px', border: '1px solid var(--border)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700 }}>{t('other_tasks', lang)}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', gap: 12 }}>
+              <span><b style={{ ...numStyle, color: 'var(--text)' }}>{fmtInt(d.tasks.done, lang)}</b> {t('done_word', lang)}</span>
+              <span><b style={{ ...numStyle, color: 'var(--text)' }}>{fmtInt(d.tasks.open, lang)}</b> {t('in_process', lang)}</span>
+              <span><b style={{ ...numStyle, color: Number(d.tasks.late) > 0 ? 'var(--danger)' : 'var(--text)' }}>{fmtInt(d.tasks.late, lang)}</b> {t('late_word', lang)}</span>
+            </div>
+          </div>
+        ) : null}
         {over48 > 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '10px 12px', borderRadius: 10, background: 'var(--warning-soft)', color: 'var(--warning)', fontSize: 13, fontWeight: 600 }}>
             <AlertTriangle size={16} strokeWidth={SW} style={{ flexShrink: 0 }} />
@@ -135,9 +147,36 @@ export function OpsEveningView({ data, loading, error, denied, refetch, lang, ca
   return <EveningFrame lang={lang} sub={sub} right={right}>{body}</EveningFrame>
 }
 
+// The ticket report knows nothing about Work-page tasks (e.g. "Other jobs" given by the office).
+// Count the person's own task parts for the report day; best-effort, the card works without it.
+function useOwnTasks(day) {
+  const uid = useAuthStore((st) => st.profile?.id)
+  const [tasks, setTasks] = useState(null)
+  useEffect(() => {
+    if (!uid || !day) return undefined
+    let alive = true
+    const from = new Date(`${day}T00:00:00+05:30`).toISOString()
+    const to = new Date(new Date(`${day}T00:00:00+05:30`).getTime() + 86400000).toISOString()
+    supabase.from('work_task_parts').select('status,due_date,finished_at').eq('assignee_id', uid)
+      .then(({ data, error }) => {
+        if (!alive || error || !data) return
+        const open = data.filter((p) => p.status !== 'finished' && p.status !== 'postponed')
+        setTasks({
+          done: data.filter((p) => p.status === 'finished' && p.finished_at >= from && p.finished_at < to).length,
+          open: open.length,
+          late: open.filter((p) => p.due_date && p.due_date < day).length,
+        })
+      })
+    return () => { alive = false }
+  }, [uid, day])
+  return tasks
+}
+
 function EveningBody({ lang, canHide, onHide }) {
   const r = useOpsDayReport('exec')
-  return <OpsEveningView {...r} lang={lang} canHide={canHide} onHide={onHide} />
+  const tasks = useOwnTasks(r.data && r.data.day)
+  const data = r.data && tasks ? { ...r.data, tasks } : r.data
+  return <OpsEveningView {...r} data={data} lang={lang} canHide={canHide} onHide={onHide} />
 }
 
 export default function OpsEveningCard({ lang: langProp }) {

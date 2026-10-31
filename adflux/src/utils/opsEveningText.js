@@ -100,6 +100,8 @@ function execText(r, lang) {
   L.push(`• ${t('fixed_today_w', lang)}: ${fmtInt(tk.fixed, lang)}`)
   L.push(`• ${t('logged_word', lang)}: ${fmtInt(tk.logged, lang)}`)
   L.push(`• ${t('in_process', lang)}: ${fmtInt(tk.in_progress, lang)}`)
+  const wt = r.tasks
+  if (wt && isNum(wt.done)) L.push(`• ${t('other_tasks', lang)}: ${fmtInt(wt.done, lang)} ${t('done_word', lang)} · ${fmtInt(wt.open, lang)} ${t('in_process', lang)} · ${fmtInt(wt.late, lang)} ${t('late_word', lang)}`)
   // Live screen figures exist only on a still-open day; once the day is closed there is nothing live
   // to say, so the line is left out rather than printed as "Still open: Day closed".
   if (!closed && isNum(f.offline)) {
