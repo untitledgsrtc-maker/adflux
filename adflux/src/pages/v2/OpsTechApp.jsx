@@ -38,6 +38,8 @@ const SRC = {
 }
 const STAT = { open: ['ખુલ્લું', 'Open', 'da', 'circle'], work: ['કામ ચાલુ', 'In process', 'in', 'loader'], cant: ['ઠીક ન થયું', "Can't fix", 'wa', 'flag'], fixed: ['ઠીક થયું', 'Fixed', 'ok', 'checkc'] }
 const ICON_FOR = [[/power|electric|વીજ|પાવર/i, 'zap'], [/bill|બિલ/i, 'rupee'], [/soft|સોફ્ટ/i, 'mon'], [/wir|વાયર/i, 'plug'], [/internet|ethernet|net/i, 'wifi'], [/timer|ટાઈમર/i, 'clock'], [/bird|nest|pigeon|પક્ષી/i, 'feather'], [/switch|સ્વિચ/i, 'toggle'], [/display|damage|blank|તૂટ/i, 'monoff'], [/camera|કેમેરા/i, 'camera'], [/clean|dust|સફાઈ/i, 'drop']]
+// A camera ticket = camera-off alert, or a fault picked as "Camera faulty". It lives in its own tab.
+const isCamTicket = t => t.source === 'auto_camera' || t.type === 'camera_fault' || /camera/i.test(t.cause || '')
 const iconOf = (en) => (ICON_FOR.find(([re]) => re.test(en || '')) || [0, 'alert'])[1]
 // Which kind of person to call for which problem (same rule as the old station screen).
 const CALL_RULES = [[/clean|bird|pigeon|nest|dust/i, /clean|safai|સફાઈ/i], [/bill|internet|ethernet|software|network/i, /depot|ડેપો|office/i], [/./, /electric|ઇલેક્ટ્રિશિયન/i]]
@@ -129,11 +131,12 @@ export default function OpsTechApp() {
     const procScreens = new Set(inProc.map(t => t.screen_id).filter(Boolean))
     const dayStart = Date.parse(`${istTodayISO()}T00:00:00+05:30`)
     for (const st of stations) {
-      const mine = inProc.filter(t => t.depot_id === st.id)
-      if (mine.length) {
+      for (const isCam of [false, true]) {
+        const mine = inProc.filter(t => t.depot_id === st.id && isCamTicket(t) === isCam)
+        if (!mine.length) continue
         const scrIdx = st.scr.filter(s => mine.some(t => t.screen_id === s.id)).map(s => s.n)
         const cant = mine.some(t => t.cant_fix_reason)
-        out.push({ id: `${st.id}:work`, st: st.id, scr: scrIdx, scrIds: mine.map(t => t.screen_id), src: 'auto', status: cant ? 'cant' : 'work', age: ago(mine[0].created_at), tickets: mine, cant: mine.find(t => t.cant_fix_reason)?.cant_fix_reason })
+        out.push({ id: `${st.id}:${isCam ? 'camwork' : 'work'}`, st: st.id, scr: scrIdx, scrIds: mine.map(t => t.screen_id), src: isCam ? 'cam' : 'auto', status: cant ? 'cant' : 'work', age: ago(mine[0].created_at), tickets: mine, cant: mine.find(t => t.cant_fix_reason)?.cant_fix_reason })
       }
       if (onHours) {
         const off = st.scr.filter(s => s.status === 'offline' && !procScreens.has(s.id))
@@ -156,10 +159,10 @@ export default function OpsTechApp() {
     // fixed today (my tickets resolved today)
     const doneT = d.tickets.filter(t => t.status === 'resolved' && t.resolved_at && Date.parse(t.resolved_at) >= dayStart && t.type !== 'photo_request')
     const byDep = {}
-    doneT.forEach(t => { (byDep[t.depot_id] = byDep[t.depot_id] || []).push(t) })
-    for (const [did, ts] of Object.entries(byDep)) {
-      const st = stById[did]; if (!st) continue
-      out.push({ id: `${did}:fixed`, st: did, scr: st.scr.filter(s => ts.some(t => t.screen_id === s.id)).map(s => s.n), scrIds: ts.map(t => t.screen_id), src: 'auto', status: 'fixed', age: ago(ts[0].resolved_at), tickets: ts, by: 'You' })
+    doneT.forEach(t => { const k = `${t.depot_id}|${isCamTicket(t) ? 'cam' : 'auto'}`; (byDep[k] = byDep[k] || []).push(t) })
+    for (const [k, ts] of Object.entries(byDep)) {
+      const [did, kind] = k.split('|'); const st = stById[did]; if (!st) continue
+      out.push({ id: `${did}:${kind === 'cam' ? 'camfixed' : 'fixed'}`, st: did, scr: st.scr.filter(s => ts.some(t => t.screen_id === s.id)).map(s => s.n), scrIds: ts.map(t => t.screen_id), src: kind, status: 'fixed', age: ago(ts[0].resolved_at), tickets: ts, by: 'You' })
     }
     return out
   }, [stations, stById, d.tickets, onHours])
@@ -234,9 +237,10 @@ export default function OpsTechApp() {
       {jobs.map(f => <VisitCard key={f.id} f={f} st={stById[f.st]} onOpen={() => setOpenId(f.id)} />)}
       <OpsEveningCard lang={(typeof localStorage !== 'undefined' && localStorage.getItem('ops2_lang')) || 'en'} />
     </div>
-  } else if (tab === 'faults') {
-    const list = faults.filter(f => ft === 'open' ? ['open', 'cant'].includes(f.status) : ft === 'work' ? f.status === 'work' : f.status === 'fixed')
-    const cnt = k => faults.filter(f => k === 'open' ? ['open', 'cant'].includes(f.status) : k === 'work' ? f.status === 'work' : f.status === 'fixed').length
+  } else if (tab === 'faults' || tab === 'cams') {
+    const pool = faults.filter(f => (f.src === 'cam') === (tab === 'cams'))
+    const list = pool.filter(f => ft === 'open' ? ['open', 'cant'].includes(f.status) : ft === 'work' ? f.status === 'work' : f.status === 'fixed')
+    const cnt = k => pool.filter(f => k === 'open' ? ['open', 'cant'].includes(f.status) : k === 'work' ? f.status === 'work' : f.status === 'fixed').length
     body = <div style={{ display: 'grid', gap: 14 }}>
       <Seg full value={ft} onChange={setFt} opts={['open', 'work', 'fixed'].map(k => [k, <Bi g={STAT[k][0]} e={<><span className="num">{cnt(k)}</span> {STAT[k][1]}</>} />])} />
       {list.length === 0 && <div className="card" style={{ padding: 18 }}><Bi g="અહીં કંઈ નથી" e="Nothing here" /></div>}
@@ -252,8 +256,8 @@ export default function OpsTechApp() {
       {header}
       {!online && <div className="offb"><Ic n="wifioff" /><Bi g="નેટવર્ક નથી. સેવ થશે નહીં." e="No signal. Changes cannot be saved until signal returns." /></div>}
       <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>{body}</div>
-      <nav className="bnav">{[['today', 'home', 'આજે', 'Today'], ['faults', 'list', 'ફોલ્ટ', 'Faults'], ['me', 'user', 'મારું', 'Me']].map(([k, i, g, e]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => { setTab(k); setOpenId(null) }} aria-current={tab === k}><Ic n={i} s={22} /><Bi g={g} e={e} center /></button>)}</nav>
-      {openFault && <FaultPage key={openFault.id} f={openFault} st={stById[openFault.st]} d={d} uid={uid} onHours={onHours} back={() => setOpenId(null)} reload={load} show={show} setTabFixed={() => { setOpenId(null); setFt('fixed'); setTab('faults') }} />}
+      <nav className="bnav">{[['today', 'home', 'આજે', 'Today'], ['faults', 'list', 'ફોલ્ટ', 'Faults'], ['cams', 'camera', 'કેમેરા', 'Camera'], ['me', 'user', 'મારું', 'Me']].map(([k, i, g, e]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => { setTab(k); setOpenId(null) }} aria-current={tab === k}><Ic n={i} s={22} /><Bi g={g} e={e} center /></button>)}</nav>
+      {openFault && <FaultPage key={openFault.id} f={openFault} st={stById[openFault.st]} d={d} uid={uid} onHours={onHours} back={() => setOpenId(null)} reload={load} show={show} setTabFixed={() => { setOpenId(null); setFt('fixed'); setTab(openFault.src === 'cam' ? 'cams' : 'faults') }} />}
       {sheet && sheet.k === 'log' && <LogSheet stations={stations} issues={d.issues} uid={uid} onClose={() => setSheet(null)} onDone={() => { setSheet(null); show({ t: 'નોંધાયું · Fault logged' }); load() }} show={show} />}
       {bell && <Sheet title={<Bi g="એલર્ટ" e="Alerts" />} onClose={() => setBell(false)}>
         <div style={{ display: 'grid', gap: 10 }}>
@@ -306,7 +310,7 @@ async function uploadPhoto(depotId, prefix, file) {
 
 function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) {
   const [sel, setSel] = useState(() => f.scrIds.filter(Boolean))
-  const [reason, setReason] = useState(() => f.tickets[0]?.issue_type_id || '')
+  const [reason, setReason] = useState(() => f.tickets[0]?.issue_type_id || (f.src === 'cam' ? (d.issues.find(x => /camera/i.test(x.issue_en))?.id || '') : ''))
   const [called, setCalled] = useState(null)
   const [call, setCall] = useState(null)
   const [before, setBefore] = useState(null)

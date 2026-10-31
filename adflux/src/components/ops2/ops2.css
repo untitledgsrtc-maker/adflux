@@ -94,7 +94,7 @@
 .ox .vcard.v-in{border-left-color:var(--in)}
 .ox .vcard:hover{background:#243248}
 .ox .vnum{width:36px;height:36px;border-radius:999px;background:var(--raised);display:grid;place-items:center;font-size:17px;font-weight:600;flex:none}
-.ox .bnav{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--bd);background:var(--card);padding-bottom:12px}
+.ox .bnav{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--bd);background:var(--card);padding-bottom:12px}
 .ox .bnav button{display:grid;justify-items:center;gap:2px;padding:8px 0;min-height:64px;background:none;border:0;border-top:3px solid transparent;color:var(--mu);cursor:pointer;font:inherit}
 .ox .bnav button.on{color:var(--yT);border-top-color:var(--y)}
 .ox .bnav button.on .e{color:var(--yT);opacity:.8}

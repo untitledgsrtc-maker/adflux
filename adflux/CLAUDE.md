@@ -22017,3 +22017,7 @@ Ops staff also get Work-page tasks ("other tasks"); the Ops evening report only 
 ## 529 · Ops: Camera faulty reason + central call numbers (31-10-2026)
 
 New ops_issue_types row "Camera faulty" (supabase_phase529, applied). OpsTechApp shows two office numbers on top of the per-depot contacts: damage/display/blank/camera -> Hardware / screen service 6353774918; bill -> Accounts 8980880889 (CENTRAL list in OpsTechApp.jsx; change the number there). Camera faulty uses the hardware number (assumed). Depot contacts still follow after them.
+
+## 530 · Ops app: Camera tickets in their own tab (31-10-2026)
+
+OpsTechApp bottom nav now Today / Faults / Camera / Me. Camera = camera-off alerts plus any ticket that is source auto_camera, type camera_fault or cause matching /camera/ (isCamTicket). In-process and fixed groups are split per station into screen vs camera; Faults tab shows screens only, Camera tab shows cameras (same Open / In process / Fixed filter). A camera alert opens with the "Camera faulty" reason preselected. Frontend only (bnav css 3 -> 4 columns).
