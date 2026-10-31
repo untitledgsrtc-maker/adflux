@@ -18,6 +18,7 @@ import { dialPhone } from '../../utils/openExternal'
 import { normalizeIndianPhone } from '../../utils/phone'
 import { captureGps } from '../../utils/captureGps'
 import DepotContactsModal from '../../components/ops/DepotContactsModal'
+import OpsEveningCard from '../../components/ops/OpsEveningCard'
 import '../../components/ops2/ops2.css'
 import { Ic, Bi, Btn, Pill, Tile, Ring, Hero, StatTile, Card, Seg, Sel, Bar, ScrTile, Sheet, Toast, useToast, Photo, Swipe, LangToggle, G } from '../../components/ops2/ui'
 
@@ -224,6 +225,7 @@ export default function OpsTechApp() {
       })()}
       {jobs.length > 0 && <span className="lbl" style={{ marginTop: 4 }}><G t="બીજું કામ · Other jobs" /></span>}
       {jobs.map(f => <VisitCard key={f.id} f={f} st={stById[f.st]} onOpen={() => setOpenId(f.id)} />)}
+      <OpsEveningCard lang={(typeof localStorage !== 'undefined' && localStorage.getItem('ops2_lang')) || 'en'} />
     </div>
   } else if (tab === 'faults') {
     const list = faults.filter(f => ft === 'open' ? ['open', 'cant'].includes(f.status) : ft === 'work' ? f.status === 'work' : f.status === 'fixed')

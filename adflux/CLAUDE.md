@@ -22005,3 +22005,7 @@ Operations staff (operation_executive / operation_head) already have their own e
 ## 526 · Ops "Fixed" photo is optional (31-10-2026)
 
 OpsTechApp FixSheet: the after-fix photo no longer blocks Save (label now "optional"; the Fixed button no longer says "take photo"). `fix()` already skipped the upload when no file, and `ops_ticket_resolve` takes only the ticket id, so no server change. If a photo is given it is still saved to fix_photo_path. Frontend only.
+
+## 527 · Evening report added to the live Ops app (31-10-2026)
+
+Technicians only use OpsTechApp (/ops-home); OpsEveningCard was mounted only in the classic OpsHomeV2, so they had no evening report. Mounted OpsEveningCard at the bottom of the OpsTechApp Today tab (shows from 19:00 IST, small preview button before). Reads ops_my_day_report, view + share only. Frontend only.
