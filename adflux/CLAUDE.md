@@ -22021,3 +22021,7 @@ New ops_issue_types row "Camera faulty" (supabase_phase529, applied). OpsTechApp
 ## 530 · Ops app: Camera tickets in their own tab (31-10-2026)
 
 OpsTechApp bottom nav now Today / Faults / Camera / Me. Camera = camera-off alerts plus any ticket that is source auto_camera, type camera_fault or cause matching /camera/ (isCamTicket). In-process and fixed groups are split per station into screen vs camera; Faults tab shows screens only, Camera tab shows cameras (same Open / In process / Fixed filter). A camera alert opens with the "Camera faulty" reason preselected. Frontend only (bnav css 3 -> 4 columns).
+
+## 531 · Work timer widget shows the same seconds as the Work page (02-11-2026)
+
+The Windows widget (Untitled Work timer) read seconds from WindowsAgentEngine.pushState using the PC clock (Date.now), while MyWorkV2 uses PC clock + server skew (Phase 446). A PC clock ~5 s behind the server showed the widget 5 s behind the page. Engine now fetches work_server_time each loadAll (15 s) into s.skew and adds it in pushState. Display only; pay still comes from server timestamps. The engine runs inside the website page, so this ships with the web deploy (no new Windows installer needed).

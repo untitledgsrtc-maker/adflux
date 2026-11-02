@@ -56,6 +56,8 @@ export default function WindowsAgentEngine() {
         ])
         if (cfg.error || !alive) return
         s.config = cfg.data
+        // Same clock fix as the Work page (Phase 446): server time minus this PC's clock, so the widget and the page show the same seconds
+        try { const t0 = Date.now(); const { data: srv } = await supabase.rpc('work_server_time'); if (srv) s.skew = Date.parse(srv) - (t0 + (Date.now() - t0) / 2) } catch { /* keep the last value */ }
         setIntervalMin(Number(cfg.data?.screenshot_interval_min || 10))
         setNeedConsent(!!(cfg.data?.tracked && !cfg.data?.consent_at))
         s.running = run.data || null
@@ -219,7 +221,7 @@ export default function WindowsAgentEngine() {
     }
     function pushState() {
       if (!s.running) { emit('agent:state', { running: false }); invoke('set_tray_tooltip', { text: 'Untitled Work - not running' }).catch(() => {}); return }
-      const upTo = s.asking ? new Date(s.asking.began).getTime() : Date.now()   // frozen while the question is open
+      const upTo = (s.asking ? new Date(s.asking.began).getTime() : Date.now()) + (s.skew || 0)   // frozen while the question is open; PC clock corrected to server time like the Work page
       const secs = Math.max(0, (upTo - new Date(s.running.started_at).getTime()) / 1000 - (s.running.break_seconds || 0))
       emit('agent:state', { running: true, paused: !!s.asking, secs, client: clientName(s.running.project_id), label: s.running.task_label, recording: recordOk() && Date.now() - s.lastSampleAt < 30000, err: s.lastErr })
     }
