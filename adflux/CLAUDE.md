@@ -22025,3 +22025,7 @@ OpsTechApp bottom nav now Today / Faults / Camera / Me. Camera = camera-off aler
 ## 531 · Work timer widget shows the same seconds as the Work page (02-11-2026)
 
 The Windows widget (Untitled Work timer) read seconds from WindowsAgentEngine.pushState using the PC clock (Date.now), while MyWorkV2 uses PC clock + server skew (Phase 446). A PC clock ~5 s behind the server showed the widget 5 s behind the page. Engine now fetches work_server_time each loadAll (15 s) into s.skew and adds it in pushState. Display only; pay still comes from server timestamps. The engine runs inside the website page, so this ships with the web deploy (no new Windows installer needed).
+
+## 532 · Ops screen status pulled every 2 minutes (02-11-2026)
+
+LED online/offline status reaches Ops through pg_cron job ops-aiadflux-sync -> /api/ops/sync (CMS pull). It ran every 10 min, so a fixed screen could show offline (and "Screens are still offline" blocked Fixed) for up to 10 min. Now */2 (supabase_phase532, applied via cron.alter_job; endpoint skips off-hours itself). App already re-reads every 60 s. Revert: set schedule back to */10. Side finding: some ops_screens.last_response_at are in the FUTURE (newest 22:59 IST at 20:38 IST) - CMS time zone suspect; not changed.
