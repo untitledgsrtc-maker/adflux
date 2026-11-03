@@ -145,6 +145,13 @@ BEGIN
      AND ta_date BETWEEN v_month_start AND v_month_end
      AND (v_month_year < '2026-10' OR status IS DISTINCT FROM 'rejected');
 
+  -- Phase 535 (owner 3 Nov 2026): operations staff are paid their travel by hand, so TA never goes in their salary
+  -- (their days only sat at 'rejected' by admin habit; a new pending/approved day would have been paid). From Oct 2026.
+  IF v_month_year >= '2026-10'
+     AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = p_user_id AND u.role IN ('operation_executive', 'operation_head')) THEN
+    v_ta_da := 0;
+  END IF;
+
   SELECT
     COALESCE(SUM(CASE WHEN is_paid_request AND is_half_day  THEN 0.5
                       WHEN is_paid_request                  THEN 1

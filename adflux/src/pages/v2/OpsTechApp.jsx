@@ -45,7 +45,7 @@ const iconOf = (en) => (ICON_FOR.find(([re]) => re.test(en || '')) || [0, 'alert
 const CALL_RULES = [[/clean|bird|pigeon|nest|dust/i, /clean|safai|સફાઈ/i], [/bill|internet|ethernet|software|network/i, /depot|ડેપો|office/i], [/./, /electric|ઇલેક્ટ્રિશિયન/i]]
 // Office numbers that apply to every station (not saved per depot): hardware / screen service and accounts.
 const CENTRAL = [
-  [/damage|display|blank|camera/i, { id: 'central-hw', name: 'Hardware / screen service', role_en: 'Hardware / screen service', role_gu: 'હાર્ડવેર / સ્ક્રીન સર્વિસ', phone: '6353774918' }],
+  [/damage|display|blank|camera|\btv\b/i, { id: 'central-hw', name: 'Hardware / screen service', role_en: 'Hardware / screen service', role_gu: 'હાર્ડવેર / સ્ક્રીન સર્વિસ', phone: '6353774918' }],
   [/bill/i, { id: 'central-acc', name: 'Accounts', role_en: 'Accounts', role_gu: 'એકાઉન્ટ્સ', phone: '8980880889' }],
 ]
 const centralFor = issueEn => CENTRAL.filter(([re]) => re.test(issueEn || '')).map(([, c]) => c)
