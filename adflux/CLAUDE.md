@@ -22049,3 +22049,7 @@ Owner: "yes pay approved claims". The salary skips rejected daily_ta days (Phase
 ## 537 · Salpesh October: 2 Oct half day set (03-11-2026)
 
 Data fix, no code. Salpesh checked in 2 Oct 11:43 (after 11:30) but work_sessions.check_in_status was NULL, so Phase 478 missed the half-day cut; set it to half_day (row 00807c39). Oct net 14094 -> 13805 (late half days 0.5 -> 1.0, deduction 1442 -> 1731). SAME GAP, NOT FIXED (owner did not ask): Rakeshkumar 2 Oct 11:31 status NULL; Dhara 5 Oct 14:12 status on_time. 21 Oct bereavement leave KEPT: HR (Riya) entered it at 10:19 IST after his 07:17 check-in; he had no activity and 0 km that day, so the earlier "he worked" reading was too strong. Owner/HR to confirm if it should be removed.
+
+## 538 · Rakeshkumar 2 Oct and Dhara 5 Oct set to half day (03-11-2026)
+
+Data fix, no code (same gap as 537). Rakeshkumar checked in 2 Oct 11:31 and Dhara 5 Oct 14:12 (was marked on_time); both set work_sessions.check_in_status = half_day, no leave on those days. October net: Rakeshkumar 14404 -> 13731 (late half days 1.5 -> 2.0), Dhara 21396 -> 20954 (0 -> 0.5). Owner asked for it explicitly.
