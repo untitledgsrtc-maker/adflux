@@ -22045,3 +22045,7 @@ Owner: operations staff (Gohil, Gulshan) are paid travel by hand, so TA must not
 ## 536 · Approved TA claims are paid even on a rejected day (03-11-2026)
 
 Owner: "yes pay approved claims". The salary skips rejected daily_ta days (Phase 534) but an admin can approve a claim on such a day (ta_override km, other / da_night / hotel amounts). _compute_monthly_salary_base now adds approved ta_da_requests on rejected days straight from the claims table, from 2026-10: ta_override = claim_km x the day per-km rate (3 if unknown), others = claim_amount. Pending/approved days already hold their claims inside daily_ta, so no double count; ops roles are still zeroed afterwards. Applied live, shadow-compared for all active sales/TC/ops: only Salpesh Oct TA 1561 -> 1961 (net 13694 -> 14094) and Mayur 2208 -> 2388 (net 30466 -> 30646) moved. Revert: remove the Phase 536 block from the file and re-run it.
+
+## 537 · Salpesh October: 2 Oct half day set (03-11-2026)
+
+Data fix, no code. Salpesh checked in 2 Oct 11:43 (after 11:30) but work_sessions.check_in_status was NULL, so Phase 478 missed the half-day cut; set it to half_day (row 00807c39). Oct net 14094 -> 13805 (late half days 0.5 -> 1.0, deduction 1442 -> 1731). SAME GAP, NOT FIXED (owner did not ask): Rakeshkumar 2 Oct 11:31 status NULL; Dhara 5 Oct 14:12 status on_time. 21 Oct bereavement leave KEPT: HR (Riya) entered it at 10:19 IST after his 07:17 check-in; he had no activity and 0 km that day, so the earlier "he worked" reading was too strong. Owner/HR to confirm if it should be removed.
