@@ -22053,3 +22053,7 @@ Data fix, no code. Salpesh checked in 2 Oct 11:43 (after 11:30) but work_session
 ## 538 · Rakeshkumar 2 Oct and Dhara 5 Oct set to half day (03-11-2026)
 
 Data fix, no code (same gap as 537). Rakeshkumar checked in 2 Oct 11:31 and Dhara 5 Oct 14:12 (was marked on_time); both set work_sessions.check_in_status = half_day, no leave on those days. October net: Rakeshkumar 14404 -> 13731 (late half days 1.5 -> 2.0), Dhara 21396 -> 20954 (0 -> 0.5). Owner asked for it explicitly.
+
+## 539 · Half-day (late check-in) rule starts with October 2026 (03-11-2026)
+
+Owner: "start half day rule from October". Phase 478 half-day cut applied to every month, so recomputing a month paid before 23 Oct changed it (Viral Sept showed 29066 vs 29604 paid = exactly the 0.5 day cut of 538). _compute_monthly_salary_base now counts late half days only when month >= 2026-10. Applied live, shadow-compared for all active sales/TC: only Sept moved - Viral 29066 -> 29604 (now equals what was paid), Aayushi 9078 -> 9828; every October figure unchanged. Still open: Sept still counts rejected TA (Kirti 882) because that rule is also Oct+; Kirti Sept 29717 vs paid 29459 probably from a 12 Oct score recalc; Aayushi Sept paid 7618 = no variable (2210): ask owner whether it was withheld on purpose. Revert: remove the month guard and re-run the file.

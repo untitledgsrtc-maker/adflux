@@ -186,7 +186,9 @@ BEGIN
   -- Phase 478 (owner 23 Oct 2026): sales + telecaller who check in after 11:30 IST
   -- (work_sessions.check_in_status='half_day') lose half a day. Skipped on a day that already has an
   -- approved leave (no double deduction). Counted as unpaid, same daily rate as leave.
-  IF EXISTS (SELECT 1 FROM public.users u WHERE u.id = p_user_id AND u.role IN ('sales','telecaller')) THEN
+  -- Phase 539 (owner 3 Nov 2026): the rule starts with October 2026, so months already paid (Sept and earlier) never move.
+  IF v_month_year >= '2026-10'
+     AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = p_user_id AND u.role IN ('sales','telecaller')) THEN
     SELECT COUNT(*) * 0.5 INTO v_late_half
       FROM public.work_sessions w
      WHERE w.user_id = p_user_id
