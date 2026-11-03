@@ -69,6 +69,7 @@ DECLARE
   v_working_days   int     := 0;
   v_incentive      numeric := 0;
   v_ta_da          numeric := 0;
+  v_ta_claims_rej  numeric := 0;
   v_leave_total       numeric := 0;
   v_leave_paid_req    numeric := 0;
   v_leave_unpaid_req  numeric := 0;
@@ -144,6 +145,23 @@ BEGIN
    WHERE user_id = p_user_id
      AND ta_date BETWEEN v_month_start AND v_month_end
      AND (v_month_year < '2026-10' OR status IS DISTINCT FROM 'rejected');
+
+  -- Phase 536 (owner 3 Nov 2026): an APPROVED claim is paid even when the admin rejected that day's GPS travel.
+  -- The day row is skipped above, so add the approved claims on rejected days straight from ta_da_requests:
+  -- ta_override = claim_km at the day's per-km rate (3 when unknown); other / da_night / hotel = claim_amount.
+  -- Days that are pending / approved already carry their claims inside daily_ta, so nothing is counted twice.
+  IF v_month_year >= '2026-10' THEN
+    SELECT COALESCE(SUM(CASE WHEN r.kind = 'ta_override'
+                             THEN COALESCE(r.claim_km, 0) * COALESCE(d.bike_amount / NULLIF(d.km_traveled, 0), 3)
+                             ELSE COALESCE(r.claim_amount, 0) END), 0)
+      INTO v_ta_claims_rej
+      FROM public.ta_da_requests r
+      JOIN public.daily_ta d ON d.user_id = r.user_id AND d.ta_date = r.claim_date AND d.status = 'rejected'
+     WHERE r.user_id = p_user_id
+       AND r.status = 'approved'
+       AND r.claim_date BETWEEN v_month_start AND v_month_end;
+    v_ta_da := v_ta_da + round(v_ta_claims_rej);
+  END IF;
 
   -- Phase 535 (owner 3 Nov 2026): operations staff are paid their travel by hand, so TA never goes in their salary
   -- (their days only sat at 'rejected' by admin habit; a new pending/approved day would have been paid). From Oct 2026.
