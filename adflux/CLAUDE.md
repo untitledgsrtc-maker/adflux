@@ -22029,3 +22029,7 @@ The Windows widget (Untitled Work timer) read seconds from WindowsAgentEngine.pu
 ## 532 · Ops screen status pulled every 2 minutes (02-11-2026)
 
 LED online/offline status reaches Ops through pg_cron job ops-aiadflux-sync -> /api/ops/sync (CMS pull). It ran every 10 min, so a fixed screen could show offline (and "Screens are still offline" blocked Fixed) for up to 10 min. Now */2 (supabase_phase532, applied via cron.alter_job; endpoint skips off-hours itself). App already re-reads every 60 s. Revert: set schedule back to */10. Side finding: some ops_screens.last_response_at are in the FUTURE (newest 22:59 IST at 20:38 IST) - CMS time zone suspect; not changed.
+
+## 533 · Ops reasons: TV software problem, TV last input problem (03-11-2026)
+
+Two new ops_issue_types rows (supabase_phase533, applied, idempotent), order 12 and 13. No code change: the reason list reads the table. "TV software problem" matches the existing software call rule (depot contacts); "TV last input problem" falls to the electrician default rule. Add a CENTRAL number in OpsTechApp.jsx if either needs a fixed office number.
