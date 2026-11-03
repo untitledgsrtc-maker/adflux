@@ -258,7 +258,7 @@ After every commit:
 1. Tell the owner the commit SHA.
 2. Tell the owner the exact command to run from his Mac terminal:
    ```
-   cd ~/Documents/untitled-os2/Untitled/adflux
+   cd ~/Library/Mobile\ Documents/com~apple~CloudDocs/Documents/untitled-os2/Untitled/adflux
    git push origin untitled-os
    ```
 3. Vercel auto-deploys from `untitled-os`. SQL files must be run by hand in Supabase Studio.
@@ -22057,3 +22057,15 @@ Data fix, no code (same gap as 537). Rakeshkumar checked in 2 Oct 11:31 and Dhar
 ## 539 · Half-day (late check-in) rule starts with October 2026 (03-11-2026)
 
 Owner: "start half day rule from October". Phase 478 half-day cut applied to every month, so recomputing a month paid before 23 Oct changed it (Viral Sept showed 29066 vs 29604 paid = exactly the 0.5 day cut of 538). _compute_monthly_salary_base now counts late half days only when month >= 2026-10. Applied live, shadow-compared for all active sales/TC: only Sept moved - Viral 29066 -> 29604 (now equals what was paid), Aayushi 9078 -> 9828; every October figure unchanged. Still open: Sept still counts rejected TA (Kirti 882) because that rule is also Oct+; Kirti Sept 29717 vs paid 29459 probably from a 12 Oct score recalc; Aayushi Sept paid 7618 = no variable (2210): ask owner whether it was withheld on purpose. Revert: remove the month guard and re-run the file.
+
+## 540 · Session wrap-up, 02-03 Nov 2026 (Ops + salary)
+
+REPO PATH: on the owner's Mac the repo is ~/Library/Mobile\ Documents/com~apple~CloudDocs/Documents/untitled-os2/Untitled/adflux (the ~/Documents/untitled-os2 path written in older sections does not exist; section 14 line fixed, the rest left as history). The sandbox cannot git push (auto-mode blocks it): commit locally, the owner pushes.
+
+OPS (all live): 523-525 evening report + attendance hours; 526 Fixed photo optional; 527 evening report mounted on the live Ops app (OpsTechApp); 528 Work tasks row in that report; 529 Camera faulty reason + central numbers (hardware 6353774918, accounts 8980880889); 530 Camera tab; 531 Windows widget uses server-corrected clock; 532 LED sync cron every 2 min; 533 TV software problem + TV last input problem reasons (call 6353774918 via 535).
+
+SALARY (money function db/functions/_compute_monthly_salary_base.sql, all from 2026-10 so paid months never move): 534 rejected TA days not paid; 535 ops roles never get TA in salary (paid by hand); 536 approved claims paid even on a rejected day; 539 half-day (late check-in) cut starts Oct 2026. Data fixes: Salpesh 2 Oct, Rakeshkumar 2 Oct, Dhara 5 Oct set to half_day (537/538).
+
+SEPTEMBER decisions: Aayushi Sept variable (2210) was withheld ON PURPOSE by the owner, so her paid 7618 is correct although the formula now shows 9828 (not changed). Kirti Sept 29717 vs paid 29459 (probably a 12 Oct score recalc, unproven). Sept still counts rejected TA (owner did not ask to change a paid month).
+
+PARKED by owner: operation_head role / team-total evening card (nobody holds the role; card stays unmounted). Open: Salpesh 21 Oct bereavement leave (HR entered it; kept unless HR confirms he worked); Gohil depot calls; 53 overdue ops tickets; "open" count mismatch between Command page and evening report; Ajay phone settings; future last_response_at readings not reproduced.
