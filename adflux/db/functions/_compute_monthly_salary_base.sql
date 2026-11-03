@@ -41,6 +41,9 @@
 --    captured phase97.2 body. Owner-approved, shadow-compared. To revert to the
 --    old 12-free-days + base/26 math, restore the pre-184 leave block from git.
 --
+-- PHASE 534 CHANGE (3 Nov 2026): rejected TA days excluded from ta_da from 2026-10. To revert, remove the
+--    `AND (v_month_year < '2026-10' OR status IS DISTINCT FROM 'rejected')` line from the ta_da query and re-run.
+--
 -- REVERT: re-run this file. TRIPWIRE: VERIFY block at the bottom.
 -- ============================================================================
 
@@ -134,10 +137,13 @@ BEGIN
        AND month_year = v_month_year;
   END IF;
 
+  -- Phase 534 (owner 3 Nov 2026): a TA day the admin REJECTED is not paid in salary. From Oct 2026 on;
+  -- earlier months keep counting every day so months already paid never move (same cutover idea as incentive / divisor).
   SELECT COALESCE(SUM(total_amount), 0) INTO v_ta_da
     FROM public.daily_ta
    WHERE user_id = p_user_id
-     AND ta_date BETWEEN v_month_start AND v_month_end;
+     AND ta_date BETWEEN v_month_start AND v_month_end
+     AND (v_month_year < '2026-10' OR status IS DISTINCT FROM 'rejected');
 
   SELECT
     COALESCE(SUM(CASE WHEN is_paid_request AND is_half_day  THEN 0.5

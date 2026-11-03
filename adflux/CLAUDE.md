@@ -22033,3 +22033,7 @@ LED online/offline status reaches Ops through pg_cron job ops-aiadflux-sync -> /
 ## 533 · Ops reasons: TV software problem, TV last input problem (03-11-2026)
 
 Two new ops_issue_types rows (supabase_phase533, applied, idempotent), order 12 and 13. No code change: the reason list reads the table. "TV software problem" matches the existing software call rule (depot contacts); "TV last input problem" falls to the electrician default rule. Add a CENTRAL number in OpsTechApp.jsx if either needs a fixed office number.
+
+## 534 · Rejected TA is not paid in salary (03-11-2026)
+
+Owner: "don't pay rejected TA in salary". _compute_monthly_salary_base summed ALL daily_ta rows whatever the status. Now excludes status=rejected from ta_da FROM 2026-10 (earlier months unchanged so paid months do not move). Canonical file db/functions/_compute_monthly_salary_base.sql edited and applied live; tripwire still true (auth gate, divisor, net). Shadow-compared: Salpesh Oct net 15101 -> 13694 (TA 2968 -> 1561). Oct effect team-wide: Gohil -1767, Mayur -1566, Kirti -1271, Gulshan -1216, test -699, Ajay -592, Viral -484, Gandhinagar -3. Ops (Gohil/Gulshan) lose all TA from salary because every day is rejected (paid by hand). Pending TA still counts. Revert: remove the one AND line and re-run the file.
