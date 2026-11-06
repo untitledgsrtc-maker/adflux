@@ -473,7 +473,7 @@ function Chip({ active, onClick, label, count, dot }) {
 function Field({ label, children }) {
   return (
     <label style={{ display: 'block', marginTop: 8 }}>
-      <div style={{ fontSize: 11.5, color: 'var(--text-subtle, #64748b)', marginBottom: 4, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-subtle, #64748b)', marginBottom: 4, fontWeight: 600 }}>{label}</div>
       {children}
     </label>
   )

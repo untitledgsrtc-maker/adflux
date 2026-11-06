@@ -139,7 +139,7 @@ export default function FinanceRevSplit() {
   }
 
   const card = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }
-  const lbl = { fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 700, marginBottom: 6 }
+  const lbl = { fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-subtle)', fontWeight: 700, marginBottom: 6 }
   const dim = (n) => (Math.round(n) === 0 ? <span style={{ color: 'var(--text-subtle)' }}>—</span> : money(n))
   const stChip = (st) => ({ padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600,
     background: st === 'Paid' ? 'var(--success-soft)' : st === 'Part paid' ? 'var(--warning-soft)' : 'var(--danger-soft)',

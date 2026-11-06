@@ -104,7 +104,7 @@ export default function OpsCommandV2() {
       </div>
 
       {/* needs you */}
-      <div className="lead-section-label" style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>{t('needs_you', lang)}</div>
+      <div className="lead-section-label" style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>{t('needs_you', lang)}</div>
       {nothingNeeded ? (
         <div className="lead-card" style={{ textAlign: 'center', padding: '18px 14px', color: 'var(--success)', marginBottom: 18, fontWeight: 600 }}>{t('all_handled', lang)}</div>
       ) : (
@@ -126,7 +126,7 @@ export default function OpsCommandV2() {
 
       {/* my techs scorecard */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{t('my_techs', lang)} · {numL(techs.length, lang)}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{t('my_techs', lang)} · {numL(techs.length, lang)}</div>
         <button onClick={() => nav('/ops-dashboard')} style={{ background: 'none', border: 'none', color: 'var(--blue, #3B82F6)', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>{t('live_console', lang)}<ChevronRight size={13} /></button>
       </div>
       {techs.length === 0 ? (
@@ -143,13 +143,13 @@ export default function OpsCommandV2() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <span style={{ fontSize: 14.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tk.name || '—'}</span>
-                    {tk.on_duty && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 700, color: 'var(--success)', flexShrink: 0 }}><span style={{ width: 5, height: 5, borderRadius: 999, background: 'var(--success)' }} />{t('on_duty', lang)}</span>}
+                    {tk.on_duty && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 12, fontWeight: 700, color: 'var(--success)', flexShrink: 0 }}><span style={{ width: 5, height: 5, borderRadius: 999, background: 'var(--success)' }} />{t('on_duty', lang)}</span>}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{numL(tk.tickets_closed || 0, lang)} {t('fixes_word', lang)}{tk.avg_fix_hours ? ` · ${numL(tk.avg_fix_hours, lang)}h ${t('avg_fix', lang).toLowerCase()}` : ''} · {numL(tk.km || 0, lang)} km</div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 18, fontWeight: 700, color: toneVar[tone], lineHeight: 1 }}>{numL(Math.round(tk.uptime_pct || 0), lang)}%</div>
-                  <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{t('uptime_word', lang)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('uptime_word', lang)}</div>
                 </div>
                 {tap && <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
               </El>

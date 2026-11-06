@@ -57,7 +57,7 @@ function UptimeRow({ up, lang }) {
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <div style={{ ...numStyle, fontSize: 24, fontWeight: 700, lineHeight: 1, color: TONE_FG[tone] }}>{has ? fmtPct(pct, lang) : '—'}</div>
           {up && up.month_pct != null ? (
-            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>{t('month_word', lang)} {fmtPct(up.month_pct, lang)}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>{t('month_word', lang)} {fmtPct(up.month_pct, lang)}</div>
           ) : null}
         </div>
       </div>

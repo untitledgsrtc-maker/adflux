@@ -26,7 +26,7 @@ import DepotContactsModal from '../../components/ops/DepotContactsModal'
 const OUTCOME_DB = { reached: 'connected', will_come: 'connected', fixed_call: 'connected', no_answer: 'no_answer' }
 
 // design-system tokens (global, matches OpsAdminV2 / leads.css)
-const secLbl = { fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }
+const secLbl = { fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }
 const fieldSel = { width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 12px', fontSize: 15 }
 const CHIP = { danger: ['var(--danger-soft)', 'var(--danger)'], amber: ['var(--warning-soft)', 'var(--warning)'], green: ['var(--success-soft)', 'var(--success)'] }
 function chip(text, tone) {
@@ -613,7 +613,7 @@ export default function OpsTicketsV2() {
             </div>
           </div>
         )}
-        <div style={{ fontSize: 11.5, color: 'var(--text-subtle, var(--text-muted))', textAlign: 'center', gridColumn: '1 / -1' }}>{t('scoped_note', lang)}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-subtle, var(--text-muted))', textAlign: 'center', gridColumn: '1 / -1' }}>{t('scoped_note', lang)}</div>
       </div>
     )
   }

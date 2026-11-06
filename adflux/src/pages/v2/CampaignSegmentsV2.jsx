@@ -229,7 +229,7 @@ export default function CampaignSegmentsV2() {
             <Users size={22} strokeWidth={1.6} />
           </span>
           <div>
-            <div style={{ fontSize: 11.5, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.07em', fontWeight: 600 }}>Matches</div>
+            <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.07em', fontWeight: 600 }}>Matches</div>
             <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 26, color: 'var(--v2-ink-0)', lineHeight: 1.1 }}>
               {counting ? <Loader2 size={20} strokeWidth={1.6} className="spin" style={{ color: 'var(--v2-yellow, #FFE600)' }} /> : `${count ?? '—'} leads`}
             </div>
@@ -294,7 +294,7 @@ export default function CampaignSegmentsV2() {
         )}
       </div>
 
-      <p style={{ fontSize: 11.5, color: 'var(--v2-ink-2)', margin: '14px 0 0', lineHeight: 1.6 }}>
+      <p style={{ fontSize: 12, color: 'var(--v2-ink-2)', margin: '14px 0 0', lineHeight: 1.6 }}>
         Bulk-sending to a saved segment unlocks in <b style={{ color: 'var(--v2-ink-1)' }}>Broadcast</b> (needs a payment method + a Meta-approved template).
       </p>
 

@@ -95,7 +95,7 @@ export default function OpsTechV2() {
       </div>
 
       {/* stations */}
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>{t('my_stations', lang)} · {numL(stations.length, lang)}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>{t('my_stations', lang)} · {numL(stations.length, lang)}</div>
       {stations.length === 0 ? (
         <div className="lead-card" style={{ textAlign: 'center', padding: '18px 14px', color: 'var(--text-muted)' }}>{t('no_depot', lang)}</div>
       ) : (
@@ -112,7 +112,7 @@ export default function OpsTechV2() {
                     {(s.camera_off || 0) > 0 && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--warning)' }}><VideoOff size={12} /> {numL(s.camera_off, lang)}</span>}
                   </div>
                 </div>
-                {down && <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--danger)' }}>{numL(s.offline, lang)} {t('down_word', lang)}</span>}
+                {down && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--danger)' }}>{numL(s.offline, lang)} {t('down_word', lang)}</span>}
                 <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
               </button>
             )

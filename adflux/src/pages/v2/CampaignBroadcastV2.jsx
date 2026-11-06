@@ -498,7 +498,7 @@ export default function CampaignBroadcastV2() {
                 <div key={t.name + (t.language || '')} style={{ padding: '14px 18px', borderBottom: '1px solid var(--v2-line)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 700, color: 'var(--v2-ink-0)', fontFamily: 'var(--v2-display)' }}>{t.name}</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', padding: '2px 8px', borderRadius: 999, color: st.color, background: st.bg }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', padding: '2px 8px', borderRadius: 999, color: st.color, background: st.bg }}>
                       <st.Icon size={12} strokeWidth={1.8} /> {st.label}
                     </span>
                     <span style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{t.category} · {(t.language || 'en')}</span>

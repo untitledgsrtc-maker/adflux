@@ -24,6 +24,7 @@ import {
   Plus, Upload, Sparkles, ChevronRight, ArrowRight, Mic,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { fetchAllPages } from '../../utils/fetchAllPages'
 import { useAuthStore } from '../../store/authStore'
 import { formatCurrency, formatRelative } from '../../utils/formatters'
 import {
@@ -53,23 +54,12 @@ const STAGE_RAIL = [
 // .select() capped at the PostgREST 1000-row limit → the dashboard's lists +
 // counts were silently 100+ leads short for admins. Reps are RLS-scoped (<1000)
 // so they paid one request as before. Same { data, error } shape as one query.
-async function fetchAllDashboardLeads() {
-  const PAGE = 1000
-  let all = []
-  let from = 0
-  for (;;) {
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*, assigned:assigned_to(id, name, city)')
-      .order('created_at', { ascending: false })
-      .range(from, from + PAGE - 1)
-    if (error) return { data: all, error }
-    all = all.concat(data || [])
-    if (!data || data.length < PAGE) break
-    from += PAGE
-    if (from >= 20000) break   // safety backstop
-  }
-  return { data: all, error: null }
+function fetchAllDashboardLeads() {
+  return fetchAllPages((from, to) => supabase
+    .from('leads')
+    .select('*, assigned:assigned_to(id, name, city)')
+    .order('created_at', { ascending: false })
+    .range(from, to))
 }
 
 export default function LeadDashboardV2() {

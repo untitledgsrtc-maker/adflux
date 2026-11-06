@@ -114,12 +114,12 @@ function Kpi({ label, value, sub, color, Icon, tint }) {
         {Icon && <span style={{ width: 32, height: 32, borderRadius: 9, display: 'grid', placeItems: 'center', background: tint || 'var(--surface-2)', color: color || 'var(--text-muted)' }}><Icon size={17} /></span>}
       </div>
       <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 25, marginTop: 8, color: color || 'var(--text, #f1f5f9)' }}>{value}</div>
-      {sub && <div style={{ fontSize: 11.5, color: 'var(--text-subtle)', marginTop: 3 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 3 }}>{sub}</div>}
     </Card>
   )
 }
 const Spin = () => <div style={{ padding: 40, textAlign: 'center' }}><Loader2 size={26} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-muted)' }} /></div>
-const thL = { textAlign: 'left', fontSize: 10.5, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--text-subtle, #64748b)', fontWeight: 600, padding: '9px 10px' }
+const thL = { textAlign: 'left', fontSize: 12, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--text-subtle, #64748b)', fontWeight: 600, padding: '9px 10px' }
 const thR = { ...thL, textAlign: 'right' }
 const tdL = { padding: '9px 10px', verticalAlign: 'middle', borderTop: '1px solid var(--border-soft, rgba(255,255,255,.06))' }
 const tdR = { ...tdL, textAlign: 'right', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600 }
@@ -983,7 +983,7 @@ function ImportTab() {
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           {rules.map(rl => (
-            <span key={rl.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, padding: '4px 9px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+            <span key={rl.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '4px 9px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
               {rl.pattern} → {(BUCKET_OPTS.find(([k]) => k === rl.set_bucket) || [null, rl.set_bucket || '?'])[1]}{rl.set_head ? ' · ' + rl.set_head : ''}
               <span onClick={() => delRule(rl.id)} style={{ cursor: 'pointer', color: 'var(--text-subtle)', display: 'inline-flex' }}><Trash2 size={12} /></span>
             </span>
@@ -1233,8 +1233,8 @@ function RegisterTab() {
     <Card style={{ padding: 0, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: 14, borderBottom: '1px solid var(--border)' }}>
         <div style={{ fontSize: 13, fontWeight: 600 }}>{filtered.length} transactions <span style={{ color: 'var(--text-subtle)', fontWeight: 400 }}>&middot; edit any dropdown, dashboard updates live</span></div>
-        {reviewCount > 0 && <span onClick={() => setFBucket('review')} style={{ cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)' }}>{reviewCount} to sort</span>}
-        {sweepCount > 0 && <span onClick={() => setHideSweep(h => !h)} style={{ cursor: 'pointer', fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{hideSweep ? `${sweepCount} transfers hidden · show` : 'hide transfers'}</span>}
+        {reviewCount > 0 && <span onClick={() => setFBucket('review')} style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger)' }}>{reviewCount} to sort</span>}
+        {sweepCount > 0 && <span onClick={() => setHideSweep(h => !h)} style={{ cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{hideSweep ? `${sweepCount} transfers hidden · show` : 'hide transfers'}</span>}
         {selected.size > 0 ? (
           <>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent, #FFE600)' }}>{selected.size} selected:</span>
@@ -1258,7 +1258,7 @@ function RegisterTab() {
       </div>
       {addOpen && (() => {
         const inp = { background: 'var(--surface, #1e293b)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', color: 'var(--text)', fontSize: 13, outline: 'none' }
-        const lbl = { display: 'block', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }
+        const lbl = { display: 'block', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--text-subtle)', fontWeight: 600, marginBottom: 4 }
         const dirBtn = (v, txt) => <button onClick={() => setAf(a => ({ ...a, dir: v }))} style={{ flex: 1, padding: '7px 0', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--border)', background: af.dir === v ? (v === 'in' ? 'var(--success)' : 'var(--danger)') : 'transparent', color: af.dir === v ? '#fff' : 'var(--text-muted)', borderRadius: v === 'in' ? '8px 0 0 8px' : '0 8px 8px 0' }}>{txt}</button>
         return (
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', padding: '13px 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2, #334155)' }}>
@@ -1288,7 +1288,7 @@ function RegisterTab() {
               const head = (
                 <tr key={'h' + m} style={{ background: 'var(--surface-2, #334155)' }}>
                   <td style={{ ...tdL, fontWeight: 700, color: 'var(--accent, #FFE600)', fontFamily: 'Space Grotesk', whiteSpace: 'nowrap' }} colSpan={4}>{monthLabel(m)} <span style={{ color: 'var(--text-subtle)', fontWeight: 400, fontSize: 12 }}>&middot; {mt.n} txns</span></td>
-                  <td style={{ ...tdL, fontSize: 11.5 }} colSpan={3}><span style={{ color: 'var(--success)' }}>In {fmtINR(inn)}</span> &nbsp; <span style={{ color: 'var(--danger)' }}>Out {fmtINR(out)}</span> &nbsp; <b>Net {fmtINR(inn - out)}</b></td>
+                  <td style={{ ...tdL, fontSize: 12 }} colSpan={3}><span style={{ color: 'var(--success)' }}>In {fmtINR(inn)}</span> &nbsp; <span style={{ color: 'var(--danger)' }}>Out {fmtINR(out)}</span> &nbsp; <b>Net {fmtINR(inn - out)}</b></td>
                 </tr>
               )
               const trs = rs.map(r => {
@@ -1299,13 +1299,13 @@ function RegisterTab() {
                   <tr key={r.id} style={{ background: selected.has(r.id) ? 'rgba(255,230,0,.08)' : r.bucket === 'review' ? 'rgba(245,158,11,.06)' : undefined }}>
                     <td style={tdL}><input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} /></td>
                     <td style={{ ...tdL, whiteSpace: 'nowrap', fontFamily: 'Space Grotesk' }}>{fmtDate(r.txn_date)}{r.note ? <span title={r.note} style={{ color: 'var(--warning)', marginLeft: 4 }}>~</span> : ''}</td>
-                    <td style={{ ...tdL, maxWidth: 260 }} title={r.description}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>{r.ref_no ? <div style={{ fontSize: 10.5, color: 'var(--text-subtle)' }}>Receipt {r.ref_no}</div> : null}</td>
+                    <td style={{ ...tdL, maxWidth: 260 }} title={r.description}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>{r.ref_no ? <div style={{ fontSize: 12, color: 'var(--text-subtle)' }}>Receipt {r.ref_no}</div> : null}</td>
                     <td style={{ ...tdR, color: r.direction === 'in' ? 'var(--success)' : 'var(--text)' }}>{r.direction === 'in' ? '+' : ''}{fmtINR(r.amount)}</td>
                     <td style={tdL}>
                       <select value={tagOf(r, headById[r.expense_head_id])} onChange={e => retag(r, e.target.value)} style={selStyle}><option value="">Review / to sort</option>{MANUAL_TAGS.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                      <div style={{ fontSize: 10.5, color: 'var(--text-subtle)', marginTop: 2 }}>{bHint}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 2 }}>{bHint}</div>
                       {r.bucket === 'income' && r.direction === 'in' && (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-muted)', marginTop: 3, cursor: 'pointer' }} title="A payment received before the CRM was used: count it as revenue (amount as typed, no GST removed)">
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-muted)', marginTop: 3, cursor: 'pointer' }} title="A payment received before the CRM was used: count it as revenue (amount as typed, no GST removed)">
                           <input type="checkbox" checked={!!r.counts_as_revenue} onChange={e => patch(r.id, { counts_as_revenue: e.target.checked, reconcile_ignored: e.target.checked ? true : r.reconcile_ignored })} />
                           Old payment (before CRM) - count as revenue
                         </label>

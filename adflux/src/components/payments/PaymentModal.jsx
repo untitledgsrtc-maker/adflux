@@ -367,7 +367,7 @@ export function PaymentModal({
                   miss it. Owner: "team might forget a partial was received." */}
               {!isEdit && pendingAmount > 0 && (
                 <div style={{
-                  fontSize: 11.5,
+                  fontSize: 12,
                   color: 'var(--warning)',
                   background: 'rgba(245,158,11,0.10)',
                   border: '1px solid rgba(245,158,11,0.35)',

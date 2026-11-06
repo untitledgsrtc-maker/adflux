@@ -184,7 +184,7 @@ function CityPhotoUploader({ cityId, value, onChange }) {
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              fontSize:   11.5,
+              fontSize:   12,
               color:      'var(--text-muted)',
               wordBreak:  'break-all',
               lineHeight: 1.4,

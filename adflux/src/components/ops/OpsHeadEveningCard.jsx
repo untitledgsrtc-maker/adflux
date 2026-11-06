@@ -42,7 +42,7 @@ const arr = (v) => (Array.isArray(v) ? v : [])
 
 // Explicit backgrounds: the global `thead th` / `tbody tr:hover td` rules tint cells,
 // and the pinned name column must stay opaque so scrolled cells never show through it.
-const th = { textAlign: 'left', fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 700, padding: '9px 10px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.04em', background: 'var(--surface-2)' }
+const th = { textAlign: 'left', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700, padding: '9px 10px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.04em', background: 'var(--surface-2)' }
 const td = { fontSize: 13.5, color: 'var(--text)', padding: '10px 10px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', background: 'var(--surface)' }
 const stickyCell = { position: 'sticky', left: 0, zIndex: 1, boxShadow: '1px 0 0 var(--border)' }
 
@@ -92,7 +92,7 @@ function TechTable({ techs, lang }) {
           </tbody>
         </table>
       </div>
-      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 6 }}>{t('calls_legend', lang)}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>{t('calls_legend', lang)}</div>
     </>
   )
 }
@@ -173,7 +173,7 @@ function TotalsRow({ totals, lang }) {
   const item = (label, value, i) => (
     <div key={i} style={{ flex: 1, textAlign: 'center', borderLeft: i ? '1px solid var(--border)' : 'none', padding: '0 6px' }}>
       <div style={{ ...numStyle, fontSize: 19, fontWeight: 700 }}>{value}</div>
-      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{label}</div>
     </div>
   )
   const tt = totals || {}

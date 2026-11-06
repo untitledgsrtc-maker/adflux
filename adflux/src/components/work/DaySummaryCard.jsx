@@ -455,7 +455,7 @@ export default function DaySummaryCard({
             <div
               style={{
                 marginTop: 6,
-                fontSize:  11,
+                fontSize:  12,
                 color:     'var(--v2-ink-2, #94a3b8)',
                 textAlign: 'center',
               }}

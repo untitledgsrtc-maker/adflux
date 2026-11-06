@@ -120,7 +120,7 @@ export default function CampaignChrome({ active, title = 'Campaigns', sub, right
               {/* live count pill (mockup) — only when we have a real, non-zero number */}
               {n != null && n > 0 && (
                 <span style={{
-                  fontFamily: 'var(--v2-display, "Space Grotesk")', fontSize: 10.5, fontWeight: 700,
+                  fontFamily: 'var(--v2-display, "Space Grotesk")', fontSize: 12, fontWeight: 700,
                   minWidth: 18, textAlign: 'center', padding: '1px 6px', borderRadius: 999,
                   background: isActive ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-bg-2, #1a2742)',
                   color: isActive ? 'var(--accent-fg, #0b1220)' : 'var(--v2-ink-2, #6a7590)',

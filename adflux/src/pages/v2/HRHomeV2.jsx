@@ -127,7 +127,7 @@ function Tile({ title, sub, Icon, onClick, soon, badge }) {
       <span style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--surface-2, #334155)', display: 'grid', placeItems: 'center', color: 'var(--accent, #FFE600)', flexShrink: 0 }}><Icon size={18} /></span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text, #f1f5f9)' }}>{title}{soon && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, padding: '2px 7px', borderRadius: 999, background: 'var(--surface-2, #334155)', color: 'var(--text-subtle)' }}>soon</span>}</div>
-        <div style={{ fontSize: 11.5, color: 'var(--text-subtle, #64748b)', marginTop: 2 }}>{sub}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-subtle, #64748b)', marginTop: 2 }}>{sub}</div>
       </div>
       {badge > 0 && <span style={{ fontSize: 12, fontWeight: 700, minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999, background: 'var(--warning-soft, rgba(245,158,11,.12))', color: 'var(--warning, #F59E0B)', display: 'grid', placeItems: 'center' }}>{badge}</span>}
       {!soon && <ChevronRight size={16} style={{ color: 'var(--text-subtle)', flexShrink: 0 }} />}

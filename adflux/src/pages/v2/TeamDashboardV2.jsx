@@ -1538,7 +1538,7 @@ export default function TeamDashboardV2() {
                   const chip = (color, bg) => ({
                     display: 'inline-flex', alignItems: 'center', gap: 4,
                     padding: '3px 9px', borderRadius: 999,
-                    fontSize: 10.5, fontWeight: 600, whiteSpace: 'nowrap',
+                    fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
                     border: `1px solid ${color}`, background: bg, color,
                   })
                   return (
@@ -1821,7 +1821,7 @@ export default function TeamDashboardV2() {
                       gap:          4,
                       padding:      '3px 8px',
                       borderRadius: 999,
-                      fontSize:     10,
+                      fontSize:     12,
                       fontWeight:   600,
                       letterSpacing:'.04em',
                       textTransform:'uppercase',

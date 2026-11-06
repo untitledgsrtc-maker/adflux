@@ -120,7 +120,7 @@ export default function DepotContactsModal({ depot, lang = 'gu', meId = null, ca
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>{c.name || label(c)}</div>
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{[c.name ? label(c) : null, c.phone].filter(Boolean).join(' · ') || '—'}</div>
-              {addedBy(c) && <div style={{ fontSize: 11.5, color: 'var(--text-subtle, var(--text-muted))', marginTop: 2 }}>{addedBy(c)}</div>}
+              {addedBy(c) && <div style={{ fontSize: 12, color: 'var(--text-subtle, var(--text-muted))', marginTop: 2 }}>{addedBy(c)}</div>}
             </div>
             {canRemove(c) && <button onClick={() => remove(c)} aria-label={t('contact_remove', lang)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', minWidth: 44, minHeight: 44 }}><Trash2 size={16} strokeWidth={1.6} /></button>}
           </div>

@@ -17,6 +17,7 @@
 
 import { useCallback, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllPages } from '../utils/fetchAllPages'
 
 // Phase 323 (audit H2) — REVERTED to `*`. The explicit column list named
 // stage_changed_at (and handoff_sla_due_at), which exist in phase SQL FILES but
@@ -57,22 +58,11 @@ export function useLeads() {
     // .range until a short chunk signals the end → loads ALL leads the
     // rep's RLS allows. Reps (scoped under 1000) still do ONE round trip;
     // only admin with >1000 leads pays the extra request(s). Hard 20k cap.
-    const CHUNK = 1000
-    let all = []
-    let offset = 0
-    let lastErr = null
-    for (;;) {
-      const { data, error: err } = await supabase
-        .from('leads')
-        .select(SELECT_COLUMNS)
-        .order('created_at', { ascending: false })
-        .range(offset, offset + CHUNK - 1)
-      if (err) { lastErr = err; break }
-      all = all.concat(data || [])
-      if (!data || data.length < CHUNK) break   // last (short) page
-      offset += CHUNK
-      if (offset >= 20000) break                // safety backstop
-    }
+    const { data: all, error: lastErr } = await fetchAllPages((from, to) => supabase
+      .from('leads')
+      .select(SELECT_COLUMNS)
+      .order('created_at', { ascending: false })
+      .range(from, to))
 
     if (lastErr) {
       // Phase 12 — surface RLS / auth errors instead of silent empty.

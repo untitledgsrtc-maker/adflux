@@ -235,7 +235,7 @@ function StepEditor({ st, idx, total, onPatch, onDelete, onMove }) {
                   {busy ? <Loader2 size={14} className="spin" /> : (st.material_type === 'video' ? <Video size={14} /> : <FileText size={14} />)}
                   {st.material_url ? ' Replace' : ' Upload'}
                 </button>
-                {st.material_url && <span style={{ fontSize: 11.5, color: 'var(--success)' }}>uploaded</span>}
+                {st.material_url && <span style={{ fontSize: 12, color: 'var(--success)' }}>uploaded</span>}
                 <input ref={fileRef} type="file" accept={st.material_type === 'video' ? 'video/*' : '.pdf'} style={{ display: 'none' }}
                   onChange={e => { uploadMaterial(e.target.files?.[0], st.material_type); e.target.value = '' }} />
               </>

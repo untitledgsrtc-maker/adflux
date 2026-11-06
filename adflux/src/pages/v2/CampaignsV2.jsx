@@ -283,7 +283,7 @@ export default function CampaignsV2() {
                     <tr key={c.id} className="camp-row">
                       <td style={{ ...td }}>
                         <div style={{ fontWeight: 600, color: 'var(--v2-ink-0, #f5f7fb)' }}>{c.name}</div>
-                        <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 2 }}>
                           created {fmtDate(c.created_at)}
                         </div>
                       </td>
@@ -333,7 +333,7 @@ export default function CampaignsV2() {
         )}
       </div>
 
-      <p style={{ fontSize: 11.5, color: 'var(--v2-ink-2)', margin: '14px 0 0', lineHeight: 1.6 }}>
+      <p style={{ fontSize: 12, color: 'var(--v2-ink-2)', margin: '14px 0 0', lineHeight: 1.6 }}>
         Manual / Excel upload keeps working exactly as today. No existing lead / telecaller / sales / quote / payroll flow changes — campaigns sit beside the live system.
       </p>
 
@@ -368,6 +368,6 @@ const btnY = { background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg,
 const btnGhost = { background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, height: 34, padding: '0 12px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }
 const th = { padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--v2-ink-2, #6a7590)', borderBottom: '1px solid var(--v2-line, #1f2b47)', whiteSpace: 'nowrap', background: 'rgba(255,255,255,.02)' }
 const td = { padding: '13px 16px', borderBottom: '1px solid var(--v2-line, #1f2b47)', fontSize: 13, color: 'var(--v2-ink-1, #a9b3c7)', verticalAlign: 'middle' }
-const tcPill = { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--v2-ink-1, #a9b3c7)', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', padding: '3px 9px', borderRadius: 999 }
+const tcPill = { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--v2-ink-1, #a9b3c7)', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', padding: '3px 9px', borderRadius: 999 }
 const tcAv = { width: 18, height: 18, borderRadius: 999, background: 'var(--v2-blue-soft, rgba(96,165,250,0.16))', color: 'var(--v2-blue, #60a5fa)', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }
 const chip = (c) => ({ display: 'inline-flex', padding: '2px 8px', borderRadius: 999, fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', background: c === 'GOVERNMENT' ? 'var(--v2-blue-soft, rgba(96,165,250,0.16))' : 'var(--v2-tint-yellow, rgba(255,230,0,0.14))', color: c === 'GOVERNMENT' ? 'var(--v2-blue, #60a5fa)' : 'var(--v2-yellow, #FFE600)' })

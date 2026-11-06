@@ -371,7 +371,7 @@ export default function CheckInV2() {
                     {label}
                   </div>
                   <div style={{
-                    fontSize:   11,
+                    fontSize:   12,
                     fontFamily: 'var(--v2-display, "Space Grotesk")',
                     color:      'var(--v2-ink-2, #94a3b8)',
                     whiteSpace: 'nowrap',
@@ -386,7 +386,7 @@ export default function CheckInV2() {
             {plan.followups.length > 5 && (
               <div style={{
                 marginTop:   2,
-                fontSize:    11,
+                fontSize:    12,
                 color:       'var(--v2-ink-2, #94a3b8)',
                 textAlign:   'center',
               }}>

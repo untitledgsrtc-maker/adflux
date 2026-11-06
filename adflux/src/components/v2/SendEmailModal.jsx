@@ -104,6 +104,6 @@ const head = { padding: '14px 18px', borderBottom: '1px solid var(--v2-line, #1f
 const xBtn = { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--v2-ink-2)', display: 'flex' }
 const lbl = { fontSize: 12, color: 'var(--v2-ink-2, #6a7590)', textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, marginBottom: 6, display: 'block' }
 const inp = { width: '100%', height: 38, padding: '0 12px', background: 'var(--v2-bg-2, #1a2742)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, color: 'var(--v2-ink-0, #f5f7fb)', fontSize: 14, outline: 'none', fontFamily: 'inherit' }
-const note = { marginTop: 12, fontSize: 11.5, color: 'var(--v2-ink-2)', display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }
+const note = { marginTop: 12, fontSize: 12, color: 'var(--v2-ink-2)', display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }
 const btnY = { background: 'var(--v2-yellow, #FFE600)', color: 'var(--accent-fg, #0b1220)', border: 'none', borderRadius: 10, height: 40, padding: '0 18px', fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }
 const btnG = { background: 'transparent', color: 'var(--v2-ink-1, #a9b3c7)', border: '1px solid var(--v2-line, #1f2b47)', borderRadius: 10, height: 40, padding: '0 16px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }

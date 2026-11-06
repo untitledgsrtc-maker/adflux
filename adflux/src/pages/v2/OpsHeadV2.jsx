@@ -26,7 +26,7 @@ import { isOnHours } from '../../utils/opsHours'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
 import LiveFieldMap from '../../components/ops/LiveFieldMap'
 
-const th = { textAlign: 'left', fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 700, padding: '9px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.04em' }
+const th = { textAlign: 'left', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700, padding: '9px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.04em' }
 const td = { fontSize: 14, color: 'var(--text)', padding: '11px 12px', borderBottom: '1px solid var(--border)', verticalAlign: 'middle' }
 const selBox = { background: 'var(--surface-2, var(--surface))', color: 'var(--text)', border: '1px solid var(--border-strong, var(--border))', borderRadius: 8, padding: '7px 9px', fontSize: 13, maxWidth: 190 }
 const inp = { width: '100%', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border-strong, var(--border))', borderRadius: 'var(--radius, 10px)', padding: '10px 12px', fontSize: 14, boxSizing: 'border-box' }
@@ -504,7 +504,7 @@ export default function OpsHeadV2() {
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{c.name || c.role_en || 'Contact'}</div>
                   <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>{[c.role_en, c.phone].filter(Boolean).join(' · ') || '—'}</div>
                   {c.created_by && techs.find(x => x.id === c.created_by) && (
-                    <div style={{ fontSize: 11.5, color: 'var(--text-subtle, var(--text-muted))', marginTop: 2 }}>Added by {techs.find(x => x.id === c.created_by).name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-subtle, var(--text-muted))', marginTop: 2 }}>Added by {techs.find(x => x.id === c.created_by).name}</div>
                   )}
                 </div>
                 <button onClick={() => delContact(c.id)} title="Remove" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}><Trash2 size={16} /></button>

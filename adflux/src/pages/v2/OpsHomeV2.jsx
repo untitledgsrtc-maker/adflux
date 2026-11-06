@@ -219,7 +219,7 @@ export default function OpsHomeV2() {
           )}
 
           {/* STATIONS — worst first, one tap opens the fix screen */}
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>
             {lang === 'gu' ? 'તમારા સ્ટેશન · સૌથી ખરાબ પહેલા' : 'Your stations · worst first'}
           </div>
           {stations.length === 0 ? (
@@ -284,7 +284,7 @@ function MiniStat({ val, label }) {
   return (
     <div>
       <div style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums', fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{val}</div>
-      <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label}</div>
     </div>
   )
 }

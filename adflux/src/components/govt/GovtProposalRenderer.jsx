@@ -337,7 +337,7 @@ export function GovtProposalRenderer({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'baseline',
-            fontSize: 11.5,
+            fontSize: 12,
             color: '#444',
             marginBottom: 14,
             paddingBottom: 6,

@@ -115,6 +115,7 @@ export default function CampaignInboxV2() {
   // client-side over the already-loaded threads (no new query). A TC searches
   // within their own assigned threads (RLS-scoped, §243).
   const [convSearch, setConvSearch] = useState('')
+  const [showN, setShowN] = useState(100)   // draw only the first 100 threads; 3,700+ in the DOM made the page heavy
   const [convFilter, setConvFilter] = useState('all') // all | open | needs | reply
   const [convTeam, setConvTeam] = useState('all')     // Phase 259 — assigned_to filter (privileged only)
   const [convNum, setConvNum] = useState('all')       // Phase 394 — which of OUR WhatsApp numbers (account id)
@@ -151,6 +152,7 @@ export default function CampaignInboxV2() {
   const [outTemplates, setOutTemplates] = useState(null) // null = not loaded yet
   const [tplLoading, setTplLoading] = useState(false)
 
+  useEffect(() => { setShowN(100) }, [convSearch, convFilter, convTeam, convNum])
   const lastSigRef = useRef(null)
   const lastMsgSigRef = useRef(null)   // Phase 323 (audit H1) — message-pane skip-guard
   const loadThreads = useCallback(async (silent = false) => {
@@ -710,7 +712,7 @@ export default function CampaignInboxV2() {
                     type="button"
                     onClick={() => setConvFilter(f.key)}
                     style={{
-                      fontSize: 11.5, fontWeight: 600, padding: '4px 10px', borderRadius: 999,
+                      fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999,
                       cursor: 'pointer', border: '1px solid ' + (on ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-line)'),
                       background: on ? 'var(--v2-tint-yellow, rgba(255,230,0,0.14))' : 'transparent',
                       color: on ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-ink-2, #6a7590)',
@@ -791,7 +793,7 @@ export default function CampaignInboxV2() {
             </div>
           ) : (
             <div style={{ maxHeight: 600, overflowY: 'auto' }}>
-              {filteredThreads.map((t) => {
+              {filteredThreads.slice(0, showN).map((t) => {
                 const active = t.id === selId
                 // Phase 263 — UNREAD = the customer sent the last message and we
                 // haven't replied. NOT window-gated (unlike the Reply chip), so a
@@ -853,6 +855,12 @@ export default function CampaignInboxV2() {
                   </button>
                 )
               })}
+              {filteredThreads.length > showN && (
+                <button type="button" className="v2d-btn" style={{ width: '100%', margin: '8px 0', minHeight: 44 }}
+                  onClick={() => setShowN((n) => n + 100)}>
+                  Show more ({filteredThreads.length - showN} left)
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -892,7 +900,7 @@ export default function CampaignInboxV2() {
                   {sel.customer_name && (
                     <span style={{ display: 'block', fontSize: 12, color: 'var(--v2-ink-2, #6a7590)' }}>{fmtPhone(sel.customer_wa_id)}</span>
                   )}
-                  <span style={{ fontSize: 11.5, color: windowOpen(sel.window_expires_at) ? 'var(--v2-green, #22c55e)' : 'var(--v2-ink-2, #6a7590)' }}>
+                  <span style={{ fontSize: 12, color: windowOpen(sel.window_expires_at) ? 'var(--v2-green, #22c55e)' : 'var(--v2-ink-2, #6a7590)' }}>
                     {windowOpen(sel.window_expires_at) ? `Window open · ${windowLeft(sel.window_expires_at)}` : 'Window closed — needs a template to re-open'}
                   </span>
                 </span>
@@ -956,7 +964,7 @@ export default function CampaignInboxV2() {
                         {showSep && (
                           <div style={{ textAlign: 'center', margin: '6px 0 12px' }}>
                             <span style={{
-                              fontSize: 10.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase',
+                              fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase',
                               color: 'var(--v2-ink-2, #6a7590)', background: 'var(--v2-bg-2)',
                               border: '1px solid var(--v2-line)', borderRadius: 999, padding: '3px 10px',
                             }}>
@@ -1043,7 +1051,7 @@ export default function CampaignInboxV2() {
 
               {/* window bar */}
               <div style={{
-                padding: '8px 16px', fontSize: 11.5, fontWeight: 600,
+                padding: '8px 16px', fontSize: 12, fontWeight: 600,
                 borderTop: '1px solid var(--v2-line)',
                 color: windowOpen(sel.window_expires_at) ? 'var(--v2-green, #22c55e)' : 'var(--v2-amber, #F59E0B)',
                 background: windowOpen(sel.window_expires_at) ? 'var(--v2-green-soft, rgba(34,197,94,0.12))' : 'var(--v2-amber-soft, rgba(245,158,11,0.12))',
@@ -1106,7 +1114,7 @@ export default function CampaignInboxV2() {
                       background: 'var(--v2-bg-1, #0f1525)', border: '1px solid var(--v2-line, #1f2b47)',
                     }}>
                       <div style={{
-                        fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+                        fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
                         color: 'var(--v2-ink-2, #6a7590)', padding: '2px 6px 6px',
                       }}>
                         Station videos
@@ -1133,7 +1141,7 @@ export default function CampaignInboxV2() {
                             >
                               <Film size={14} strokeWidth={1.6} style={{ color: 'var(--v2-ink-2, #6a7590)', flexShrink: 0 }} />
                               {c.name}
-                              <span style={{ color: 'var(--v2-ink-2, #6a7590)', marginLeft: 'auto', fontSize: 11.5 }}>Send link</span>
+                              <span style={{ color: 'var(--v2-ink-2, #6a7590)', marginLeft: 'auto', fontSize: 12 }}>Send link</span>
                             </button>
                           ))}
                         </div>
@@ -1299,7 +1307,7 @@ export default function CampaignInboxV2() {
                                 )}
                               </span>
                               {preview && (
-                                <span style={{ display: 'block', fontSize: 11.5, color: 'var(--v2-ink-2, #6a7590)', marginTop: 2 }}>
+                                <span style={{ display: 'block', fontSize: 12, color: 'var(--v2-ink-2, #6a7590)', marginTop: 2 }}>
                                   {preview}…
                                 </span>
                               )}
@@ -1307,7 +1315,7 @@ export default function CampaignInboxV2() {
                           )
                         })
                       )}
-                      <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2, #6a7590)', padding: '6px 8px 2px', borderTop: '1px solid var(--v2-line, #1f2b47)', marginTop: 4 }}>
+                      <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #6a7590)', padding: '6px 8px 2px', borderTop: '1px solid var(--v2-line, #1f2b47)', marginTop: 4 }}>
                         Fixed Meta-approved wording (name auto-filled) · sent from the company number · max one per lead per 24h.
                       </div>
                     </div>
@@ -1357,7 +1365,7 @@ const miniAv = {
 }
 const chipYSmall = {
   display: 'inline-flex', alignItems: 'center', padding: '1px 6px', borderRadius: 999,
-  fontSize: 9.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
+  fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase',
   background: 'var(--v2-tint-yellow, rgba(255,230,0,0.14))', color: 'var(--v2-yellow, #FFE600)',
 }
 const chipReply = {

@@ -347,7 +347,7 @@ export default function PendingApprovalsV2() {
                           {(r.users?.name || r.quotes?.sales_person_name) && <span>· by {r.users?.name || r.quotes?.sales_person_name}</span>}
                         </div>
                       </div>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: 'var(--success, #10B981)', whiteSpace: 'nowrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--success, #10B981)', whiteSpace: 'nowrap' }}>
                         <CheckCircle2 size={13} /> {formatDate(r.decided_at)}
                       </span>
                     </div>

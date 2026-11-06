@@ -27,7 +27,7 @@ export const TONE_BG = {
 const SEV_FG = { 2: 'var(--danger)', 1: 'var(--warning)', 0: 'var(--text-muted)' }
 
 export const sectionLabel = {
-  fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)',
+  fontSize: 12, fontWeight: 700, color: 'var(--text-muted)',
   textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6,
 }
 export const numStyle = { fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums' }
@@ -161,7 +161,7 @@ export function MetricTile({ icon: Icon, value, label, sub, tone = 'neutral', sm
       </div>
       <div style={{ ...numStyle, fontSize: small ? 18 : 26, fontWeight: 700, lineHeight: 1.1, marginTop: 8, color: TONE_FG[tone] || TONE_FG.neutral }}>{value}</div>
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontWeight: 600 }}>{label}</div>
-      {sub ? <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div> : null}
+      {sub ? <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div> : null}
     </div>
   )
 }

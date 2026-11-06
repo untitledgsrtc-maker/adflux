@@ -274,7 +274,7 @@ export default function CampaignClientQrV2() {
                       <td style={{ ...td, padding: '8px 16px' }}><Thumb qr={qrValue(r.code)} /></td>
                       <td style={td}>
                         <div style={{ fontWeight: 600, color: 'var(--v2-ink-0, #f5f7fb)' }}>{r.client_name}</div>
-                        <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', letterSpacing: '.04em', marginTop: 2 }}>{r.code}</div>
+                        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', letterSpacing: '.04em', marginTop: 2 }}>{r.code}</div>
                       </td>
                       <td style={td}>
                         {waM
@@ -303,7 +303,7 @@ export default function CampaignClientQrV2() {
         )}
       </div>
 
-      <p style={{ fontSize: 11.5, color: 'var(--v2-ink-2)', margin: '14px 0 0', lineHeight: 1.6 }}>
+      <p style={{ fontSize: 12, color: 'var(--v2-ink-2)', margin: '14px 0 0', lineHeight: 1.6 }}>
         Same tracker as your boards — a scan hits /api/q/&lt;code&gt;, logs one scan, then opens the target (WhatsApp or a link). <b style={{ color: 'var(--v2-ink-1)' }}>Editing re-points the SAME QR</b> — the code is fixed, so an already-printed QR keeps working with no reprint. Only download the PNG for a brand-new QR.
       </p>
 
@@ -342,7 +342,7 @@ export default function CampaignClientQrV2() {
                   <div style={{ marginTop: 12 }}>
                     <label style={lbl}>Link (website, video, form…)</label>
                     <input style={inp} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="e.g. https://youtu.be/… or acme.com/offer" />
-                    <div style={{ marginTop: 6, fontSize: 10.5, color: 'var(--v2-ink-2)', wordBreak: 'break-all' }}>
+                    <div style={{ marginTop: 6, fontSize: 12, color: 'var(--v2-ink-2)', wordBreak: 'break-all' }}>
                       {linkUrl.trim() && !target
                         ? <span style={{ color: 'var(--v2-rose, #f87171)' }}>Not a valid link.</span>
                         : target
@@ -371,7 +371,7 @@ export default function CampaignClientQrV2() {
                     <div style={{ width: 170, height: 170, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--v2-ink-2, #6a7590)', fontSize: 12 }}>{qrType === 'link' ? 'Enter a link' : 'Enter a number'}</div>
                   )}
                 </div>
-                <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', marginTop: 8, wordBreak: 'break-all' }}>{target ? qrValue(displayCode) : '—'}</div>
+                <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 8, wordBreak: 'break-all' }}>{target ? qrValue(displayCode) : '—'}</div>
               </div>
             </div>
           </div>

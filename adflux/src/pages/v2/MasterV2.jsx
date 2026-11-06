@@ -722,7 +722,7 @@ function AssetUploader({ row, field, label, kind, accept, onUpload, onClear }) {
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              fontSize: 11.5, color: 'var(--text-muted)',
+              fontSize: 12, color: 'var(--text-muted)',
               wordBreak: 'break-all', lineHeight: 1.4,
             }}>
               {url.length > 60 ? url.slice(0, 30) + '…' + url.slice(-25) : url}
@@ -733,7 +733,7 @@ function AssetUploader({ row, field, label, kind, accept, onUpload, onClear }) {
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
                 style={{
-                  padding: '5px 10px', fontSize: 11.5, fontWeight: 600,
+                  padding: '5px 10px', fontSize: 12, fontWeight: 600,
                   background: 'var(--surface-3)', border: 'none',
                   borderRadius: 6, color: 'var(--text)',
                   cursor: uploading ? 'wait' : 'pointer',
@@ -746,7 +746,7 @@ function AssetUploader({ row, field, label, kind, accept, onUpload, onClear }) {
                 onClick={onClear}
                 disabled={uploading}
                 style={{
-                  padding: '5px 10px', fontSize: 11.5, fontWeight: 600,
+                  padding: '5px 10px', fontSize: 12, fontWeight: 600,
                   background: 'transparent', border: '1px solid var(--surface-3)',
                   borderRadius: 6, color: 'var(--text-muted)',
                   cursor: 'pointer',

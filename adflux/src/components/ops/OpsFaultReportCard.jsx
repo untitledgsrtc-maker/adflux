@@ -112,7 +112,7 @@ function HeadBody({ d, lang }) {
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--text-muted)' }}>{l.scoreNote}</div>
+      <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>{l.scoreNote}</div>
     </>
   )
 }

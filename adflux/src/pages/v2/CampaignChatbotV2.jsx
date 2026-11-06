@@ -78,7 +78,7 @@ function Shell({ type, selected, children, showTarget = true, showSource = true 
         <span style={{ width: 8, height: 8, borderRadius: 3, background: DOT[type], flexShrink: 0 }} />
         {TITLE[type]}
       </div>
-      <div style={{ padding: '9px 11px', fontSize: 11.5, color: 'var(--v2-ink-1)', lineHeight: 1.45, wordBreak: 'break-word' }}>
+      <div style={{ padding: '9px 11px', fontSize: 12, color: 'var(--v2-ink-1)', lineHeight: 1.45, wordBreak: 'break-word' }}>
         {children}
       </div>
       {showSource && <Handle type="source" position={Position.Right} style={handleStyle} />}
@@ -129,14 +129,14 @@ function ButtonsNode({ data, selected }) {
       <div style={{ padding: '8px 11px', borderBottom: '1px solid var(--v2-line)', fontSize: 12, fontWeight: 700, color: 'var(--v2-ink-0)', display: 'flex', alignItems: 'center', gap: 7 }}>
         <span style={{ width: 8, height: 8, borderRadius: 3, background: DOT.buttons, flexShrink: 0 }} />Buttons
       </div>
-      <div style={{ padding: '9px 11px', fontSize: 11.5, color: 'var(--v2-ink-1)', lineHeight: 1.4 }}>
+      <div style={{ padding: '9px 11px', fontSize: 12, color: 'var(--v2-ink-1)', lineHeight: 1.4 }}>
         {data?.media_url && <span style={mediaTag}>{data.media_type || 'file'}</span>}
         {clip(data?.text, 60) || <i style={{ color: 'var(--v2-ink-2)' }}>prompt…</i>}
       </div>
       <div style={{ borderTop: '1px solid var(--v2-line)' }}>
         {btns.length === 0 && <div style={{ padding: '7px 11px', fontSize: 12, color: 'var(--v2-ink-2)' }}>No buttons yet</div>}
         {btns.map((b, i) => (
-          <div key={i} style={{ position: 'relative', padding: '7px 11px', fontSize: 11.5, color: 'var(--v2-ink-0)', borderTop: i ? '1px solid var(--v2-line)' : 'none' }}>
+          <div key={i} style={{ position: 'relative', padding: '7px 11px', fontSize: 12, color: 'var(--v2-ink-0)', borderTop: i ? '1px solid var(--v2-line)' : 'none' }}>
             {b.label || `Button ${i + 1}`}
             <Handle type="source" id={`btn_${i}`} position={Position.Right} style={{ ...handleStyle, top: '50%' }} />
           </div>
@@ -145,7 +145,7 @@ function ButtonsNode({ data, selected }) {
     </div>
   )
 }
-const mediaTag = { display: 'inline-block', fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--v2-green, #22c55e)', border: '1px solid var(--v2-green, #22c55e)', borderRadius: 5, padding: '0 5px', marginRight: 6, marginBottom: 4 }
+const mediaTag = { display: 'inline-block', fontSize: 12, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--v2-green, #22c55e)', border: '1px solid var(--v2-green, #22c55e)', borderRadius: 5, padding: '0 5px', marginRight: 6, marginBottom: 4 }
 
 const nodeTypes = { start: StartNode, message: MessageNode, buttons: ButtonsNode, keyword: KeywordNode, action: ActionNode, handoff: HandoffNode }
 
@@ -428,14 +428,14 @@ export default function CampaignChatbotV2() {
         <>
         {/* C14 — pick which chatbot to edit; one is Live on WhatsApp */}
         <div style={flowbar}>
-          <span style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.07em', fontWeight: 600 }}>Chatbot</span>
+          <span style={{ fontSize: 12, color: 'var(--v2-ink-2)', textTransform: 'uppercase', letterSpacing: '.07em', fontWeight: 600 }}>Chatbot</span>
           <select style={{ ...pinp, width: 'auto', minWidth: 130, height: 34 }} value={flowId || ''} onChange={(e) => switchFlow(e.target.value)}>
             {flows.map((f) => <option key={f.id || 'x'} value={f.id || ''}>{f.name}{f.is_published ? '  ·  LIVE' : ''}</option>)}
           </select>
           <input style={{ ...pinp, width: 150, height: 34 }} value={curName} onChange={(e) => setCurName(e.target.value)} onBlur={() => renameFlow(curName)} placeholder="name" title="Rename this chatbot" />
           <button type="button" onClick={newFlow} style={{ ...btnG, height: 34 }}><Plus size={13} strokeWidth={1.8} /> New</button>
           <button type="button" onClick={delFlow} style={{ ...btnG, height: 34, padding: '0 10px', color: 'var(--v2-rose, #f87171)' }} title="Delete this chatbot"><Trash2 size={13} strokeWidth={1.6} /></button>
-          <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 600, color: (flows.find((f) => f.id === flowId)?.is_published) ? 'var(--v2-green, #22c55e)' : 'var(--v2-ink-2)' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: (flows.find((f) => f.id === flowId)?.is_published) ? 'var(--v2-green, #22c55e)' : 'var(--v2-ink-2)' }}>
             {(flows.find((f) => f.id === flowId)?.is_published) ? '● LIVE on WhatsApp' : 'Draft — Publish to go Live'}
           </span>
         </div>
@@ -570,7 +570,7 @@ function NodeEditor({ node, patch }) {
             <input style={{ ...pinp, flex: 1 }} value={b.label || ''} maxLength={24} onChange={(e) => setBtn(i, { label: e.target.value })} placeholder="Rates" />
             <button type="button" onClick={() => patch({ buttons: btns.filter((_, j) => j !== i) })} style={{ ...btnG, height: 38, padding: '0 8px', color: 'var(--v2-rose, #f87171)' }}><Trash2 size={13} strokeWidth={1.6} /></button>
           </div>
-          <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2)', marginTop: 6 }}>Wire this button&rsquo;s dot to a block, or type an inline reply below.</div>
+          <div style={{ fontSize: 12, color: 'var(--v2-ink-2)', marginTop: 6 }}>Wire this button&rsquo;s dot to a block, or type an inline reply below.</div>
           <textarea style={{ ...ptext, minHeight: 54, marginTop: 6 }} value={b.reply_text || ''} onChange={(e) => setBtn(i, { reply_text: e.target.value })} placeholder="Inline reply (if not wired)…" />
         </div>
       ))}

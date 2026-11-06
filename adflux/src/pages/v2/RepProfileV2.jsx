@@ -101,7 +101,7 @@ function Tile({ label, value, tone, sub }) {
       borderRadius: 14, padding: '12px 14px',
     }}>
       <div style={{
-        fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase',
+        fontSize: 12, letterSpacing: '.12em', textTransform: 'uppercase',
         color: 'var(--v2-ink-2, var(--text-muted))', fontWeight: 700,
       }}>{label}</div>
       <div style={{
@@ -134,7 +134,7 @@ function SectionCard({ title, sub, action, children }) {
             {title}
           </div>
           {sub && (
-            <div style={{ fontSize: 11.5, color: 'var(--v2-ink-2, var(--text-muted))', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--v2-ink-2, var(--text-muted))', marginTop: 2 }}>
               {sub}
             </div>
           )}
@@ -226,7 +226,7 @@ function RepPerformanceCard({ userId }) {
                   fontSize: 18, fontWeight: 700,
                   color: t.accent ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-ink-0, var(--text))',
                 }}>{t.value}</div>
-                {t.sub && <div style={{ fontSize: 10.5, color: 'var(--v2-ink-2, var(--text-muted))', marginTop: 2 }}>{t.sub}</div>}
+                {t.sub && <div style={{ fontSize: 12, color: 'var(--v2-ink-2, var(--text-muted))', marginTop: 2 }}>{t.sub}</div>}
               </div>
             ))}
           </div>
@@ -305,7 +305,7 @@ function EditTargetsModal({ userId, current, onClose, onSaved }) {
         ].map(([label, value, setter]) => (
           <div key={label} style={{ marginBottom: 12 }}>
             <label style={{
-              display: 'block', fontSize: 11.5, fontWeight: 600,
+              display: 'block', fontSize: 12, fontWeight: 600,
               color: 'var(--v2-ink-2, var(--text-muted))', marginBottom: 4,
               textTransform: 'uppercase', letterSpacing: '.08em',
             }}>{label}</label>

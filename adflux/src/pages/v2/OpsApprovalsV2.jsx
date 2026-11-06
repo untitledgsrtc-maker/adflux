@@ -130,7 +130,7 @@ export default function OpsApprovalsV2() {
 
 function SectionLabel({ icon: Icon, text }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>
       <Icon size={14} /> {text}
     </div>
   )
