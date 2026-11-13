@@ -1202,7 +1202,10 @@ export default function AdminDashboardDesktop() {
                   navigate('/quotes')
                 }}
               />
-                <FunnelPanel stages={state.funnel.stages} max={state.funnel.max} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+                  <FunnelPanel stages={state.funnel.stages} max={state.funnel.max} />
+                  <LiabilityPanel data={state.liability} />
+                </div>
               </section>
               <section className="v2d-grid-2" style={{ marginBottom: 16, alignItems: 'start' }}>
                 <OutstandingPanel
@@ -1225,16 +1228,15 @@ export default function AdminDashboardDesktop() {
                   <DailyCheckinCard />
                 </section>
               <section className="v2d-grid-2" style={{ marginBottom: 16, alignItems: 'start' }}>
-                <LeaderboardPanel rows={state.leaderboard} max={state.lbMax} period={period} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+                  <LeaderboardPanel rows={state.leaderboard} max={state.lbMax} period={period} />
+                  <BriefDeliveryCard
+                    stats={state.briefStats}
+                    salesUsers={state.salesUsersForLive}
+                    onRetry={() => navigate('/admin/push-debug')}
+                  />
+                </div>
                 <TeamActivityPanel />
-              </section>
-              <section className="v2d-grid-2" style={{ marginBottom: 16, alignItems: 'start' }}>
-                <LiabilityPanel data={state.liability} />
-                <BriefDeliveryCard
-                stats={state.briefStats}
-                salesUsers={state.salesUsersForLive}
-                onRetry={() => navigate('/admin/push-debug')}
-              />
               </section>
               </>
             )}
