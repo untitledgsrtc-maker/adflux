@@ -16,6 +16,8 @@ import {
 // CTA + the per-item arrow.
 import { supabase } from '../../lib/supabase'
 import { LEAD_STAGES, STAGE_LABELS } from '../../hooks/useLeads'
+import { fetchAllPages } from '../../utils/fetchAllPages'
+import { formatCompact } from '../../utils/formatters'
 
 const STAGE_BAR_COLOR = {
   New:              'rgba(96,165,250,.50)',
@@ -325,19 +327,24 @@ export function LeadPipelinePanel() {
   const [counts, setCounts] = useState(null)
 
   useEffect(() => {
-    supabase
-      .from('leads')
-      .select('stage, expected_value')
-      .then(({ data }) => {
-        const c = {}
-        LEAD_STAGES.forEach(s => { c[s] = 0 })
-        let value = 0
-        ;(data || []).forEach(l => {
-          c[l.stage] = (c[l.stage] || 0) + 1
-          if (!['Won', 'Lost'].includes(l.stage)) value += Number(l.expected_value) || 0
-        })
-        setCounts({ counts: c, total: (data || []).length, value })
-      })
+    let live = true
+    // Phase 545 - exact per-stage counts (a plain select stops at 1000 rows), then the active value.
+    Promise.all([
+      supabase.from('leads').select('id', { count: 'exact', head: true }),
+      ...LEAD_STAGES.map(s => supabase.from('leads').select('id', { count: 'exact', head: true }).eq('stage', s)),
+    ]).then(([all, ...per]) => {
+      if (!live) return
+      const c = {}
+      LEAD_STAGES.forEach((s, i) => { c[s] = per[i].count || 0 })
+      setCounts({ counts: c, total: all.count || 0, value: null })
+      return fetchAllPages((from, to) => supabase.from('leads').select('expected_value')
+        .not('stage', 'in', '(Won,Lost)').order('id').range(from, to))
+    }).then((r) => {
+      if (!live || !r) return
+      const value = (r.data || []).reduce((a, l) => a + (Number(l.expected_value) || 0), 0)
+      setCounts(prev => prev && { ...prev, value })
+    })
+    return () => { live = false }
   }, [])
 
   if (!counts) return null
@@ -353,7 +360,7 @@ export function LeadPipelinePanel() {
         <div>
           <div style={{ fontSize: 13, fontWeight: 600 }}>Lead pipeline</div>
           <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', marginTop: 2 }}>
-            {counts.total} total · ₹{(counts.value/100000).toFixed(1)}L active value
+            {counts.total.toLocaleString('en-IN')} total{counts.value === null ? '' : ` · ${formatCompact(counts.value)} active value`}
           </div>
         </div>
         <button
@@ -440,7 +447,8 @@ export function TeamActivityPanel() {
           {Array.from(data.sessions.values()).filter(s => s.check_in_at).length} of {data.team.length} field staff checked in
         </div>
       </div>
-      <table className="v2d-q-table">
+      <div className="v2d-team-scroll">
+      <table className="v2d-q-table v2d-team-tbl">
         <thead>
           <tr>
             <th>Name</th>
@@ -486,6 +494,7 @@ export function TeamActivityPanel() {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

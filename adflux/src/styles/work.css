@@ -338,3 +338,13 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 @keyframes wkinpop { from { transform: scale(0); } to { transform: scale(1); } }
 @media (max-width: 720px) { .wk-in-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .wk-in-two { grid-template-columns: 1fr; } .wk-in-w { grid-template-columns: 100px minmax(0, 1fr); } .wk-in-w > span:last-child { grid-column: 1 / -1; text-align: left !important; } }
 @media (prefers-reduced-motion: reduce) { .wk-in-k, .wk-in-card { animation-duration: .01s !important; } .wk-in-line, .wk-in-dot { animation-duration: .01s !important; } .wk-in-tr u { transition-duration: .01s !important; } }
+
+/* Phase 545 - Daily check-in rows: 3 columns on desktop, stacked on phones (was clipped at 375px) */
+.wk-dc-line { display: grid; grid-template-columns: 130px 90px 1fr; gap: 12px; align-items: center; padding: 10px 16px; }
+.wk-dc-act { margin-left: auto; }
+@media (max-width: 640px) {
+  .wk-dc-line { grid-template-columns: 1fr auto; gap: 8px 12px; }
+  .wk-dc-line > div { grid-column: 1 / -1; }
+  .wk-dc-act { margin-left: 0; width: 100%; }
+  .wk-dc-act .wk-btn { flex: 1 1 100%; min-height: 44px; }
+}

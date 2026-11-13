@@ -20,7 +20,7 @@ function Line({ label, done, total, missing, closed, note, canSend, kind, onSend
   const shown = all || canSend && sel.length ? missing : missing.slice(0, 5)
   const pct = total ? Math.round(done / total * 100) : 0
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '130px 90px 1fr', gap: 12, alignItems: 'center', padding: '10px 16px' }}>
+    <div className="wk-dc-line">
       <b style={{ fontSize: 14 }}>{label}</b>
       <span className="wk-num" style={{ fontSize: 14 }}>{closed ? '-' : `${done} of ${total}`}</span>
       <div style={{ minWidth: 0 }}>
@@ -38,7 +38,7 @@ function Line({ label, done, total, missing, closed, note, canSend, kind, onSend
                   {!all && missing.length > 5 && <button className="wk-btn g sm" onClick={() => setAll(true)}>+{missing.length - 5} more</button>}
                   {all && missing.length > 5 && <button className="wk-btn g sm" onClick={() => setAll(false)}>Less</button>}
                   {canSend && (
-                    <span className="wk-grp" style={{ gap: 6, marginLeft: 'auto' }}>
+                    <span className="wk-grp wk-dc-act" style={{ gap: 6 }}>
                       {sel.length > 0 && <button className="wk-btn y sm" disabled={busy} onClick={() => send(sel)}>Remind {sel.length} selected</button>}
                       <button className="wk-btn o sm" disabled={busy} onClick={() => send(missing.map((m) => m.id))}>Remind all not yet ({missing.length})</button>
                     </span>

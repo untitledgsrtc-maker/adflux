@@ -874,7 +874,8 @@ export default function AdminDashboardDesktop() {
     // This week (Mon-Sun, IST) approved payments per day vs last week's total.
     const dayMs = 86400000
     const t0 = new Date(`${todayDate}T00:00:00Z`).getTime()
-    const monMs = t0 - ((new Date(t0).getUTCDay() + 6) % 7) * dayMs
+    const todayIdx = (new Date(t0).getUTCDay() + 6) % 7
+    const monMs = t0 - todayIdx * dayMs
     const isoOf = (ms) => new Date(ms).toISOString().slice(0, 10)
     const paidOn = (iso) => paymentsApr.reduce((a, p) => a + ((p.payment_date || '').slice(0, 10) === iso ? Number(p.amount_received) || 0 : 0), 0)
     const weekDays = Array.from({ length: 7 }, (_, i) => ({ label: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i], iso: isoOf(monMs + i * dayMs) }))
@@ -882,7 +883,8 @@ export default function AdminDashboardDesktop() {
     const week = {
       days: weekDays,
       total: weekDays.reduce((a, d) => a + d.amt, 0),
-      prev: Array.from({ length: 7 }, (_, i) => paidOn(isoOf(monMs - (7 - i) * dayMs))).reduce((a, b) => a + b, 0),
+      // Same days of last week (Mon..today) so a part-week is not compared against a full week.
+      prev: Array.from({ length: todayIdx + 1 }, (_, i) => paidOn(isoOf(monMs - 7 * dayMs + i * dayMs))).reduce((a, b) => a + b, 0),
     }
 
     setState({
@@ -1378,7 +1380,7 @@ function WeekRevenuePanel({ week }) {
         </div>
         {delta !== null && (
           <span style={{ fontSize: 12, fontWeight: 600, color: delta >= 0 ? 'var(--v2-green, #22c55e)' : 'var(--v2-rose, #f43f5e)' }}>
-            {delta >= 0 ? '+' : ''}{delta}% vs last week
+            {delta >= 0 ? '+' : ''}{delta}% vs same days last week
           </span>
         )}
       </div>
@@ -2477,10 +2479,8 @@ function SourceAttribCard({ rows = [] }) {
           return (
             <div
               key={r.source}
+              className="v2d-src-row"
               style={{
-                display: 'grid',
-                gridTemplateColumns: '160px 1fr 90px 70px',
-                gap: 10, alignItems: 'center',
                 padding: '8px 12px',
                 background: 'rgba(255,255,255,.02)',
                 border: '1px solid var(--v2-line)',
