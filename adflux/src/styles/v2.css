@@ -2369,6 +2369,8 @@
 @media (max-width: 640px) {
   .v2d-src-row { grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px 12px; }
   .v2d-src-row > :nth-child(2) { grid-column: 1 / -1; order: 4; }
-  .v2d-team-tbl th, .v2d-team-tbl td { padding: 8px 6px !important; width: auto !important; }
+  .v2d-team-scroll { margin-inline: -20px; }
+  .v2d-team-tbl th, .v2d-team-tbl td { padding: 8px 4px !important; width: auto !important; }
   .v2d-team-tbl th:first-child, .v2d-team-tbl td:first-child { padding-left: 12px !important; }
+  .v2d-team-tbl th:last-child, .v2d-team-tbl td:last-child { padding-right: 12px !important; }
 }
