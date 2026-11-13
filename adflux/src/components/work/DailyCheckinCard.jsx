@@ -81,7 +81,7 @@ export default function DailyCheckinCard() {
     return true
   }
   return (
-    <div className="wk" style={{ padding: 0 }}>
+    <div className="wk" style={{ padding: 0, maxWidth: 'none' }}>
       <div className="wk-card flush">
         <div className="wk-ch" style={{ padding: '12px 16px' }}>
           <h3 style={{ fontSize: 16 }}>Daily check-in</h3>

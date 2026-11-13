@@ -98,6 +98,10 @@ export default function AdminDashboardDesktop() {
   // liability still reads monthly_sales_data which is segment-blind —
   // see the comment by the leaderboard build below.
   const [segmentFilter, setSegmentFilter] = useState('all')
+  const [tab, setTab] = useState(() => {
+    try { const t = localStorage.getItem('v2d_admin_tab'); return ['money', 'team', 'pipeline'].includes(t) ? t : 'money' } catch { return 'money' }
+  })
+  const pickTab = (t) => { setTab(t); try { localStorage.setItem('v2d_admin_tab', t) } catch { /* private window */ } }
 
   useEffect(() => {
     load(period, segmentFilter)
@@ -1055,37 +1059,6 @@ export default function AdminDashboardDesktop() {
                 the queue is empty the banner disappears entirely; admins
                 don't need a "well done, inbox zero" pat on the back on
                 every page load. */}
-            {state.pending.length > 0 && (
-              <section
-                className="v2d-banner"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 16px',
-                  background: 'rgba(249, 115, 22, 0.08)',
-                  border: '1px solid rgba(249, 115, 22, 0.25)',
-                  borderRadius: 12,
-                  marginBottom: 16,
-                }}
-              >
-                <AlertTriangle size={18} style={{ color: '#f97316', flex: '0 0 auto' }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <Zap size={14} strokeWidth={1.6} />
-                    {state.pending.length} payment{state.pending.length > 1 ? 's' : ''} waiting on approval
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.6))' }}>
-                    Approve to credit the sales team.
-                  </div>
-                </div>
-                <button
-                  className="v2d-banner-cta"
-                  onClick={() => navigate('/pending-approvals')}
-                  style={{ flex: '0 0 auto' }}
-                >
-                  Open queue
-                </button>
-              </section>
-            )}
 
             {/* Phase 25d — Hero Revenue KPIs aligned to the
                 owner-approved design (_design_reference/Untitled_Os_(1)/
@@ -1196,8 +1169,14 @@ export default function AdminDashboardDesktop() {
               />
             </section>
 
-            <section style={{ marginBottom: 16 }}>
-              <CashForecastCard
+            {/* Phase 546 - tabs: money / team / pipeline. Only the open tab is mounted, so
+                the other tabs' self-fetching panels do not load until opened. */}
+            <DashTabs value={tab} onChange={pickTab} />
+
+            {tab === 'money' && (
+              <>
+                <section style={{ marginBottom: 16 }}>
+                  <CashForecastCard
                 outstanding={state.kpi.outstanding}
                 overdueCount={state.kpi.outstandingOver45d}
                 buckets={state.cashBuckets}
@@ -1207,39 +1186,9 @@ export default function AdminDashboardDesktop() {
                   navigate('/quotes')
                 }}
               />
-            </section>
-
-            <section style={{ marginBottom: 16 }}>
-              <DailyCheckinCard />
-            </section>
-
-            {/* Phase 41.3 — Top hot leads + brief delivery status. */}
-            <section className="v2d-grid-2" style={{ marginBottom: 16 }}>
-              <TopHotLeadsCard
-                rows={state.hotLeads}
-                onOpen={(id) => navigate(`/leads/${id}`)}
-                onAll={() => navigate('/leads')}
-              />
-              <BriefDeliveryCard
-                stats={state.briefStats}
-                salesUsers={state.salesUsersForLive}
-                onRetry={() => navigate('/admin/push-debug')}
-              />
-            </section>
-
-            {/* Phase 47.7 — source attribution: which lead source
-                is converting best in the last 90 days. */}
-            <section style={{ marginBottom: 16 }}>
-              <SourceAttribCard rows={state.sourceAttrib || []} />
-            </section>
-
-            {/* Row 2: Revenue trend + Funnel */}
-            <section className="v2d-grid-2">
-              {/* Phase 31F — clicking a bar drills into /quotes filtered
-                  to that month. monthKey is "YYYY-MM"; we widen it to
-                  the full month range and feed the global quote filter
-                  store before navigating. */}
-              <RevenueTrendPanel
+                </section>
+              <section className="v2d-grid-2" style={{ marginBottom: 16, alignItems: 'start' }}>
+                <RevenueTrendPanel
                 months={state.trendMonths}
                 max={state.trendMax}
                 onMonthClick={(monthKey) => {
@@ -1253,59 +1202,59 @@ export default function AdminDashboardDesktop() {
                   navigate('/quotes')
                 }}
               />
-              <FunnelPanel stages={state.funnel.stages} max={state.funnel.max} />
-            </section>
-
-            {/* Row 3: Outstanding (LEFT) + Team leaderboard (RIGHT).
-                Both are 6-row scannable lists — pairing them fits the
-                "where's the money stuck / who's earning" glance an
-                admin runs every morning. Outstanding used to take a
-                whole row alone which wasted half the width. */}
-            <section className="v2d-grid-2">
-              <OutstandingPanel
+                <FunnelPanel stages={state.funnel.stages} max={state.funnel.max} />
+              </section>
+              <section className="v2d-grid-2" style={{ marginBottom: 16, alignItems: 'start' }}>
+                <OutstandingPanel
                 rows={state.outstandingList}
                 onOpen={(row) => openQuote(row)}
               />
-              <LeaderboardPanel rows={state.leaderboard} max={state.lbMax} period={period} />
-            </section>
-
-            {/* Row 4: Incentive liability + Renewal opportunities.
-                Liability = "what we owe the team if month closed today".
-                Renewals = "money we could earn if we ask clients ending
-                in 30 days." Both forward-looking, naturally paired. */}
-            <section className="v2d-grid-2">
-              <LiabilityPanel data={state.liability} />
-              <RenewalsPanel data={state.renewals} onOpen={(row) => openQuote(row)} onAll={() => navigate('/renewal-tools')} />
-            </section>
-
-            {/* Row 4c — Phase 12 rev3 — Lead pipeline (left) + Today's
-                team activity (right). Lead funnel is for the M1 LEADS
-                table (separate from the QUOTES funnel above). Team
-                activity shows daily check-ins + counters per person. */}
-            <section className="v2d-grid-2" style={{ marginTop: 16 }}>
-              <LeadPipelinePanel />
-              <TeamActivityPanel />
-            </section>
-
-            {/* Row 4b: Stale won quotes — separate row, full-width when
-                present. Forward-looking risk: deals won that won't
-                actually collect unless someone chases. Hidden when
-                count = 0 to keep the page tight. */}
-            {state.staleQuotes && state.staleQuotes.length > 0 && (
+                <RenewalsPanel data={state.renewals} onOpen={(row) => openQuote(row)} onAll={() => navigate('/renewal-tools')} />
+              </section>
+                {state.staleQuotes && state.staleQuotes.length > 0 && (
               <section>
                 <StalePanel rows={state.staleQuotes} onOpen={(row) => openQuote(row)} />
               </section>
             )}
+              </>
+            )}
 
-            {/* Phase 41.1 — RepActivityPanel dropped (folded into
-                TeamActivityPanel above). Recent activity feed
-                (ActivityPanel) dropped — audit trail moves to a
-                separate /audit-log page if needed; not daily-glance
-                material. */}
+            {tab === 'team' && (
+              <>
+                <section style={{ marginBottom: 16 }}>
+                  <DailyCheckinCard />
+                </section>
+              <section className="v2d-grid-2" style={{ marginBottom: 16, alignItems: 'start' }}>
+                <LeaderboardPanel rows={state.leaderboard} max={state.lbMax} period={period} />
+                <TeamActivityPanel />
+              </section>
+              <section className="v2d-grid-2" style={{ marginBottom: 16, alignItems: 'start' }}>
+                <LiabilityPanel data={state.liability} />
+                <BriefDeliveryCard
+                stats={state.briefStats}
+                salesUsers={state.salesUsersForLive}
+                onRetry={() => navigate('/admin/push-debug')}
+              />
+              </section>
+              </>
+            )}
 
-            {/* Row 5: Active campaigns — horizontal grid of cards needs
-                the full row width to lay out without wrapping awkwardly. */}
-            <ActiveCampaignsPanel rows={state.activeCampaigns} onOpen={(row) => openQuote(row)} />
+            {tab === 'pipeline' && (
+              <>
+              <section className="v2d-grid-2" style={{ marginBottom: 16, alignItems: 'start' }}>
+                <LeadPipelinePanel />
+                <TopHotLeadsCard
+                rows={state.hotLeads}
+                onOpen={(id) => navigate(`/leads/${id}`)}
+                onAll={() => navigate('/leads')}
+              />
+              </section>
+                <section style={{ marginBottom: 16 }}>
+                  <SourceAttribCard rows={state.sourceAttrib || []} />
+                </section>
+                <ActiveCampaignsPanel rows={state.activeCampaigns} onOpen={(row) => openQuote(row)} />
+              </>
+            )}
 
             <div className="v2d-foot">
               v2 · admin · {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -2154,6 +2103,34 @@ function ActivityPanel({ items, onOpen }) {
    Phase 41.2 — Sprint 2 cards: Segment toggle + Admin Actions
    queue + Reps-in-field + Cash forecast.
    ═══════════════════════════════════════════════════════════ */
+
+function DashTabs({ value, onChange }) {
+  const opts = [{ k: 'money', label: 'Money' }, { k: 'team', label: 'Team' }, { k: 'pipeline', label: 'Pipeline' }]
+  return (
+    <div role="tablist" aria-label="Dashboard sections" style={{
+      display: 'flex', gap: 4, padding: 4, marginBottom: 16, width: 'fit-content', maxWidth: '100%',
+      background: 'var(--v2-bg-1)', border: '1px solid var(--v2-line)', borderRadius: 999,
+    }}>
+      {opts.map(o => {
+        const on = value === o.k
+        return (
+          <button
+            key={o.k} type="button" role="tab" aria-selected={on}
+            onClick={() => onChange(o.k)}
+            style={{
+              padding: '10px 20px', minHeight: 44, fontSize: 13, fontWeight: 600,
+              border: 'none', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit',
+              background: on ? 'var(--v2-yellow, #FFE600)' : 'transparent',
+              color: on ? 'var(--accent-fg, #0F172A)' : 'var(--v2-ink-1)',
+            }}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 function SegmentToggle({ value, onChange }) {
   const opts = [
