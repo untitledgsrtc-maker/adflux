@@ -270,7 +270,7 @@ export default function AdminDashboardDesktop() {
       // last-ping but is not in the field). Mirrors the TeamDashboard
       // live-count rule (check_out_at / auto_checked_out).
       supabase.from('work_sessions')
-        .select('user_id, check_out_at, auto_checked_out')
+        .select('user_id, check_out_at, auto_checked_out, daily_counters')
         .eq('work_date', todayDate),
       // Perf (audit M8) — team-wide follow-ups-due count. Depends only on
       // todayDate (known above) so it rides the batch as the 18th element
@@ -860,6 +860,31 @@ export default function AdminDashboardDesktop() {
 
     const missedReps = repActivity.filter(r => r.missed)
 
+    // Today rings (team): calls + meetings come from today's work_sessions.daily_counters (the same stored
+    // counters the rep pages use), quotes from repActivity. Target = sum over reps who checked in today.
+    const todaySessions = wsCheckedOutRes.data || []
+    const idsToday = new Set(todaySessions.map(w => w.user_id))
+    const sumCtr = (k) => todaySessions.reduce((a, w) => a + (Number(w.daily_counters?.[k]) || 0), 0)
+    const rings = {
+      calls:    { done: sumCtr('calls'),    target: salesUsers.filter(u => idsToday.has(u.id)).reduce((a, u) => a + (Number(targetByUser[u.id]?.min_calls) || 0), 0) },
+      meetings: { done: sumCtr('meetings'), target: salesUsers.filter(u => idsToday.has(u.id) && u.role === 'sales').length * 5 },
+      quotes:   { done: repActivity.reduce((a, r) => a + r.sentToday, 0), target: salesUsers.filter(u => idsToday.has(u.id)).reduce((a, u) => a + (Number(targetByUser[u.id]?.min_quotes ?? 2) || 0), 0) },
+    }
+
+    // This week (Mon-Sun, IST) approved payments per day vs last week's total.
+    const dayMs = 86400000
+    const t0 = new Date(`${todayDate}T00:00:00Z`).getTime()
+    const monMs = t0 - ((new Date(t0).getUTCDay() + 6) % 7) * dayMs
+    const isoOf = (ms) => new Date(ms).toISOString().slice(0, 10)
+    const paidOn = (iso) => paymentsApr.reduce((a, p) => a + ((p.payment_date || '').slice(0, 10) === iso ? Number(p.amount_received) || 0 : 0), 0)
+    const weekDays = Array.from({ length: 7 }, (_, i) => ({ label: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i], iso: isoOf(monMs + i * dayMs) }))
+      .map(d => ({ ...d, amt: paidOn(d.iso), today: d.iso === todayDate, future: d.iso > todayDate }))
+    const week = {
+      days: weekDays,
+      total: weekDays.reduce((a, d) => a + d.amt, 0),
+      prev: Array.from({ length: 7 }, (_, i) => paidOn(isoOf(monMs - (7 - i) * dayMs))).reduce((a, b) => a + b, 0),
+    }
+
     setState({
       loading: false,
       kpi: {
@@ -891,6 +916,7 @@ export default function AdminDashboardDesktop() {
       briefStats,
       // Phase 47.7
       sourceAttrib,
+      rings, week,
     })
   }
 
@@ -1141,6 +1167,12 @@ export default function AdminDashboardDesktop() {
               </div>
             </section>
 
+            {/* Phase 542 — planned design: today's rings + this week's revenue (_design_reference/dashboard_glass_mockup.html) */}
+            <section className="v2d-grid-2" style={{ marginBottom: 16 }}>
+              <TodayRingsPanel rings={state.rings} />
+              <WeekRevenuePanel week={state.week} />
+            </section>
+
             {/* Phase 41.2 — Segment toggle (was hidden state-only). */}
             <SegmentToggle value={segmentFilter} onChange={setSegmentFilter} />
 
@@ -1285,6 +1317,90 @@ export default function AdminDashboardDesktop() {
 /* ══════════════════════════════════════════════════════════
    Sub-components
    ══════════════════════════════════════════════════════════ */
+
+// Phase 542 — three concentric rings (calls / meetings / quotes) for the whole team today.
+function TodayRingsPanel({ rings }) {
+  const rows = [
+    { key: 'calls',    label: 'Calls',       color: 'var(--v2-yellow, #FFE600)', r: 58, ...rings.calls },
+    { key: 'meetings', label: 'Meetings',    color: 'var(--v2-green, #22c55e)',  r: 44, ...rings.meetings },
+    { key: 'quotes',   label: 'Quotes sent', color: 'var(--v2-blue, #3b82f6)',   r: 30, ...rings.quotes },
+  ]
+  return (
+    <div className="v2d-panel">
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Today</div>
+          <div className="v2d-panel-s">Whole team, against the targets of reps who checked in</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+        <svg width="140" height="140" viewBox="0 0 140 140" role="img" aria-label="Today's calls, meetings and quotes against target">
+          {rows.map(x => {
+            const c = 2 * Math.PI * x.r
+            const pct = x.target > 0 ? Math.min(1, x.done / x.target) : 0
+            return (
+              <g key={x.key} transform="rotate(-90 70 70)">
+                <circle cx="70" cy="70" r={x.r} fill="none" stroke="var(--v2-line, #334155)" strokeWidth="10" />
+                <circle cx="70" cy="70" r={x.r} fill="none" stroke={x.color} strokeWidth="10" strokeLinecap="round"
+                  strokeDasharray={c} strokeDashoffset={c * (1 - pct)} style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
+              </g>
+            )
+          })}
+        </svg>
+        <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
+          {rows.map(x => (
+            <div key={x.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ width: 4, height: 28, borderRadius: 2, background: x.color, flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{x.label}</div>
+                <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 18, color: 'var(--v2-ink-0)' }}>
+                  {x.done}{x.target > 0 ? <span style={{ fontSize: 14, color: 'var(--v2-ink-2)' }}> / {x.target}</span> : null}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Phase 542 — payments approved per day this week (Mon-Sun) with the change against last week.
+function WeekRevenuePanel({ week }) {
+  const max = Math.max(1, ...week.days.map(d => d.amt))
+  const delta = week.prev > 0 ? Math.round(((week.total - week.prev) / week.prev) * 100) : null
+  return (
+    <div className="v2d-panel">
+      <div className="v2d-panel-h">
+        <div>
+          <div className="v2d-panel-t">Collected this week</div>
+          <div className="v2d-panel-s">Approved payments, all segments</div>
+        </div>
+        {delta !== null && (
+          <span style={{ fontSize: 12, fontWeight: 600, color: delta >= 0 ? 'var(--v2-green, #22c55e)' : 'var(--v2-rose, #f43f5e)' }}>
+            {delta >= 0 ? '+' : ''}{delta}% vs last week
+          </span>
+        )}
+      </div>
+      <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 700, fontSize: 26, color: 'var(--v2-ink-0)', marginBottom: 12 }}>
+        <Money value={week.total} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 110 }}>
+        {week.days.map(d => (
+          <div key={d.iso} title={`${d.label}: ₹${new Intl.NumberFormat('en-IN').format(Math.round(d.amt))}`}
+            style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'stretch', height: '100%' }}>
+            <div style={{ height: `${Math.max(4, (d.amt / max) * 100)}%`, borderRadius: 6, background: d.today ? 'var(--v2-yellow, #FFE600)' : 'var(--v2-bg-2)', opacity: d.future ? 0.35 : 1 }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+        {week.days.map(d => (
+          <div key={d.iso} style={{ flex: 1, textAlign: 'center', fontSize: 12, color: d.today ? 'var(--v2-ink-0)' : 'var(--v2-ink-2)', fontWeight: d.today ? 600 : 400 }}>{d.label}</div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function Kpi({ label, value, count, tone, dot, sub, cta }) {
   const icon = { green: '₹', blue: '◎', amber: '⏱', rose: '!' }[tone] || '•'

@@ -16,6 +16,7 @@ import { Plus, Loader2, AlertTriangle, Inbox, X, Search, Download } from 'lucide
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import CampaignChrome from '../../components/v2/CampaignChrome'
+import { fetchAllPages } from '../../utils/fetchAllPages'
 import { pushToast, toastError, toastSuccess } from '../../components/v2/Toast'
 
 const SOURCES = [
@@ -34,7 +35,8 @@ export default function CampaignsV2() {
   const [rows, setRows] = useState([])
   const [boardCounts, setBoardCounts] = useState({})
   const [leadsCount, setLeadsCount] = useState(null)
-  const [stats, setStats] = useState({})          // campaign_id → { leads, won }
+  const [stats, setStats] = useState({})          // campaign_id → { leads, won, convs, replied, quotes, wonValue }
+  const [nums, setNums] = useState({})            // whatsapp_account_id → display number
   const [tcs, setTcs] = useState([])
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -54,7 +56,7 @@ export default function CampaignsV2() {
     try {
       const { data: camps, error: e1 } = await supabase
         .from('campaigns')
-        .select('id, name, source_type, segment, default_telecaller_id, is_active, created_at')
+        .select('id, name, source_type, segment, default_telecaller_id, whatsapp_account_id, is_active, created_at')
         .order('created_at', { ascending: false })
       if (e1) {
         if (e1.code === '42P01' || /does not exist|schema cache/i.test(e1.message || '')) {
@@ -73,14 +75,35 @@ export default function CampaignsV2() {
       // from ONE bounded read of campaign-attached leads. No join on the hot
       // leads path; campaign leads are a small subset (§45).
       const { data: cLeads } = await supabase
-        .from('leads').select('campaign_id, stage')
+        .from('leads').select('id, campaign_id, stage')
         .not('campaign_id', 'is', null).limit(10000)
       const agg = {}
+      const of = (cid) => agg[cid] || (agg[cid] = { leads: 0, won: 0, convs: 0, replied: 0, quotes: 0, wonValue: 0 })
+      const leadCamp = {}
       ;(cLeads || []).forEach((l) => {
-        const a = agg[l.campaign_id] || (agg[l.campaign_id] = { leads: 0, won: 0 })
+        const a = of(l.campaign_id)
+        leadCamp[l.id] = l.campaign_id
         a.leads++
         if (l.stage === 'Won') a.won++
       })
+      // Replied = chats where the customer wrote back; quotes / won value come from the quotes of campaign leads.
+      // Best effort: if one of these reads fails the page still shows leads / won as before.
+      const [convs, qts, accs] = await Promise.all([
+        fetchAllPages((f, t) => supabase.from('whatsapp_conversations').select('id, campaign_id, last_inbound_at').not('campaign_id', 'is', null).order('id').range(f, t)),
+        fetchAllPages((f, t) => supabase.from('quotes').select('id, lead_id, status, total_amount').not('lead_id', 'is', null).order('id').range(f, t)),
+        supabase.from('whatsapp_accounts').select('id, display_number'),
+      ])
+      ;(convs.data || []).forEach((c) => { const a = of(c.campaign_id); a.convs++; if (c.last_inbound_at) a.replied++ })
+      ;(qts.data || []).forEach((q) => {
+        const cid = leadCamp[q.lead_id]
+        if (!cid) return
+        const a = of(cid)
+        a.quotes++
+        if (q.status === 'won') a.wonValue += Number(q.total_amount) || 0
+      })
+      const nm = {}
+      ;(accs.data || []).forEach((x) => { nm[x.id] = x.display_number })
+      setNums(nm)
       setStats(agg)
       setLeadsCount((cLeads || []).length)
 
@@ -106,6 +129,7 @@ export default function CampaignsV2() {
 
   const totalBoards = useMemo(() => Object.values(boardCounts).reduce((a, b) => a + b, 0), [boardCounts])
   const activeCount = useMemo(() => rows.filter((r) => r.is_active).length, [rows])
+  const totals = useMemo(() => Object.values(stats).reduce((t, a) => ({ convs: t.convs + a.convs, replied: t.replied + a.replied, wonValue: t.wonValue + a.wonValue }), { convs: 0, replied: 0, wonValue: 0 }), [stats])
 
   const filtered = useMemo(() => rows.filter((r) => {
     if (fSource && r.source_type !== fSource) return false
@@ -116,15 +140,15 @@ export default function CampaignsV2() {
   }), [rows, fSource, fStatus, q])
 
   function exportCsv() {
-    const head = ['Campaign', 'Source', 'Segment', 'Telecaller', 'Boards', 'Leads', 'Won', 'Conv %', 'Status', 'Created']
+    const head = ['Campaign', 'Source', 'Number', 'Segment', 'Telecaller', 'Boards', 'Leads', 'Replied', 'Quotes', 'Won', 'Conv %', 'Status', 'Created']
     const lines = [head.join(',')]
     filtered.forEach((c) => {
-      const st = stats[c.id] || { leads: 0, won: 0 }
+      const st = stats[c.id] || { leads: 0, won: 0, replied: 0, quotes: 0 }
       const conv = st.leads ? Math.round((st.won / st.leads) * 100) : 0
       const cells = [
-        c.name, srcOf(c.source_type).t.split(' (')[0], c.segment === 'GOVERNMENT' ? 'Govt' : 'Private',
+        c.name, srcOf(c.source_type).t.split(' (')[0], nums[c.whatsapp_account_id] || '', c.segment === 'GOVERNMENT' ? 'Govt' : 'Private',
         (c.default_telecaller_id && tcName[c.default_telecaller_id]) || 'round-robin',
-        boardCounts[c.id] || 0, st.leads, st.won, `${conv}%`, c.is_active ? 'Active' : 'Paused', fmtDate(c.created_at),
+        boardCounts[c.id] || 0, st.leads, st.replied, st.quotes, st.won, `${conv}%`, c.is_active ? 'Active' : 'Paused', fmtDate(c.created_at),
       ].map((v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s })
       lines.push(cells.join(','))
     })
@@ -185,6 +209,8 @@ export default function CampaignsV2() {
         <Kpi label="Boards (QR)" value={loading ? '·' : totalBoards} hint="locations stamped" />
         <Kpi label="Leads captured" value={loading ? '·' : (leadsCount ?? 0)} hint="from all campaigns" accent />
         <Kpi label="Telecallers" value={loading ? '·' : tcs.length} hint="available to route" />
+        <Kpi label="Reply rate" value={loading ? '·' : (totals.convs ? `${Math.round((totals.replied / totals.convs) * 100)}%` : '—')} hint={`${totals.replied} of ${totals.convs} chats wrote back`} />
+        <Kpi label="Won value" value={loading ? '·' : `₹${new Intl.NumberFormat('en-IN').format(Math.round(totals.wonValue))}`} hint="won quotes from campaign leads" accent />
       </div>
 
       {/* New campaign form (toggled) */}
@@ -266,10 +292,13 @@ export default function CampaignsV2() {
                 <tr>
                   <th style={th}>Campaign</th>
                   <th style={th}>Source</th>
+                  <th style={th}>Number</th>
                   <th style={th}>Segment</th>
                   <th style={th}>Telecaller</th>
                   <th style={{ ...th, textAlign: 'right' }}>Boards</th>
                   <th style={{ ...th, textAlign: 'right' }}>Leads</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Replied</th>
+                  <th style={{ ...th, textAlign: 'right' }}>Quotes</th>
                   <th style={{ ...th, textAlign: 'right' }}>Won</th>
                   <th style={{ ...th, textAlign: 'right' }}>Conv&nbsp;%</th>
                   <th style={th}>Status</th>
@@ -293,6 +322,7 @@ export default function CampaignsV2() {
                           {s.t.split(' (')[0]}
                         </span>
                       </td>
+                      <td style={{ ...td, whiteSpace: 'nowrap', color: 'var(--v2-ink-1)' }}>{nums[c.whatsapp_account_id] || '—'}</td>
                       <td style={td}><span style={chip(c.segment)}>{c.segment === 'GOVERNMENT' ? 'Govt' : 'Private'}</span></td>
                       <td style={td}>
                         {tn ? (
@@ -308,6 +338,12 @@ export default function CampaignsV2() {
                       </td>
                       <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0, #f5f7fb)' }}>
                         {(stats[c.id]?.leads) || 0}
+                      </td>
+                      <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0, #f5f7fb)' }}>
+                        {(stats[c.id]?.replied) || 0}
+                      </td>
+                      <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 600, color: 'var(--v2-ink-0, #f5f7fb)' }}>
+                        {(stats[c.id]?.quotes) || 0}
                       </td>
                       <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--v2-display)', fontWeight: 600, color: (stats[c.id]?.won) ? 'var(--v2-green, #22c55e)' : 'var(--v2-ink-2)' }}>
                         {(stats[c.id]?.won) || 0}
