@@ -15,7 +15,7 @@
 // list is page-scoped (only QuotesV2 needed cross-page filter sync).
 // Add a Zustand store later if filters need to persist across routes.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchAllPages } from '../utils/fetchAllPages'
 
@@ -36,16 +36,21 @@ export function useLeads() {
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)   // first 1000 shown, the rest still arriving
+  const reqRef = useRef(0)                                // only the newest fetchLeads call may write state
 
   const fetchLeads = useCallback(async (opts = {}) => {
+    const reqId = ++reqRef.current
     setLoading(true)
     setError(null)
+    setLoadingMore(false)
     // Phase 247.2 — team viewer: load ALL reps' leads (READ-ONLY) via the gated
     // team_all_leads() RPC (her own-only RLS would return just hers). The RPC
     // returns the same shape as SELECT_COLUMNS (row + assigned/telecaller
     // nested), so every downstream memo/render is unchanged. Off unless opts.team.
     if (opts.team) {
       const { data, error: err } = await supabase.rpc('team_all_leads')
+      if (reqRef.current !== reqId) return { data: Array.isArray(data) ? data : [], error: err }   // a newer call owns the state
       if (err) { console.error('[useLeads] team fetch failed:', err); setError(err.message || 'Could not load team leads.'); setLeads([]) }
       else { setLeads(Array.isArray(data) ? data : []) }
       setLoading(false)
@@ -62,8 +67,17 @@ export function useLeads() {
       .from('leads')
       .select(SELECT_COLUMNS)
       .order('created_at', { ascending: false })
-      .range(from, to))
+      .range(from, to), {
+      // Show the first 1000 rows right away; the rest fills in behind them (admin: ~2 s instead of ~7 s to first paint).
+      onPartial: (rows) => {
+        if (reqRef.current !== reqId) return
+        setLeads(rows)
+        setLoading(false)
+        setLoadingMore(true)
+      },
+    })
 
+    if (reqRef.current !== reqId) return { data: all, error: lastErr }   // a newer call owns the state now
     if (lastErr) {
       // Phase 12 — surface RLS / auth errors instead of silent empty.
       console.error('[useLeads] fetch failed:', lastErr)
@@ -73,6 +87,7 @@ export function useLeads() {
       setLeads(all)
     }
     setLoading(false)
+    setLoadingMore(false)
     return { data: all, error: lastErr }
   }, [])
 
@@ -190,6 +205,7 @@ export function useLeads() {
   return {
     leads,
     loading,
+    loadingMore,
     error,
     fetchLeads,
     updateLead,

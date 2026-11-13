@@ -183,7 +183,7 @@ export default function LeadsV2() {
     return l.assigned_to === profile.id
         || l.telecaller_id === profile.id
   }
-  const { leads, loading, error, fetchLeads, reassignBulk, stageBulk, deleteBulk, applyRealtimeChange } = useLeads()
+  const { leads, loading, loadingMore, error, fetchLeads, reassignBulk, stageBulk, deleteBulk, applyRealtimeChange } = useLeads()
 
   /* ─── Filter state ─── */
   // Phase 268 — persisted in sessionStorage so tapping Back into the list keeps
@@ -1162,6 +1162,12 @@ export default function LeadsV2() {
         >
           <AlertTriangle size={16} />
           <span>{error}</span>
+        </div>
+      )}
+
+      {loadingMore && (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+          Showing the newest leads. Loading the rest, counts will update.
         </div>
       )}
 

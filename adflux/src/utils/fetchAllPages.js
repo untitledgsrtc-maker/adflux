@@ -1,13 +1,16 @@
 // Read every row of a PostgREST query in 1000-row pages (the server caps one request near 1000).
 // First page alone: small lists (reps) still cost one round trip. A full first page means more rows, so the
 // rest come in parallel waves of 4 instead of one-after-another (admin: 13 sequential requests -> 4 round trips). Measured live: waves of 6 were no faster (server-bound, ~2.5 s per wave either way)..
+// onPartial(rowsSoFar) fires after the first page and after each wave while more rows are still coming,
+// so a screen can show the first 1000 rows at once and fill in the rest.
 // makeQuery(from, to) must return a fresh query with .range(from, to) applied and a stable order.
 // Returns { data, error } like one query; on an error `data` holds the pages read before it.
-export async function fetchAllPages(makeQuery, { chunk = 1000, max = 20000, wave = 4 } = {}) {
+export async function fetchAllPages(makeQuery, { chunk = 1000, max = 20000, wave = 4, onPartial } = {}) {
   const first = await makeQuery(0, chunk - 1)
   if (first.error) return { data: [], error: first.error }
   let all = first.data || []
   if (all.length < chunk) return { data: all, error: null }
+  if (onPartial) onPartial(all)
   for (let offset = chunk; offset < max; offset += wave * chunk) {
     const starts = Array.from({ length: wave }, (_, i) => offset + i * chunk).filter((o) => o < max)
     const pages = await Promise.all(starts.map((o) => makeQuery(o, o + chunk - 1)))
@@ -17,6 +20,7 @@ export async function fetchAllPages(makeQuery, { chunk = 1000, max = 20000, wave
       all = all.concat(rows)
       if (rows.length < chunk) return { data: all, error: null }
     }
+    if (onPartial) onPartial(all)
   }
   return { data: all, error: null }
 }
