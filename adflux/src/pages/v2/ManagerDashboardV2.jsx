@@ -56,7 +56,8 @@ export default function ManagerDashboardV2() {
       setLoading(true); setError('')
       try {
         const today = istTodayISO()
-        const startUtc = `${today}T00:00:00.000Z`
+        // IST midnight (was UTC midnight, which counted yesterday evening 18:30-24:00 IST as today).
+        const startUtc = `${today}T00:00:00+05:30`
 
         // 1. Direct reports — users.manager_id = me.
         const { data: repsRows, error: repsErr } = await supabase
@@ -101,10 +102,13 @@ export default function ManagerDashboardV2() {
             .gte('duration_seconds', 10)
             .or('direction.is.null,direction.neq.missed')
             .not('lead_id', 'is', null),
+          // Phase 568 — done meetings only (CLAUDE.md section 33): meeting + site_visit, minus scheduled
+          // ("Meeting scheduled...") and auto check-in companion rows, one per lead (revisits = 1).
+          // Same rule as GpsTrackV2.uniqueMeetingCount and the DB counter; keep in lockstep.
           supabase.from('lead_activities')
-            .select('created_by')
+            .select('id, created_by, lead_id, activity_type, notes')
             .in('created_by', repIds)
-            .eq('activity_type', 'meeting')
+            .in('activity_type', ['meeting', 'site_visit'])
             .gte('created_at', startUtc),
           supabase.from('leads')
             .select('assigned_to')
@@ -126,7 +130,15 @@ export default function ManagerDashboardV2() {
           calls[r.user_id] = (calls[r.user_id] || 0) + 1
           if (r.outcome === 'connected') conn[r.user_id] = (conn[r.user_id] || 0) + 1
         })
-        ;(meetRows || []).forEach(r => { meet[r.created_by] = (meet[r.created_by] || 0) + 1 })
+        const meetSeen = new Set()
+        ;(meetRows || []).forEach(r => {
+          const note = r.notes || ''
+          if (note.startsWith("I'm here · auto-check-in") || note.startsWith('Meeting scheduled')) return
+          const key = `${r.created_by}|${r.lead_id || `walkin_${r.id}`}`
+          if (meetSeen.has(key)) return
+          meetSeen.add(key)
+          meet[r.created_by] = (meet[r.created_by] || 0) + 1
+        })
         ;(leadRows || []).forEach(r => { open[r.assigned_to] = (open[r.assigned_to] || 0) + 1 })
         ;(pingRows || []).forEach(r => {
           // First (most recent) wins because rows are ordered DESC.
