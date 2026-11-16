@@ -380,6 +380,14 @@ export default function TeamDashboardV2() {
         })
         setGpsOffByUser(gm)
       } else {
+      // Phase 565: a sales head (not admin/HR) lists only his assigned reps + himself; the data tables are already RLS-limited.
+      const isTeamHead = profile?.team_role === 'sales_manager' && !['admin', 'co_owner', 'hr', 'office_admin'].includes(profile?.role)
+      let repsQ = supabase.from('users')
+          .select('id, name, team_role, city, daily_targets, is_active, profile_image_url, app_version')
+          .in('team_role', ['sales', 'sales_manager', 'telecaller'])
+          .eq('is_active', true)
+          .order('name')
+      if (isTeamHead) repsQ = repsQ.or(`manager_id.eq.${profile.id},id.eq.${profile.id}`)
       ;[repsRes, sesRes, callsRes, newLeadsRes, pipelineRes, voiceRes, pingsRes, policyRes, fuRes, quoteSentRes, quoteWonRes, paymentsRes, overdueFuRes, actGeoRes, qualifiedRes, callbacksRes, monthQuotesRes, monthWonRes] = await Promise.all([
         // Phase 32F — agency excluded from Team Live grid. Owner spec
         // (10 May 2026): agency = external commission partner, not
@@ -390,11 +398,7 @@ export default function TeamDashboardV2() {
         // team_role filter. TC also pings GPS, logs calls, and
         // counts against daily targets — owner reported Dhara not
         // appearing in /team-dashboard despite live pings + 26 calls.
-        supabase.from('users')
-          .select('id, name, team_role, city, daily_targets, is_active, profile_image_url, app_version')
-          .in('team_role', ['sales', 'sales_manager', 'telecaller'])
-          .eq('is_active', true)
-          .order('name'),
+        repsQ,
         supabase.from('work_sessions')
           // Phase 93.23 (26 May 2026) — added check_out_at +
           // auto_checked_out + check_out_source. Without these the

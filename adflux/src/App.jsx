@@ -269,7 +269,8 @@ function RequireTeamView({ children }) {
   // 2026-08-03: HR admitted for attendance/GPS (view only). HR has RLS on
   // gps_pings/work_sessions/users but NOT leads/quotes/payments, so the sales
   // cards on the dashboard return empty for HR — attendance shows, money doesn't.
-  const ok = isPrivileged || profile?.role === 'hr' || profile?.role === 'accounts' || profile?.role === 'office_admin' || profile?.can_view_team_dashboard
+  // Phase 565: sales head (team_role='sales_manager') reads the page the admin way; RLS limits it to his assigned reps.
+  const ok = isPrivileged || profile?.role === 'hr' || profile?.role === 'accounts' || profile?.role === 'office_admin' || profile?.can_view_team_dashboard || profile?.team_role === 'sales_manager'
   if (!ok) return <Navigate to="/" replace />
   return children
 }

@@ -242,6 +242,7 @@ const MANAGER_NAV = [
   { to: '/calls',             label: 'My Calls',       icon: Phone },
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
+  { to: '/team-dashboard',    label: 'Team Live',      icon: MapPin },      // Phase 565 - his assigned reps only (RLS)
 ]
 
 // Phase 109 (1 Jun 2026) — HR login. Minimal nav: the offer/roster
