@@ -31,6 +31,12 @@ function hhmm(hourDecimal) {
   return `${hh > 12 ? hh - 12 : hh}:${mm} ${hh >= 12 ? 'pm' : 'am'}`
 }
 
+// '14:30' -> 14.5
+function timeToHour(t) {
+  const [h, m] = String(t).split(':').map(Number)
+  return (h || 0) + (m || 0) / 60
+}
+
 // returns { en, gu }
 export function coachText(kind, detail = {}) {
   const whoEn = pickWho(detail) || 'this lead'
@@ -67,6 +73,37 @@ export function coachText(kind, detail = {}) {
         gu: `સવારે 9:30 સુધીમાં દિવસ શરૂ કરો: છેલ્લા 5 દિવસનો સરેરાશ સમય ${t} છે.`,
       }
     }
+    // Phase 575 — office Work staff
+    case 'work_overdue': {
+      const title = detail.title || 'your task'
+      const forEn = detail.client ? ` for ${detail.client}` : ''
+      const forGu = detail.client ? ` (${detail.client})` : ''
+      return {
+        en: `Finish "${title}"${forEn}: due since ${shortDate(detail.due)}.`,
+        gu: `"${title}"${forGu} પૂરું કરો: ${shortDate(detail.due)} થી બાકી છે.`,
+      }
+    }
+    case 'work_due_soon': {
+      const title = detail.title || 'your task'
+      const atEn = detail.due_time ? ` by ${hhmm(timeToHour(detail.due_time))}` : ''
+      const atGu = detail.due_time ? ` ${hhmm(timeToHour(detail.due_time))} સુધીમાં` : ''
+      return {
+        en: `"${title}" is due on ${shortDate(detail.due)}${atEn}: start it first.`,
+        gu: `"${title}" ${shortDate(detail.due)} ના રોજ${atGu} આપવાનું છે: પહેલા તે શરૂ કરો.`,
+      }
+    }
+    case 'work_stuck': {
+      const title = detail.title || 'your task'
+      return {
+        en: `"${title}" has been in progress for ${detail.days} days: finish it or tell your head.`,
+        gu: `"${title}" ${detail.days} દિવસથી ચાલુ છે: પૂરું કરો અથવા હેડને જણાવો.`,
+      }
+    }
+    case 'report_share':
+      return {
+        en: `Share your evening report every day: last week ${detail.shared} of ${detail.worked} days.`,
+        gu: `દરરોજ સાંજનો રિપોર્ટ શેર કરો: ગયા અઠવાડિયે ${detail.worked} માંથી ${detail.shared} દિવસ.`,
+      }
     default:
       return { en: '', gu: '' }
   }
@@ -76,5 +113,7 @@ export function coachText(kind, detail = {}) {
 export function coachLink(action) {
   if (action?.kind === 'quote_chase' && action.quote_id) return `/quotes/${action.quote_id}`
   if (action?.lead_id) return `/leads/${action.lead_id}`
+  if (action?.kind && action.kind.startsWith('work_')) return '/my-work'
+  if (action?.kind === 'report_share') return '/my-work'
   return null
 }

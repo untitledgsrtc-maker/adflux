@@ -11,6 +11,9 @@ import { Lightbulb, ChevronRight, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { coachText, coachLink } from '../../utils/coachText'
 
+// Phase 575 — roles that get evening actions (sales/TC in the Day Summary card, office staff on My Work)
+const COACH_ROLES = ['sales', 'telecaller', 'staff', 'hr', 'accounts', 'office_admin']
+
 export default function CoachActions({ userId, role }) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -20,7 +23,7 @@ export default function CoachActions({ userId, role }) {
   const [last, setLast]       = useState(null) // { date, done, total }
 
   const load = useCallback(async () => {
-    if (!userId || (role !== 'sales' && role !== 'telecaller')) return
+    if (!userId || !COACH_ROLES.includes(role)) return
     setLoading(true); setError('')
     const { data: d, error: bErr } = await supabase.rpc('coach_build_mine')
     if (bErr) { setError(bErr.message || 'Could not load suggestions'); setLoading(false); return }
@@ -46,7 +49,7 @@ export default function CoachActions({ userId, role }) {
 
   useEffect(() => { load() }, [load])
 
-  if (role !== 'sales' && role !== 'telecaller') return null
+  if (!COACH_ROLES.includes(role)) return null
 
   const dayLabel = forDate
     ? new Date(`${forDate}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })

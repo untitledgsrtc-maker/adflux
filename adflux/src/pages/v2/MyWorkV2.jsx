@@ -21,6 +21,7 @@ import NewTaskModal from '../../components/work/NewTaskModal'
 import PostponeModal from '../../components/work/PostponeModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
 import OnTimeScoreCard from '../../components/work/OnTimeScoreCard'
+import CoachActions from '../../components/coach/CoachActions'
 import UserAvatar from '../../components/common/UserAvatar'
 import WorkCalendar from '../../components/work/WorkCalendar'
 import DateField from '../../components/work/DateField'
@@ -331,6 +332,8 @@ export default function MyWorkV2() {
                     ? <EveningCard hour={istHour()} entries={entries} items={items} secs={todaySecs} name={profile?.name}
                         projName={projName} shared={shared} uid={uid} today={today} firstIn={firstIn} att={att} onShared={load} />
                     : <TodayStrip secs={todaySecs} firstIn={firstIn} />}
+                  {/* Phase 575 — evening coach: 3 named actions for the next working day (office staff; CoachActions skips other roles) */}
+                  {!isOpsRole && istHour() >= 19 && <CoachActions userId={uid} role={profile?.role} />}
                 </div>
               </div>
               <div className="wk-c12 wk-trio">
