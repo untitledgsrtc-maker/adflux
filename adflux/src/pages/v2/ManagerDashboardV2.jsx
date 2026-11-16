@@ -28,6 +28,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { Phone, Calendar, Inbox, Users as UsersIcon, TrendingUp, MapPin, Loader2 } from 'lucide-react'
+import OldCallbacksPanel from '../../components/manager/OldCallbacksPanel'
 
 const istTodayISO = () => {
   // IST date at server-style format (yyyy-mm-dd). The dashboard
@@ -101,8 +102,8 @@ export default function ManagerDashboardV2() {
             .or('direction.is.null,direction.neq.missed')
             .not('lead_id', 'is', null),
           supabase.from('lead_activities')
-            .select('user_id')
-            .in('user_id', repIds)
+            .select('created_by')
+            .in('created_by', repIds)
             .eq('activity_type', 'meeting')
             .gte('created_at', startUtc),
           supabase.from('leads')
@@ -125,7 +126,7 @@ export default function ManagerDashboardV2() {
           calls[r.user_id] = (calls[r.user_id] || 0) + 1
           if (r.outcome === 'connected') conn[r.user_id] = (conn[r.user_id] || 0) + 1
         })
-        ;(meetRows || []).forEach(r => { meet[r.user_id] = (meet[r.user_id] || 0) + 1 })
+        ;(meetRows || []).forEach(r => { meet[r.created_by] = (meet[r.created_by] || 0) + 1 })
         ;(leadRows || []).forEach(r => { open[r.assigned_to] = (open[r.assigned_to] || 0) + 1 })
         ;(pingRows || []).forEach(r => {
           // First (most recent) wins because rows are ordered DESC.
@@ -262,6 +263,9 @@ export default function ManagerDashboardV2() {
           ))}
         </div>
       )}
+
+      {/* Phase 567 — old callbacks, oldest first, bulk close */}
+      {!loading && !error && reps.length > 0 && <OldCallbacksPanel reps={reps} />}
     </div>
   )
 }
