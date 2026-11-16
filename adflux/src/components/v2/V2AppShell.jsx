@@ -69,7 +69,7 @@ import {
   TrendingUp, UserCircle2, UserPlus, Contact2, MapPin, Tv, FileBox,
   Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet, Megaphone, MessageCircle,
   IndianRupee, GraduationCap, Activity, Gauge, Briefcase,
-  ClipboardList,
+  ClipboardList, Lightbulb,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -88,6 +88,7 @@ const ADMIN_NAV = [
   // team tracking" — the panels on /dashboard show summary cards
   // but admin wants the full per-rep live grid one click away.
   { to: '/team-dashboard',    label: 'Team Live',      icon: Users },
+  { to: '/coach',             label: 'Team Evening',   icon: Lightbulb },   // Phase 574 - evening coach
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
@@ -243,6 +244,7 @@ const MANAGER_NAV = [
   { to: '/my-offer',          label: 'My Offer',       icon: FileText },
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
   { to: '/team-dashboard',    label: 'Team Live',      icon: MapPin },      // Phase 565 - his assigned reps only (RLS)
+  { to: '/coach',             label: 'Team Evening',   icon: Lightbulb },   // Phase 574 - evening coach, his reps
 ]
 
 // Phase 109 (1 Jun 2026) — HR login. Minimal nav: the offer/roster
@@ -705,7 +707,9 @@ export function V2AppShell() {
     if (!arr.some((n) => n.to === '/quote-approvals')) extra.push({ to: '/quote-approvals', label: 'Quote prices', icon: CheckSquare })
     return [...arr, ...extra]
   }
-  const nav = withOnboarding(withTeam(withSalesHeadApprovals(baseNav)))
+  // Phase 574 — Team Evening is admin + sales manager only; co_owner shares ADMIN_NAV but is govt-scoped (section 42).
+  const nav = withOnboarding(withTeam(withSalesHeadApprovals(
+    baseNav.filter((n) => n.to !== '/coach' || profile?.role === 'admin' || profile?.team_role === 'sales_manager'))))
   const mobileNav = withTeam(baseMobileNav)
 
   // Topbar search — commits to the shared quote-filter store and

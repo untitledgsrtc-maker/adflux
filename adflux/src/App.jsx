@@ -18,6 +18,7 @@ const PresentView = lazyWithRetry(() => import('./pages/v2/PresentView'))  // Ph
 const QuotePrintDoc = lazyWithRetry(() => import('./pages/QuotePrintDoc'))  // AI real-PDF — login-less print page for the headless-Chromium render service
 import CheckInGate        from './components/v2/CheckInGate'   // Phase 60
 const ManagerDashboardV2 = lazyWithRetry(() => import('./pages/v2/ManagerDashboardV2')) // Phase 61
+const CoachTeamV2 = lazyWithRetry(() => import('./pages/v2/CoachTeamV2')) // Phase 574
 const TeamManagerAssignV2 = lazyWithRetry(() => import('./pages/v2/TeamManagerAssignV2')) // Phase 61
 const MyOfferV2 = lazyWithRetry(() => import('./pages/v2/MyOfferV2'))
 const CreateQuoteV2 = lazyWithRetry(() => import('./pages/v2/CreateQuoteV2'))
@@ -252,6 +253,15 @@ function RequireManager({ children }) {
   const { isPrivileged, isManager, loading } = useAuth()
   if (loading) return <LoadingScreen />
   if (!isPrivileged && !isManager) return <Navigate to="/" replace />
+  return children
+}
+
+/* Phase 574 — Team Evening (evening coach). Admin sees every sales/TC rep,
+   a sales manager his assigned reps; the RPC enforces the same rule. */
+function RequireCoachTeam({ children }) {
+  const { profile, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (profile?.role !== 'admin' && profile?.team_role !== 'sales_manager') return <Navigate to="/" replace />
   return children
 }
 
@@ -541,6 +551,7 @@ export default function App() {
               direct reports + today's metrics. Sales head + TC head
               land here on app open via RootRedirect. */}
           <Route path="/manager"                   element={<RequireManager><ManagerDashboardV2 /></RequireManager>} />
+          <Route path="/coach"                     element={<RequireCoachTeam><CoachTeamV2 /></RequireCoachTeam>} />
           {/* Phase 61 — Admin reassigns reps to managers. */}
           <Route path="/admin/team-assign"         element={<RequirePrivileged><TeamManagerAssignV2 /></RequirePrivileged>} />
           {/* Phase 56m — per-rep call log (own + admin view of any rep). */}

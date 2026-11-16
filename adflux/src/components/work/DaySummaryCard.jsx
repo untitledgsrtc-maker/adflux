@@ -32,6 +32,7 @@ import { istTodayISO } from '../../utils/istDate'
 import useDaySummary from '../../hooks/useDaySummary'
 import { formatDaySummaryText, openWhatsAppShare } from '../../utils/whatsappSummary'
 import { formatCurrency } from '../../utils/formatters'
+import CoachActions from '../coach/CoachActions'
 
 function fmt(seconds) {
   if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return '0m'
@@ -424,6 +425,9 @@ export default function DaySummaryCard({
               )}
             </>
           )}
+
+          {/* Phase 574 — evening coach: 3 named actions for the next working day (sales + TC only) */}
+          <CoachActions userId={profile?.id} role={role} />
 
           {/* CTA */}
           <button
