@@ -1,13 +1,15 @@
 // Finance -> Rev split tab (owner 2026-10-28). Profit of each WON Government deal (Auto Hood + GSRTC LED)
 // split between the two partners (default Vishal 35% / Brijesh 65%). Profit per deal = order value (ex-GST)
 // - commission (dept expense) - vendor costing - TDS withheld, same as the owner's sheet. Tick the deals to
-// include; totals, the split and the Excel export follow the ticks. Read-only: nothing is written.
+// include; totals, the split and the Excel export follow the ticks. Phase 580: the only write is a partner
+// payout record (PartnerPayouts / partner_payouts, admin only); deals it covers show "Settled".
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Loader2, Download, RefreshCw, FileText } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toastError } from '../../components/v2/Toast'
 import SegmentToggle from '../../components/v2/SegmentToggle'
 import { savePdfBlob } from '../../utils/savePdf'
+import PartnerPayouts from '../../components/finance/PartnerPayouts'
 
 const money = (n) => (n == null || isNaN(n) ? '—' : (n < 0 ? '−₹' : '₹') + new Intl.NumberFormat('en-IN').format(Math.abs(Math.round(n))))
 const dmy = (s) => { if (!s) return ''; const [y, m, d] = String(s).slice(0, 10).split('-'); return d ? `${d}/${m}/${y}` : s }
@@ -43,9 +45,19 @@ export default function FinanceRevSplit() {
   const [common, setCommon] = useState({ cost: 0, income: 0 })   // org-wide office expense + total collected income (from the P&L)
   const [useCommon, setUseCommon] = useState(true)
   const [bank, setBank] = useState({})            // media -> bank direct cost (vendor / capital / lump sums)
+  const [payouts, setPayouts] = useState([])      // Phase 580: partner_payouts, newest first
+
+  const loadPayouts = useCallback(async () => {
+    const { data, error } = await supabase.from('partner_payouts')
+      .select('id, paid_on, amount, method, note, share_pct, quote_ids')
+      .order('paid_on', { ascending: false }).order('created_at', { ascending: false })
+    if (error) { toastError(error, 'Could not load the partner payouts.'); return }
+    setPayouts(data || [])
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true); setErr(false)
+    loadPayouts()
     try {
       const qs = await pagedQuotes()
       const ids = qs.map(q => q.id)
@@ -93,7 +105,7 @@ export default function FinanceRevSplit() {
       }))
     } catch (e) { setErr(true); toastError(e, 'Could not load the deals.') }
     setLoading(false)
-  }, [])
+  }, [loadPayouts])
   useEffect(() => { load() }, [load])
 
   const shown = useMemo(() => deals.filter(d => (media === 'all' || d.media === media) && (pay === 'all' || d.status === pay)), [deals, media, pay])
@@ -110,6 +122,7 @@ export default function FinanceRevSplit() {
   const net = tot.profit - exp - commonShare
   const v = Math.min(100, Math.max(0, Number(vishal) || 0))
   const vShare = net * v / 100, bShare = net - vShare
+  const settled = useMemo(() => new Set(payouts.flatMap(p => p.quote_ids || [])), [payouts])   // Phase 580
 
   async function exportPdf() {
     try {
@@ -181,6 +194,17 @@ export default function FinanceRevSplit() {
         ))}
       </div>
 
+      {/* Phase 580 — what has been paid to Vishal, and which deals that covers */}
+      <PartnerPayouts
+        payouts={payouts}
+        selIds={sel.map(d => d.id)}
+        settledIds={settled}
+        vShare={vShare}
+        sharePct={v}
+        onChanged={loadPayouts}
+        onTickUnsettled={() => setPicked(new Set(shown.filter(d => !settled.has(d.id)).map(d => d.id)))}
+      />
+
       {/* filters + actions */}
       <div style={{ ...card, display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end', padding: 14 }}>
         <div><div style={lbl}>Media</div><SegmentToggle value={media} onChange={setMedia} opts={mediaOpts} style={{ marginBottom: 0 }} /></div>
@@ -239,7 +263,7 @@ export default function FinanceRevSplit() {
                   <td style={tdR}>{dim(d.comm)}</td><td style={tdR}>{dim(d.vendor)}</td><td style={tdR}>{dim(d.tds)}</td>
                   <td style={{ ...tdR, color: d.profit >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{money(d.profit)}</td>
                   <td style={{ ...td, color: 'var(--text-muted)' }}>{dmy(d.last) || '—'}</td>
-                  <td style={td}><span style={stChip(d.status)}>{d.status}</span></td>
+                  <td style={td}><span style={stChip(d.status)}>{d.status}</span>{settled.has(d.id) && <span style={{ marginLeft: 6, padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600, background: 'var(--blue-soft)', color: 'var(--blue)' }}>Settled</span>}</td>
                 </tr>
               ))}
               {!shown.length && <tr><td style={{ ...td, textAlign: 'center', color: 'var(--text-subtle)', padding: 30 }} colSpan={11}>No deals match.</td></tr>}
