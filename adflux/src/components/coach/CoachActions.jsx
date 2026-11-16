@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Lightbulb, ChevronRight, Loader2 } from 'lucide-react'
+import { Lightbulb, ChevronRight, Loader2, Sparkles } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { coachText, coachLink } from '../../utils/coachText'
 
@@ -21,19 +21,23 @@ export default function CoachActions({ userId, role }) {
   const [forDate, setForDate] = useState(null)
   const [actions, setActions] = useState([])
   const [last, setLast]       = useState(null) // { date, done, total }
+  const [tip, setTip]         = useState(null) // Phase 577: latest AI tip { en, gu }
 
   const load = useCallback(async () => {
     if (!userId || !COACH_ROLES.includes(role)) return
     setLoading(true); setError('')
     const { data: d, error: bErr } = await supabase.rpc('coach_build_mine')
     if (bErr) { setError(bErr.message || 'Could not load suggestions'); setLoading(false); return }
-    const [{ data: next, error: nErr }, { data: checked }] = await Promise.all([
+    const [{ data: next, error: nErr }, { data: checked }, { data: tips }] = await Promise.all([
       supabase.from('coach_actions').select('id, kind, detail, lead_id, quote_id, rank')
         .eq('user_id', userId).eq('for_date', d).order('rank'),
       supabase.from('coach_actions').select('for_date, done')
         .eq('user_id', userId).not('checked_at', 'is', null)
         .order('for_date', { ascending: false }).limit(10),
+      supabase.from('coach_tips').select('en, gu, tip_date')
+        .eq('user_id', userId).order('tip_date', { ascending: false }).limit(1),
     ])
+    setTip(tips && tips[0] ? tips[0] : null)
     if (nErr) { setError(nErr.message || 'Could not load suggestions'); setLoading(false); return }
     setForDate(d)
     setActions(next || [])
@@ -69,6 +73,16 @@ export default function CoachActions({ userId, role }) {
       <div style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)', marginTop: 2 }}>
         કાલના 3 કામ · checked automatically at night
       </div>
+
+      {tip && (
+        <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v2-line, #334155)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)' }}>
+            <Sparkles size={14} strokeWidth={1.6} /> Tip for you · તમારા માટે ટિપ
+          </div>
+          <div style={{ fontSize: 14, lineHeight: 1.4, marginTop: 4, color: 'var(--v2-ink-0, #f1f5f9)' }}>{tip.en}</div>
+          <div style={{ fontSize: 13, lineHeight: 1.4, marginTop: 2, color: 'var(--v2-ink-2, #94a3b8)' }}>{tip.gu}</div>
+        </div>
+      )}
 
       {last && (
         <div style={{ marginTop: 8, fontSize: 12, color: last.done === last.total ? 'var(--v2-green, #10B981)' : 'var(--v2-amber, #F59E0B)' }}>

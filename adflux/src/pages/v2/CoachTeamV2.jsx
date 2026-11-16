@@ -25,13 +25,25 @@ export default function CoachTeamV2() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lang, setLang] = useState('en')
+  const [tips, setTips] = useState({})   // Phase 577: user_id -> latest AI tip
   const [group, setGroup] = useState('all')   // Phase 575/576: all | sales | office | ops
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
     const { data, error: err } = await supabase.rpc('coach_team_view', { p_date: istTodayISO() })
     if (err) setError(err.message || 'Could not load the team')
-    else setRows(data || [])
+    else {
+      setRows(data || [])
+      // Phase 577 — latest AI tip per person (RLS: admin all, sales manager his reps)
+      const ids = (data || []).map(r => r.id)
+      if (ids.length) {
+        const { data: t } = await supabase.from('coach_tips').select('user_id, en, gu, tip_date')
+          .in('user_id', ids).order('tip_date', { ascending: false })
+        const map = {}
+        ;(t || []).forEach(x => { if (!map[x.user_id]) map[x.user_id] = x })
+        setTips(map)
+      }
+    }
     setLoading(false)
   }, [])
 
@@ -113,6 +125,12 @@ export default function CoachTeamV2() {
                   </div>
                 ))}
               </div>
+
+              {tips[r.id] && (
+                <div style={{ marginTop: 10, padding: 8, borderRadius: 10, background: 'var(--v2-bg-2, #0f172a)', border: '1px solid var(--v2-line, #334155)', fontSize: 13, lineHeight: 1.4, color: 'var(--v2-ink-1, #cbd5e1)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)' }}>AI tip · </span>{tips[r.id][lang]}
+                </div>
+              )}
 
               <div style={{ marginTop: 10, fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)' }}>Next working day</div>
               {(r.next_actions || []).length === 0 ? (
