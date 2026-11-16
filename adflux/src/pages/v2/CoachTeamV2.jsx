@@ -25,7 +25,7 @@ export default function CoachTeamV2() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lang, setLang] = useState('en')
-  const [group, setGroup] = useState('all')   // Phase 575: all | sales | office
+  const [group, setGroup] = useState('all')   // Phase 575/576: all | sales | office | ops
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -77,11 +77,12 @@ export default function CoachTeamV2() {
         </div>
       )}
 
-      {!loading && !error && rows.some(r => r.score_kind === 'ontime') && (
+      {!loading && !error && rows.some(r => r.score_kind !== 'day') && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
           <button type="button" style={pill(group === 'all')} onClick={() => setGroup('all')}>All</button>
           <button type="button" style={pill(group === 'sales')} onClick={() => setGroup('sales')}>Sales &amp; telecallers</button>
           <button type="button" style={pill(group === 'office')} onClick={() => setGroup('office')}>Office team</button>
+          <button type="button" style={pill(group === 'ops')} onClick={() => setGroup('ops')}>Ops</button>
         </div>
       )}
 
@@ -93,7 +94,7 @@ export default function CoachTeamV2() {
 
       {!loading && !error && rows.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(360px, 100%), 1fr))', gap: 12 }}>
-          {rows.filter(r => group === 'all' || (group === 'office' ? r.score_kind === 'ontime' : r.score_kind !== 'ontime')).map(r => (
+          {rows.filter(r => group === 'all' || (group === 'office' ? r.score_kind === 'ontime' : group === 'ops' ? r.score_kind === 'uptime' : r.score_kind === 'day')).map(r => (
             <div key={r.id} style={{ padding: 14, borderRadius: 14, background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v2-line, #334155)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
                 <div style={{ fontFamily: 'var(--v2-display, "Space Grotesk")', fontSize: 17, fontWeight: 600, color: 'var(--v2-ink-0, #f1f5f9)' }}>{r.name}</div>
@@ -102,7 +103,7 @@ export default function CoachTeamV2() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 }}>
                 {[
-                  [r.score_kind === 'ontime' ? 'On time (month)' : 'Score today', r.score_today == null ? '–' : `${r.score_today}%`, tone(r.score_today, r.score_kind === 'ontime' ? 85 : 70, r.score_kind === 'ontime' ? 60 : 40)],
+                  [r.score_kind === 'ontime' ? 'On time (month)' : r.score_kind === 'uptime' ? 'Uptime today' : 'Score today', r.score_today == null ? '–' : `${r.score_today}%`, tone(r.score_today, r.score_kind === 'ontime' ? 85 : 70, r.score_kind === 'ontime' ? 60 : 40)],
                   ['Done today', r.actions_today ? `${r.done_today}/${r.actions_today}` : '–', 'var(--v2-ink-0, #f1f5f9)'],
                   ['14-day done', r.done_rate_14d == null ? '–' : `${r.done_rate_14d}%`, tone(r.done_rate_14d, 70, 40)],
                 ].map(([label, val, color]) => (

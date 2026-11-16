@@ -104,6 +104,30 @@ export function coachText(kind, detail = {}) {
         en: `Share your evening report every day: last week ${detail.shared} of ${detail.worked} days.`,
         gu: `દરરોજ સાંજનો રિપોર્ટ શેર કરો: ગયા અઠવાડિયે ${detail.worked} માંથી ${detail.shared} દિવસ.`,
       }
+    // Phase 576 — Ops technicians
+    case 'ops_stuck_ticket': {
+      const what = detail.screen ? `${detail.screen} at ${detail.depot}` : (detail.depot || 'a screen')
+      const whatGu = detail.screen ? `${detail.depot} ના ${detail.screen}` : (detail.depot || 'સ્ક્રીન')
+      return {
+        en: `Close the ticket for ${what} or mark "can't fix": open since ${shortDate(detail.since)}.`,
+        gu: `${whatGu} ની ટિકિટ બંધ કરો અથવા "રિપેર નથી થતું" માર્ક કરો: ${shortDate(detail.since)} થી ખુલ્લી છે.`,
+      }
+    }
+    case 'ops_photo':
+      return {
+        en: `Send the campaign photo for ${detail.depot || 'the depot'}: asked on ${shortDate(detail.since)}.`,
+        gu: `${detail.depot || 'ડેપો'} નો કેમ્પેઇન ફોટો મોકલો: ${shortDate(detail.since)} ના રોજ માંગ્યો હતો.`,
+      }
+    case 'ops_depot_faults':
+      return {
+        en: `Visit ${detail.depot} first: ${detail.count} screens with open faults, oldest since ${shortDate(detail.since)}.`,
+        gu: `પહેલા ${detail.depot} જાઓ: ${detail.count} સ્ક્રીનમાં ફોલ્ટ ખુલ્લા છે, સૌથી જૂનો ${shortDate(detail.since)} થી.`,
+      }
+    case 'ops_camera':
+      return {
+        en: `Fix the cameras at ${detail.depot}: ${detail.count} off since ${shortDate(detail.since)}.`,
+        gu: `${detail.depot} ના કૅમેરા ચાલુ કરો: ${detail.count} કૅમેરા ${shortDate(detail.since)} થી બંધ છે.`,
+      }
     default:
       return { en: '', gu: '' }
   }
@@ -115,5 +139,6 @@ export function coachLink(action) {
   if (action?.lead_id) return `/leads/${action.lead_id}`
   if (action?.kind && action.kind.startsWith('work_')) return '/my-work'
   if (action?.kind === 'report_share') return '/my-work'
+  if (action?.kind && action.kind.startsWith('ops_')) return '/ops-home'
   return null
 }

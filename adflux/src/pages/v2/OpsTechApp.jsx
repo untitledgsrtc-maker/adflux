@@ -19,6 +19,8 @@ import { normalizeIndianPhone } from '../../utils/phone'
 import { captureGps } from '../../utils/captureGps'
 import DepotContactsModal from '../../components/ops/DepotContactsModal'
 import OpsEveningCard from '../../components/ops/OpsEveningCard'
+import CoachActions from '../../components/coach/CoachActions'
+import { useAuthStore } from '../../store/authStore'
 import '../../components/ops2/ops2.css'
 import { Ic, Bi, Btn, Pill, Tile, Ring, Hero, StatTile, Card, Seg, Sel, Bar, ScrTile, Sheet, Toast, useToast, Photo, Swipe, LangToggle, G } from '../../components/ops2/ui'
 
@@ -236,6 +238,8 @@ export default function OpsTechApp() {
       {jobs.length > 0 && <span className="lbl" style={{ marginTop: 4 }}><G t="બીજું કામ · Other jobs" /></span>}
       {jobs.map(f => <VisitCard key={f.id} f={f} st={stById[f.st]} onOpen={() => setOpenId(f.id)} />)}
       <OpsEveningCard lang={(typeof localStorage !== 'undefined' && localStorage.getItem('ops2_lang')) || 'en'} />
+      {/* Phase 576 — evening coach: 3 named actions for the next working day (after 7 PM) */}
+      <CoachEvening />
     </div>
   } else if (tab === 'faults' || tab === 'cams') {
     const pool = faults.filter(f => (f.src === 'cam') === (tab === 'cams'))
@@ -473,4 +477,12 @@ function TechMe({ d, avgFixM, monthFixed, nav }) {
       </div></Card>}
     <div className="card list">{[['file', 'પગાર સ્લિપ', 'Salary slips', '/ops-performance'], ['cal', 'રજાની અરજી', 'Leave request', '/my-offer'], ['phone', 'મારા કૉલ', 'My calls', '/calls'], ['brief', 'મારું કામ', 'My work', '/my-work']].map(([i, g, e, to]) => <button key={e} className="rrow" onClick={() => nav(to)}><Tile n={i} s={36} /><span style={{ flex: 1 }}><Bi g={g} e={e} /></span><Ic n="cr" style={{ color: 'var(--mu)' }} /></button>)}</div>
   </div>
+}
+
+// Phase 576 — evening coach box for the technician, shown after 7 PM IST.
+function CoachEvening() {
+  const profile = useAuthStore(s => s.profile)
+  const hr = parseInt(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: false }).format(new Date()), 10)
+  if (!profile?.id || hr < 19) return null
+  return <CoachActions userId={profile.id} role={profile.role} />
 }

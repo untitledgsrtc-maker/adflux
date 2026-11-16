@@ -12,7 +12,7 @@ import { supabase } from '../../lib/supabase'
 import { coachText, coachLink } from '../../utils/coachText'
 
 // Phase 575 — roles that get evening actions (sales/TC in the Day Summary card, office staff on My Work)
-const COACH_ROLES = ['sales', 'telecaller', 'staff', 'hr', 'accounts', 'office_admin']
+const COACH_ROLES = ['sales', 'telecaller', 'staff', 'hr', 'accounts', 'office_admin', 'operation_executive', 'operation_head']   // Phase 576: + Ops technicians
 
 export default function CoachActions({ userId, role }) {
   const navigate = useNavigate()
