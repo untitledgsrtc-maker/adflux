@@ -2377,3 +2377,6 @@
 
 /* Phase 548 - sidebar brand tile shows the real logo mark (was a "UA" text tile). CSS only: V2AppShell stays untouched. */
 .v2d-brand-mark { background: url('/favicon.svg') center / contain no-repeat; color: transparent; font-size: 0; }
+
+/* Phase 549 - login page brand tile shows the real logo mark (same as sidebar, CSS only). */
+.v2d-login-mark { background: url('/favicon.svg') center / contain no-repeat; color: transparent; font-size: 0; }
