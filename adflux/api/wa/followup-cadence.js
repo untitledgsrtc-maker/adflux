@@ -29,6 +29,9 @@ const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
 const WA_TOKEN     = process.env.CAMPAIGN_WA_TOKEN
 const AI_SECRET    = process.env.AI_REPLY_SECRET
 const GRAPH        = 'https://graph.facebook.com/v21.0'
+// Phase 579: at most this many template sends per run (the cron runs once a day). Owner, 17 Nov 2026:
+// after the 6-7 Nov Meta RED rating, a 10-day backlog must not go out as one burst.
+const DAILY_CAP    = Math.max(1, Number(process.env.FOLLOWUP_DAILY_CAP) || 30)
 
 const ok   = (obj = {}) => new Response(JSON.stringify({ ok: true, ...obj }), { status: 200, headers: { 'content-type': 'application/json' } })
 const nope = (reason, status = 200) => new Response(JSON.stringify({ ok: false, reason }), { status, headers: { 'content-type': 'application/json' } })
@@ -60,8 +63,11 @@ export default async function handler(req) {
   const istMin = istNow.getUTCHours() * 60 + istNow.getUTCMinutes()
   if (istMin < 9 * 60 + 30 || istMin >= 19 * 60 + 30) return ok({ skipped: 'off_hours', istMin })
 
-  const due = await sbRows(`rpc/followup_cadence_candidates`, { method: 'POST', body: '{}' })
-  if (!Array.isArray(due) || due.length === 0) return ok({ due: 0, sent: 0 })
+  const allDue = await sbRows(`rpc/followup_cadence_candidates`, { method: 'POST', body: '{}' })
+  if (!Array.isArray(allDue) || allDue.length === 0) return ok({ due: 0, sent: 0 })
+  // Phase 579: most recent conversations first (lowest sequence step = fewest days silent; they reply
+  // most), capped per day. The rest stay due and go out on the next days, still at most 1/day each.
+  const due = [...allDue].sort((a, b) => (parseInt(a.new_stage, 10) || 0) - (parseInt(b.new_stage, 10) || 0)).slice(0, DAILY_CAP)
 
   const nowIso = new Date().toISOString()
   let sent = 0, failed = 0, logFailed = 0, markFailed = 0
@@ -117,5 +123,5 @@ export default async function handler(req) {
     } catch { failed++ }
   }
 
-  return ok({ due: due.length, sent, failed, logFailed, markFailed })
+  return ok({ due: allDue.length, capped_to: due.length, sent, failed, logFailed, markFailed })
 }
