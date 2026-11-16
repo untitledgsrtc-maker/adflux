@@ -5,5 +5,5 @@
   colour as the source icon PNG (resources/icon.png).
 -->
 <resources>
-    <color name="ic_launcher_background">#FFE600</color>
+    <color name="ic_launcher_background">#0F172A</color>
 </resources>

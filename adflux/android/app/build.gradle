@@ -99,8 +99,8 @@ android {
         //         external-files-path Pictures/ (Capacitor capture file) +
         //         AndroidManifest <queries> IMAGE_CAPTURE. Regression from
         //         Phase 76.2.2 (92266b7). Native/config only; needs APK rebuild.
-        versionCode 96019
-        versionName "0.96.19"
+        versionCode 96020
+        versionName "0.96.20"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
