@@ -2374,3 +2374,6 @@
   .v2d-team-tbl th:first-child, .v2d-team-tbl td:first-child { padding-left: 12px !important; }
   .v2d-team-tbl th:last-child, .v2d-team-tbl td:last-child { padding-right: 12px !important; }
 }
+
+/* Phase 548 - sidebar brand tile shows the real logo mark (was a "UA" text tile). CSS only: V2AppShell stays untouched. */
+.v2d-brand-mark { background: url('/favicon.svg') center / contain no-repeat; color: transparent; font-size: 0; }
