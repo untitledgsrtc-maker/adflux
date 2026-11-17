@@ -115,7 +115,11 @@ export default function FollowUpsV2() {
   // RPC — and the view is READ-ONLY (no Call/WhatsApp/Done/Snooze; she monitors,
   // she can't act as the rep). Never true for admin (isPrivileged) or when she's
   // on her own /follow-ups (no rep param, or rep == herself).
-  const canViewTeam = profile?.can_view_team_dashboard === true
+  // Phase 595 - the sales head (team_role sales_manager) gets the same read-only team
+  // view, but read through normal RLS (fu manager policy = his reps), not the
+  // company-wide team_all_followups / team_rep_followups RPCs.
+  const isManager = !isPrivileged && profile?.team_role === 'sales_manager'
+  const canViewTeam = profile?.can_view_team_dashboard === true || isManager
   const viewingOther = !isPrivileged && canViewTeam && !!repParam && repParam !== profile?.id
   // Phase 247 — the team viewer can flip to the WHOLE team's open follow-ups
   // (READ-ONLY) via a toggle; default stays her own actionable list. Not the
@@ -134,7 +138,7 @@ export default function FollowUpsV2() {
     // Phase 194 (drill one rep) OR Phase 247 (team viewer sees ALL) → read the
     // team's follow-ups via a gated SECURITY DEFINER RPC (own-only RLS would
     // return just her own). Read-only view — the actions are hidden downstream.
-    if (viewingOther || teamViewing) {
+    if ((viewingOther || teamViewing) && !isManager) {
       const { data: b, error: bErr } = teamViewing
         ? await supabase.rpc('team_all_followups')
         : await supabase.rpc('team_rep_followups', { p_rep_id: repParam })
@@ -170,7 +174,11 @@ export default function FollowUpsV2() {
       .eq('is_done', false)
       .order('follow_up_date', { ascending: true })
       .order('follow_up_time', { ascending: true, nullsFirst: false })
-    if (!isPrivileged) {
+    if (isManager && teamViewing) {
+      // Phase 595 - whole team: RLS limits rows to his reps (+ his own)
+    } else if (isManager && viewingOther) {
+      q = q.eq('assigned_to', repParam)
+    } else if (!isPrivileged) {
       q = q.eq('assigned_to', profile.id)
     } else if (repParam) {
       q = q.eq('assigned_to', repParam)   // Phase 122 — admin drill into one rep
@@ -190,7 +198,11 @@ export default function FollowUpsV2() {
       .lte('revisit_date', weekEnd)
       .order('revisit_date', { ascending: true })
       .limit(50)
-    if (!isPrivileged) {
+    if (isManager && teamViewing) {
+      // Phase 595 - RLS (leads_manager_team, PRIVATE) limits to his team
+    } else if (isManager && viewingOther) {
+      nq = nq.eq('assigned_to', repParam)
+    } else if (!isPrivileged) {
       nq = nq.eq('assigned_to', profile.id)
     } else if (repParam) {
       nq = nq.eq('assigned_to', repParam)   // Phase 122 — admin drill into one rep
@@ -205,7 +217,7 @@ export default function FollowUpsV2() {
     setRows((fuRes.data || []).filter(keepInFollowupQueue))
     setNurtureRows(nuRes.data || [])
     setLoading(false)
-  }, [profile?.id, isPrivileged, repParam, viewingOther, teamViewing])
+  }, [profile?.id, isPrivileged, isManager, repParam, viewingOther, teamViewing])
 
   useEffect(() => { load() }, [load])
   // Phase 34Z.59 — refetch on tab-resume so completed follow-ups

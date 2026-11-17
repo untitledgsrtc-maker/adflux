@@ -24,7 +24,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import UserAvatar from '../../components/common/UserAvatar'
-import { fetchTeamLeaderboard } from '../../utils/teamLeaderboard'
+import { fetchTeamLeaderboard, scopeLeaderboardToManagerTeam } from '../../utils/teamLeaderboard'
 import { calculateIncentive } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
 import {
@@ -83,6 +83,11 @@ function daysBetween(a, b) {
 export default function AdminDashboardDesktop() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
+  // Phase 595 - the sales head (team_role sales_manager, not admin/co_owner) sees this
+  // admin dashboard for HIS team. RLS limits money/quotes/leads to his reps' PRIVATE
+  // data; below, the rep list + leaderboard are narrowed to his team and the
+  // admin-only cards (approvals, liability, push delivery, billing) are hidden.
+  const isMgr = profile?.team_role === 'sales_manager' && !['admin', 'co_owner'].includes(profile?.role)
   const location = useLocation()
 
   const [state, setState] = useState({ loading: true })
@@ -97,7 +102,7 @@ export default function AdminDashboardDesktop() {
   // Active campaigns, Stale, Activity). The leaderboard / incentive
   // liability still reads monthly_sales_data which is segment-blind —
   // see the comment by the leaderboard build below.
-  const [segmentFilter, setSegmentFilter] = useState('all')
+  const [segmentFilter, setSegmentFilter] = useState(isMgr ? 'private' : 'all')
   const [tab, setTab] = useState(() => {
     try { const t = localStorage.getItem('v2d_admin_tab'); return ['money', 'team', 'pipeline'].includes(t) ? t : 'money' } catch { return 'money' }
   })
@@ -182,7 +187,9 @@ export default function AdminDashboardDesktop() {
       // but admin can't see location". Pings WERE fetched but the
       // sales-only name filter dropped Dhara → card showed "No reps
       // live right now" despite 318 live pings.
-      supabase.from('users').select('id, name, role').in('role', ['sales', 'telecaller', 'agency']),
+      isMgr   // Phase 595 - his reps only
+        ? supabase.from('users').select('id, name, role').in('role', ['sales', 'telecaller', 'agency']).eq('manager_id', profile.id)
+        : supabase.from('users').select('id, name, role').in('role', ['sales', 'telecaller', 'agency']),
       supabase.from('incentive_settings').select('*').maybeSingle(),
       // M1 — every rep's active daily target. Filtered by effective_to
       // is null (the unique partial index in supabase_phase9 ensures one
@@ -586,7 +593,7 @@ export default function AdminDashboardDesktop() {
     // Phase 363 - leaderboard = quotes SENT vs quotes WON AND PAID in the period
     // (owner rule 13 Oct 2026). One definition for all dashboards: the
     // team_leaderboard_month function via utils/teamLeaderboard. No forecast.
-    const leaderboard = (await fetchTeamLeaderboard(supabase, monthStartIso, monthEndIso)) || []
+    const leaderboard = await scopeLeaderboardToManagerTeam(supabase, (await fetchTeamLeaderboard(supabase, monthStartIso, monthEndIso)) || [], profile)
     const lbMax = Math.max(1, leaderboard.reduce((sum, r) => sum + r.wonPaidAmt, 0))
 
     // Incentive liability — monthly_sales_data is keyed by YYYY-MM, so
@@ -999,7 +1006,7 @@ export default function AdminDashboardDesktop() {
                 NOT % to target, which is the single number an owner
                 steers by. Renders only when there's a target set so
                 fresh installs don't display "0% to ₹0 target". */}
-            {state.kpi.mtdTarget > 0 && (
+            {!isMgr && state.kpi.mtdTarget > 0 && (
               <div
                 style={{
                   fontSize: 13, color: 'var(--v2-ink-1)', marginBottom: 12,
@@ -1050,9 +1057,9 @@ export default function AdminDashboardDesktop() {
 
             {/* WhatsApp API billing/eligibility failure (Meta 131042) — surfaced
                 up top with a one-tap "Fix billing" link. Self-renders null when clean. */}
-            <WaBillingBanner />
-            <AiKeyBanner />
-            <QuotePriceBanner />
+            {!isMgr && <WaBillingBanner />}
+            {!isMgr && <AiKeyBanner />}
+            {!isMgr && <QuotePriceBanner />}
 
             {/* Action Queue — demoted from hero to an inline notification.
                 Only renders when there's actually something pending. When
@@ -1099,7 +1106,8 @@ export default function AdminDashboardDesktop() {
                     <Money value={state.kpi.revenue} />
                   </div>
                   <div className="v2d-hero-sub" style={{ maxWidth: 'none' }}>
-                    {state.kpi.mtdTarget > 0
+                    {isMgr ? 'your team · private'
+                      : state.kpi.mtdTarget > 0
                       ? `${Math.round((state.kpi.revenue / state.kpi.mtdTarget) * 100)}% of target`
                       : 'target not set'}
                   </div>
@@ -1149,19 +1157,19 @@ export default function AdminDashboardDesktop() {
             </section>
 
             {/* Phase 41.2 — Segment toggle (was hidden state-only). */}
-            <SegmentToggle value={segmentFilter} onChange={setSegmentFilter} />
+            {!isMgr && <SegmentToggle value={segmentFilter} onChange={setSegmentFilter} />}
 
             {/* Phase 41.2 — Action queue + Reps in field + Cash
                 forecast. Three glance cards above the panels. */}
             <section className="v2d-grid-2" style={{ marginBottom: 16 }}>
-              <AdminActionsCard
+              {!isMgr && <AdminActionsCard
                 payments={state.pending.length}
                 leaves={state.pendingLeaves}
                 ta={state.pendingTa}
                 onPayments={() => navigate('/pending-approvals')}
                 onLeaves={() => navigate('/people?tab=leaves', { state: { tab: 'leaves' } })}
                 onTa={() => navigate('/people?tab=ta', { state: { tab: 'ta' } })}
-              />
+              />}
               <RepsInFieldCard
                 rows={state.liveReps}
                 salesUsers={state.salesUsersForLive}
@@ -1204,7 +1212,7 @@ export default function AdminDashboardDesktop() {
               />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
                   <FunnelPanel stages={state.funnel.stages} max={state.funnel.max} />
-                  <LiabilityPanel data={state.liability} />
+                  {!isMgr && <LiabilityPanel data={state.liability} />}
                 </div>
               </section>
               <section className="v2d-grid-2" style={{ marginBottom: 16, alignItems: 'start' }}>
@@ -1224,19 +1232,19 @@ export default function AdminDashboardDesktop() {
 
             {tab === 'team' && (
               <>
-                <section style={{ marginBottom: 16 }}>
+                {!isMgr && <section style={{ marginBottom: 16 }}>
                   <DailyCheckinCard />
-                </section>
+                </section>}
               <section className="v2d-grid-2" style={{ marginBottom: 16, alignItems: 'start' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
                   <LeaderboardPanel rows={state.leaderboard} max={state.lbMax} period={period} />
-                  <BriefDeliveryCard
+                  {!isMgr && <BriefDeliveryCard
                     stats={state.briefStats}
                     salesUsers={state.salesUsersForLive}
                     onRetry={() => navigate('/admin/push-debug')}
-                  />
+                  />}
                 </div>
-                <TeamActivityPanel />
+                <TeamActivityPanel managerId={isMgr ? profile.id : undefined} />
               </section>
               </>
             )}

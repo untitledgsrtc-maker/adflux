@@ -591,12 +591,13 @@ export default function TeamDashboardV2() {
           .gte('created_at', monthStartIso)
           .lt ('created_at', monthEndIso),
         // Phase 112.5/.7 — quotes WON this calendar month, per created_by
-        // (count + value). won-date proxied by updated_at (no won_at, §33).
+        // (count + value). Phase 595 - by won_at (all 92 won quotes carry it); updated_at
+        // counted a quote won earlier but edited this month as won again.
         supabase.from('quotes')
           .select('created_by, total_amount')
           .eq('status', 'won')
-          .gte('updated_at', monthStartIso)
-          .lt ('updated_at', monthEndIso),
+          .gte('won_at', monthStartIso)
+          .lt ('won_at', monthEndIso),
       ])
       }
       if (repsRes.error || sesRes.error) {
@@ -1556,13 +1557,13 @@ export default function TeamDashboardV2() {
                         style={chip('var(--blue, #3B82F6)', 'rgba(59,130,246,0.12)')}
                         title={`${mq} quote${mq === 1 ? '' : 's'} this month · ${formatCurrency(mqA)}`}
                       >
-                        {mq} quote{mq === 1 ? '' : 's'} · {formatLakh(mqA)}
+                        {mq} quote{mq === 1 ? '' : 's'} this month · {formatLakh(mqA)}
                       </span>
                       <span
                         style={chip('var(--success, #10B981)', 'rgba(16,185,129,0.12)')}
                         title={`${mw} won this month · ${formatCurrency(mwA)}`}
                       >
-                        {mw} won · {formatLakh(mwA)}
+                        {mw} won this month · {formatLakh(mwA)}
                       </span>
                       {(pendingOutcomesByUser[r.id] || 0) > 0 && (
                         <span

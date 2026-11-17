@@ -54,7 +54,8 @@ export default function DashboardV2() {
   // Phase 391 - office admin never sees the sales dashboard.
   if (profile?.role === 'office_admin')        return <Navigate to="/office" replace />
 
-  if (isPrivileged) return <AdminDashboardDesktop />
+  // Phase 595 - sales head gets the admin dashboard scoped to his team (see isMgr inside)
+  if (isPrivileged || profile?.team_role === 'sales_manager') return <AdminDashboardDesktop />
   // Phase 101.B — agency branch. Same /dashboard URL, role-aware
   // switch matches the admin/sales pattern above.
   if (isAgency) return <AgencyHomeView />

@@ -418,14 +418,16 @@ export function LeadPipelinePanel() {
 
 /* ─── Today's team activity ────────────────────────────────────────
    Per-person row with check-in status + counters. Sales-only roles. */
-export function TeamActivityPanel() {
+export function TeamActivityPanel({ managerId } = {}) {
   const navigate = useNavigate()
   const [data, setData] = useState(null)
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10)
     Promise.all([
-      supabase.from('users').select('id, name, team_role, city, daily_targets').eq('is_active', true).in('team_role', ['sales','telecaller','sales_manager','agency']),
+      managerId   // Phase 595 - sales head: his reps only
+        ? supabase.from('users').select('id, name, team_role, city, daily_targets').eq('is_active', true).eq('manager_id', managerId)
+        : supabase.from('users').select('id, name, team_role, city, daily_targets').eq('is_active', true).in('team_role', ['sales','telecaller','sales_manager','agency']),
       supabase.from('work_sessions').select('user_id, daily_counters, check_in_at, check_out_at').eq('work_date', today),
     ]).then(([t, s]) => {
       const sessions = new Map((s.data || []).map(x => [x.user_id, x]))
@@ -466,7 +468,7 @@ export function TeamActivityPanel() {
             const checkedIn = !!sess?.check_in_at
             const checkedOut = !!sess?.check_out_at
             return (
-              <tr key={u.id} onClick={() => navigate('/team')} style={{ cursor: 'pointer' }}>
+              <tr key={u.id} onClick={() => navigate(managerId ? '/team-dashboard' : '/team')} style={{ cursor: 'pointer' }}>
                 <td>
                   <div style={{ fontWeight: 600 }}>{u.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', textTransform: 'uppercase', letterSpacing: '.08em' }}>

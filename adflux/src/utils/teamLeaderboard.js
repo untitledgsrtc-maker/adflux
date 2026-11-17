@@ -53,7 +53,7 @@ export function lbShare(row, rows) {
 // reps (users.manager_id = him) plus himself on the leaderboard. Everyone else:
 // rows returned unchanged, no extra query.
 export async function scopeLeaderboardToManagerTeam(supabase, rows, profile) {
-  if (!rows?.length || profile?.team_role !== 'sales_manager' || profile?.role === 'admin') return rows
+  if (!rows?.length || profile?.team_role !== 'sales_manager' || ['admin', 'co_owner'].includes(profile?.role)) return rows
   const { data, error } = await supabase.from('users').select('id').eq('manager_id', profile.id)
   if (error) { console.warn('[leaderboard] team scope failed', error); return rows.filter((r) => r.id === profile.id) }
   const ids = new Set([profile.id, ...(data || []).map((u) => u.id)])

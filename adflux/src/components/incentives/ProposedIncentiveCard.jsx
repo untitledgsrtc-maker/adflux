@@ -201,6 +201,8 @@ export default function ProposedIncentiveCard({ compact = false }) {
   // Phase 32F agency; Phase 109 hr. Neither earns sales incentive, so the
   // "Forecast is flat — send quotes" card is noise on their pages.
   if (['agency', 'hr'].includes(profile?.role)) return null
+  // Phase 595 - sales head pages look like admin's (no rep banner); his own incentive stays on My Performance.
+  if (profile?.team_role === 'sales_manager') return null
 
   if (!data) {
     // Skeleton — same height as the real card so layout doesn't jump.
