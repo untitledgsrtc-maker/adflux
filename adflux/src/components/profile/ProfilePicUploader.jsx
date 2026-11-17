@@ -170,7 +170,8 @@ export default function ProfilePicUploader() {
           {profile?.name || '—'}
         </div>
         <div style={{ fontSize: 12, color: 'var(--v2-ink-2, var(--text-muted))', marginBottom: 8 }}>
-          {profile?.role}{profile?.team_role && profile.team_role !== profile.role ? ` · ${profile.team_role}` : ''}
+          {/* Phase 594 - job title (users.designation) instead of system codes; old text if none set */}
+          {profile?.designation || <>{profile?.role}{profile?.team_role && profile.team_role !== profile.role ? ` · ${profile.team_role}` : ''}</>}
         </div>
         <input
           ref={fileRef}

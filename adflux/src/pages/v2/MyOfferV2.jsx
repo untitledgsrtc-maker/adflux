@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react'
 import { Download, FileText, AlertCircle, CalendarOff } from 'lucide-react'
 import { useOffers } from '../../hooks/useOffers'
 import { useAuthStore } from '../../store/authStore'
-import { formatCurrency } from '../../utils/formatters'
+import { formatCurrency, formatDate } from '../../utils/formatters'
 import TaDaRequestPanel from '../../components/incentives/TaDaRequestPanel'
 import { RequestLeaveModal } from '../../components/leads/RepDayTools'
 import RepLeaveHistory from '../../components/leads/RepLeaveHistory'
@@ -265,7 +265,7 @@ export default function MyOfferV2() {
                 value={offer.full_legal_name || offer.candidate_name} />
             <KV label="Position" value={offer.position} />
             <KV label="Territory" value={offer.territory} />
-            <KV label="Joining Date" value={offer.joining_date} />
+            <KV label="Joining Date" value={formatDate(offer.joining_date)} />
             <KV label="Place" value={offer.place} />
             <KV label="Fixed Salary"
                 value={offer.fixed_salary_monthly
