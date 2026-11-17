@@ -238,6 +238,7 @@ const MANAGER_NAV = [
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
+  { to: '/campaigns/inbox',   label: 'WhatsApp',       icon: MessageCircle },   // Phase 590 - his team's chats (RLS), reply on own only
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },
   { to: '/my-performance',    label: 'My Performance', icon: TrendingUp },
   { to: '/calls',             label: 'My Calls',       icon: Phone },

@@ -94,7 +94,11 @@ export default function CampaignInboxV2() {
   // Phase 205 — admin sees all + can reassign; a sales/telecaller/agency rep
   // sees only their assigned chats (RLS-scoped) and replies, no reassign.
   const profile = useAuthStore((s) => s.profile)
-  const isPrivileged = ['admin', 'co_owner'].includes(profile?.role) || profile?.team_role === 'sales_manager'
+  const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
+  // Phase 590 - sales manager: reads his team's chats (RLS scopes them) + filters
+  // by rep, but replies only on his own chats (same as api/wa/send) and can't
+  // reassign (no conversation write policy for him). Was lumped into isPrivileged.
+  const isManager = !isPrivileged && profile?.team_role === 'sales_manager'
   // Sales Head (can_view_team_dashboard) READS every rep's chats (RLS wa_conv_team_viewer),
   // but stays read-only: writes below stay gated on isPrivileged / own-thread. NOT the
   // same as isPrivileged (that gates reassign + the team-filter dropdown).
@@ -103,7 +107,7 @@ export default function CampaignInboxV2() {
   // Chat READ needs can_view_team_dashboard (RLS wa_conv_team_viewer via is_team_viewer);
   // a write-capable Sales Head carries BOTH flags (grant model, supabase_sales_head_manager_p1.sql).
   const isSalesHead = profile?.is_sales_head === true
-  const canSeeAll = isPrivileged || isTeamViewer || isSalesHead
+  const canSeeAll = isPrivileged || isManager || isTeamViewer || isSalesHead
   const canInbox = isPrivileged || ['sales', 'telecaller', 'agency'].includes(profile?.role)
 
   const [loading, setLoading] = useState(true)
@@ -229,7 +233,7 @@ export default function CampaignInboxV2() {
       }
       setPreviews(map)
     }
-  }, [isPrivileged, profile?.id])
+  }, [isPrivileged, canSeeAll, profile?.id])
 
   const loadMsgs = useCallback(async (convId, silent = false) => {
     if (!convId) { setMsgs([]); return }
@@ -327,10 +331,16 @@ export default function CampaignInboxV2() {
 
   // Telecallers — for the reassign dropdown (admin only; reps don't reassign).
   useEffect(() => {
+    if (isManager) {
+      // Phase 590 - the manager's filter lists his own reps (chats are assigned to field reps too).
+      supabase.from('users').select('id, name').eq('manager_id', profile.id).order('name')
+        .then(({ data }) => setTcs(data || []))
+      return
+    }
     if (!isPrivileged) return
     supabase.from('users').select('id, name').eq('role', 'telecaller').order('name')
       .then(({ data }) => setTcs(data || []))
-  }, [isPrivileged])
+  }, [isPrivileged, isManager, profile?.id])
 
   // Phase 394 — our own WhatsApp numbers (95815 78261 service, 98982 73686 marketing).
   useEffect(() => {
@@ -345,7 +355,7 @@ export default function CampaignInboxV2() {
   const sel = useMemo(() => threads.find((t) => t.id === selId) || null, [threads, selId])
   // Phase 205 read-only gate — a Sales Head (team viewer, can_view_team_dashboard)
   // READS every rep's chat but may only WRITE on their own assigned thread. Admin /
-  // co_owner / sales_manager write anywhere. All writes are already server-gated
+  // co_owner write anywhere; a sales_manager writes on his own threads only (Phase 590). All writes are already server-gated
   // (api/wa/send §205, send-template §120, reassign RLS); this only hides the
   // composer / template / reassign so a Sales Head on someone else's chat doesn't
   // see controls that would 403.
@@ -362,7 +372,7 @@ export default function CampaignInboxV2() {
     return threads.filter((t) => {
       const isOpen = windowOpen(t.window_expires_at)
       // Phase 259 — team filter (privileged only; reps see own threads via RLS §243)
-      if (isPrivileged && convTeam !== 'all') {
+      if ((isPrivileged || isManager) && convTeam !== 'all') {
         if (convTeam === '__none__') { if (t.assigned_to) return false }
         else if (t.assigned_to !== convTeam) return false
       }
@@ -379,7 +389,7 @@ export default function CampaignInboxV2() {
       }
       return false
     })
-  }, [threads, isPrivileged, convTeam, convNum, convFilter, convSearch])
+  }, [threads, isPrivileged, isManager, convTeam, convNum, convFilter, convSearch])
 
   // Load the selected conversation's lead (powers the assigned/reassign pill +
   // Create quote). One small read per conversation-open; campaign admin page.
@@ -752,7 +762,7 @@ export default function CampaignInboxV2() {
             )}
 
             {/* Phase 259 — team (assigned telecaller) filter; privileged only */}
-            {isPrivileged && tcs.length > 0 && (
+            {(isPrivileged || isManager) && tcs.length > 0 && (
               <select
                 value={convTeam}
                 onChange={(e) => setConvTeam(e.target.value)}
