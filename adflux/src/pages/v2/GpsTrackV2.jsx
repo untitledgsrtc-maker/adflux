@@ -138,7 +138,8 @@ export default function GpsTrackV2() {
   const { userId, date } = useParams()
   const targetDate = date || istTodayISO()
   const profile = useAuthStore(s => s.profile)
-  const isPrivileged = ['admin', 'co_owner', 'hr', 'accounts', 'office_admin'].includes(profile?.role) // +hr 2026-08-03: attendance/GPS view (RLS hides sales — calls/activities blank for HR). +accounts 2026-09-01 (§275): open a day's route from the TA table to verify km before approving.
+  // Phase 584: + sales manager (team_role) — reads his assigned reps' day directly; RLS (phase564/584) limits it to them.
+  const isPrivileged = ['admin', 'co_owner', 'hr', 'accounts', 'office_admin'].includes(profile?.role) || profile?.team_role === 'sales_manager' // +hr 2026-08-03: attendance/GPS view (RLS hides sales — calls/activities blank for HR). +accounts 2026-09-01 (§275): open a day's route from the TA table to verify km before approving.
   // Phase 194 — a per-user team viewer (can_view_team_dashboard) can open a
   // rep's route activity from the dashboard drill-down. Kept SEPARATE from
   // isPrivileged: her own RLS is own-only, so she loads the rep's day-track via
