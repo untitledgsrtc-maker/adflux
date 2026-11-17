@@ -170,17 +170,17 @@ export default function CampaignInboxV2() {
     // Chunked .range paging replaces the hard 200 cap (§66 — 332 threads and
     // growing meant 132 conversations were invisible to everyone).
     const sortCol = sortColRef.current
-    const PAGE = 500
+    const PAGE = 1000   // Phase 591 - API page max; 6 requests for ~6k chats (was 500, 8 for 4k)
     let rows = []
     let error = null
-    for (let from = 0; from < 4000; from += PAGE) {
+    for (let from = 0; from < 12000; from += PAGE) {   // Phase 591 - was 4000: hid the 1,842 oldest of 5,842 chats
       let q = supabase
         .from('whatsapp_conversations')
         // '*' so customer_name (C11) + last_message_* (Phase 251) flow through
         // and a missing column never breaks the inbox load before the SQL runs.
         .select('*')
         .order(sortCol, { ascending: false, nullsFirst: false })
-        .range(from, from + PAGE - 1) // cap-ok: chunked pages, 4000 backstop
+        .range(from, from + PAGE - 1) // cap-ok: chunked pages, 12000 backstop
       // Phase 243 — a rep sees only their own conversations. RLS already scopes
       // this, but filter in the UI too so the intent is explicit and a rep never
       // relies solely on RLS. Admin / co_owner / manager see every thread.
@@ -332,8 +332,9 @@ export default function CampaignInboxV2() {
   // Telecallers — for the reassign dropdown (admin only; reps don't reassign).
   useEffect(() => {
     if (isManager) {
-      // Phase 590 - the manager's filter lists his own reps (chats are assigned to field reps too).
-      supabase.from('users').select('id, name').eq('manager_id', profile.id).order('name')
+      // Phase 591 - he sees every chat like admin, so the filter lists the telecallers
+      // (as admin) plus his own field reps (chats are assigned to them too).
+      supabase.from('users').select('id, name').or(`role.eq.telecaller,manager_id.eq.${profile.id}`).order('name')
         .then(({ data }) => setTcs(data || []))
       return
     }
