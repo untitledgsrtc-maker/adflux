@@ -66,3 +66,9 @@ NOTIFY pgrst, 'reload schema';
 --  LEFT JOIN pg_depend d ON d.objid=p.oid AND d.deptype='e'
 --  WHERE n.nspname='public' AND p.prokind='f' AND d.objid IS NULL
 --    AND NOT EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig,'{}')) c WHERE c LIKE 'search_path=%');
+
+-- Phase 602.1 (18 Nov) - next_workday (3 overloads) was missed by the query above because
+-- the rows are recorded as members of the supabase_vault extension; pinned the same way.
+ALTER FUNCTION public.next_workday(date) SET search_path = public, extensions, pg_temp;
+ALTER FUNCTION public.next_workday(timestamp without time zone) SET search_path = public, extensions, pg_temp;
+ALTER FUNCTION public.next_workday(timestamp with time zone) SET search_path = public, extensions, pg_temp;
