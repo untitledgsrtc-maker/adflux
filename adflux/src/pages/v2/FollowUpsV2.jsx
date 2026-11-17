@@ -159,6 +159,9 @@ export default function FollowUpsV2() {
     // the snapshot the trigger wrote at Won time. Payments that landed
     // after the FU was created are subtracted from total_amount when
     // the row renders.
+    // Phase 595.3 - built per page: the API returns at most 1000 rows, so the list was
+    // cut at 1000 (team view 876 of 1197; admin 1000 of 1862). Read in 1000-row pages.
+    const fuQuery = () => {
     let q = supabase.from('follow_ups')
       .select(`
         id, follow_up_date, follow_up_time, note, is_done, auto_generated,
@@ -174,6 +177,7 @@ export default function FollowUpsV2() {
       .eq('is_done', false)
       .order('follow_up_date', { ascending: true })
       .order('follow_up_time', { ascending: true, nullsFirst: false })
+      .order('id', { ascending: true })   // stable order across pages
     if (isManager && teamViewing) {
       // Phase 595 - whole team: RLS limits rows to his reps (+ his own)
     } else if (isManager && viewingOther) {
@@ -182,6 +186,8 @@ export default function FollowUpsV2() {
       q = q.eq('assigned_to', profile.id)
     } else if (repParam) {
       q = q.eq('assigned_to', repParam)   // Phase 122 — admin drill into one rep
+    }
+    return q
     }
 
     // Phase 31S — Nurture leads where revisit_date is within the
@@ -208,7 +214,17 @@ export default function FollowUpsV2() {
       nq = nq.eq('assigned_to', repParam)   // Phase 122 — admin drill into one rep
     }
 
-    const [fuRes, nuRes] = await Promise.all([q, nq])
+    const fetchAllFu = async () => {
+      let all = []
+      for (let from = 0; from < 10000; from += 1000) {   // cap-ok: chunked pages, 10000 backstop
+        const { data, error } = await fuQuery().range(from, from + 999)
+        if (error) return { data: null, error }
+        all = all.concat(data || [])
+        if (!data || data.length < 1000) break
+      }
+      return { data: all, error: null }
+    }
+    const [fuRes, nuRes] = await Promise.all([fetchAllFu(), nq])
     if (fuRes.error) { setError(fuRes.error.message); setLoading(false); return }
     if (nuRes.error) { setError(nuRes.error.message); setLoading(false); return }
     // Phase 176.1 — frontend backstop: never show a follow-up on a LOST lead,
