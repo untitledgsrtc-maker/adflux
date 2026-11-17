@@ -188,8 +188,8 @@ export default function AdminDashboardDesktop() {
       // sales-only name filter dropped Dhara → card showed "No reps
       // live right now" despite 318 live pings.
       isMgr   // Phase 595 - his reps + himself (he is out in the field too)
-        ? supabase.from('users').select('id, name, role').in('role', ['sales', 'telecaller', 'agency']).or(`manager_id.eq.${profile.id},id.eq.${profile.id}`)
-        : supabase.from('users').select('id, name, role').in('role', ['sales', 'telecaller', 'agency']),
+        ? supabase.from('users').select('id, name, role, daily_targets').in('role', ['sales', 'telecaller', 'agency']).or(`manager_id.eq.${profile.id},id.eq.${profile.id}`)
+        : supabase.from('users').select('id, name, role, daily_targets').in('role', ['sales', 'telecaller', 'agency']),
       supabase.from('incentive_settings').select('*').maybeSingle(),
       // M1 — every rep's active daily target. Filtered by effective_to
       // is null (the unique partial index in supabase_phase9 ensures one
@@ -890,7 +890,7 @@ export default function AdminDashboardDesktop() {
       : { count: 0 }
     const rings = {
       calls:    { done: realCalls || 0,    target: salesUsers.filter(u => idsToday.has(u.id)).reduce((a, u) => a + (Number(targetByUser[u.id]?.min_calls) || 0), 0) },
-      meetings: { done: sumCtr('meetings'), target: salesUsers.filter(u => idsToday.has(u.id) && u.role === 'sales').length * 5 },
+      meetings: { done: sumCtr('meetings'), target: salesUsers.filter(u => idsToday.has(u.id) && u.role === 'sales').reduce((a, u) => a + (Number(u.daily_targets?.meetings) || 5), 0) },   // Phase 605 - each rep's own target (was a flat 5)
       quotes:   { done: repActivity.reduce((a, r) => a + r.sentToday, 0), target: salesUsers.filter(u => idsToday.has(u.id)).reduce((a, u) => a + (Number(targetByUser[u.id]?.min_quotes ?? 2) || 0), 0) },
     }
 
