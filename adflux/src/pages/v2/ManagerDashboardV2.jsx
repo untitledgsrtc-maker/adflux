@@ -48,6 +48,7 @@ export default function ManagerDashboardV2() {
   const [error, setError]         = useState('')
   const [reps, setReps]           = useState([])
   const [byUser, setByUser]       = useState({}) // rep_id → {calls, connected, meetings, openLeads, lastPing}
+  const [teamOpen, setTeamOpen]   = useState(null) // Phase 582: distinct open leads of the team
 
   useEffect(() => {
     if (!profile?.id || !isManager) return
@@ -94,6 +95,7 @@ export default function ManagerDashboardV2() {
           { data: meetRows },   // 3. Today's meetings per rep (activity_type='meeting').
           { data: leadRows },   // 4. Open leads per rep (stage not in Won/Lost).
           { data: pingRows },   // 5. Latest GPS ping per rep (today only).
+          { count: openTotal }, // 6. Phase 582: team open leads, each counted once.
         ] = await Promise.all([
           supabase.from('call_logs')
             .select('user_id, outcome')
@@ -110,15 +112,31 @@ export default function ManagerDashboardV2() {
             .in('created_by', repIds)
             .in('activity_type', ['meeting', 'site_visit'])
             .gte('created_at', startUtc),
-          supabase.from('leads')
-            .select('assigned_to')
-            .in('assigned_to', repIds)
-            .not('stage', 'in', '(Won,Lost)'),
-          supabase.from('gps_pings')
+          // Phase 582 — exact count per rep in the database (was: download rows,
+          // capped at 1000 by the API, so the total read 1000 and some reps 0).
+          // A lead counts for a rep when they are its owner OR its telecaller.
+          Promise.all(repIds.map(id => supabase.from('leads')
+            .select('id', { count: 'exact', head: true })
+            .or(`assigned_to.eq.${id},telecaller_id.eq.${id}`)
+            .not('stage', 'in', '(Won,Lost)')
+            .then(({ count }) => [id, count || 0])))
+            .then(pairs => ({ data: pairs })),
+          // Phase 582 — one latest ping per rep (the old single query took the newest
+          // 1000 pings of the whole team, so a rep who stopped earlier read "No GPS today").
+          Promise.all(repIds.map(id => supabase.from('gps_pings')
             .select('user_id, created_at')
-            .in('user_id', repIds)
+            .eq('user_id', id)
             .gte('created_at', startUtc)
-            .order('created_at', { ascending: false }),
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .then(({ data }) => (data && data[0]) || null)))
+            .then(rows => ({ data: rows.filter(Boolean) })),
+          // Phase 582 — team total counts each open lead once (a lead can have an owner
+          // AND a telecaller in the same team).
+          supabase.from('leads')
+            .select('id', { count: 'exact', head: true })
+            .or(`assigned_to.in.(${repIds.join(',')}),telecaller_id.in.(${repIds.join(',')})`)
+            .not('stage', 'in', '(Won,Lost)'),
         ])
 
         const calls   = {}
@@ -139,12 +157,13 @@ export default function ManagerDashboardV2() {
           meetSeen.add(key)
           meet[r.created_by] = (meet[r.created_by] || 0) + 1
         })
-        ;(leadRows || []).forEach(r => { open[r.assigned_to] = (open[r.assigned_to] || 0) + 1 })
+        ;(leadRows || []).forEach(([id, n]) => { open[id] = n })
         ;(pingRows || []).forEach(r => {
           // First (most recent) wins because rows are ordered DESC.
           if (!ping[r.user_id]) ping[r.user_id] = r.created_at
         })
 
+        if (!cancelled) setTeamOpen(openTotal ?? null)
         if (!cancelled) {
           setByUser(Object.fromEntries(repIds.map(id => [id, {
             calls:     calls[id] || 0,
@@ -222,7 +241,7 @@ export default function ManagerDashboardV2() {
                     ? `${Math.round((totals.connected / totals.calls) * 100)}% connected`
                     : '—'} />
         <HeroTile icon={<Calendar size={16} />}    label="Meetings"      value={totals.meetings} />
-        <HeroTile icon={<Inbox size={16} />}       label="Open leads"    value={totals.openLeads} />
+        <HeroTile icon={<Inbox size={16} />}       label="Open leads"    value={teamOpen ?? totals.openLeads} />
       </div>
 
       {/* Direct-reports grid */}
