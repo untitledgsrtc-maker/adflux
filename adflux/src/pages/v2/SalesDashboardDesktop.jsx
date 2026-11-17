@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { fetchTeamLeaderboard } from '../../utils/teamLeaderboard'
+import { fetchTeamLeaderboard, scopeLeaderboardToManagerTeam } from '../../utils/teamLeaderboard'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
 import UserAvatar from '../../components/common/UserAvatar'
@@ -157,7 +157,7 @@ export default function SalesDashboardDesktop() {
     const lbSettleMap = buildSettlementMap(lbQuotes || [], lbPayments || [])
 
     // Phase 363 - quotes SENT vs WON AND PAID this period (one shared definition).
-    const leaderboard = (await fetchTeamLeaderboard(supabase, monthStartIso, monthEndIso)) || []
+    const leaderboard = await scopeLeaderboardToManagerTeam(supabase, (await fetchTeamLeaderboard(supabase, monthStartIso, monthEndIso)) || [], profile)
 
     // My settled-this-period revenue — the actually-paid number.
     // Read from the same settle map the leaderboard uses so the rep's

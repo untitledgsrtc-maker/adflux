@@ -21,7 +21,7 @@ import { useNavigate } from 'react-router-dom'
 import { Bell, Flame, Home, FileText, Plus, BarChart3, AlertTriangle, RefreshCw, LogOut, Trophy } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { fetchTeamLeaderboard } from '../../utils/teamLeaderboard'
+import { fetchTeamLeaderboard, scopeLeaderboardToManagerTeam } from '../../utils/teamLeaderboard'
 import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
 import UserAvatar from '../../components/common/UserAvatar'
@@ -110,7 +110,7 @@ export default function SalesDashboardV2() {
     ])
 
     // Phase 363 - quotes SENT vs WON AND PAID this month (one shared definition).
-    const leaderboard = (await fetchTeamLeaderboard(supabase, monthStartIso, monthEndIso)) || []
+    const leaderboard = await scopeLeaderboardToManagerTeam(supabase, (await fetchTeamLeaderboard(supabase, monthStartIso, monthEndIso)) || [], profile)
 
     // My settled-this-month total (drives the "Settled" KPI). Server-side RPC;
     // on RPC error (missing pre-SQL) fall back to the byte-identical client math

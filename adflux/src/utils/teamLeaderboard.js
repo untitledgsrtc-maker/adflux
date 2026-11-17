@@ -48,3 +48,14 @@ export function lbShare(row, rows) {
   const total = (rows || []).reduce((s, r) => s + (r.wonPaidAmt || 0), 0)
   return total > 0 ? Math.round(((row.wonPaidAmt || 0) / total) * 100) : 0
 }
+
+// Phase 588 (owner 17 Nov 2026) - a sales manager (not admin) sees only his own
+// reps (users.manager_id = him) plus himself on the leaderboard. Everyone else:
+// rows returned unchanged, no extra query.
+export async function scopeLeaderboardToManagerTeam(supabase, rows, profile) {
+  if (!rows?.length || profile?.team_role !== 'sales_manager' || profile?.role === 'admin') return rows
+  const { data, error } = await supabase.from('users').select('id').eq('manager_id', profile.id)
+  if (error) { console.warn('[leaderboard] team scope failed', error); return rows.filter((r) => r.id === profile.id) }
+  const ids = new Set([profile.id, ...(data || []).map((u) => u.id)])
+  return rows.filter((r) => ids.has(r.id))
+}
