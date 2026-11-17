@@ -326,6 +326,7 @@ export default function QuotesV2() {
     let amount = 0
     let sentAmount = 0   // Phase 277 — quotes actually SENT (excludes drafts), for Conversion
     let outstanding = 0
+    let collected = 0    // Phase 589 - approved payments actually received
     let wonAmount = 0, wonCount = 0, lostCount = 0   // Phase 276 — Won + Conversion
     displayed.forEach(q => {
       const amt = Number(q.total_amount) || 0
@@ -333,13 +334,14 @@ export default function QuotesV2() {
       if (q.status !== 'draft') sentAmount += amt
       const b = computeBalance(q)
       if (b.kind === 'due') outstanding += b.amount || 0
+      if (q.status !== 'lost') (q.payments || []).forEach(p => { if (p.approval_status === 'approved') collected += Number(p.amount_received || 0) })
       if (q.status === 'won')  { wonCount += 1; wonAmount += amt }
       else if (q.status === 'lost') { lostCount += 1 }
     })
     // Phase 277 — Conversion = won ₹ ÷ quotes-SENT ₹ (owner: "won out of quotes
     // sent, in amount %"). Drafts aren't sent → excluded from the denominator.
     const convPct = sentAmount > 0 ? Math.round((wonAmount / sentAmount) * 100) : 0
-    return { count: displayed.length, amount, sentAmount, outstanding, wonAmount, wonCount, lostCount, convPct }
+    return { count: displayed.length, amount, sentAmount, outstanding, collected, wonAmount, wonCount, lostCount, convPct }
   }, [displayed])
 
   // Phase 311 — on the Won tab, the DATE column shows the WON date (won_at);
@@ -378,10 +380,12 @@ export default function QuotesV2() {
         // Phase 35.1 — design-rule rollout: ring shows collection
         // rate (collected / total amount). footerStats surfaces
         // outstanding + filtered chip, matching /work hero.
-        const collected = Math.max(0, totals.amount - totals.outstanding)
-        const collectPct = totals.amount > 0
-          ? Math.round((collected / totals.amount) * 100)
-          : 100
+        // Phase 589 - collected = approved payments received (was total quoted
+        // minus outstanding, which counted every lost/sent/draft quote as
+        // collected). Lost skipped, like outstanding. Ring = received / (received + still due).
+        const collected = totals.collected
+        const owed = collected + totals.outstanding
+        const collectPct = owed > 0 ? Math.round((collected / owed) * 100) : 100
         return (
           <V2Hero
             eyebrow={showTeam ? 'Team quotes' : 'Your pipeline'}

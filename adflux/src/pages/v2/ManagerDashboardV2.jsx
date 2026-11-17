@@ -100,7 +100,7 @@ export default function ManagerDashboardV2() {
           supabase.from('call_logs')
             .select('user_id, outcome')
             .in('user_id', repIds)
-            .gte('created_at', startUtc)
+            .gte('call_at', startUtc) // Phase 589 - call time, same as Team Live (was sync time)
             .gte('duration_seconds', 10)
             .or('direction.is.null,direction.neq.missed')
             .not('lead_id', 'is', null),
