@@ -444,7 +444,7 @@ export default function AdminDashboardDesktop() {
        Each cell has a small subtitle (delta or count or % of target).
        Compute the extra numbers needed alongside the legacy revenue
        set above. */
-    const todayIso = new Date().toISOString().slice(0, 10)
+    const todayIso = todayDate   // Phase 596 - IST day (was UTC: 'Collected today' showed yesterday before 05:30 IST)
     const todayCollected = paymentsAprFiltered
       .filter(p => (p.payment_date || '').slice(0, 10) === todayIso)
       .reduce((s, p) => s + Number(p.amount_received || 0), 0)
@@ -876,8 +876,20 @@ export default function AdminDashboardDesktop() {
     const todaySessions = wsCheckedOutRes.data || []
     const idsToday = new Set(todaySessions.map(w => w.user_id))
     const sumCtr = (k) => todaySessions.reduce((a, w) => a + (Number(w.daily_counters?.[k]) || 0), 0)
+    // Phase 596 - calls ring = REAL calls (lead-tied, >=10s, not missed, by call time), the same
+    // rule as My Team + Team Live. The stored counter counted every call incl. personal numbers
+    // and tap-only audit rows (356 vs 65 for the sales head's team on 17 Nov).
+    const { count: realCalls } = salesUsers.length
+      ? await supabase.from('call_logs')
+          .select('id', { count: 'exact', head: true })
+          .in('user_id', salesUsers.map(u => u.id))
+          .gte('call_at', `${todayDate}T00:00:00+05:30`)
+          .gte('duration_seconds', 10)
+          .or('direction.is.null,direction.neq.missed')
+          .not('lead_id', 'is', null)
+      : { count: 0 }
     const rings = {
-      calls:    { done: sumCtr('calls'),    target: salesUsers.filter(u => idsToday.has(u.id)).reduce((a, u) => a + (Number(targetByUser[u.id]?.min_calls) || 0), 0) },
+      calls:    { done: realCalls || 0,    target: salesUsers.filter(u => idsToday.has(u.id)).reduce((a, u) => a + (Number(targetByUser[u.id]?.min_calls) || 0), 0) },
       meetings: { done: sumCtr('meetings'), target: salesUsers.filter(u => idsToday.has(u.id) && u.role === 'sales').length * 5 },
       quotes:   { done: repActivity.reduce((a, r) => a + r.sentToday, 0), target: salesUsers.filter(u => idsToday.has(u.id)).reduce((a, u) => a + (Number(targetByUser[u.id]?.min_quotes ?? 2) || 0), 0) },
     }
