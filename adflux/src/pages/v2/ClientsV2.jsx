@@ -50,6 +50,10 @@ export default function ClientsV2() {
   const navigate = useNavigate()
   const profile = useAuthStore(s => s.profile)
   const isAdmin = profile?.role === 'admin'
+  // Phase 587 - sales manager sees his reps' clients (read-only on theirs).
+  const isManager = !isAdmin && profile?.team_role === 'sales_manager'
+  const showTeam = isAdmin || isManager
+  const othersReadOnly = (c) => isManager && c?.created_by !== profile?.id
 
   const [clients, setClients] = useState([])
   const [userMap, setUserMap] = useState({}) // id → name (admin only)
@@ -109,7 +113,15 @@ export default function ClientsV2() {
     // embedding a users(name) join, because the join would require an
     // FK index and we want this list to stay fast. We also keep the
     // sales-only subset around for the rep filter dropdown.
-    if (isAdmin) {
+    if (isManager) {
+      const { data: users } = await supabase.from('users').select('id, name, role')
+        .or(`manager_id.eq.${profile.id},id.eq.${profile.id}`)
+      const map = {}
+      ;(users || []).forEach(u => { map[u.id] = u.name })
+      setUserMap(map)
+      setSalesUsers((users || []).filter(u => u.id !== profile.id)
+        .map(u => ({ id: u.id, name: u.name, role: u.role })))
+    } else if (isAdmin) {
       const { data: users } = await supabase.from('users').select('id, name, role')
       const map = {}
       ;(users || []).forEach(u => { map[u.id] = u.name })
@@ -132,7 +144,7 @@ export default function ClientsV2() {
     let list = clients
     // Admin-only rep filter — each client has ONE owner (created_by), so
     // filtering by created_by gives admin a single rep's book.
-    if (isAdmin && repFilter !== 'all') {
+    if (showTeam && repFilter !== 'all') {
       list = list.filter(c => c.created_by === repFilter)
     }
     if (!q) return list
@@ -142,7 +154,7 @@ export default function ClientsV2() {
       (c.phone   || '').toLowerCase().includes(q) ||
       (c.email   || '').toLowerCase().includes(q)
     )
-  }, [clients, search, isAdmin, repFilter])
+  }, [clients, search, showTeam, repFilter])
 
   function startNewQuoteForClient(c) {
     // Prefill Step1Client via router state. CreateQuoteV2 must read
@@ -266,6 +278,8 @@ export default function ClientsV2() {
           <div style={{ fontSize: 13, color: 'var(--v2-ink-2)' }}>
             {isAdmin
               ? 'All client records across the team.'
+              : isManager
+              ? "Your team's clients. You can edit only your own."
               : "Clients you've quoted. Edits here don't rewrite past quotes."}
           </div>
         </div>
@@ -282,7 +296,7 @@ export default function ClientsV2() {
         {/* Admin-only sales-rep filter — scope the list to one rep's
             book. Hidden for sales role (RLS already limits them to
             their own clients, so the dropdown would be a single option). */}
-        {isAdmin && salesUsers.length > 0 && (
+        {showTeam && salesUsers.length > 0 && (
           <select
             value={repFilter}
             onChange={e => setRepFilter(e.target.value)}
@@ -298,7 +312,7 @@ export default function ClientsV2() {
               cursor: 'pointer',
             }}
           >
-            <option value="all">All sales reps</option>
+            <option value="all">{isManager ? 'All my team' : 'All sales reps'}</option>
             {salesUsers.map(u => (
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
@@ -331,7 +345,7 @@ export default function ClientsV2() {
           a single rep's book at a glance. Falls back to all clients
           when the filter is "All sales reps" or for non-admin views. */}
       {(() => {
-        const scoped = (isAdmin && repFilter !== 'all')
+        const scoped = (showTeam && repFilter !== 'all')
           ? clients.filter(c => c.created_by === repFilter)
           : clients
         const wonTotal = scoped.reduce((s, c) => s + (Number(c.total_won_amount) || 0), 0)
@@ -339,7 +353,7 @@ export default function ClientsV2() {
           <>
           {!loading && (
             <V2Hero
-              eyebrow={(isAdmin && repFilter !== 'all') ? 'This rep\'s clients' : 'Client book'}
+              eyebrow={(showTeam && repFilter !== 'all') ? 'This rep\'s clients' : 'Client book'}
               value={formatCurrency(wonTotal)}
               label={`won from ${scoped.length} client${scoped.length === 1 ? '' : 's'}`}
             />
@@ -394,7 +408,7 @@ export default function ClientsV2() {
                   <th style={thStyleR}>Quotes</th>
                   <th style={thStyleR}>Total won</th>
                   <th style={thStyle}>Last quote</th>
-                  {isAdmin && <th style={thStyle}>Owner</th>}
+                  {showTeam && <th style={thStyle}>Owner</th>}
                   <th style={{ ...thStyleR, width: 140 }}>Actions</th>
                 </tr>
               </thead>
@@ -418,7 +432,7 @@ export default function ClientsV2() {
                     <td style={tdStyleR}>{c.quote_count || 0}</td>
                     <td style={tdStyleR}>{formatCurrency(c.total_won_amount)}</td>
                     <td style={tdStyle}>{formatDateShort(c.last_quote_at)}</td>
-                    {isAdmin && (
+                    {showTeam && (
                       <td style={tdStyle}>
                         <span style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>
                           {userMap[c.created_by] || (c.created_by ? '—' : 'Unassigned')}
@@ -427,14 +441,14 @@ export default function ClientsV2() {
                     )}
                     <td style={tdStyleR}>
                       <div style={{ display: 'inline-flex', gap: 6 }}>
-                        <button
+                        {!othersReadOnly(c) && <button
                           className="v2d-btn-ghost"
                           title="Edit client"
                           onClick={() => { setEditing({ ...c }); setSaveErr('') }}
                           style={iconBtnStyle}
                         >
                           <Edit3 size={14} />
-                        </button>
+                        </button>}
                         <button
                           className="v2d-btn-ghost"
                           title="New quote for this client"
@@ -449,7 +463,7 @@ export default function ClientsV2() {
                             not discoverable. confirmDialog blocks
                             accidental nuke + shows quote-reference
                             count. */}
-                        <button
+                        {!othersReadOnly(c) && <button
                           className="v2d-btn-ghost"
                           title="Delete client"
                           onClick={() => handleDelete(c)}
@@ -459,7 +473,7 @@ export default function ClientsV2() {
                           }}
                         >
                           <Trash2 size={14} />
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   </tr>
