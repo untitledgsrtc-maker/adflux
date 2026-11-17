@@ -68,6 +68,11 @@ export default function QuotesV2() {
   // owner / co_owner roles.
   // Phase 11i — owner role removed; admin + co_owner is the privileged set.
   const isAdmin = ['admin', 'co_owner'].includes(profile?.role)
+  // Phase 583 — a sales manager sees his team's quotes, so he gets the rep filter + team labels.
+  const showTeam = isAdmin || profile?.team_role === 'sales_manager'
+  // Phase 583 — a sales manager only reads his reps' quotes (quotes_manager_read is SELECT-only),
+  // so Edit / Delete show only on his OWN quotes. A Sales Head (is_sales_head) keeps her edit path.
+  const othersReadOnly = (q) => !isAdmin && profile?.team_role === 'sales_manager' && profile?.is_sales_head !== true && q?.created_by !== profile?.id
 
   const { quotes, filters, setFilters, resetFilters, fetchQuotes } = useQuotes()
   const [loading, setLoading] = useState(true)
@@ -117,6 +122,7 @@ export default function QuotesV2() {
   function canDeleteQuote(q) {
     if (!q) return false
     if (teamViewing) return false   // Phase 247.3 — team view is READ-ONLY
+    if (othersReadOnly(q)) return false   // Phase 583
     const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
     if (q.status === 'won') {
       // Won always blocked when payments present. Trigger does the
@@ -258,9 +264,9 @@ export default function QuotesV2() {
   // to one rep, the tabs show that rep's status breakdown (otherwise
   // "Won 7" lies when the table only renders 3 of theirs).
   const repScoped = useMemo(() => {
-    if (!isAdmin || repFilter === 'all') return segmentScoped
+    if (!showTeam || repFilter === 'all') return segmentScoped
     return segmentScoped.filter(q => q.created_by === repFilter)
-  }, [segmentScoped, isAdmin, repFilter])
+  }, [segmentScoped, showTeam, repFilter])
 
   const counts = useMemo(() => (
     QUOTE_STATUSES.reduce((acc, s) => {
@@ -310,9 +316,9 @@ export default function QuotesV2() {
   // this — RLS limits them to their own rows already, so the filter
   // is admin-only).
   const displayed = useMemo(() => {
-    if (!isAdmin || repFilter === 'all') return sorted
+    if (!showTeam || repFilter === 'all') return sorted
     return sorted.filter(q => q.created_by === repFilter)
-  }, [sorted, isAdmin, repFilter])
+  }, [sorted, showTeam, repFilter])
 
   // Totals strip — recomputed against the displayed (filtered) set so
   // when admin scopes to one rep they see that rep's totals only.
@@ -378,9 +384,9 @@ export default function QuotesV2() {
           : 100
         return (
           <V2Hero
-            eyebrow={isAdmin ? 'Team quotes' : 'Your pipeline'}
+            eyebrow={showTeam ? 'Team quotes' : 'Your pipeline'}
             value={formatCurrency(totals.amount)}
-            label={`${totals.count} quote${totals.count === 1 ? '' : 's'}${(hasActiveFilters || (isAdmin && repFilter !== 'all')) ? ' · filtered' : ''}`}
+            label={`${totals.count} quote${totals.count === 1 ? '' : 's'}${(hasActiveFilters || (showTeam && repFilter !== 'all')) ? ' · filtered' : ''}`}
             percent={totals.amount > 0 ? collectPct : undefined}
             footerStats={totals.amount > 0 ? [
               { label: 'collected',   value: formatCurrency(collected),         tint: '#2BD8A0' },
@@ -396,14 +402,14 @@ export default function QuotesV2() {
       <div className="v2d-page-head">
         <div>
           <div className="v2d-page-kicker">
-            {isAdmin ? 'All team quotes' : 'Your pipeline'}
+            {showTeam ? 'All team quotes' : 'Your pipeline'}
           </div>
           <h1 className="v2d-page-title">
-            {isAdmin ? 'Quotes' : 'My Quotes'}
+            {showTeam ? 'Quotes' : 'My Quotes'}
           </h1>
           <div className="v2d-page-sub">
             {repScoped.length} quote{repScoped.length !== 1 ? 's' : ''}
-            {(hasActiveFilters || (isAdmin && repFilter !== 'all')) ? ' · filtered' : ''}
+            {(hasActiveFilters || (showTeam && repFilter !== 'all')) ? ' · filtered' : ''}
           </div>
         </div>
         <button className="v2d-cta" onClick={() => navigate('/quotes/new')}>
@@ -510,7 +516,7 @@ export default function QuotesV2() {
             Phase 279 — Media moved out to the visible pill row above. */}
         <FilterDrawer fields={[
           // Admin-only rep filter.
-          ...(isAdmin && repOptions.length > 0 ? [{
+          ...(showTeam && repOptions.length > 0 ? [{
             key: 'rep',
             label: 'Sales rep',
             value: repFilter,
@@ -523,7 +529,7 @@ export default function QuotesV2() {
           }] : []),
         ]} />
 
-        {(hasActiveFilters || (isAdmin && repFilter !== 'all') || segmentFilter !== 'all' || mediaFilter !== 'all') && (
+        {(hasActiveFilters || (showTeam && repFilter !== 'all') || segmentFilter !== 'all' || mediaFilter !== 'all') && (
           <button className="v2d-ghost" onClick={() => {
             handleReset(); setRepFilter('all'); setSegmentFilter('all'); setMediaFilter('all')
           }}>
@@ -538,7 +544,7 @@ export default function QuotesV2() {
       <ActiveFilterChips fields={[
         // Phase 142B — segment chip dropped (the pill shows + clears it).
         // Phase 279 — media chip dropped too (now a visible pill row, same reason).
-        ...(isAdmin && repOptions.length > 0 ? [{
+        ...(showTeam && repOptions.length > 0 ? [{
           key: 'rep', label: 'Sales rep',
           value: repFilter, defaultValue: 'all',
           options: repOptions.map(r => ({ value: r.id, label: r.name })),
@@ -609,7 +615,7 @@ export default function QuotesV2() {
                   <Th field="quote_number" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Quote #</Th>
                   <Th field="client_company" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Company</Th>
                   <Th field="client_name"  sortField={sortField} sortDir={sortDir} onSort={handleSort}>Contact</Th>
-                  {isAdmin && (
+                  {showTeam && (
                     <Th field="sales_person_name" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Sales Rep</Th>
                   )}
                   <Th field="total_amount" sortField={sortField} sortDir={sortDir} onSort={handleSort} right>Amount</Th>
@@ -646,7 +652,7 @@ export default function QuotesV2() {
                         column shows the named individual. */}
                     <td style={{ fontWeight: 600 }}>{truncate(q.client_company || '—', 24)}</td>
                     <td>{q.client_name}</td>
-                    {isAdmin && <td>{q.sales_person_name || '—'}</td>}
+                    {showTeam && <td>{q.sales_person_name || '—'}</td>}
                     <td className="num">{formatCurrency(q.total_amount)}</td>
                     <td><StatusChip status={q.status} quote={q} /></td>
                     <td>
@@ -672,7 +678,7 @@ export default function QuotesV2() {
                         so these don't double-fire navigate. */}
                     <td>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {(!teamViewing || isSalesHead) && q.status !== 'lost' && (isSalesHead ? q.status !== 'won' : true) && (
+                        {(!teamViewing || isSalesHead) && !othersReadOnly(q) && q.status !== 'lost' && (isSalesHead ? q.status !== 'won' : true) && (
                           <button
                             type="button"
                             className="v2d-ghost"
@@ -775,7 +781,7 @@ export default function QuotesV2() {
                       borderTop: '1px solid var(--v2-line, #1f2741)',
                       paddingTop: 10,
                     }}>
-                      {(!teamViewing || isSalesHead) && q.status !== 'lost' && (isSalesHead ? q.status !== 'won' : true) && (
+                      {(!teamViewing || isSalesHead) && !othersReadOnly(q) && q.status !== 'lost' && (isSalesHead ? q.status !== 'won' : true) && (
                         <button
                           type="button"
                           className="v2d-ghost"

@@ -141,6 +141,8 @@ export default function LeadsV2() {
   const profile = useAuthStore(s => s.profile)
   const isAdmin = profile?.role === 'admin'
   const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
+  // Phase 583 — a sales manager's list is his team's, so he gets the rep filter + team labels.
+  const showTeam = isAdmin || profile?.team_role === 'sales_manager'
   // Phase 247.2 — a per-user team viewer (can_view_team_dashboard) can flip to
   // ALL reps' leads (READ-ONLY) via a toggle; default stays her own (RLS). Never
   // for admin (they already see all) or a normal rep (no flag → no toggle).
@@ -643,7 +645,7 @@ export default function LeadsV2() {
         ],
       })
     }
-    if (isPrivileged && distinctReps.length > 0) {
+    if ((isPrivileged || showTeam) && distinctReps.length > 0) {
       fields.push({
         key: 'rep',
         label: 'Assigned',
@@ -834,7 +836,7 @@ export default function LeadsV2() {
           expected pipeline; chip = won/lost split; right = win-rate. */}
       {leads.length > 0 && (
         <V2Hero
-          eyebrow={isAdmin ? 'Team pipeline' : 'My pipeline'}
+          eyebrow={showTeam ? 'Team pipeline' : 'My pipeline'}
           value={formatCurrency(totals.value)}
           label={`${totals.total} lead${totals.total === 1 ? '' : 's'}${winRate != null ? ` · win-rate` : ''}`}
           // Phase 35.1 — design-rule rollout: ring + footer stats
@@ -855,7 +857,7 @@ export default function LeadsV2() {
       <div className="lead-page-head">
         <div>
           <div className="lead-page-title">
-            {isAdmin ? 'Leads' : 'My Leads'}
+            {showTeam ? 'Leads' : 'My Leads'}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -969,7 +971,7 @@ export default function LeadsV2() {
           privileged users (admin / co_owner) and only when there's
           more than one rep with leads. Click a chip → filter the list
           to that rep's leads. Click the active chip again to clear. */}
-      {isPrivileged && distinctReps.length > 1 && (
+      {(isPrivileged || showTeam) && distinctReps.length > 1 && (
         <div style={{
           display: 'flex', gap: 8, flexWrap: 'wrap',
           marginBottom: 10, alignItems: 'center',
@@ -1238,7 +1240,7 @@ export default function LeadsV2() {
                 <th>Stage</th>
                 <th>Segment</th>
                 <th>Source</th>
-                {(isPrivileged || teamViewing) && <th>Assigned</th>}
+                {(isPrivileged || teamViewing || showTeam) && <th>Assigned</th>}
                 <th>Last</th>
                 <th style={{ textAlign: 'center' }} title="Total calls to this lead">Calls</th>
                 <th style={{ textAlign: 'center' }} title="Total in-app presentation time">Pres.</th>
@@ -1431,7 +1433,7 @@ export default function LeadsV2() {
                   <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     {l.source || '—'}
                   </td>
-                  {(isPrivileged || teamViewing) && (
+                  {(isPrivileged || teamViewing || showTeam) && (
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {l.assigned?.name ? (

@@ -65,7 +65,9 @@ export function useQuotes() {
         .select('*, payments(amount_received, approval_status), follow_ups(follow_up_date, is_done)')
         .order('created_at', { ascending: false })
       // Phase 11g — agency behaves like sales: own quotes only; admin sees all.
-      if (profile?.role === 'sales' || profile?.role === 'agency') {
+      // Phase 583: a sales manager (team_role) loads everything RLS lets him read:
+      // his own + his assigned reps' PRIVATE quotes (quotes_manager_read, Phase 564).
+      if ((profile?.role === 'sales' || profile?.role === 'agency') && profile?.team_role !== 'sales_manager') {
         q = q.eq('created_by', profile.id)
       }
       if (filters.status) q = q.eq('status', filters.status)
