@@ -446,7 +446,7 @@ export function TeamActivityPanel({ managerId } = {}) {
       }}>
         <div style={{ fontSize: 13, fontWeight: 600 }}>Today's team activity</div>
         <div style={{ fontSize: 12, color: 'var(--v2-ink-2, rgba(255,255,255,.40))', marginTop: 2 }}>
-          {Array.from(data.sessions.values()).filter(s => s.check_in_at).length} of {data.team.length} field staff checked in
+          {data.team.filter(u => data.sessions.get(u.id)?.check_in_at).length} of {data.team.length} field staff checked in
         </div>
       </div>
       <div className="v2d-team-scroll">
