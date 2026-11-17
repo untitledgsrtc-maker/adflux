@@ -74,6 +74,7 @@ export default function OpsTechApp() {
   const [openId, setOpenId] = useState(null)
   const [bell, setBell] = useState(false)
   const [ft, setFt] = useState('open')
+  const [cityQ, setCityQ] = useState('')   // Phase 600 - city search on the Faults / Camera lists
   const [vp, setVp] = useState('off')
   const [sheet, setSheet] = useState(null)
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine)
@@ -242,12 +243,15 @@ export default function OpsTechApp() {
       <CoachEvening />
     </div>
   } else if (tab === 'faults' || tab === 'cams') {
+    const qq = cityQ.trim().toLowerCase()
     const pool = faults.filter(f => (f.src === 'cam') === (tab === 'cams'))
+      .filter(f => !qq || String(stById[f.st]?.name || '').toLowerCase().includes(qq))   // station name carries the city
     const list = pool.filter(f => ft === 'open' ? ['open', 'cant'].includes(f.status) : ft === 'work' ? f.status === 'work' : f.status === 'fixed')
     const cnt = k => pool.filter(f => k === 'open' ? ['open', 'cant'].includes(f.status) : k === 'work' ? f.status === 'work' : f.status === 'fixed').length
     body = <div style={{ display: 'grid', gap: 14 }}>
+      <input className="inp" type="search" inputMode="search" placeholder="શહેર શોધો · Search city" aria-label="Search city" value={cityQ} onChange={e => setCityQ(e.target.value)} />
       <Seg full value={ft} onChange={setFt} opts={['open', 'work', 'fixed'].map(k => [k, <Bi g={STAT[k][0]} e={<><span className="num">{cnt(k)}</span> {STAT[k][1]}</>} />])} />
-      {list.length === 0 && <div className="card" style={{ padding: 18 }}><Bi g="અહીં કંઈ નથી" e="Nothing here" /></div>}
+      {list.length === 0 && <div className="card" style={{ padding: 18 }}>{qq ? <Bi g="આ શહેરમાં કંઈ નથી" e={`Nothing for "${cityQ.trim()}"`} /> : <Bi g="અહીં કંઈ નથી" e="Nothing here" />}</div>}
       {list.map(f => <VisitCard key={f.id} f={f} st={stById[f.st]} onOpen={() => setOpenId(f.id)} />)}
       <Btn lg full icon="plus" onClick={() => setSheet({ k: 'log' })}><G t="ચાલુ સ્ક્રીનમાં સમસ્યા · Problem on a working screen" /></Btn>
     </div>
@@ -327,6 +331,8 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
   const issue = d.issues.find(x => x.id === reason)
   const contacts = d.contacts.filter(c => c.depot_id === st.id)
   const callList = reason ? contactsFor(issue?.issue_en, contacts) : []
+  // Phase 600 - suggested numbers for the picked fault first, then every other station number
+  const callAll = reason ? [...callList, ...contacts.filter(c => !callList.some(x => x.id === c.id))] : contacts
   const isJob = f.src === 'photo'
   const guard = async (fn) => { if (lock.current || busy) return; lock.current = true; setBusy(true); try { await fn() } catch (e) { show({ t: e?.message || 'Failed', icon: 'alert' }) } finally { lock.current = false; setBusy(false) } }
 
@@ -398,7 +404,7 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
         {screensPick}
         {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="શું ખરાબી છે? · What is wrong" /></span><ReasonGrid issues={d.issues} value={reason} onPick={setReason} /></section>}
         {issue && f.status === 'open' && issue.solution_en && <div className="okrow"><Ic n="check" /><Bi g={issue.solution_gu || issue.solution_en} e={issue.solution_en} /></div>}
-        {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="row" style={{ justifyContent: 'space-between' }}><span className="lbl"><G t="3 · કોને કૉલ કરવો · Who to call" /></span><Btn sm icon="plus" onClick={() => setAddNum(true)}><G t="નવો નંબર · Add number" /></Btn></span>{(reason ? callList : contacts).length ? (reason ? callList : contacts).map(c => <CallBtn key={c.id} c={c} onCall={doCall} />) : <div className="warnrow"><Ic n="alert" /><Bi g="આ સ્ટેશનનો કોઈ નંબર નથી" e="No number saved for this station. Add one." /></div>}</section>}
+        {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="row" style={{ justifyContent: 'space-between' }}><span className="lbl"><G t="3 · કોને કૉલ કરવો · Who to call" /></span><Btn sm icon="plus" onClick={() => setAddNum(true)}><G t="નવો નંબર · Add number" /></Btn></span>{callAll.length ? callAll.map(c => <CallBtn key={c.id} c={c} onCall={doCall} />) : <div className="warnrow"><Ic n="alert" /><Bi g="આ સ્ટેશનનો કોઈ નંબર નથી" e="No number saved for this station. Add one." /></div>}</section>}
         {addNum && <DepotContactsModal depot={{ id: st.id, name: st.name }} lang={(typeof localStorage !== 'undefined' && localStorage.getItem('ops2_lang')) || 'en'} meId={uid} onClose={() => setAddNum(false)} onChanged={() => reload()} />}
         {f.status === 'open' && <div style={{ display: 'grid', gap: 10 }}>
           <Photo label={<Bi g="પહેલાંનો ફોટો (વૈકલ્પિક)" e="Before photo (optional)" />} file={before} onFile={setBefore} />
@@ -408,7 +414,8 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
           {f.tickets.some(t => /Reached station/i.test(t.notes || '')) ? <div className="okrow"><Ic n="navi" /><Bi g="સ્ટેશને પહોંચ્યા" e="Reached station" /></div> : <Btn lg full icon="navi" disabled={busy} onClick={reached}><G t="હું સ્ટેશને પહોંચ્યો · I reached" /></Btn>}
           <div className="mu sm" style={{ textAlign: 'center' }}>{f.scrIds.filter(id => st.scr.find(s => s.id === id)?.status === 'online').length} / {f.scrIds.length} પાછા ચાલુ · back online. 30 મિનિટ ચાલુ રહે તો આપમેળે ઠીક.</div>
           {f.status === 'work' && <Btn kind="pri" lg full icon="camera" onClick={() => setSheet('fix')}><G t="ઠીક થયું · Fixed" /></Btn>}
-          {callList.length > 0 || contacts.length > 0 ? <Btn lg full icon="phone" onClick={() => contacts[0] && doCall(contacts[0])}><G t="ફરી કૉલ કરો · Call again" /></Btn> : null}
+          {/* Phase 600 - every number for this station (was one 'Call again' to the first number only) */}
+          <section style={{ display: 'grid', gap: 10 }}><span className="row" style={{ justifyContent: 'space-between' }}><span className="lbl"><G t="સ્ટેશનના નંબર · Station numbers" /></span><Btn sm icon="plus" onClick={() => setAddNum(true)}><G t="નવો નંબર · Add number" /></Btn></span>{contacts.length ? contacts.map(c => <CallBtn key={c.id} c={c} onCall={doCall} />) : <div className="warnrow"><Ic n="alert" /><Bi g="આ સ્ટેશનનો કોઈ નંબર નથી" e="No number saved for this station. Add one." /></div>}</section>
           {f.status === 'work' && <Btn kind="wa" lg full icon="flag" onClick={() => setSheet('cant')}><G t="ઠીક ન થાય – ઓફિસને કહો · Can’t fix" /></Btn>}</div>}
         {f.status === 'cant' && <div className="warnrow"><Ic n="flag" s={22} /><Bi g="ઓફિસને મોકલ્યું" e={f.cant || 'Sent to the office'} /></div>}
         {f.status === 'fixed' && <div className="okrow big"><Ic n="checkc" s={24} /><Bi g="ઠીક થયું" e="Fixed" /></div>}
