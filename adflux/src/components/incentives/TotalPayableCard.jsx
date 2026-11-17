@@ -97,7 +97,9 @@ export default function TotalPayableCard() {
       const variable = Number(salary.variable || 0)
       // variable_cap not in RPC payload — compute from monthly_salary
       // (30% cap) for the muted-helper line.
-      const variableCap = Number(myProfile?.monthly_salary || 0) * 0.30
+      // Phase 593 - base is pro-rated from the joining date (monthly_score, Phase 585),
+      // so derive the cap from it (30/70) to show the same cap as the score card.
+      const variableCap = base > 0 ? Math.round(base * 0.30 / 0.70) : Number(myProfile?.monthly_salary || 0) * 0.30
       const taDaTotal = Number(salary.ta_da || 0)
       const leaveUnpaid = Number(salary.leave_days_unpaid || 0)
       const unpaidDeduction = Number(salary.unpaid_deduction || 0)

@@ -45,7 +45,9 @@ export function MyPerformance() {
   // Phase 163 (Issue 2) — default to the IST current month (see buildMonthOptions).
   const [selectedMonth, setSelectedMonth] = useState(() => istCurrentMonthYM())
 
-  const monthOptions = buildMonthOptions()
+  // Phase 593 - no months before the joining date (same as the salary slips list).
+  const joinYm = myProfile?.join_date ? String(myProfile.join_date).slice(0, 7) : null
+  const monthOptions = buildMonthOptions().filter(m => !joinYm || m >= joinYm || m === selectedMonth)
 
   useEffect(() => {
     async function load() {
