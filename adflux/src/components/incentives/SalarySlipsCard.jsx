@@ -96,7 +96,14 @@ export default function SalarySlipsCard() {
       // any FULLY-PAID month. One row per month; a payout attaches its amount/date, else null.
       const paidMap = new Map()
       for (const r of data || []) if (!paidMap.has(r.month_year)) paidMap.set(r.month_year, r)
-      const months = new Set([...recentMonths(4), ...paidMap.keys()])
+      // Phase 585 — no slips for months before the person joined (joining date from their
+      // incentive profile; if it can't be read for this role, nothing is filtered).
+      const { data: sip } = await supabase.from('staff_incentive_profiles')
+        .select('join_date').eq('user_id', profile.id).maybeSingle()
+      if (cancelled) return
+      const joinYm = sip?.join_date ? String(sip.join_date).slice(0, 7) : null
+      const recent = recentMonths(4).filter((my) => !joinYm || my >= joinYm)
+      const months = new Set([...recent, ...paidMap.keys()])
       const list = [...months].sort().reverse().map((my) => ({ month_year: my, payout: paidMap.get(my) || null }))
       setRows(list)
     })()

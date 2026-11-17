@@ -17,7 +17,7 @@ import { istCurrentMonthYM } from '../../utils/istDate'
 // Phase 33L (F5 fix) — inline 6-month sparkline. Pulls from
 // score_history RPC. Renders bars instead of a chart library to
 // stay zero-dependency. Tap a bar → tooltip.
-function ScoreSparkline({ userId }) {
+function ScoreSparkline({ userId, markEmpty = true }) {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   useEffect(() => {
@@ -49,14 +49,19 @@ function ScoreSparkline({ userId }) {
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 56 }}>
         {history.map((m, i) => {
           const pct = Number(m.avg_score_pct) || 0
-          const barColor = pct < 50 ? 'var(--danger)'
+          // Phase 585 — a month with no working days (before joining, or nothing counted) has no
+          // real score; the RPC returns 100 for it. Show a grey stub + "—" instead of a fake 100%.
+          // (Work team: working_days = counted tasks and 0 tasks pays the full variable, so it is not 'no data'.)
+          const noData = markEmpty && Number(m.working_days || 0) === 0
+          const barColor = noData ? 'var(--border-strong, #475569)'
+                         : pct < 50 ? 'var(--danger)'
                          : pct >= 90 ? 'var(--success)'
                          : 'var(--accent, #FFE600)'
           const isCurrent = i === history.length - 1
           return (
             <div
               key={m.month_start}
-              title={`${m.month_label}: ${pct.toFixed(0)}% · ₹${new Intl.NumberFormat('en-IN').format(Math.round(m.total_payable || 0))}`}
+              title={noData ? `${m.month_label}: no working days` : `${m.month_label}: ${pct.toFixed(0)}% · ₹${new Intl.NumberFormat('en-IN').format(Math.round(m.total_payable || 0))}`}
               style={{
                 flex: 1, display: 'flex', flexDirection: 'column',
                 alignItems: 'center', gap: 4,
@@ -64,7 +69,7 @@ function ScoreSparkline({ userId }) {
             >
               <div style={{
                 width: '100%',
-                height: `${Math.max(2, pct * 0.4)}px`,
+                height: noData ? '2px' : `${Math.max(2, pct * 0.4)}px`,
                 background: barColor,
                 borderRadius: '3px 3px 0 0',
                 opacity: isCurrent ? 1 : 0.7,
@@ -79,7 +84,7 @@ function ScoreSparkline({ userId }) {
                 fontSize: 12, fontFamily: 'inherit',
                 color: 'var(--text-muted)',
               }}>
-                {pct.toFixed(0)}%
+                {noData ? '—' : `${pct.toFixed(0)}%`}
               </div>
             </div>
           )
@@ -369,7 +374,7 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader, r
 
       {/* Phase 33L (F5 fix) — 6-month sparkline. Gives reps the trend
           line that was lost when MyPerformanceView was removed. */}
-      {!isAgency && <ScoreSparkline userId={userId} />}
+      {!isAgency && <ScoreSparkline userId={userId} markEmpty={profile?.role !== 'staff'} />}
     </div>
   )
 }
