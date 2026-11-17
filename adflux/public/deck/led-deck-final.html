@@ -3994,8 +3994,11 @@ section.slide[data-i="5"]{ overflow-y:auto !important; overflow-x:hidden; -webki
       "Hi,\n\n" +
       "Sharing Untitled Advertising's GSRTC bus-station LED screen network — soundless LED screens across 20 bus stations, AI cameras + QR-scan tracking that prove who actually sees every ad.\n\n" +
       "264 screens · 20 cities · 700+ brands.\n\n" +
-      "Call: 98982 73686\n" +
-      "WhatsApp: https://wa.me/919581578261\n";
+      (window.__deckRep   // Phase 598 - presenting rep's number when the app passed one
+        ? "Call " + window.__deckRep.name + ": " + window.__deckRep.disp + "\n" +
+          "WhatsApp: https://wa.me/91" + window.__deckRep.ten + "\n"
+        : "Call: 98982 73686\n" +
+          "WhatsApp: https://wa.me/919581578261\n");
     window.location.href = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
   });
 })();
@@ -4116,6 +4119,10 @@ window.DECK_VIDEOS = window.DECK_VIDEOS || {};
       if(call){ call.setAttribute('href','tel:+91'+ten); var rv=call.querySelector('.s13-rv'); if(rv) rv.textContent=disp; }
       var ph=q('.s11-phone'); if(ph) ph.textContent='Call '+disp;
       var wa=q('a.s13-pill.ghost'); if(wa) wa.setAttribute('href','https://wa.me/91'+ten);
+      // Phase 598 - "Get a quote" opens WhatsApp to the presenting rep (was the app's quote
+      // form, which a client can't use); the share email carries the rep's number too.
+      var gq=q('a.s13-pill.prime'); if(gq) gq.setAttribute('href','https://wa.me/91'+ten+'?text='+encodeURIComponent("Hi "+name+", I'd like a quote for the GSRTC LED screens."));
+      window.__deckRep = { ten: ten, disp: disp, name: name };
     }
     if(c.email){
       var em=q('a.s13-row[href^="mailto:"]');
