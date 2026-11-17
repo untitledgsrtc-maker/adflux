@@ -417,12 +417,14 @@ export function V2AppShell() {
     try {
       localStorage.setItem('deck_contact', JSON.stringify({
         name:  profile.name,
-        phone: profile.phone || profile.mobile || '',
+        // Phase 597 - users has no phone/mobile column (was always blank -> deck showed the
+        // company number for every rep). signature_mobile = the number on proposals.
+        phone: profile.signature_mobile || profile.whatsapp_number || '',
         email: profile.email || '',
         city:  profile.city || '',
       }))
     } catch { /* localStorage blocked — deck keeps the default contact */ }
-  }, [profile?.name, profile?.phone, profile?.mobile, profile?.email, profile?.city])
+  }, [profile?.name, profile?.signature_mobile, profile?.whatsapp_number, profile?.email, profile?.city])
 
   const navigate = useNavigate()
   const location = useLocation()
