@@ -240,14 +240,18 @@ function Network({ faults, live, needs, stations, openF, openS, go, onHours, off
 
 function Faults({ faults, openF, techList, techName }) {
   const [st, setSt] = useState('open'); const [src, setSrc] = useState('all'); const [tf, setTf] = useState('')
-  const c = k => faults.filter(f => f.status === k).length
-  const list = faults.filter(f => f.status === st && (src === 'all' || f.src === src) && (!tf || f.tech === tf)).sort((a, b) => !!b.esc - !!a.esc || b.age - a.age)
+  const [cityQ, setCityQ] = useState('')   // Phase 600 - city search (station name carries the city)
+  const qq = cityQ.trim().toLowerCase()
+  const shown = qq ? faults.filter(f => String(f.stName || '').toLowerCase().includes(qq)) : faults
+  const c = k => shown.filter(f => f.status === k).length
+  const list = shown.filter(f => f.status === st && (src === 'all' || f.src === src) && (!tf || f.tech === tf)).sort((a, b) => !!b.esc - !!a.esc || b.age - a.age)
   const cols = 'minmax(0,1.7fr) 150px 130px 100px minmax(0,1.3fr) minmax(0,2fr)'
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <Hero icon="list" eyebrow="Open faults" value={c('open') + c('work') + c('cant')} sub={`${c('open')} not started · ${c('work')} in process · ${c('cant')} can't fix · ${c('fixed')} fixed today`} />
       <div className="row" style={{ gap: 12, flexWrap: 'wrap', justifyContent: 'space-between' }}>
         <Seg value={st} onChange={setSt} opts={['open', 'work', 'cant', 'fixed'].map(k => [k, <>{STAT[k][0]} <span className="num">{c(k)}</span></>])} />
+        <input className="inp" type="search" style={{ width: 230 }} placeholder="Search city" aria-label="Search city" value={cityQ} onChange={e => setCityQ(e.target.value)} />
         <div style={{ width: 230 }}><Sel label="Technician" value={tf} onChange={setTf} opts={[['', 'All technicians'], ...techList.map(t => [t.id, t.n])]} /></div>
       </div>
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>{[['all', 'All sources', 'grid'], ...Object.entries(SRC).map(([k, v]) => [k, v[0], v[1]])].map(([k, l, i]) => <button key={k} className={'chip' + (src === k ? ' on' : '')} onClick={() => setSrc(k)}><Ic n={i} s={16} />{l}</button>)}</div>
@@ -386,19 +390,27 @@ function FaultPanel({ f, stations, d, techList, techName, onClose, openScr, show
       {f.esc && <div className={f.escT === 'da' ? 'errrow' : 'warnrow'}><Ic n="flag" /><span>{f.esc}</span></div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>{[['Technician', f.tech ? techName(f.tech) : 'None'], ['What is wrong', reasonOf || 'Not picked yet'], ['Opened', f.tickets[0] ? `${dd(f.tickets[0].created_at)} ${hhmm(f.tickets[0].created_at)}` : '–'], ['Notes', f.tickets[0]?.notes || f.note || '–']].map(([l, v]) => <div key={l}><div className="lbl">{l}</div><div>{v}</div></div>)}</div>
       {f.scr.length > 0 && <div style={{ display: 'grid', gap: 8 }}><span className="lbl">Screens</span><div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>{f.scr.map(n => <Btn key={n} sm icon="mon" onClick={() => openScr(st, n)}>{scrLabel(n)}</Btn>)}</div></div>}
+      {f.st && <StationNumbers depotId={f.st} />}
     </Sheet>
   )
 }
 
-function StationPanel({ s, onClose, openScr, techName, onHours }) {
+// Phase 600 - every saved number for a station; shared by the station view and the fault detail.
+function StationNumbers({ depotId }) {
   const [contacts, setContacts] = useState(null)
-  useEffect(() => { let on = true; supabase.from('ops_depot_contacts').select('id, role_en, name, phone, display_order').eq('depot_id', s.id).order('display_order').then(({ data }) => on && setContacts(data || [])); return () => { on = false } }, [s.id])
+  useEffect(() => { let on = true; supabase.from('ops_depot_contacts').select('id, role_en, name, phone, display_order').eq('depot_id', depotId).order('display_order').then(({ data }) => on && setContacts(data || [])); return () => { on = false } }, [depotId])
+  return (
+    <div style={{ display: 'grid', gap: 4 }}><span className="lbl">Who to call</span>
+      {contacts === null ? <div className="mu">Loading...</div> : contacts.length ? contacts.map(c => <div key={c.id} className="row" style={{ gap: 12, minHeight: 48 }}><Tile n="phone" tone="ok" s={32} /><div style={{ flex: 1 }}><div>{c.name || c.role_en}</div><div className="mu sm">{c.name ? c.role_en : ''}</div></div><Btn sm icon="phone" onClick={() => dialPhone(c.phone)}>{c.phone}</Btn></div>) : <div className="mu">No numbers added yet.</div>}</div>
+  )
+}
+
+function StationPanel({ s, onClose, openScr, techName, onHours }) {
   return (
     <Sheet side title={s.name} sub={`${s.n} screens · ${s.assigned_to ? techName(s.assigned_to) : 'No technician'}`} onClose={onClose}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 8 }}>{s.scr.map(x => <ScrTile key={x.id} n={x.n} st={!onHours ? 'rest' : x.status === 'offline' ? 'off' : 'on'} onClick={() => openScr(s, x.n)} />)}</div>
       <div className="mu sm">Tap a screen for its profile.</div>
-      <div style={{ display: 'grid', gap: 4 }}><span className="lbl">Who to call</span>
-        {contacts === null ? <div className="mu">Loading...</div> : contacts.length ? contacts.map(c => <div key={c.id} className="row" style={{ gap: 12, minHeight: 48 }}><Tile n="phone" tone="ok" s={32} /><div style={{ flex: 1 }}><div>{c.name || c.role_en}</div><div className="mu sm">{c.name ? c.role_en : ''}</div></div><Btn sm icon="phone" onClick={() => dialPhone(c.phone)}>{c.phone}</Btn></div>) : <div className="mu">No numbers added yet.</div>}</div>
+      <StationNumbers depotId={s.id} />
     </Sheet>
   )
 }
