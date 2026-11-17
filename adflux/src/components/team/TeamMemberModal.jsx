@@ -1,6 +1,6 @@
 // src/components/team/TeamMemberModal.jsx
 // Admin creates team member with password — no email invite, no session switch
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { supabase, supabaseSignup } from '../../lib/supabase'
 import { useTeam } from '../../hooks/useTeam'
@@ -35,6 +35,22 @@ const SEGMENT_SCOPES = [
   { value: 'GOVERNMENT', label: 'Government only (DAVP / GSRTC)' },
   { value: 'PRIVATE',    label: 'Private only (LED clients)' },
 ]
+
+// Phase 581 — role labels for roles the dropdown above does not offer, so the
+// box shows a person's REAL role instead of silently showing "Sales".
+const OTHER_ROLE_LABELS = {
+  co_owner: 'Co-owner', hr: 'HR', accounts: 'Accounts', office_admin: 'Office admin',
+  staff: 'Office staff', operation_executive: 'Operations technician', operation_head: 'Operations head',
+}
+
+// Phase 581 — Indian mobile: keep the 10 digits ('+91 98980 12345' -> '9898012345').
+// Returns '' for blank, null for anything that is not a 10-digit number.
+function cleanMobile(v) {
+  const d = String(v || '').replace(/\D/g, '')
+  if (!d) return ''
+  const ten = d.length === 12 && d.startsWith('91') ? d.slice(2) : d.length === 11 && d.startsWith('0') ? d.slice(1) : d
+  return /^[6-9]\d{9}$/.test(ten) ? ten : null
+}
 
 function Field({ label, required, error, hint, children }) {
   return (
@@ -72,7 +88,16 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
     // users.id with validation trigger). Used only when role='agency'.
     // Empty string = unassigned; admin must pick from signers list.
     default_signer_user_id: member?.default_signer_user_id || '',
+    // Phase 581 — contact details, editable after creation.
+    whatsapp_number:  member?.whatsapp_number || '',
+    signature_mobile: member?.signature_mobile || '',
+    city:             member?.city || '',
   })
+  // Phase 581 — the row as stored when the box opened (fresh read). Edit saves
+  // only what differs from it, so a field the caller's list did not load
+  // (e.g. designation from the person page) is never blanked.
+  const original = useRef(null)
+  const [freshLoading, setFreshLoading] = useState(mode === 'edit')
   const [errors, setErrors]           = useState({})
   const [saving, setSaving]           = useState(false)
   const [serverError, setServerError] = useState('')
@@ -88,6 +113,35 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
     setForm(f => ({ ...f, [field]: value }))
     setErrors(e => ({ ...e, [field]: '' }))
   }
+
+  // Phase 581 — on edit, read the person's current row (the list / person page
+  // hands in a partial or stale object).
+  useEffect(() => {
+    if (mode !== 'edit' || !member?.id) return
+    let cancelled = false
+    supabase.from('users')
+      .select('id, name, role, team_role, designation, segment_access, agency_commission_percent, default_signer_user_id, whatsapp_number, signature_mobile, city')
+      .eq('id', member.id).maybeSingle()
+      .then(({ data, error: err }) => {
+        if (cancelled) return
+        setFreshLoading(false)
+        if (err || !data) { setServerError('Could not load the latest details. Close and open again.'); return }
+        original.current = data
+        setForm(f => ({
+          ...f,
+          name: data.name || '',
+          role: data.role || f.role,
+          designation: data.designation || '',
+          segment_access: data.segment_access || 'ALL',
+          agency_commission_percent: data.agency_commission_percent != null ? String(data.agency_commission_percent) : f.agency_commission_percent,
+          default_signer_user_id: data.default_signer_user_id || '',
+          whatsapp_number: data.whatsapp_number || '',
+          signature_mobile: data.signature_mobile || '',
+          city: data.city || '',
+        }))
+      })
+    return () => { cancelled = true }
+  }, [mode, member?.id])
 
   // Phase 101.C.JSX — lazy-fetch signers when agency role selected.
   // Single query; cached for the modal lifetime. Re-fires when admin
@@ -124,6 +178,9 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
       if (!form.password) errs.password = 'Password is required'
       else if (form.password.length < 6) errs.password = 'Minimum 6 characters'
     }
+    // Phase 581 — mobiles: blank is allowed, otherwise a 10-digit Indian mobile.
+    if (cleanMobile(form.whatsapp_number) === null) errs.whatsapp_number = 'Enter a 10-digit mobile number'
+    if (cleanMobile(form.signature_mobile) === null) errs.signature_mobile = 'Enter a 10-digit mobile number'
     // Phase 101.A2 — split salary vs commission validation by role.
     // Agency = commission-only, validate commission % (0..100). All
     // other roles validate Monthly Salary in add mode per Phase 11g.
@@ -205,6 +262,10 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
         // selected scope.
         segment_access: ROLES_WITHOUT_SEGMENT.has(form.role) ? 'ALL' : form.segment_access,
         is_active: true,
+        // Phase 581 — contact details from the new fields.
+        whatsapp_number: cleanMobile(form.whatsapp_number) || null,
+        signature_mobile: cleanMobile(form.signature_mobile) || null,
+        city: form.city.trim() || null,
       }
       if (form.role === 'agency') {
         baseInsert.agency_commission_percent = Number(form.agency_commission_percent)
@@ -249,27 +310,42 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
       }
 
     } else {
+      // Phase 581 — wait for the fresh row; never save from a partial object.
+      const o = original.current
+      if (!o) { setServerError('Details are still loading. Try again in a moment.'); setSaving(false); return }
       // Phase 101.A2 — edit mode: persist agency_commission_percent
       // when role is (or becomes) 'agency'. If admin flips an existing
       // sales user to agency, the Phase 101.A1
       // users_agency_deactivate_incentive trigger fires server-side
       // to deactivate the staff_incentive_profiles row.
-      const updatePayload = {
+      const wanted = {
         name: form.name.trim(),
         role: form.role,
-        // Phase 27 — mirror role into team_role on edit too. If admin
-        // changes Dhara from 'sales' → 'telecaller', team_role must
-        // follow or the dropdowns will keep showing her as sales.
-        team_role: form.role,
         designation: form.designation.trim() || null,
         // Phase 11j — admin can change a rep's segment scope from edit.
         segment_access: ROLES_WITHOUT_SEGMENT.has(form.role) ? 'ALL' : form.segment_access,
+        whatsapp_number: cleanMobile(form.whatsapp_number) || null,
+        signature_mobile: cleanMobile(form.signature_mobile) || null,
+        city: form.city.trim() || null,
       }
       if (form.role === 'agency') {
-        updatePayload.agency_commission_percent = Number(form.agency_commission_percent)
-        // Phase 101.C.JSX — persist default proposal signer on edit.
-        // Empty string = NULL (admin cleared the assignment).
-        updatePayload.default_signer_user_id = form.default_signer_user_id || null
+        // Phase 101.A2 / 101.C — agency commission % + default proposal signer.
+        wanted.agency_commission_percent = Number(form.agency_commission_percent)
+        wanted.default_signer_user_id = form.default_signer_user_id || null
+      }
+      // Phase 581 — send only what changed.
+      const updatePayload = {}
+      for (const [k, v] of Object.entries(wanted)) {
+        if ((o[k] ?? null) !== (v ?? null)) updatePayload[k] = v
+      }
+      // Phase 27 mirrored role into team_role on EVERY save, which silently turned a
+      // sales_manager (Devang), government_partner (Vishal) or ops team_role back into
+      // the plain role. Phase 581: team_role follows ONLY when the role itself changes.
+      if (updatePayload.role !== undefined) updatePayload.team_role = form.role
+      if (Object.keys(updatePayload).length === 0) {
+        setSaving(false)
+        onClose()
+        return
       }
       const { error } = await updateMember(member.id, updatePayload)
       if (error) {
@@ -336,8 +412,11 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
           )}
 
           <Field label="Role" required>
-            <select value={form.role} onChange={e => set('role', e.target.value)}>
+            <select value={form.role} onChange={e => set('role', e.target.value)} disabled={freshLoading}>
               {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              {!ROLES.some(r => r.value === form.role) && (
+                <option value={form.role}>{OTHER_ROLE_LABELS[form.role] || form.role}</option>
+              )}
             </select>
           </Field>
 
@@ -355,6 +434,24 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
               value={form.designation}
               onChange={e => set('designation', e.target.value)}
             />
+          </Field>
+
+          {/* Phase 581 — contact details (were not editable after creation). */}
+          <Field label="WhatsApp number" error={errors.whatsapp_number}
+            hint="Reminders, nudges and the team assistant use this number. 10 digits.">
+            <input type="tel" inputMode="numeric" placeholder="e.g. 9898012345"
+              value={form.whatsapp_number} onChange={e => set('whatsapp_number', e.target.value)}
+              style={errors.whatsapp_number ? { borderColor: 'var(--red)' } : {}} />
+          </Field>
+          <Field label="Signature mobile" error={errors.signature_mobile}
+            hint="Printed under the person's name on proposals they sign. Leave blank if they do not sign.">
+            <input type="tel" inputMode="numeric" placeholder="e.g. 9898012345"
+              value={form.signature_mobile} onChange={e => set('signature_mobile', e.target.value)}
+              style={errors.signature_mobile ? { borderColor: 'var(--red)' } : {}} />
+          </Field>
+          <Field label="City">
+            <input type="text" placeholder="e.g. Vadodara"
+              value={form.city} onChange={e => set('city', e.target.value)} />
           </Field>
 
           {/* Phase 11j — segment scope. Hidden for admin (always ALL).
@@ -463,7 +560,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
 
         <div className="md-f">
           <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="btn btn-y" onClick={handleSubmit} disabled={saving}>
+          <button className="btn btn-y" onClick={handleSubmit} disabled={saving || freshLoading}>
             {saving ? 'Saving…' : mode === 'add' ? 'Create Member' : 'Save Changes'}
           </button>
         </div>
