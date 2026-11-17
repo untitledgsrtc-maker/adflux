@@ -187,8 +187,8 @@ export default function AdminDashboardDesktop() {
       // but admin can't see location". Pings WERE fetched but the
       // sales-only name filter dropped Dhara → card showed "No reps
       // live right now" despite 318 live pings.
-      isMgr   // Phase 595 - his reps only
-        ? supabase.from('users').select('id, name, role').in('role', ['sales', 'telecaller', 'agency']).eq('manager_id', profile.id)
+      isMgr   // Phase 595 - his reps + himself (he is out in the field too)
+        ? supabase.from('users').select('id, name, role').in('role', ['sales', 'telecaller', 'agency']).or(`manager_id.eq.${profile.id},id.eq.${profile.id}`)
         : supabase.from('users').select('id, name, role').in('role', ['sales', 'telecaller', 'agency']),
       supabase.from('incentive_settings').select('*').maybeSingle(),
       // M1 — every rep's active daily target. Filtered by effective_to
