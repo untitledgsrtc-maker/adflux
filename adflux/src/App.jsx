@@ -556,7 +556,7 @@ export default function App() {
           <Route path="/admin/team-assign"         element={<RequirePrivileged><TeamManagerAssignV2 /></RequirePrivileged>} />
           {/* Phase 56m — per-rep call log (own + admin view of any rep). */}
           <Route path="/calls"                     element={<CallLogsV2 />} />
-          <Route path="/admin/calls/:userId"       element={<RequirePrivileged><CallLogsV2 /></RequirePrivileged>} />
+          <Route path="/admin/calls/:userId"       element={<RequireTeamView><CallLogsV2 /></RequireTeamView>} />{/* Phase 592: sales head opens his reps' call logs from My Team */}
           {/* Phase 34Z.55 — push notification diagnostics + test send.
               Surfaces all six gates (Notification API, Push API, VAPID,
               SW, permission, subscription) so owner can diagnose why

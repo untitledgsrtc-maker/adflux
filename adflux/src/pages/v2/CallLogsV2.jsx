@@ -31,7 +31,8 @@ export default function CallLogsV2() {
   // /admin/calls/:userId (admin view) → show that user's calls.
   const targetUserId = params?.userId || profile?.id
   const isOwnView = targetUserId === profile?.id
-  const canViewTarget = isOwnView || isPrivileged
+  // Phase 592 - sales head opens his reps' logs from My Team; RLS (call_logs_manager) limits rows to his reps.
+  const canViewTarget = isOwnView || isPrivileged || profile?.team_role === 'sales_manager'
 
   const todayISO = () => {
     const d = new Date()
