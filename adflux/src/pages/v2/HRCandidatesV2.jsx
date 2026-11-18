@@ -178,7 +178,7 @@ export default function HRCandidatesV2() {
             <CandidateCard key={r.id} r={r} calls={callMap[r.id]}
               onPatch={patch} onDelete={removeCandidate} onCall={() => setCallFor(r)}
               onSendOffer={() => setOfferFor(r)}
-              onConvert={() => nav('/hr/new-user', { state: { prefill: { name: r.name, email: r.email, phone: r.phone, candidate_id: r.id } } })}
+              onConvert={profile?.role === 'admin' ? () => nav('/hr/new-user', { state: { prefill: { name: r.name, email: r.email, phone: r.phone, candidate_id: r.id } } }) : null}
               onReload={load} />
           ))}
         </div>
@@ -275,7 +275,7 @@ function CandidateCard({ r, calls, onPatch, onDelete, onCall, onSendOffer, onCon
             <Send size={14} /> Send offer
           </button>
         )}
-        {r.stage === 'hired' && !r.converted_user_id && (
+        {r.stage === 'hired' && !r.converted_user_id && onConvert && (
           <button onClick={onConvert} style={{ ...actBtn, borderColor: 'var(--success, #10B981)', color: 'var(--success)' }}>
             <UserPlus size={14} /> Create login
           </button>

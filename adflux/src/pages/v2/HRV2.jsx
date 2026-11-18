@@ -18,11 +18,12 @@ import { useOffers, STATUS_META } from '../../hooks/useOffers'
 import { SendOfferModal }   from '../../components/hr/SendOfferModal'
 import { OfferDetailModal } from '../../components/hr/OfferDetailModal'
 import { formatCurrency } from '../../utils/formatters'
+import { useAuthStore } from '../../store/authStore'
 
 const FILTERS = [
   { key: 'all',       label: 'All' },
   { key: 'waiting',   label: 'Waiting for owner' },
-  { key: 'approved',  label: 'Approved - share link' },
+  { key: 'approved',  label: 'Share the link' },
   { key: 'open',      label: 'Open invites' },
   { key: 'accepted',  label: 'Accepted' },
   { key: 'converted', label: 'Converted' },
@@ -31,8 +32,8 @@ const FILTERS = [
 
 function matchesFilter(offer, key) {
   if (key === 'all') return true
-  if (key === 'waiting')    return ['pending_approval','draft'].includes(offer.status)
-  if (key === 'approved')   return offer.status === 'approved'
+  if (key === 'waiting')    return offer.status === 'pending_approval'
+  if (key === 'approved')   return ['approved','draft'].includes(offer.status)
   if (key === 'open')       return ['sent','filled'].includes(offer.status)
   if (key === 'accepted')   return offer.status === 'accepted'
   if (key === 'converted')  return offer.status === 'converted_to_user'
@@ -42,6 +43,7 @@ function matchesFilter(offer, key) {
 
 export default function HRV2() {
   const navigate = useNavigate()
+  const isOwner = useAuthStore(st => st.profile?.role) === 'admin'   // Phase 618 - HR hires through the offer card
   const { offers, loading, error, fetchOffers } = useOffers()
   // Phase 618 - ?filter= from the HR home Hiring tile, ?offer= from the approval push
   const [params] = useSearchParams()
@@ -92,14 +94,14 @@ export default function HRV2() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
+          {isOwner && <button
             className="v2d-cta v2d-cta--ghost"
             onClick={() => navigate('/hr/new-user')}
             style={{ background: 'transparent', color: 'var(--v2-ink-1)', border: '1px solid var(--v2-line)' }}
           >
             <UserCheck size={15} />
             <span>Create User</span>
-          </button>
+          </button>}
           <button className="v2d-cta" onClick={() => setSendOpen(true)}>
             <UserPlus size={15} />
             <span>Send Offer</span>

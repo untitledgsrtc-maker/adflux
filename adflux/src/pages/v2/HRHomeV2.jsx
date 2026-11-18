@@ -18,7 +18,7 @@ import DailyCheckinCard from '../../components/work/DailyCheckinCard'
 export default function HRHomeV2() {
   const nav = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const [c, setC] = useState({ leaves: 0, ta: 0, team: 0, offers: 0, candidates: 0 })
+  const [c, setC] = useState({ leaves: 0, ta: 0, team: 0, candidates: 0, owner: 0, share: 0, cand: 0, login: 0, onboard: 0 })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -28,13 +28,21 @@ export default function HRHomeV2() {
         supabase.from('leaves').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('ta_da_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('users').select('id', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('hr_offers').select('id', { count: 'exact', head: true }).in('status', ['draft', 'sent', 'filled']),
+        // Phase 618 - the hiring pipeline (one small list, counted here)
+        supabase.from('hr_offers').select('status, converted_at').neq('status', 'cancelled'),
         // Phase 281 — new candidates to review. Errors (returns null count) until
         // the Recruit SQL is applied → shows 0, never breaks the cockpit.
         supabase.from('hr_candidates').select('id', { count: 'exact', head: true }).eq('stage', 'applied'),
       ])
       if (!alive) return
-      setC({ leaves: lv.count || 0, ta: ta.count || 0, team: tm.count || 0, offers: of.count || 0, candidates: cand.count || 0 })
+      const rows = of.data || []
+      const by = (...st) => rows.filter(r => st.includes(r.status)).length
+      const since = Date.now() - 30 * 86400000
+      setC({
+        leaves: lv.count || 0, ta: ta.count || 0, team: tm.count || 0, candidates: cand.count || 0,
+        owner: by('pending_approval'), share: by('approved', 'draft'), cand: by('sent', 'filled'), login: by('accepted'),
+        onboard: rows.filter(r => r.status === 'converted_to_user' && r.converted_at && Date.parse(r.converted_at) >= since).length,
+      })
       setLoading(false)
     })()
     return () => { alive = false }
@@ -43,7 +51,8 @@ export default function HRHomeV2() {
   const name = (profile?.name || 'there').split(' ')[0]
   const hour = new Date().getHours()
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-  const pending = c.leaves + c.ta + c.candidates
+  const isOwner = profile?.role === 'admin'
+  const pending = c.leaves + c.ta + c.candidates + (isOwner ? c.owner : c.share + c.login)
 
   return (
     <div className="v2d-page">
@@ -60,7 +69,7 @@ export default function HRHomeV2() {
         <Kpi label="New candidates" value={loading ? '…' : c.candidates} accent={c.candidates > 0} onClick={() => nav('/hr/candidates')} Icon={ClipboardList} />
         <Kpi label="Leaves to approve" value={loading ? '…' : c.leaves} accent={c.leaves > 0} onClick={() => nav('/admin/leaves')} Icon={CalendarCheck} />
         <Kpi label="TA/DA to approve" value={loading ? '…' : c.ta} accent={c.ta > 0} onClick={() => nav('/admin/ta-payouts')} Icon={Wallet} />
-        <Kpi label="Open offers" value={loading ? '…' : c.offers} onClick={() => nav('/hr/offers')} Icon={FileText} />
+        <Kpi label={isOwner ? 'Offers waiting for you' : 'Offers waiting for owner'} value={loading ? '…' : c.owner} accent={isOwner && c.owner > 0} onClick={() => nav('/hr/offers?filter=waiting')} Icon={FileText} />
         <Kpi label="Team members" value={loading ? '…' : c.team} onClick={() => nav('/team')} Icon={Users} />
       </div>
 
@@ -72,9 +81,13 @@ export default function HRHomeV2() {
         <Tile title="Candidates" sub="resumes · shortlist · calls" Icon={ClipboardList} onClick={() => nav('/hr/candidates')} badge={c.candidates} />
       </Section>
 
-      <Section title="2 · Hire" sub="make them official">
-        <Tile title="Add member" sub="create account + set salary/targets" Icon={UserPlus} onClick={() => nav('/hr/new-user')} />
-        <Tile title="Offers / invites" sub="send + track offer letters" Icon={FileText} onClick={() => nav('/hr/offers')} />
+      {/* Phase 618 - one hiring path: offer -> owner approval -> link -> accepted -> login -> onboarding */}
+      <Section title="2 · Hire" sub="one path: offer, owner approval, link, login">
+        <Tile title="Waiting for owner" sub="salary approval" Icon={FileText} onClick={() => nav('/hr/offers?filter=waiting')} badge={c.owner} />
+        <Tile title="Share the link" sub="approved or sent back" Icon={FileText} onClick={() => nav('/hr/offers?filter=approved')} badge={c.share} />
+        <Tile title="Waiting for candidate" sub="link sent, not accepted yet" Icon={FileText} onClick={() => nav('/hr/offers?filter=open')} badge={c.cand} />
+        <Tile title="Ready to create login" sub="accepted - one tap" Icon={UserPlus} onClick={() => nav('/hr/offers?filter=accepted')} badge={c.login} />
+        <Tile title="Onboarding" sub="logins made in the last 30 days" Icon={GraduationCap} onClick={() => nav('/hr/onboarding')} badge={c.onboard} />
       </Section>
 
       <Section title="3 · Onboard & train" sub="first days — no doubts">

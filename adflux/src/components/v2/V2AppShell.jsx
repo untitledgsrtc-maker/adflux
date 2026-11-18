@@ -257,7 +257,7 @@ const HR_NAV = [
   { to: '/hr',                label: 'HR Home',        icon: UserCircle2 },
   { to: '/hr/candidates',     label: 'Recruit',        icon: Contact2 },
   { to: '/hr/onboarding',     label: 'Onboarding',     icon: GraduationCap },
-  { to: '/hr/new-user',       label: 'Add Member',     icon: UserPlus },
+  { to: '/hr/offers',         label: 'Hiring',         icon: UserPlus },   // Phase 618 - one hiring path (Add Member no longer in HR's menu)
   // 2026-08-03 — HR back-office: approve leaves + TA/DA, see team roster + attendance.
   { to: '/admin/leaves',      label: 'Leaves',         icon: CheckSquare },
   { to: '/admin/ta-payouts',  label: 'TA Claims',      icon: Wallet },
