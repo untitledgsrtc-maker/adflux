@@ -29,7 +29,10 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { formatDate } from '../../utils/formatters'
 import { istTodayISO } from '../../utils/istDate'
-import { evaluateMeetingLocation } from '../../utils/meetingLocation'
+import { evaluateMeetingLocation, distanceM } from '../../utils/meetingLocation'
+
+// Phase 610 — a meeting this close to the day's check-in point is flagged (not blocked, score unchanged)
+const CHECKIN_SPOT_M = 150
 
 // Phase 34Z.6 — haversine + summariseTrack live in src/utils/
 // gpsDistance.js so /work uses the same filter rules.
@@ -162,6 +165,7 @@ export default function GpsTrackV2() {
   // Phase 76 DaySummaryCard.
   const [gpsOffEvents, setGpsOffEvents] = useState([])
   const [networkOffEvents, setNetworkOffEvents] = useState([])  // Phase 228 — internet-off log
+  const [stageLog, setStageLog] = useState([])  // Phase 610 — who changed a lead's stage, this rep+day
   // Phase 76.2.2 (2026-05-23) — live call_logs breakdown for this
   // rep+day. Owner directive: show total / missed (0 or null) /
   // short (1-9s) / qualified (>=10s) as separate KPI buckets so
@@ -205,6 +209,7 @@ export default function GpsTrackV2() {
       // through ONE gated RPC, mapped into the same *Res shapes; every line after
       // is untouched. Admin keeps the exact Promise.all (else) — byte-unchanged.
       let userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes, networkOffRes
+      let stageRes = { data: [] }   // Phase 610 — shortcut: the gated team RPC path does not carry it yet
       if ((!isPrivileged && canViewTeam) || profile?.role === 'accounts') {   // Phase 474: accounts reads the day via the same gated RPC (her own RLS hides meetings/calls)
         const { data: b, error: bErr } = await supabase.rpc('team_rep_daytrack', {
           p_user_id: userId, p_start: start, p_end: end, p_date: targetDate,
@@ -220,13 +225,13 @@ export default function GpsTrackV2() {
         networkOffRes = { data: b?.network_off || [], error: null }  // Phase 228 (empty until RPC surfaces it)
         setTaKm(b?.ta_km ?? null)
       } else {
-      ;[userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes, networkOffRes] = await Promise.all([
+      ;[userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes, networkOffRes, stageRes] = await Promise.all([
         supabase.from('users').select('id, name, role, team_role, city').eq('id', userId).maybeSingle(),
         fetchAllPings(userId, start, end),  // Phase 103.D.6 — paged past 1000-row cap
         // Phase 32E — work_sessions row gives check-in/out times,
         // morning plan, counters. One row per (user_id, work_date).
         supabase.from('work_sessions')
-          .select('check_in_at, check_out_at, daily_counters, planned_meetings, morning_plan_text, evening_summary')
+          .select('check_in_at, check_out_at, check_in_gps_lat, check_in_gps_lng, daily_counters, planned_meetings, morning_plan_text, evening_summary')
           .eq('user_id', userId)
           .eq('work_date', targetDate)
           .maybeSingle(),
@@ -275,6 +280,14 @@ export default function GpsTrackV2() {
           .gte('lost_at', start)
           .lte('lost_at', end)
           .order('lost_at', { ascending: false }),
+        // Phase 610 — stage changes this rep made today (trigger-written, every path incl. bulk).
+        supabase.from('lead_stage_log')
+          .select('id, changed_at, old_stage, new_stage, lost_reason, lead:lead_id(id, name, company)')
+          .eq('changed_by', userId)
+          .gte('changed_at', start)
+          .lte('changed_at', end)
+          .order('changed_at', { ascending: false })
+          .limit(500),
       ])
       }
       if (cancelled) return
@@ -287,6 +300,7 @@ export default function GpsTrackV2() {
       setVoiceLogs(voiceRes.data || [])
       setGpsOffEvents(gpsOffRes?.data || [])
       setNetworkOffEvents(networkOffRes?.data || [])
+      setStageLog(stageRes?.data || [])
       // Phase 76.2.2 — bucket the call rows. NULL duration goes to
       // missed (likely Phase 65 hasn't patched yet; treat as not-yet-
       // qualified). Zero duration also missed (no ring picked up).
@@ -1301,7 +1315,14 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
             ts:   new Date(e.lost_at).getTime(),
             raw:  e,
           })),
+          ...stageLog.map(e => ({
+            kind: 'stage',
+            ts:   new Date(e.changed_at).getTime(),
+            raw:  e,
+          })),
         ].sort((a, b) => b.ts - a.ts)
+        // Phase 610 — a meeting logged within this of the day's check-in point is flagged
+        const ci = session?.check_in_gps_lat != null ? { lat: Number(session.check_in_gps_lat), lng: Number(session.check_in_gps_lng) } : null
 
         return (
           <div className="lead-card">
@@ -1309,7 +1330,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
               <div>
                 <div className="lead-card-title">Activity timeline · {tl.length}</div>
                 <div className="lead-card-sub">
-                  Calls · WhatsApp · meetings · notes · GPS-off · internet-off events
+                  Calls · WhatsApp · meetings · notes · stage changes · GPS-off · internet-off events
                 </div>
               </div>
             </div>
@@ -1390,6 +1411,27 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
                       </div>
                     )
                   }
+                  if (item.kind === 'stage') {
+                    const e = item.raw
+                    const t = new Date(e.changed_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                    return (
+                      <div
+                        key={`stage-${e.id}`}
+                        onClick={() => e.lead?.id && navigate(`/leads/${e.lead.id}`)}
+                        style={{ cursor: e.lead?.id ? 'pointer' : 'default', padding: '10px 14px', borderTop: '1px solid var(--border)' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13, flexWrap: 'wrap' }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', minWidth: 44 }}>{t}</span>
+                          <span style={{ fontWeight: 700, color: e.new_stage === 'Lost' ? 'var(--danger)' : 'var(--text)' }}>
+                            Stage {e.old_stage || '—'} → {e.new_stage}
+                          </span>
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            → {e.lead?.company || e.lead?.name || '—'}{e.lost_reason ? ` · ${e.lost_reason}` : ''}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  }
                   // activity
                   const a = item.raw
                   const t = new Date(a.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
@@ -1452,6 +1494,16 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
                           return (
                             <div style={{ fontSize: 12, fontWeight: 600, color, marginTop: 4, marginLeft: 52 }}>{label}</div>
                           )
+                        })()}
+                      {(a.activity_type === 'meeting' || a.activity_type === 'site_visit')
+                        && !isAutoCheckinRow(a) && !isScheduledMeetingRow(a)
+                        && ci && a.gps_lat != null && (() => {
+                          const m = Math.round(distanceM(ci.lat, ci.lng, Number(a.gps_lat), Number(a.gps_lng)))
+                          return m <= CHECKIN_SPOT_M ? (
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warning)', marginTop: 4, marginLeft: 52 }}>
+                              Logged at the check-in spot · {m} m from where the day started
+                            </div>
+                          ) : null
                         })()}
                     </div>
                   )
