@@ -166,6 +166,7 @@ export default function GpsTrackV2() {
   const [gpsOffEvents, setGpsOffEvents] = useState([])
   const [networkOffEvents, setNetworkOffEvents] = useState([])  // Phase 228 — internet-off log
   const [stageLog, setStageLog] = useState([])  // Phase 610 — who changed a lead's stage, this rep+day
+  const [quoteDeletes, setQuoteDeletes] = useState([])  // Phase 611 — quotes this rep deleted, this day
   // Phase 76.2.2 (2026-05-23) — live call_logs breakdown for this
   // rep+day. Owner directive: show total / missed (0 or null) /
   // short (1-9s) / qualified (>=10s) as separate KPI buckets so
@@ -210,6 +211,7 @@ export default function GpsTrackV2() {
       // is untouched. Admin keeps the exact Promise.all (else) — byte-unchanged.
       let userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes, networkOffRes
       let stageRes = { data: [] }   // Phase 610 — shortcut: the gated team RPC path does not carry it yet
+      let delRes = { data: [] }     // Phase 611 — same shortcut
       if ((!isPrivileged && canViewTeam) || profile?.role === 'accounts') {   // Phase 474: accounts reads the day via the same gated RPC (her own RLS hides meetings/calls)
         const { data: b, error: bErr } = await supabase.rpc('team_rep_daytrack', {
           p_user_id: userId, p_start: start, p_end: end, p_date: targetDate,
@@ -225,7 +227,7 @@ export default function GpsTrackV2() {
         networkOffRes = { data: b?.network_off || [], error: null }  // Phase 228 (empty until RPC surfaces it)
         setTaKm(b?.ta_km ?? null)
       } else {
-      ;[userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes, networkOffRes, stageRes] = await Promise.all([
+      ;[userRes, pingsRes, sessionRes, actsRes, voiceRes, gpsOffRes, callRowsRes, networkOffRes, stageRes, delRes] = await Promise.all([
         supabase.from('users').select('id, name, role, team_role, city').eq('id', userId).maybeSingle(),
         fetchAllPings(userId, start, end),  // Phase 103.D.6 — paged past 1000-row cap
         // Phase 32E — work_sessions row gives check-in/out times,
@@ -288,6 +290,14 @@ export default function GpsTrackV2() {
           .lte('changed_at', end)
           .order('changed_at', { ascending: false })
           .limit(500),
+        // Phase 611 — quotes this rep deleted today (trigger-written copy).
+        supabase.from('quote_delete_log')
+          .select('id, deleted_at, quote_number, status, client, total_amount')
+          .eq('deleted_by', userId)
+          .gte('deleted_at', start)
+          .lte('deleted_at', end)
+          .order('deleted_at', { ascending: false })
+          .limit(200),
       ])
       }
       if (cancelled) return
@@ -301,6 +311,7 @@ export default function GpsTrackV2() {
       setGpsOffEvents(gpsOffRes?.data || [])
       setNetworkOffEvents(networkOffRes?.data || [])
       setStageLog(stageRes?.data || [])
+      setQuoteDeletes(delRes?.data || [])
       // Phase 76.2.2 — bucket the call rows. NULL duration goes to
       // missed (likely Phase 65 hasn't patched yet; treat as not-yet-
       // qualified). Zero duration also missed (no ring picked up).
@@ -1320,6 +1331,11 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
             ts:   new Date(e.changed_at).getTime(),
             raw:  e,
           })),
+          ...quoteDeletes.map(e => ({
+            kind: 'quote_deleted',
+            ts:   new Date(e.deleted_at).getTime(),
+            raw:  e,
+          })),
         ].sort((a, b) => b.ts - a.ts)
         // Phase 610 — a meeting logged within this of the day's check-in point is flagged
         const ci = session?.check_in_gps_lat != null ? { lat: Number(session.check_in_gps_lat), lng: Number(session.check_in_gps_lng) } : null
@@ -1330,7 +1346,7 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
               <div>
                 <div className="lead-card-title">Activity timeline · {tl.length}</div>
                 <div className="lead-card-sub">
-                  Calls · WhatsApp · meetings · notes · stage changes · GPS-off · internet-off events
+                  Calls · WhatsApp · meetings · notes · stage changes · quote deletes · GPS-off · internet-off events
                 </div>
               </div>
             </div>
@@ -1406,6 +1422,21 @@ function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], net
                           <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                             duration {fmtDur(e.duration_seconds)}
                             {onT ? ` · back on at ${onT}` : ' · still off'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  }
+                  if (item.kind === 'quote_deleted') {
+                    const e = item.raw
+                    const t = new Date(e.deleted_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                    return (
+                      <div key={`qdel-${e.id}`} style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', background: 'var(--danger-soft, rgba(239,68,68,.08))' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13, flexWrap: 'wrap' }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)', minWidth: 44 }}>{t}</span>
+                          <span style={{ fontWeight: 700, color: 'var(--danger)' }}>Quote deleted</span>
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            {e.quote_number || '—'} · {e.client || '—'} · {e.status}{e.total_amount != null ? ` · Rs ${Number(e.total_amount).toLocaleString('en-IN')}` : ''}
                           </span>
                         </div>
                       </div>
