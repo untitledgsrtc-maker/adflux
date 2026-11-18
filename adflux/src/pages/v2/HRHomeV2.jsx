@@ -1,58 +1,90 @@
 // =============================================================================
-// HRHomeV2 — HR daily cockpit (spec: docs/HR_ONBOARDING_RECRUITMENT_SPEC.md).
-// The landing for role='hr' (+ admin/co_owner). Surfaces what needs HR today +
-// links to the 5 lifecycle stages: Recruit → Hire → Onboard → Manage → Exit.
-// Counts via HR's own RLS (leaves/ta_da_requests FOR ALL, users read, hr_offers).
-// Additive, HR-facing. Recruit + Onboard cards are placeholders until built.
+// HRHomeV2 — HR daily cockpit. Landing for role='hr' (+ admin/co_owner).
+// Phase 620 (owner 19-11-2026: "HR dashboard UI not good, must be user friendly"):
+// the page shows HR's WORK, not a menu. One "To do today" list (oldest first, every
+// row opens the page where that job is done), a slim hiring status row, and the
+// daily check-in moved to the bottom. The old 13 lifecycle tiles only repeated the
+// left menu and were removed. Reads via HR's own RLS; names via a second query
+// (no users() embed, CLAUDE.md section 30 foot-gun).
 // =============================================================================
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Users, CalendarCheck, Wallet, FileText, MapPin, UserPlus, ClipboardList,
-  GraduationCap, ChevronRight, LogOut,
-} from 'lucide-react'
+import { CalendarCheck, Wallet, ClipboardList, FileText, UserPlus, ChevronRight, CheckCircle2, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import DailyCheckinCard from '../../components/work/DailyCheckinCard'
 
+const SHOW = 12   // rows shown before "Show all"
+
+const dd = (d) => (d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '')
+const ago = (ts) => {
+  const days = Math.floor((Date.now() - Date.parse(ts)) / 86400000)
+  return days <= 0 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`
+}
+const money = (n) => 'Rs ' + Math.round(Number(n) || 0).toLocaleString('en-IN')
+
 export default function HRHomeV2() {
   const nav = useNavigate()
   const profile = useAuthStore(s => s.profile)
-  const [c, setC] = useState({ leaves: 0, ta: 0, team: 0, candidates: 0, owner: 0, share: 0, cand: 0, login: 0, onboard: 0 })
-  const [loading, setLoading] = useState(true)
+  const isOwner = profile?.role === 'admin'
+  const [data, setData] = useState(null)
+  const [err, setErr] = useState('')
+  const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const [lv, ta, tm, of, cand] = await Promise.all([
-        supabase.from('leaves').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('ta_da_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('users').select('id', { count: 'exact', head: true }).eq('is_active', true),
-        // Phase 618 - the hiring pipeline (one small list, counted here)
-        supabase.from('hr_offers').select('status, converted_at').neq('status', 'cancelled'),
-        // Phase 281 — new candidates to review. Errors (returns null count) until
-        // the Recruit SQL is applied → shows 0, never breaks the cockpit.
-        supabase.from('hr_candidates').select('id', { count: 'exact', head: true }).eq('stage', 'applied'),
+      const [lv, ta, cand, of] = await Promise.all([
+        supabase.from('leaves').select('id, user_id, leave_date, leave_type, is_half_day, created_at').eq('status', 'pending').order('created_at').limit(50),
+        supabase.from('ta_da_requests').select('id, user_id, claim_date, kind, claim_amount, city, created_at').eq('status', 'pending').order('created_at').limit(50),
+        supabase.from('hr_candidates').select('id, name, role_applied, created_at').eq('stage', 'applied').order('created_at').limit(50),
+        supabase.from('hr_offers').select('id, candidate_name, position, status, created_at, updated_at').in('status', ['pending_approval', 'approved', 'draft', 'sent', 'filled', 'accepted']).order('updated_at').limit(50),
       ])
+      const bad = [lv, ta, cand, of].find(r => r.error)
       if (!alive) return
-      const rows = of.data || []
-      const by = (...st) => rows.filter(r => st.includes(r.status)).length
-      const since = Date.now() - 30 * 86400000
-      setC({
-        leaves: lv.count || 0, ta: ta.count || 0, team: tm.count || 0, candidates: cand.count || 0,
-        owner: by('pending_approval'), share: by('approved', 'draft'), cand: by('sent', 'filled'), login: by('accepted'),
-        onboard: rows.filter(r => r.status === 'converted_to_user' && r.converted_at && Date.parse(r.converted_at) >= since).length,
-      })
-      setLoading(false)
+      if (bad) { setErr(bad.error.message || 'Could not load'); setData({ lv: [], ta: [], cand: [], of: [], names: {} }); return }
+      const ids = [...new Set([...(lv.data || []), ...(ta.data || [])].map(r => r.user_id).filter(Boolean))]
+      const { data: us } = ids.length ? await supabase.from('users').select('id, name').in('id', ids) : { data: [] }
+      if (!alive) return
+      setData({ lv: lv.data || [], ta: ta.data || [], cand: cand.data || [], of: of.data || [], names: Object.fromEntries((us || []).map(u => [u.id, u.name])) })
     })()
     return () => { alive = false }
   }, [])
 
+  // One list of real jobs, oldest first.
+  const todo = useMemo(() => {
+    if (!data) return []
+    const n = (id) => data.names[id] || 'Someone'
+    const rows = [
+      ...data.lv.map(r => ({ key: 'l' + r.id, Icon: CalendarCheck, kind: 'Leave', who: n(r.user_id), what: `${dd(r.leave_date)}${r.is_half_day ? ' (half day)' : ''}${r.leave_type ? ' · ' + r.leave_type : ''}`, at: r.created_at, action: 'Approve / reject', go: '/admin/leaves' })),
+      ...data.ta.map(r => ({ key: 't' + r.id, Icon: Wallet, kind: 'TA / DA claim', who: n(r.user_id), what: `${money(r.claim_amount)} · ${r.kind || 'claim'}${r.city ? ' · ' + r.city : ''} · ${dd(r.claim_date)}`, at: r.created_at, action: 'Check claim', go: '/admin/ta-payouts' })),
+      ...data.cand.map(r => ({ key: 'c' + r.id, Icon: ClipboardList, kind: 'New candidate', who: r.name, what: r.role_applied || 'applied', at: r.created_at, action: 'Call / shortlist', go: '/hr/candidates' })),
+      ...data.of.flatMap(r => {
+        const base = { Icon: FileText, who: r.candidate_name, what: r.position || '', at: r.updated_at || r.created_at }
+        if (r.status === 'pending_approval') return isOwner ? [{ ...base, key: 'o' + r.id, kind: 'Offer to approve', action: 'Approve salary', go: `/hr/offers?offer=${r.id}` }] : []
+        if (r.status === 'approved') return isOwner ? [] : [{ ...base, key: 'o' + r.id, kind: 'Offer approved', action: 'Share link', go: `/hr/offers?offer=${r.id}` }]
+        if (r.status === 'draft') return isOwner ? [] : [{ ...base, key: 'o' + r.id, kind: 'Offer sent back', action: 'See note', go: `/hr/offers?offer=${r.id}` }]
+        if (r.status === 'accepted') return [{ ...base, key: 'o' + r.id, kind: 'Offer accepted', action: 'Create login', go: `/hr/offers?offer=${r.id}` }]
+        return []
+      }),
+    ]
+    return rows.sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+  }, [data, isOwner])
+
+  const hiring = useMemo(() => {
+    const st = (...s) => (data?.of || []).filter(o => s.includes(o.status)).length
+    return [
+      { label: 'Waiting for owner', n: st('pending_approval'), filter: 'waiting' },
+      { label: 'Share the link', n: st('approved', 'draft'), filter: 'approved' },
+      { label: 'With candidate', n: st('sent', 'filled'), filter: 'open' },
+      { label: 'Ready for login', n: st('accepted'), filter: 'accepted' },
+    ]
+  }, [data])
+
   const name = (profile?.name || 'there').split(' ')[0]
   const hour = new Date().getHours()
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-  const isOwner = profile?.role === 'admin'
-  const pending = c.leaves + c.ta + c.candidates + (isOwner ? c.owner : c.share + c.login)
+  const visible = showAll ? todo : todo.slice(0, SHOW)
 
   return (
     <div className="v2d-page">
@@ -60,90 +92,75 @@ export default function HRHomeV2() {
         <div>
           <div className="v2d-page-kicker">HR workspace</div>
           <h1 className="v2d-page-title">{greet}, {name}</h1>
-          <div className="v2d-page-sub">{pending > 0 ? `${pending} item${pending > 1 ? 's' : ''} need you today.` : 'Nothing pending — all caught up.'}</div>
+          <div className="v2d-page-sub">
+            {!data ? 'Loading your day…' : todo.length ? `${todo.length} thing${todo.length > 1 ? 's' : ''} to do today — oldest first.` : 'Nothing waiting — all caught up.'}
+          </div>
         </div>
+        <button className="v2d-cta" onClick={() => nav('/hr/offers')}><UserPlus size={16} /><span>Send an offer</span></button>
       </div>
 
-      {/* pending actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 18 }}>
-        <Kpi label="New candidates" value={loading ? '…' : c.candidates} accent={c.candidates > 0} onClick={() => nav('/hr/candidates')} Icon={ClipboardList} />
-        <Kpi label="Leaves to approve" value={loading ? '…' : c.leaves} accent={c.leaves > 0} onClick={() => nav('/admin/leaves')} Icon={CalendarCheck} />
-        <Kpi label="TA/DA to approve" value={loading ? '…' : c.ta} accent={c.ta > 0} onClick={() => nav('/admin/ta-payouts')} Icon={Wallet} />
-        <Kpi label={isOwner ? 'Offers waiting for you' : 'Offers waiting for owner'} value={loading ? '…' : c.owner} accent={isOwner && c.owner > 0} onClick={() => nav('/hr/offers?filter=waiting')} Icon={FileText} />
-        <Kpi label="Team members" value={loading ? '…' : c.team} onClick={() => nav('/team')} Icon={Users} />
-      </div>
+      {err && (
+        <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 10, border: '1px solid var(--danger, #EF4444)', background: 'var(--danger-soft, rgba(239,68,68,.12))', color: 'var(--danger, #EF4444)', fontSize: 13 }}>
+          Some items could not load ({err}). <button type="button" className="v2d-ghost" onClick={() => window.location.reload()}>Retry</button>
+        </div>
+      )}
 
-      {/* who said the morning hi / shared the evening report today */}
-      <div style={{ marginBottom: 18 }}><DailyCheckinCard /></div>
+      {/* To do today */}
+      <section style={{ background: 'var(--surface, #1e293b)', border: '1px solid var(--border, #334155)', borderRadius: 14, marginBottom: 16, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border, #334155)', fontWeight: 700, fontSize: 15 }}>To do today</div>
+        {!data ? (
+          <div style={{ padding: 24, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)' }}><Loader2 size={16} className="spin" /> Loading…</div>
+        ) : todo.length === 0 ? (
+          <div style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)' }}>
+            <CheckCircle2 size={22} style={{ color: 'var(--success, #10B981)' }} />
+            <div style={{ marginTop: 8, fontSize: 14 }}>All caught up. New leaves, claims, candidates and offers show up here.</div>
+          </div>
+        ) : (
+          <>
+            {visible.map(r => (
+              <button key={r.key} type="button" className="hr-todo-row" onClick={() => nav(r.go)}>
+                <span className="hr-todo-ic"><r.Icon size={16} /></span>
+                <span style={{ minWidth: 0, flex: 1, textAlign: 'left' }}>
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--text, #f1f5f9)' }}>{r.who} <span style={{ fontWeight: 500, color: 'var(--text-muted, #94a3b8)' }}>· {r.kind}</span></span>
+                  <span style={{ display: 'block', fontSize: 12, color: 'var(--text-subtle, #64748b)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.what} · {ago(r.at)}</span>
+                </span>
+                <span className="hr-todo-act">{r.action}<ChevronRight size={14} /></span>
+              </button>
+            ))}
+            {todo.length > SHOW && (
+              <button type="button" className="v2d-ghost" style={{ margin: 10 }} onClick={() => setShowAll(v => !v)}>
+                {showAll ? 'Show fewer' : `Show all ${todo.length}`}
+              </button>
+            )}
+          </>
+        )}
+      </section>
 
-      {/* lifecycle sections */}
-      <Section title="1 · Recruit" sub="find + shortlist candidates">
-        <Tile title="Candidates" sub="resumes · shortlist · calls" Icon={ClipboardList} onClick={() => nav('/hr/candidates')} badge={c.candidates} />
-      </Section>
+      {/* Hiring status, one row */}
+      <section style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, marginRight: 4 }}>Hiring</span>
+        {hiring.map(h => (
+          <button key={h.filter} type="button" className="hr-chip" onClick={() => nav(`/hr/offers?filter=${h.filter}`)}>
+            {h.label} <b className="tabular-nums" style={{ color: h.n > 0 ? 'var(--accent, #FFE600)' : 'var(--text-subtle, #64748b)' }}>{data ? h.n : '…'}</b>
+          </button>
+        ))}
+      </section>
 
-      {/* Phase 618 - one hiring path: offer -> owner approval -> link -> accepted -> login -> onboarding */}
-      <Section title="2 · Hire" sub="one path: offer, owner approval, link, login">
-        <Tile title="Waiting for owner" sub="salary approval" Icon={FileText} onClick={() => nav('/hr/offers?filter=waiting')} badge={c.owner} />
-        <Tile title="Share the link" sub="approved or sent back" Icon={FileText} onClick={() => nav('/hr/offers?filter=approved')} badge={c.share} />
-        <Tile title="Waiting for candidate" sub="link sent, not accepted yet" Icon={FileText} onClick={() => nav('/hr/offers?filter=open')} badge={c.cand} />
-        <Tile title="Ready to create login" sub="accepted - one tap" Icon={UserPlus} onClick={() => nav('/hr/offers?filter=accepted')} badge={c.login} />
-        <Tile title="Onboarding" sub="logins made in the last 30 days" Icon={GraduationCap} onClick={() => nav('/hr/onboarding')} badge={c.onboard} />
-      </Section>
+      {/* who said the morning hi / shared the evening report — kept, but below HR's own work */}
+      <DailyCheckinCard />
 
-      <Section title="3 · Onboard & train" sub="first days — no doubts">
-        <Tile title="Onboarding timeline" sub="who's onboarding · who's stuck" Icon={GraduationCap} onClick={() => nav('/hr/onboarding')} />
-        <Tile title="Build templates" sub="role steps · material · tests" Icon={ClipboardList} onClick={() => nav('/hr/onboarding/templates')} />
-      </Section>
-
-      <Section title="4 · Manage" sub="day-to-day people ops">
-        <Tile title="Leaves" sub="approve / reject" Icon={CalendarCheck} onClick={() => nav('/admin/leaves')} badge={c.leaves} />
-        <Tile title="TA / DA claims" sub="approve travel claims" Icon={Wallet} onClick={() => nav('/admin/ta-payouts')} badge={c.ta} />
-        <Tile title="Team roster" sub="members · roles · designations" Icon={Users} onClick={() => nav('/team')} />
-        <Tile title="Attendance / GPS" sub="who's in the field today" Icon={MapPin} onClick={() => nav('/team-dashboard')} />
-      </Section>
-
-      <Section title="5 · Exit" sub="offboarding">
-        <Tile title="Offboarding" sub="deactivate · collect assets" Icon={LogOut} soon />
-      </Section>
-    </div>
-  )
-}
-
-function Kpi({ label, value, accent, onClick, Icon }) {
-  return (
-    <div onClick={onClick} style={{ cursor: 'pointer', background: 'var(--surface, #1e293b)', border: `1px solid ${accent ? 'var(--warning, #F59E0B)' : 'var(--border, #334155)'}`, borderRadius: 14, padding: 18 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ fontSize: 12, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-subtle, #64748b)', fontWeight: 600 }}>{label}</div>
-        <Icon size={18} style={{ color: accent ? 'var(--warning, #F59E0B)' : 'var(--text-muted, #94a3b8)' }} />
-      </div>
-      <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 30, marginTop: 6, color: accent ? 'var(--warning, #F59E0B)' : 'var(--text, #f1f5f9)' }}>{value}</div>
-    </div>
-  )
-}
-
-function Section({ title, sub, children }) {
-  return (
-    <div style={{ marginBottom: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text, #f1f5f9)' }}>{title}</div>
-        <div style={{ fontSize: 12, color: 'var(--text-subtle, #64748b)' }}>{sub}</div>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>{children}</div>
-    </div>
-  )
-}
-
-function Tile({ title, sub, Icon, onClick, soon, badge }) {
-  return (
-    <div onClick={soon ? undefined : onClick}
-      style={{ cursor: soon ? 'default' : 'pointer', opacity: soon ? 0.55 : 1, background: 'var(--surface, #1e293b)', border: '1px solid var(--border, #334155)', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
-      <span style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--surface-2, #334155)', display: 'grid', placeItems: 'center', color: 'var(--accent, #FFE600)', flexShrink: 0 }}><Icon size={18} /></span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text, #f1f5f9)' }}>{title}{soon && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, padding: '2px 7px', borderRadius: 999, background: 'var(--surface-2, #334155)', color: 'var(--text-subtle)' }}>soon</span>}</div>
-        <div style={{ fontSize: 12, color: 'var(--text-subtle, #64748b)', marginTop: 2 }}>{sub}</div>
-      </div>
-      {badge > 0 && <span style={{ fontSize: 12, fontWeight: 700, minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999, background: 'var(--warning-soft, rgba(245,158,11,.12))', color: 'var(--warning, #F59E0B)', display: 'grid', placeItems: 'center' }}>{badge}</span>}
-      {!soon && <ChevronRight size={16} style={{ color: 'var(--text-subtle)', flexShrink: 0 }} />}
+      <style>{`
+        .hr-todo-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: transparent; border: 0; border-top: 1px solid var(--border, #334155); cursor: pointer; font: inherit; color: inherit; }
+        .hr-todo-row:first-of-type { border-top: 0; }
+        .hr-todo-row:hover { background: var(--surface-2, #334155); }
+        .hr-todo-row:focus-visible, .hr-chip:focus-visible { outline: 2px solid var(--accent, #FFE600); outline-offset: -2px; }
+        .hr-todo-ic { width: 32px; height: 32px; border-radius: 10px; background: var(--surface-2, #334155); color: var(--accent, #FFE600); display: grid; place-items: center; flex-shrink: 0; }
+        .hr-todo-act { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--accent, #FFE600); white-space: nowrap; flex-shrink: 0; }
+        .hr-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border, #334155); background: var(--surface, #1e293b); color: var(--text-muted, #94a3b8); font: inherit; font-size: 13px; cursor: pointer; }
+        .hr-chip:hover { border-color: var(--accent, #FFE600); color: var(--text, #f1f5f9); }
+        @media (max-width: 720px) { .hr-todo-act { font-size: 12px; } .hr-todo-row { padding: 12px; } }
+        .spin { animation: spin 1s linear infinite; }
+      `}</style>
     </div>
   )
 }
