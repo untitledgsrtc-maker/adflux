@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { usePersistedState } from '../../hooks/usePersistedState'  // Phase 268 — remember filters across Back
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText, CheckCircle2 } from 'lucide-react'
+import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText, CheckCircle2, MessageCircle } from 'lucide-react'
 // Phase 94 — path-param routing replaces the quoteIntent fallback.
 // Import retained for any future producer that still needs the
 // in-memory channel (e.g. external bookmark hand-offs). Currently
@@ -30,6 +30,7 @@ import { confirmDialog } from '../../components/v2/ConfirmDialog'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import V2Hero from '../../components/v2/V2Hero'
 import SegmentToggle from '../../components/v2/SegmentToggle'
+import { openWhatsApp } from '../../utils/whatsapp'
 
 /* ─── Local helpers ────────────────────────────────── */
 function computeBalance(q) {
@@ -341,6 +342,33 @@ export default function QuotesV2() {
     return { count: displayed.length, amount, sentAmount, outstanding, collected, wonAmount, wonCount, lostCount, convPct }
   }, [displayed])
 
+  // Phase 615 - admin / sales head filtered to ONE rep: send that rep this summary on WhatsApp.
+  async function shareRepSummary() {
+    const rep = repOptions.find(r => r.id === repFilter)
+    const name = rep?.name || 'Rep'
+    const { data: u } = await supabase.from('users').select('whatsapp_number').eq('id', repFilter).maybeSingle()
+    const by = (st) => displayed.filter(q => q.status === st).length
+    const period = filters.dateFrom || filters.dateTo
+      ? `${filters.dateFrom ? formatDate(filters.dateFrom) : '...'} to ${filters.dateTo ? formatDate(filters.dateTo) : 'today'}`
+      : 'All time'
+    const seg = segmentFilter === 'all' ? 'All segments' : segmentFilter === 'government' ? 'Government' : 'Private'
+    const due = displayed.map(q => ({ q, b: computeBalance(q) })).filter(x => x.b.kind === 'due' && x.b.amount > 0)
+      .sort((a, b) => b.b.amount - a.b.amount).slice(0, 5)
+    const lines = [
+      `*Quote summary - ${name}*`,
+      `${period} · ${seg}`,
+      '',
+      `Total quotes: ${totals.count} (${formatCurrency(totals.amount)})`,
+      `Sent ${by('sent')} · Negotiating ${by('negotiating')} · Draft ${by('draft')} · Won ${by('won')} · Lost ${by('lost')}`,
+      `Won: ${formatCurrency(totals.wonAmount)} (${totals.wonCount})`,
+      ...(!filters.status ? [`Conversion: ${totals.convPct}% (won value of sent value)`] : []),
+      `Outstanding: ${formatCurrency(totals.outstanding)}`,
+      ...(due.length ? ['', 'Biggest pending payments:', ...due.map(({ q, b }) => `- ${q.quote_number || ''} · ${q.client_company || q.client_name || ''} · ${formatCurrency(b.amount)}`)] : []),
+    ]
+    if (!u?.whatsapp_number) toastError(null, `No WhatsApp number saved for ${name} - pick the chat yourself.`)
+    openWhatsApp(u?.whatsapp_number || '', lines.join('\n'))
+  }
+
   // Phase 311 — on the Won tab, the DATE column shows the WON date (won_at);
   // every other tab shows created_at (unchanged). Mirrors the useQuotes Won-tab
   // date filter so the date shown == the date filtered on.
@@ -552,6 +580,15 @@ export default function QuotesV2() {
           onChange: setRepFilter,
         }] : []),
       ]} />
+
+      {showTeam && repFilter !== 'all' && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0 0 10px' }}>
+          <button type="button" className="v2d-ghost" onClick={shareRepSummary} title="Send this summary to the rep on WhatsApp">
+            <MessageCircle size={14} />
+            <span>Share summary on WhatsApp</span>
+          </button>
+        </div>
+      )}
 
       {/* Phase 34Z.11 — totals strip retired. V2Hero above already
           shows total amount + outstanding + filter scope. Mobile
