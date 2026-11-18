@@ -21,6 +21,7 @@ import { useState, useRef } from 'react'
 import { X, Download, UserPlus, Copy, Check, MessageSquare, Mail, KeyRound, FileText } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useOffers, buildOfferUrl, STATUS_META } from '../../hooks/useOffers'
+import { offerLoginArgs, offerTargets } from '../../utils/hrOffer'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { formatCurrency } from '../../utils/formatters'
 import { toastError, toastSuccess } from '../v2/Toast'
@@ -187,10 +188,9 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
 
     const pRole     = authRole || 'sales'
     const pTeamRole = teamRole || 'sales'
-    // CLAUDE.md §8 — segment scope on users.segment_access applies ONLY to
-    // roles sales + telecaller; every other role = ALL. Compute from the
-    // resolved role (a govt hire keeps ALL, not the old hardcoded PRIVATE).
-    const pSegment  = (pRole === 'sales' || pRole === 'telecaller') ? 'PRIVATE' : 'ALL'
+    // Phase 618 - manager, segment and allowances come from the offer (set once by HR,
+    // approved by the owner). Legacy offers keep the old rule: CLAUDE.md section 8 -
+    // sales / telecaller = PRIVATE, every other role = ALL (see utils/hrOffer.js).
     // Seed the sales incentive profile only for incentive-earning roles.
     // has_incentive === false (flat-salary ops/accounts/etc) → skip it;
     // null (legacy sales offer) or true → seed the sales profile below.
@@ -220,7 +220,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
       // whose claim window broke (Mayur). Fall back to Vadodara so it's never
       // null; HR can correct in Team.
       p_city:             offer.city || 'Vadodara',
-      p_segment_access:   pSegment,
+      ...offerLoginArgs(offer),
     })
 
     if (rpcErr) {
@@ -291,6 +291,21 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
         + ' - press Convert again to retry (safe), or set it in People > Team.')
       setConverting(false)
       return
+    }
+
+    // Phase 618 - daily targets from the offer (only when the person has no active row yet,
+    // so a re-run never doubles them) and the recruit card -> login link. Best-effort.
+    const targets = offerTargets(offer)
+    if (targets) {
+      const { data: activeT } = await supabase.from('daily_targets').select('id').eq('user_id', userId).is('effective_to', null).limit(1)
+      if (!activeT?.length) {
+        const { error: tErr } = await supabase.from('daily_targets').insert([{ user_id: userId, ...targets, effective_from: offer.joining_date || new Date().toISOString().split('T')[0] }])
+        if (tErr) console.warn('[offer-convert] targets failed:', tErr.message)
+      }
+    }
+    if (offer.candidate_id) {
+      const { error: cErr } = await supabase.from('hr_candidates').update({ converted_user_id: userId }).eq('id', offer.candidate_id)
+      if (cErr) console.warn('[offer-convert] candidate link failed:', cErr.message)
     }
 
     // Auto-start the hire's onboarding from their role template (best-effort;
