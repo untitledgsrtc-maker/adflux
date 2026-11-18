@@ -237,6 +237,7 @@ const MANAGER_NAV = [
   { to: '/follow-ups',        label: 'Follow-ups',     icon: ClockIcon },
   { to: '/leads',             label: 'Leads',          icon: Inbox },
   { to: '/quotes',            label: 'Quotes',         icon: FileText },
+  { to: '/quote-approvals',   label: 'Quote prices',   icon: CheckSquare }, // Phase 608 - his reps' price requests (RLS)
   { to: '/clients',           label: 'Clients',        icon: Contact2 },
   { to: '/campaigns/inbox',   label: 'WhatsApp',       icon: MessageCircle },   // Phase 590 - his team's chats (RLS), reply on own only
   { to: '/dashboard',         label: 'Dashboard',      icon: LayoutDashboard },

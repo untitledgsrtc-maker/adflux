@@ -241,7 +241,8 @@ function RequireApprovals({ children }) {
 function RequireQuoteApprovals({ children }) {
   const { profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  const ok = profile?.role === 'admin' || profile?.is_sales_head === true
+  // Phase 608 - a team manager decides his own reps' requests (RLS qpa_manager_*).
+  const ok = profile?.role === 'admin' || profile?.is_sales_head === true || profile?.team_role === 'sales_manager'
   if (!ok) return <Navigate to="/quotes" replace />
   return children
 }
