@@ -18,7 +18,7 @@
 // does not carry the offer salary over).
 
 import { useState, useRef } from 'react'
-import { X, Download, UserPlus, Copy, Check, MessageSquare, Mail, KeyRound, FileText } from 'lucide-react'
+import { X, Download, UserPlus, Copy, Check, MessageSquare, Mail, KeyRound, FileText, Send, Undo2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useOffers, buildOfferUrl, STATUS_META } from '../../hooks/useOffers'
 import { offerLoginArgs, offerTargets } from '../../utils/hrOffer'
@@ -26,6 +26,7 @@ import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { formatCurrency } from '../../utils/formatters'
 import { toastError, toastSuccess } from '../v2/Toast'
 import SendEmailModal from '../v2/SendEmailModal'
+import { useAuthStore } from '../../store/authStore'
 
 // Phase 109.4 — open a private PAN/Aadhaar card via a short-lived signed
 // URL (the hr-offer-pii bucket is NOT public; staff-only SELECT RLS gates
@@ -81,6 +82,38 @@ function loginMessage(d) {
   ].filter(l => l !== null).join('\n')
 }
 
+// Phase 618 - the six hiring steps, done / current / upcoming from the offer status.
+const HIRE_STEPS = ['Offer drafted', 'Owner approval', 'Link sent', 'Accepted', 'Login created', 'Onboarding']
+function hireStepIndex(status) {
+  if (status === 'draft' || status === 'pending_approval') return 1
+  if (status === 'approved') return 2
+  if (status === 'sent' || status === 'filled') return 3
+  if (status === 'accepted') return 4
+  if (status === 'converted_to_user') return 6
+  return -1
+}
+function HireSteps({ status }) {
+  const cur = hireStepIndex(status)
+  if (cur < 0) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+      {HIRE_STEPS.map((label, i) => {
+        const done = i < cur, now = i === cur
+        return (
+          <span key={label} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 999, fontSize: '.75rem', fontWeight: 600,
+            border: '1px solid ' + (now ? 'var(--accent)' : 'var(--brd)'),
+            background: done ? 'rgba(34,197,94,.10)' : now ? 'var(--accent-soft, rgba(255,230,0,.14))' : 'transparent',
+            color: done ? 'var(--green)' : now ? 'var(--fg)' : 'var(--gray)',
+          }}>
+            {done ? <Check size={14} /> : <span>{i + 1}</span>} {label}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 function Row({ label, value }) {
   if (!value) return null
   return (
@@ -116,7 +149,11 @@ function Section({ title, children }) {
 }
 
 export function OfferDetailModal({ offer, onClose, onChanged }) {
-  const { updateOffer, cancelOffer } = useOffers()
+  const { updateOffer, cancelOffer, markSent } = useOffers()
+  const isOwner = useAuthStore(s => s.profile?.role) === 'admin'
+  const [apprSalary, setApprSalary] = useState(String(offer.fixed_salary_monthly ?? ''))
+  const [apprNote, setApprNote] = useState('')
+  const [apprBusy, setApprBusy] = useState(false)
   const [converting, setConverting] = useState(false)
   const [convertErr, setConvertErr] = useState('')
   const [password,   setPassword]   = useState(() => genPassword())
@@ -144,6 +181,36 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
   const isAccepted  = offer.status === 'accepted'
   const isConverted = offer.status === 'converted_to_user'
   const canCancel   = !isAccepted && !isConverted && offer.status !== 'cancelled'
+  // Phase 618 - the link exists only once the owner approved it
+  const linkReady   = ['approved', 'sent', 'filled'].includes(offer.status)
+
+  async function approvalAction(patch, okMsg) {
+    if (apprBusy) return
+    setApprBusy(true)
+    const { error } = await updateOffer(offer.id, patch)
+    setApprBusy(false)
+    if (error) { toastError(error, 'Could not update the offer.'); return }
+    toastSuccess(okMsg)
+    onChanged?.()
+    onClose()
+  }
+  const approve = () => {
+    const sal = Number(apprSalary)
+    if (apprSalary === '' || Number.isNaN(sal) || sal < 0) { toastError(null, 'Enter the monthly salary to approve.'); return }
+    approvalAction({ fixed_salary_monthly: sal, status: 'approved', approval_note: apprNote.trim() || null }, 'Approved. HR can now share the link.')
+  }
+  const sendBack = () => {
+    if (!apprNote.trim()) { toastError(null, 'Write what HR should change.'); return }
+    approvalAction({ status: 'draft', approval_note: apprNote.trim() }, 'Sent back to HR.')
+  }
+  const resubmit = () => approvalAction({ status: 'pending_approval' }, 'Sent to the owner for approval.')
+  async function handleMarkSent() {
+    const { error } = await markSent(offer.id)
+    if (error) { toastError(error, 'Could not mark it sent.'); return }
+    toastSuccess('Marked as sent.')
+    onChanged?.()
+    onClose()
+  }
 
   async function copyToClipboard(text, key) {
     try {
@@ -444,6 +511,40 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
         </div>
 
         <div className="md-b">
+          <HireSteps status={offer.status} />
+
+          {/* Phase 618 - owner approval */}
+          {offer.status === 'pending_approval' && (isOwner ? (
+            <div style={{ marginBottom: 18, padding: 14, border: '1px solid var(--accent)', borderRadius: 10 }}>
+              <div style={{ fontWeight: 700, marginBottom: 10 }}>Approve this salary</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+                <div className="fg"><label>Monthly salary (Rs)</label>
+                  <input type="number" min="0" value={apprSalary} onChange={e => setApprSalary(e.target.value)} /></div>
+                <div className="fg"><label>Note for HR (needed to send back)</label>
+                  <input value={apprNote} onChange={e => setApprNote(e.target.value)} placeholder="e.g. make it 22,000, joining 1 Dec" /></div>
+              </div>
+              <div style={{ fontSize: '.8rem', color: 'var(--gray)', margin: '4px 0 10px' }}>
+                Manager: {offer.manager_id ? 'set' : 'none'} · Segment: {offer.segment_access || 'PRIVATE'} · TA {offer.allow_ta ? 'on' : 'off'} · DA {offer.allow_da ? 'on' : 'off'} · Hotel {offer.allow_hotel ? 'on' : 'off'} · Targets {Number(offer.min_calls) || 0} calls / {Number(offer.min_quotes) || 0} quotes / {Number(offer.min_followups) || 0} follow-ups
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn-y" onClick={approve} disabled={apprBusy}><Check size={14} style={{ marginRight: 6 }} />{apprBusy ? 'Saving...' : 'Approve'}</button>
+                <button className="btn btn-ghost" onClick={sendBack} disabled={apprBusy}><Undo2 size={14} style={{ marginRight: 6 }} />Send back to HR</button>
+              </div>
+            </div>
+          ) : (
+            <div className="okrow" style={{ marginBottom: 18, padding: 12, border: '1px dashed var(--brd)', borderRadius: 10, color: 'var(--gray)' }}>
+              Waiting for the owner to approve the salary. You will get a notification.
+            </div>
+          ))}
+          {offer.status === 'draft' && (
+            <div style={{ marginBottom: 18, padding: 12, border: '1px solid var(--brd)', borderRadius: 10 }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Sent back by the owner</div>
+              {offer.approval_note && <div style={{ fontSize: '.88rem', marginBottom: 10 }}>{offer.approval_note}</div>}
+              <div style={{ fontSize: '.8rem', color: 'var(--gray)', marginBottom: 10 }}>Cancel this offer and make a new one with the changes, or send it again as it is.</div>
+              <button className="btn btn-ghost" onClick={resubmit} disabled={apprBusy}><Send size={14} style={{ marginRight: 6 }} />Send for approval again</button>
+            </div>
+          )}
+
           <Section title="Offer (admin-entered)">
             <Row label="Candidate Email" value={offer.candidate_email} />
             <Row label="Position"        value={offer.position} />
@@ -559,12 +660,12 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
               fontSize: '.88rem',
               marginBottom: 18,
             }}>
-              Candidate has not yet opened the invite link.
+              {linkReady ? 'Candidate has not yet opened the invite link.' : 'The link is shared after the owner approves.'}
             </div>
           )}
 
-          {/* Share-link panel — visible while candidate hasn't accepted */}
-          {!isAccepted && !isConverted && (
+          {/* Share-link panel — Phase 618: only after the owner approved */}
+          {linkReady && (
             <div style={{ marginBottom: 14 }}>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                 <input readOnly value={fullUrl} style={{ flex: 1 }} />
@@ -576,6 +677,11 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
                   <MessageSquare size={14} /> WhatsApp
                 </button>
               </div>
+              {offer.status === 'approved' && (
+                <button className="btn btn-y" type="button" onClick={handleMarkSent}>
+                  <Send size={14} style={{ marginRight: 6 }} /> I have shared it - mark as sent
+                </button>
+              )}
             </div>
           )}
 

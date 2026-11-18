@@ -9,8 +9,8 @@
 // issue. The overlay bridge CSS in v2.css adapts legacy form controls to
 // the dark theme.
 
-import { useEffect, useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   UserPlus, UserCheck, Search, Briefcase, Clock, CheckCircle2, Users,
 } from 'lucide-react'
@@ -21,6 +21,8 @@ import { formatCurrency } from '../../utils/formatters'
 
 const FILTERS = [
   { key: 'all',       label: 'All' },
+  { key: 'waiting',   label: 'Waiting for owner' },
+  { key: 'approved',  label: 'Approved - share link' },
   { key: 'open',      label: 'Open invites' },
   { key: 'accepted',  label: 'Accepted' },
   { key: 'converted', label: 'Converted' },
@@ -29,7 +31,9 @@ const FILTERS = [
 
 function matchesFilter(offer, key) {
   if (key === 'all') return true
-  if (key === 'open')       return ['draft','sent','filled'].includes(offer.status)
+  if (key === 'waiting')    return ['pending_approval','draft'].includes(offer.status)
+  if (key === 'approved')   return offer.status === 'approved'
+  if (key === 'open')       return ['sent','filled'].includes(offer.status)
   if (key === 'accepted')   return offer.status === 'accepted'
   if (key === 'converted')  return offer.status === 'converted_to_user'
   if (key === 'cancelled')  return offer.status === 'cancelled'
@@ -39,12 +43,21 @@ function matchesFilter(offer, key) {
 export default function HRV2() {
   const navigate = useNavigate()
   const { offers, loading, error, fetchOffers } = useOffers()
-  const [filter, setFilter]   = useState('all')
+  // Phase 618 - ?filter= from the HR home Hiring tile, ?offer= from the approval push
+  const [params] = useSearchParams()
+  const [filter, setFilter]   = useState(() => (FILTERS.some(f => f.key === params.get('filter')) ? params.get('filter') : 'all'))
   const [search, setSearch]   = useState('')
   const [sendOpen, setSendOpen] = useState(false)
   const [selected, setSelected] = useState(null)
 
   useEffect(() => { fetchOffers() }, [fetchOffers])
+  const deepOffer = params.get('offer')
+  const deepDone = useRef(false)   // open the pushed offer once, not again after every reload
+  useEffect(() => {
+    if (!deepOffer || deepDone.current || !offers.length) return
+    const o = offers.find(x => x.id === deepOffer)
+    if (o) { deepDone.current = true; setSelected(o) }
+  }, [deepOffer, offers])
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -62,7 +75,7 @@ export default function HRV2() {
 
   const stats = useMemo(() => ({
     total:     offers.length,
-    open:      offers.filter(o => ['draft','sent','filled'].includes(o.status)).length,
+    open:      offers.filter(o => ['sent','filled'].includes(o.status)).length,
     accepted:  offers.filter(o => o.status === 'accepted').length,
     converted: offers.filter(o => o.status === 'converted_to_user').length,
   }), [offers])
