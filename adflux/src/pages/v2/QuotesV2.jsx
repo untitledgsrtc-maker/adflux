@@ -123,7 +123,6 @@ export default function QuotesV2() {
     if (!q) return false
     if (teamViewing) return false   // Phase 247.3 — team view is READ-ONLY
     if (othersReadOnly(q)) return false   // Phase 583
-    const isPrivileged = ['admin', 'co_owner'].includes(profile?.role)
     if (q.status === 'won') {
       // Won always blocked when payments present. Trigger does the
       // FK check; we hide it here too for cleaner UX. useQuotes
@@ -131,11 +130,9 @@ export default function QuotesV2() {
       // so q.payments is an array.
       const hasPayments = Array.isArray(q.payments) && q.payments.length > 0
       if (hasPayments) return false
-      // Won-without-payments: admin/co_owner only.
-      return isPrivileged
     }
-    // Draft / sent / negotiating / lost / nurture: any role.
-    return true
+    // Phase 612 - after Draft only admin may delete (DB quotes_no_delete_after_draft).
+    return (q.status || 'draft') === 'draft' || profile?.role === 'admin'
   }
 
   async function deleteQuote(e, q) {
