@@ -1063,6 +1063,8 @@ export default function GpsTrackV2() {
           voiceLogs={voiceLogs}
           gpsOffEvents={gpsOffEvents}
           networkOffEvents={networkOffEvents}
+          stageLog={stageLog}
+          quoteDeletes={quoteDeletes}
           callBreakdown={callBreakdown}
           callRows={callRows}
           navigate={navigate}
@@ -1190,7 +1192,7 @@ function CallHistorySection({ title, sub, rows, navigate, defaultOpen = false })
   )
 }
 
-function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], networkOffEvents = [], callBreakdown = { total: 0, missed: 0, noAnswer: 0, short: 0, qualified: 0, connectedQualified: 0 }, callRows = [], navigate }) {
+function RepDaySections({ session, activities, voiceLogs, gpsOffEvents = [], networkOffEvents = [], stageLog = [], quoteDeletes = [], callBreakdown = { total: 0, missed: 0, noAnswer: 0, short: 0, qualified: 0, connectedQualified: 0 }, callRows = [], navigate }) {
   const counters = session?.daily_counters || {}
   const checkIn  = session?.check_in_at
   const checkOut = session?.check_out_at
