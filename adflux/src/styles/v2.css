@@ -2380,3 +2380,21 @@
 
 /* Phase 549 - login page brand tile shows the real logo mark (same as sidebar, CSS only). */
 .v2d-login-mark { background: url('/favicon.svg') center / contain no-repeat; color: transparent; font-size: 0; }
+
+/* Phase 617 - mid-width desktop (small laptop / half screen, 861-1440px): the topbar wrapped and
+   pushed the name + avatar onto a 2nd row (search 220 + Ask AI 180 min-widths). Keep ONE row: the
+   greeting keeps its width (ellipsis only when truly narrow), the two search boxes share what is
+   left and drop their shortcut hints. Phone (<=860) and wide desktop (>1440) are unchanged.
+   !important only to beat the inline min-widths in V2AppShell / GlobalSearchBar. */
+@media (min-width: 861px) and (max-width: 1440px) {
+  .v2d-topbar { flex-wrap: nowrap; gap: 10px; }
+  .v2d-topbar > * { flex-shrink: 0; }
+  .v2d-topbar > .v2d-crumb { min-width: 0; flex: 0 1 auto; overflow: hidden; }
+  .v2d-topbar .v2d-crumb-kicker,
+  .v2d-topbar .v2d-crumb-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .v2d-topbar > .v2d-topbar-spacer { flex: 0 0 0; }
+  .v2d-topbar > .v2d-search-wrap,
+  .v2d-topbar > .v2d-search { min-width: 110px !important; flex: 1 1 0; }
+  .v2d-topbar .v2d-search-wrap .v2d-search { min-width: 0 !important; }
+  .v2d-topbar .v2d-search > span:last-child:not(:first-child) { display: none; }
+}
