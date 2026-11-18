@@ -92,6 +92,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
     whatsapp_number:  member?.whatsapp_number || '',
     signature_mobile: member?.signature_mobile || '',
     city:             member?.city || '',
+    wa_business:      member?.wa_business === true,   // Phase 619
   })
   // Phase 581 — the row as stored when the box opened (fresh read). Edit saves
   // only what differs from it, so a field the caller's list did not load
@@ -120,7 +121,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
     if (mode !== 'edit' || !member?.id) return
     let cancelled = false
     supabase.from('users')
-      .select('id, name, role, team_role, designation, segment_access, agency_commission_percent, default_signer_user_id, whatsapp_number, signature_mobile, city')
+      .select('id, name, role, team_role, designation, segment_access, agency_commission_percent, default_signer_user_id, whatsapp_number, signature_mobile, city, wa_business')
       .eq('id', member.id).maybeSingle()
       .then(({ data, error: err }) => {
         if (cancelled) return
@@ -138,6 +139,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
           whatsapp_number: data.whatsapp_number || '',
           signature_mobile: data.signature_mobile || '',
           city: data.city || '',
+          wa_business: data.wa_business === true,
         }))
       })
     return () => { cancelled = true }
@@ -266,6 +268,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
         whatsapp_number: cleanMobile(form.whatsapp_number) || null,
         signature_mobile: cleanMobile(form.signature_mobile) || null,
         city: form.city.trim() || null,
+        wa_business: !!form.wa_business,
       }
       if (form.role === 'agency') {
         baseInsert.agency_commission_percent = Number(form.agency_commission_percent)
@@ -327,6 +330,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
         whatsapp_number: cleanMobile(form.whatsapp_number) || null,
         signature_mobile: cleanMobile(form.signature_mobile) || null,
         city: form.city.trim() || null,
+        wa_business: !!form.wa_business,
       }
       if (form.role === 'agency') {
         // Phase 101.A2 / 101.C — agency commission % + default proposal signer.
@@ -443,6 +447,11 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
               value={form.whatsapp_number} onChange={e => set('whatsapp_number', e.target.value)}
               style={errors.whatsapp_number ? { borderColor: 'var(--red)' } : {}} />
           </Field>
+          {/* Phase 619 - quote PDFs open the share sheet so the rep can pick WhatsApp Business */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.85rem', margin: '-4px 0 12px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!form.wa_business} onChange={e => set('wa_business', e.target.checked)} />
+            Uses WhatsApp Business (quote PDFs open the share menu to pick it)
+          </label>
           <Field label="Signature mobile" error={errors.signature_mobile}
             hint="Printed under the person's name on proposals they sign. Leave blank if they do not sign.">
             <input type="tel" inputMode="numeric" placeholder="e.g. 9898012345"

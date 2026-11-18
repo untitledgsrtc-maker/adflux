@@ -23,6 +23,7 @@
 import { cleanPhone } from './phone'
 import { buildWhatsAppMessage, openWhatsApp, shortenUrl } from './whatsapp'
 import { shareWhatsAppDirect } from './shareDirect'
+import { useAuthStore } from '../store/authStore'
 import {
   downloadQuotePDFHtml as downloadQuotePDF,
   uploadQuotePDFHtml   as uploadQuotePDF,
@@ -89,7 +90,11 @@ export async function shareQuoteViaWhatsApp(quote, cities, { onStatus } = {}) {
       // ShareDirect: open the CLIENT's WhatsApp chat directly with the PDF
       // attached (Phase 162). Falls back to the generic sheet if WhatsApp
       // isn't installed / older APK.
-      const direct = await shareWhatsAppDirect({
+      // Phase 619 - the native direct share only knows regular WhatsApp (com.whatsapp).
+      // A rep marked "uses WhatsApp Business" goes straight to the share sheet below,
+      // PDF attached, where they tap WhatsApp Business and pick the client.
+      const waBusiness = useAuthStore.getState().profile?.wa_business === true
+      const direct = waBusiness ? { completed: false } : await shareWhatsAppDirect({
         phone:   digits.length === 10 ? `91${digits}` : digits,
         text:    caption,
         fileUri: uri,
