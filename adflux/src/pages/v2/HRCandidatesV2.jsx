@@ -191,9 +191,9 @@ export default function HRCandidatesV2() {
           share step (copy link / WhatsApp) after creating the offer. It closes only via its own
           Done / X (onClose). candidate_phone → the WhatsApp button opens THIS candidate's chat. */}
       {offerFor && <SendOfferModal
-        prefill={{ candidate_name: offerFor.name || '', candidate_email: offerFor.email || '', candidate_phone: offerFor.phone || '' }}
+        prefill={{ candidate_name: offerFor.name || '', candidate_email: offerFor.email || '', candidate_phone: offerFor.phone || '', candidate_id: offerFor.id || null }}
         onClose={() => setOfferFor(null)}
-        onCreated={() => { toastSuccess('Offer created — copy the link or share it on WhatsApp.') }} />}
+        onCreated={(o) => { toastSuccess(o?.status === 'approved' ? 'Offer created — copy the link or share it on WhatsApp.' : 'Offer sent to the owner for approval.') }} />}
 
       <style>{`.spin{animation:hrspin 1s linear infinite}@keyframes hrspin{to{transform:rotate(360deg)}}`}</style>
     </div>

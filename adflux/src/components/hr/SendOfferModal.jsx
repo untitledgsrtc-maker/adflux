@@ -14,6 +14,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { X, Copy, Check, MessageSquare } from 'lucide-react'
 import { useOffers, buildOfferUrl } from '../../hooks/useOffers'
+import { offerWhatsAppText } from '../../utils/hrOffer'
 import { supabase } from '../../lib/supabase'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { phoneLast10 } from '../../utils/phone'
@@ -64,6 +65,11 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
     incentive_renewal_rate:      '0.02',
     incentive_flat_bonus:        '10000',
     place:                       'Vadodara',
+    // Phase 618 - login details, set once here, approved by the owner, used by Create login
+    manager_id:                  '',
+    segment_access:              'PRIVATE',
+    allow_ta: false, allow_da: false, allow_hotel: false, allow_other: true,
+    min_calls: '', min_quotes: '', min_followups: '',
   })
   const [errors, setErrors]       = useState({})
   const [saving, setSaving]       = useState(false)
@@ -82,12 +88,16 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
   useEffect(() => {
     let alive = true
     supabase.from('designations')
-      .select('id, name, auth_role, team_role, has_incentive')
+      .select('id, name, auth_role, team_role, has_incentive, default_allow_ta, default_allow_da, default_allow_hotel, default_allow_other, default_min_calls, default_min_quotes, default_min_followups')
       .eq('is_active', true)
       .order('display_order')
       .then(({ data }) => { if (alive && data) setDesignations(data) })
+    // Phase 618 - managers for the new hire (same list HRNewUserV2 uses)
+    supabase.from('users').select('id, name, team_role').in('team_role', ['sales_manager', 'admin']).eq('is_active', true).order('name')
+      .then(({ data }) => { if (alive && data) setManagers(data) })
     return () => { alive = false }
   }, [])
+  const [managers, setManagers] = useState([])
 
   const picked = useMemo(
     () => designations.find(d => d.id === form.designation_id) || null,
@@ -111,6 +121,12 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
       ...f,
       designation_id: id,
       position: d ? d.name : f.position,
+      // Phase 618 - the role's defaults; HR can change them before sending for approval
+      ...(d ? {
+        allow_ta: !!d.default_allow_ta, allow_da: !!d.default_allow_da,
+        allow_hotel: !!d.default_allow_hotel, allow_other: d.default_allow_other !== false,
+        min_calls: d.default_min_calls || '', min_quotes: d.default_min_quotes || '', min_followups: d.default_min_followups || '',
+      } : {}),
     }))
     setErrors(e => ({ ...e, designation_id: '', position: '' }))
   }
@@ -186,6 +202,11 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
       designation_team_role:       picked?.team_role ?? null,
       designation_has_incentive:   picked?.has_incentive ?? null,
       designation_name:            picked?.name ?? null,
+      manager_id:                  form.manager_id || null,
+      segment_access:              form.segment_access,
+      allow_ta: !!form.allow_ta, allow_da: !!form.allow_da, allow_hotel: !!form.allow_hotel, allow_other: !!form.allow_other,
+      min_calls: Number(form.min_calls) || 0, min_quotes: Number(form.min_quotes) || 0, min_followups: Number(form.min_followups) || 0,
+      candidate_id:                prefill?.candidate_id || null,
     })
     setSaving(false)
 
@@ -195,6 +216,9 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
     }
 
     setOffer(data)
+    onCreated?.(data)
+    // Phase 618 - HR's offer waits for the owner; no link until it is approved.
+    if (data.status !== 'approved') return
     const url = buildOfferUrl(data.invite_token)
     setFullUrl(url)
 
@@ -210,7 +234,6 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
     // now and can share it any moment. Leaving it at 'draft' would
     // mis-classify outstanding invites in the list view.
     markSent(data.id)
-    onCreated?.()
   }
 
   async function copyToClipboard(text, key) {
@@ -227,22 +250,34 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
 
   function shareOnWhatsApp() {
     const link = shortUrlValue || fullUrl
-    const msg  = [
-      `Dear ${offer.candidate_name},`,
-      '',
-      `Congratulations! Untitled Advertising would like to offer you the position of *${offer.position}*.`,
-      '',
-      `Please open the link below to review the terms, complete your personal details, and digitally accept the offer:`,
-      link,
-      '',
-      `Looking forward to having you on the team.`,
-      '',
-      `Untitled Advertising`,
-    ].join('\n')
+    const msg  = offerWhatsAppText(offer, link)
     // This modal does not collect a phone. When the caller passed the
     // candidate's phone (waPhone = 91 + last 10 digits) WhatsApp opens that
     // chat; otherwise '' → the app opens the "choose contact" picker.
     openWhatsApp(waPhone, msg)
+  }
+
+  // ── WAITING FOR OWNER (Phase 618) ───────────────────
+  if (offer && offer.status !== 'approved' && offer.status !== 'sent') {
+    return (
+      <div className="mo" onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className="md">
+          <div className="md-h">
+            <div className="md-t">Sent to the owner for approval</div>
+            <button className="md-x" onClick={onClose}><X size={18} /></button>
+          </div>
+          <div className="md-b">
+            <p style={{ fontSize: '.9rem', lineHeight: 1.5 }}>
+              The offer for <strong>{offer.candidate_name}</strong> ({offer.position}) is waiting for the owner to approve the salary.
+              You get a notification when it is approved; then open it in Offers to share the link.
+            </p>
+          </div>
+          <div className="md-f">
+            <button className="btn btn-y" onClick={onClose}>Done</button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // ── SHARE PANEL ─────────────────────────────────────
@@ -478,6 +513,38 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
           </div>
           )}
 
+          {/* Phase 618 - login details: set once here, the owner sees them when approving */}
+          <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.1em', margin: '8px 0 10px', paddingBottom: 6, borderBottom: '1px solid var(--brd)' }}>
+            Login details (not shown on the letter)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Manager">
+              <select value={form.manager_id} onChange={e => set('manager_id', e.target.value)}>
+                <option value="">No manager</option>
+                {managers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Segment">
+              <select value={form.segment_access} onChange={e => set('segment_access', e.target.value)}>
+                <option value="PRIVATE">Private</option>
+                <option value="GOVERNMENT">Government</option>
+                <option value="ALL">All</option>
+              </select>
+            </Field>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, margin: '4px 0 12px', fontSize: '.85rem' }}>
+            {[['allow_ta', 'TA (travel)'], ['allow_da', 'DA'], ['allow_hotel', 'Hotel'], ['allow_other', 'Other claims']].map(([k, label]) => (
+              <label key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={!!form[k]} onChange={e => set(k, e.target.checked)} /> {label}
+              </label>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <Field label="Calls / day"><input type="number" min="0" value={form.min_calls} onChange={e => set('min_calls', e.target.value)} /></Field>
+            <Field label="Quotes / day"><input type="number" min="0" value={form.min_quotes} onChange={e => set('min_quotes', e.target.value)} /></Field>
+            <Field label="Follow-ups / day"><input type="number" min="0" value={form.min_followups} onChange={e => set('min_followups', e.target.value)} /></Field>
+          </div>
+
           <Field label="Place (for acceptance)">
             <input
               value={form.place}
@@ -489,7 +556,7 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
         <div className="md-f">
           <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="btn btn-y" onClick={handleCreate} disabled={saving}>
-            {saving ? 'Creating…' : 'Create & get invite link'}
+            {saving ? 'Saving…' : 'Send for approval'}
           </button>
         </div>
       </div>

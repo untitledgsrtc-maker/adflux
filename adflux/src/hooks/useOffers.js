@@ -27,6 +27,9 @@ const OFFER_COLS = `
   accepted_terms_at, offer_pdf_url,
   pan_card_path, aadhaar_card_path,
   converted_user_id, converted_at,
+  approved_by, approved_at, approval_note,
+  manager_id, segment_access, allow_ta, allow_da, allow_hotel, allow_other,
+  min_calls, min_quotes, min_followups, candidate_id,
   created_by, created_at, updated_at
 `
 
@@ -97,7 +100,8 @@ export function useOffers() {
       .insert([{
         ...payload,
         created_by: createdBy,
-        status: 'draft',
+        // Phase 618 - goes to the owner; the DB turns an admin's own offer into 'approved'.
+        status: 'pending_approval',
       }])
       .select(OFFER_COLS)
       .single()
@@ -125,7 +129,7 @@ export function useOffers() {
       .from('hr_offers')
       .update({ status: 'sent' })
       .eq('id', id)
-      .in('status', ['draft'])
+      .in('status', ['approved'])   // Phase 618 - only an owner-approved offer can be sent
   }, [])
 
   const cancelOffer = useCallback(async (id) => {
@@ -147,6 +151,8 @@ export function useOffers() {
 // list components can import without instantiating state.
 export const STATUS_META = {
   draft:              { label: 'Draft',        color: 'var(--gray)'   },
+  pending_approval:   { label: 'Waiting for owner', color: 'var(--warn)' },
+  approved:           { label: 'Approved - share link', color: 'var(--blue, #3B82F6)' },
   sent:               { label: 'Invite Sent',  color: 'var(--accent)' },
   filled:             { label: 'Filled',       color: 'var(--warn)'   },
   accepted:           { label: 'Accepted',     color: 'var(--green)'  },
