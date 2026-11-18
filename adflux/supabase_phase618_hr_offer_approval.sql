@@ -35,7 +35,6 @@ CREATE OR REPLACE FUNCTION public.hr_offer_guard()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp AS $$
 DECLARE
-  v_role  text := public.get_my_role();
   v_admin boolean := COALESCE(public.get_my_role() = 'admin', false);
   v_terms_changed boolean;
 BEGIN
@@ -79,9 +78,14 @@ BEGIN
     NEW.approved_by := auth.uid(); NEW.approved_at := now();
   END IF;
 
-  -- a non-admin change to approved terms needs a fresh approval
-  IF v_terms_changed AND NOT v_admin AND NEW.status = 'approved' THEN
-    NEW.status := 'pending_approval'; NEW.approved_by := NULL; NEW.approved_at := NULL;
+  -- a non-admin change to approved terms needs a fresh approval (keyed on OLD so a
+  -- single "raise salary + send/accept" write cannot slip through - review C1)
+  IF v_terms_changed AND NOT v_admin AND OLD.status = 'approved' THEN
+    IF NEW.status NOT IN ('approved','pending_approval','draft') THEN
+      RAISE EXCEPTION 'The terms changed, so the owner must approve again before it is sent.' USING ERRCODE = 'check_violation';
+    END IF;
+    IF NEW.status = 'approved' THEN NEW.status := 'pending_approval'; END IF;
+    NEW.approved_by := NULL; NEW.approved_at := NULL;
   END IF;
   -- sent back / pulled back: approval no longer stands
   IF NEW.status IN ('draft','pending_approval') AND OLD.status = 'approved' THEN
@@ -91,7 +95,8 @@ BEGIN
   IF NEW.status = 'sent' AND OLD.status IS DISTINCT FROM 'sent' AND NEW.approved_at IS NULL THEN
     RAISE EXCEPTION 'The owner has not approved this offer yet.' USING ERRCODE = 'check_violation';
   END IF;
-  IF NEW.status IN ('filled','accepted') AND OLD.status IN ('draft','pending_approval') THEN
+  IF NEW.status IN ('filled','accepted') AND (OLD.status IN ('draft','pending_approval')
+       OR (OLD.status = 'approved' AND NEW.approved_at IS NULL)) THEN
     RAISE EXCEPTION 'This offer is not ready yet' USING ERRCODE = 'check_violation';
   END IF;
   RETURN NEW;
@@ -131,7 +136,7 @@ REVOKE EXECUTE ON FUNCTION public.hr_offer_notify() FROM PUBLIC, anon, authentic
 
 DROP TRIGGER IF EXISTS trg_hr_offer_notify ON public.hr_offers;
 CREATE TRIGGER trg_hr_offer_notify
-  AFTER INSERT OR UPDATE OF status ON public.hr_offers
+  AFTER INSERT OR UPDATE ON public.hr_offers   -- not OF status: a terms edit that the guard bounces back to pending must still reach the owner
   FOR EACH ROW EXECUTE FUNCTION public.hr_offer_notify();
 
 -- ---------------------------------------------------------------- public link: not before approval

@@ -614,7 +614,8 @@ export default function App() {
           <Route path="/hr/onboarding/templates"   element={<RequireHROrPrivileged><HROnboardTemplatesV2 /></RequireHROrPrivileged>} />
           <Route path="/hr/onboarding"             element={<RequireHROrPrivileged><HROnboardingV2 /></RequireHROrPrivileged>} />
           <Route path="/hr/offers"                 element={<RequireHROrPrivileged><HRV2 /></RequireHROrPrivileged>} />
-          <Route path="/hr/new-user"               element={<RequireHROrPrivileged><HRNewUserV2 /></RequireHROrPrivileged>} />
+          {/* Phase 618 - HR hires through the offer card (owner approval); the direct Add Member page is owner-only */}
+          <Route path="/hr/new-user"               element={<RequirePrivileged><HRNewUserV2 /></RequirePrivileged>} />
           <Route path="/hr/offer/:userId"          element={<RequireHROrPrivileged><HROfferLetterV2 /></RequireHROrPrivileged>} />
           {/* Phase 33G.8 — admin Leaves CRUD. Excluded days for the
               monthly performance score now come from a real table

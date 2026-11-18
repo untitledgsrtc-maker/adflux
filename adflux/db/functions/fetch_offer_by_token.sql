@@ -144,7 +144,7 @@ AS $$
     designation_has_incentive, designation_name
   FROM public.hr_offers
   WHERE invite_token = p_token
-    AND status <> 'cancelled'
+    AND status NOT IN ('cancelled','draft','pending_approval')   -- Phase 618: not before owner approval
   LIMIT 1;
 $$;
 
@@ -171,3 +171,6 @@ SELECT
     LIKE '%designation_auth_role%designation_team_role%designation_has_incentive%designation_name%' AS has_designation_columns, -- true
   pg_get_function_result('public.fetch_offer_by_token(uuid)'::regprocedure)
     LIKE '%pan_number text%bank_ifsc text%emergency_contact_phone text%'                  AS kept_old_columns;           -- true
+
+-- VERIFY (Phase 618): the link must stay closed before owner approval - must be true
+-- SELECT position('pending_approval' in pg_get_functiondef('public.fetch_offer_by_token'::regproc)) > 0 AS link_gate_ok;
