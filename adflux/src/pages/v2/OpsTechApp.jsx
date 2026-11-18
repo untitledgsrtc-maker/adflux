@@ -15,6 +15,7 @@ import { istTodayISO } from '../../utils/istDate'
 import { isOnHours } from '../../utils/opsHours'
 import { estVariable } from '../../utils/opsPay'
 import { dialPhone } from '../../utils/openExternal'
+import { openWhatsApp } from '../../utils/whatsapp'
 import { normalizeIndianPhone } from '../../utils/phone'
 import { captureGps } from '../../utils/captureGps'
 import DepotContactsModal from '../../components/ops/DepotContactsModal'
@@ -98,7 +99,7 @@ export default function OpsTechApp() {
       const ids = depots.length ? depots.map(x => x.id) : [NIL]
       const [sRes, tRes, cRes, iRes, fRes, wRes, payRes, callRes] = await Promise.all([
         supabase.from('ops_screens').select('id, name, status, camera_active, last_response_at, depot_id').in('depot_id', ids).eq('is_active', true),
-        supabase.from('ops_tickets').select('id, depot_id, screen_id, type, source, status, cause, notes, created_at, resolved_at, cant_fix_reason, cant_fix_at, issue_type_id, photo_path, fix_photo_path').eq('assigned_to', uid).in('status', ['open', 'in_progress', 'resolved']).gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString()),
+        supabase.from('ops_tickets').select('id, depot_id, screen_id, type, source, status, cause, notes, created_at, resolved_at, cant_fix_reason, cant_fix_at, issue_type_id, photo_path, fix_photo_path, requested_by').eq('assigned_to', uid).in('status', ['open', 'in_progress', 'resolved']).gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString()),
         supabase.from('ops_depot_contacts').select('id, depot_id, role_en, role_gu, name, phone, display_order').in('depot_id', ids).order('display_order'),
         supabase.from('ops_issue_types').select('id, issue_en, issue_gu, solution_en, solution_gu, display_order').eq('is_active', true).order('display_order'),
         supabase.from('ops_screen_faults').select('id, depot_id, screen_id, kind, status, started_at, fixed_at').in('depot_id', ids).eq('status', 'fixed').gte('fixed_at', dayStart),
@@ -266,7 +267,7 @@ export default function OpsTechApp() {
       <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>{body}</div>
       <nav className="bnav">{[['today', 'home', 'આજે', 'Today'], ['faults', 'list', 'ફોલ્ટ', 'Faults'], ['cams', 'camera', 'કેમેરા', 'Camera'], ['me', 'user', 'મારું', 'Me']].map(([k, i, g, e]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => { setTab(k); setOpenId(null) }} aria-current={tab === k}><Ic n={i} s={22} /><Bi g={g} e={e} center /></button>)}</nav>
       {openFault && <FaultPage key={openFault.id} f={openFault} st={stById[openFault.st]} d={d} uid={uid} onHours={onHours} back={() => setOpenId(null)} reload={load} show={show} setTabFixed={() => { setOpenId(null); setFt('fixed'); setTab(openFault.src === 'cam' ? 'cams' : 'faults') }} />}
-      {sheet && sheet.k === 'log' && <LogSheet stations={stations} issues={d.issues} uid={uid} onClose={() => setSheet(null)} onDone={() => { setSheet(null); show({ t: 'નોંધાયું · Fault logged' }); load() }} show={show} />}
+      {sheet && sheet.k === 'log' && <LogSheet stations={stations} issues={d.issues} contacts={d.contacts} uid={uid} onClose={() => setSheet(null)} onDone={() => { setSheet(null); show({ t: 'નોંધાયું · Fault logged' }); load() }} show={show} />}
       {bell && <Sheet title={<Bi g="એલર્ટ" e="Alerts" />} onClose={() => setBell(false)}>
         <div style={{ display: 'grid', gap: 10 }}>
           {alerts.length === 0 && <div className="okrow"><Ic n="checkc" /><Bi g="કોઈ નવો એલર્ટ નથી" e="Nothing needs you right now" /></div>}
@@ -327,6 +328,13 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
   const [addNum, setAddNum] = useState(false)
   const [busy, setBusy] = useState(false)
   const lock = useRef(false)
+  // Phase 614 - photo job can be closed by sending the photo on WhatsApp to the rep who asked
+  const [asker, setAsker] = useState(null)
+  const askerId = f.src === 'photo' ? f.tickets[0]?.requested_by : null
+  useEffect(() => {
+    if (!askerId) return
+    supabase.from('users').select('name, whatsapp_number').eq('id', askerId).maybeSingle().then(({ data }) => setAsker(data || null))
+  }, [askerId])
   if (!st) return null
   const issue = d.issues.find(x => x.id === reason)
   const contacts = d.contacts.filter(c => c.depot_id === st.id)
@@ -375,6 +383,13 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
     for (const t of f.tickets) { const { error } = await supabase.rpc('ops_ticket_cant_fix', { p_ticket: t.id, p_reason: [why, note].filter(Boolean).join(': ') }); if (error) throw error }
     setSheet(null); show({ t: 'ઓફિસને મોકલ્યું · Sent to the office' }); await reload()
   })
+  const sendOnWhatsApp = () => guard(async () => {
+    const t = f.tickets[0]
+    openWhatsApp(asker?.whatsapp_number || '', `Live photo · ${st.name}\n${String(t.notes || '').replace(/^\s*·\s*/, '')}`)
+    const { error } = await supabase.from('ops_tickets').update({ status: 'resolved', resolved_at: new Date().toISOString(), notes: [t.notes, 'Photo sent on WhatsApp'].filter(Boolean).join('\n') }).eq('id', t.id)
+    if (error) throw error
+    show({ t: 'WhatsApp પર મોકલ્યું · Sent on WhatsApp' }); await reload(); setTabFixed()
+  })
   const sendPhoto = () => guard(async () => {
     const t = f.tickets[0]; const key = await uploadPhoto(st.id, 'photo', photo)
     const { error } = await supabase.from('ops_tickets').update({ photo_path: key, status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', t.id)
@@ -399,7 +414,13 @@ function FaultPage({ f, st, d, uid, onHours, back, reload, show, setTabFixed }) 
       {isJob ? <>
         <Card><div style={{ display: 'grid', gap: 12 }}><span className="row mu sm" style={{ gap: 6 }}><Ic n="camera" s={15} />Live photo</span><div style={{ fontSize: 19, fontWeight: 600 }}>{f.note}</div>{f.scr.length > 0 && <div className="mu"><G t="સ્ક્રીન · Screen " /><span className="num">{f.scr.map(n => st.scr.find(x => x.n === n)?.lbl || n).join(', ')}</span></div>}</div></Card>
         <Photo label={<Bi g="જાહેરાત ચાલુ હોય ત્યારે ફોટો લો" e="Take it while the ad is on screen" />} file={photo} onFile={setPhoto} />
-        <Btn kind="pri" lg full icon="send" disabled={!photo || busy} onClick={sendPhoto}><G t="ફોટો મોકલો · Send photo" /></Btn></> : <>
+        <Btn kind="pri" lg full icon="send" disabled={!photo || busy} onClick={sendPhoto}><G t="ફોટો મોકલો · Send photo" /></Btn>
+        {f.status === 'open' && <>
+          <div className="mu" style={{ textAlign: 'center' }}><G t="અથવા · or" /></div>
+          <Btn lg full icon="send" disabled={busy} onClick={sendOnWhatsApp}><G t={`WhatsApp પર ફોટો મોકલો · Send photo on WhatsApp${asker?.name ? ` · ${asker.name}` : ''}`} /></Btn>
+          <div className="mu sm" style={{ textAlign: 'center' }}><G t="WhatsApp ખૂલશે, ફોટો જોડો અને મોકલો. કામ પૂરું ગણાશે. · WhatsApp opens: attach the photo and send. The task is marked done." /></div></>}
+        <section style={{ display: 'grid', gap: 10 }}><span className="row" style={{ justifyContent: 'space-between' }}><span className="lbl"><G t="સ્ટેશનના નંબર · Station numbers" /></span><Btn sm icon="plus" onClick={() => setAddNum(true)}><G t="નવો નંબર · Add number" /></Btn></span>{contacts.length ? contacts.map(c => <CallBtn key={c.id} c={c} onCall={doCall} />) : <div className="warnrow"><Ic n="alert" /><Bi g="આ સ્ટેશનનો કોઈ નંબર નથી" e="No number saved for this station. Add one." /></div>}</section>
+        {addNum && <DepotContactsModal depot={{ id: st.id, name: st.name }} lang={(typeof localStorage !== 'undefined' && localStorage.getItem('ops2_lang')) || 'en'} meId={uid} onClose={() => setAddNum(false)} onChanged={() => reload()} />}</> : <>
         <Stepper f={f} called={called} />
         {screensPick}
         {f.status === 'open' && <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="શું ખરાબી છે? · What is wrong" /></span><ReasonGrid issues={d.issues} value={reason} onPick={setReason} /></section>}
@@ -441,7 +462,7 @@ function CantSheet({ onClose, onSave, busy }) {
     <div className="mu sm">The office is told with this reason.</div></Sheet>
 }
 
-function LogSheet({ stations, issues, uid, onClose, onDone, show }) {
+function LogSheet({ stations, issues, contacts = [], uid, onClose, onDone, show }) {
   const [stId, setStId] = useState(stations[0]?.id || '')
   const [scr, setScr] = useState([]); const [r, setR] = useState(null); const [file, setFile] = useState(null); const [busy, setBusy] = useState(false)
   const s = stations.find(x => x.id === stId)
@@ -461,7 +482,10 @@ function LogSheet({ stations, issues, uid, onClose, onDone, show }) {
   return <Sheet title={<Bi g="ચાલુ સ્ક્રીનમાં સમસ્યા" e="Problem on a working screen" />} onClose={onClose} footer={<Btn kind="pri" lg full icon="check" disabled={!scr.length || !r || busy} onClick={save}><G t="સાચવો · Save" /></Btn>}>
     <Sel label="Station" value={stId} onChange={v => { setStId(v); setScr([]) }} opts={stations.map(x => [x.id, x.name])} />
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>{(s?.scr || []).map(x => <ScrTile key={x.id} n={x.lbl} st={x.status === 'offline' ? 'off' : 'on'} sel={scr.includes(x.id)} onClick={() => setScr(scr.includes(x.id) ? scr.filter(y => y !== x.id) : [...scr, x.id])} />)}</div>
-    <ReasonGrid issues={issues} value={r} onPick={setR} /><Photo label={<Bi g="ફોટો" e="Photo" />} file={file} onFile={setFile} /></Sheet>
+    <ReasonGrid issues={issues} value={r} onPick={setR} /><Photo label={<Bi g="ફોટો" e="Photo" />} file={file} onFile={setFile} />
+    {/* Phase 614 - this station's numbers, tap to call */}
+    <section style={{ display: 'grid', gap: 10 }}><span className="lbl"><G t="સ્ટેશનના નંબર · Station numbers" /></span>
+      {contacts.filter(c => c.depot_id === stId).length ? contacts.filter(c => c.depot_id === stId).map(c => <CallBtn key={c.id} c={c} onCall={x => { const p = normalizeIndianPhone(x.phone).value || x.phone; if (p) dialPhone(p) }} />) : <div className="warnrow"><Ic n="alert" /><Bi g="આ સ્ટેશનનો કોઈ નંબર નથી" e="No number saved for this station." /></div>}</section></Sheet>
 }
 
 function TechMe({ d, avgFixM, monthFixed, nav }) {
