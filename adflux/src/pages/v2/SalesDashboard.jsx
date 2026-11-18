@@ -26,6 +26,7 @@ import { calculateIncentive, calculateStreak } from '../../utils/incentiveCalc'
 import { buildSettlementMap } from '../../utils/settlement'
 import UserAvatar from '../../components/common/UserAvatar'
 import { thisMonthISO, initials, todayISO } from '../../utils/formatters'
+import { fetchAllPages } from '../../utils/fetchAllPages'
 // Phase 31O — V2AppShell mounts ProposedIncentiveCard now; this file
 // no longer needs the import.
 import '../../styles/v2.css'
@@ -121,7 +122,7 @@ export default function SalesDashboardV2() {
     } else {
       if (mySettledRes?.error) console.warn('[settled] RPC unavailable, using fallback.', mySettledRes.error)
       const [{ data: lbQuotes }, { data: lbPayments }] = await Promise.all([
-        supabase.from('quotes').select('id, created_by, total_amount, status, updated_at, created_at'),
+        fetchAllPages((f, t) => supabase.from('quotes').select('id, created_by, total_amount, status, updated_at, created_at').order('id').range(f, t)),  // Phase 613 - past the 1000-row cap
         supabase.from('payments')
           .select('quote_id, amount_received, payment_date, created_at, is_final_payment')
           .eq('approval_status', 'approved'),

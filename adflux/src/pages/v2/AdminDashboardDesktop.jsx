@@ -56,6 +56,7 @@ import {
   LeadPipelinePanel, TeamActivityPanel,
 } from '../../components/dashboard/CockpitWidgets'
 import { wonDate } from '../../utils/wonDate'
+import { fetchAllPages } from '../../utils/fetchAllPages'
 import '../../styles/v2.css'
 
 /* ─── Money display: full Indian-format number with lakh/crore grouping.
@@ -162,7 +163,8 @@ export default function AdminDashboardDesktop() {
       // the dashboard show all zeros even though quotes exist. The
       // dashboard touches lots of fields; safer to pull the whole row
       // and let JS pick what's needed.
-      supabase.from('quotes').select('*'),
+      // Phase 613 - quotes passed 1000 (PostgREST caps one request): read every page.
+      fetchAllPages((f, t) => supabase.from('quotes').select('*').order('id').range(f, t)),
       // Phase 86.1 — `quotes.ref_number` does NOT exist (Phase 33N
        // confirmed). Embed dropped to use `quote_number` only.
        // Audit 24 May 2026 console showed 4× 400 from PostgREST
