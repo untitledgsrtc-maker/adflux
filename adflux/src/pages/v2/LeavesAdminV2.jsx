@@ -126,7 +126,7 @@ export default function LeavesAdminV2({ embedded = false }) {
 
     const [uRes, lRes] = await Promise.all([
       supabase.from('users')
-        .select('id, name, role')
+        .select('id, name, role, is_active')
         // Phase 273 — include hr + accounts (they take leave too → their name
         // shows in the table + they appear in the rep filter). Agency dropped
         // (commission-only, no leave/payroll).
@@ -359,7 +359,7 @@ export default function LeavesAdminV2({ embedded = false }) {
               style={inputStyle}
             >
               <option value="">— pick rep —</option>
-              {users.map(u => (
+              {users.filter(u => u.is_active && u.role !== 'admin').map(u => (
                 <option key={u.id} value={u.id}>{u.name} · {u.role}</option>
               ))}
             </select>
@@ -466,7 +466,7 @@ export default function LeavesAdminV2({ embedded = false }) {
           <label style={labelStyle}>Rep</label>
           <select value={fRepFilter} onChange={e => setFRepFilter(e.target.value)} style={inputStyle}>
             <option value="all">All reps</option>
-            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            {users.filter(u => u.is_active).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </div>
         <div>

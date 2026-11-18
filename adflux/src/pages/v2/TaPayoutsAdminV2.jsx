@@ -168,7 +168,8 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
         // Phase 225 — agency (Phase 101.A2) + telecaller dropped: neither does
         // field travel, so neither earns TA/DA (TCs are phone-only). Active
         // reps only — deactivated members shouldn't clutter the TA list.
-        .eq('role', 'sales')
+        // Phase 621 - ops technicians earn TA too (their rows showed '—')
+        .in('role', ['sales', 'operation_executive', 'operation_head'])
         .eq('is_active', true)
         .order('name', { ascending: true })
       setUsers(data || [])
@@ -487,7 +488,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
 
   // Phase 34R+ — rep name + month label for the hero.
   const selectedRepName = useMemo(
-    () => users.find(u => u.id === fUser)?.name || 'Select a rep',
+    () => users.find(u => u.id === fUser)?.name || (fUser === 'ALL' ? 'All team' : 'Select a rep'),
     [users, fUser],
   )
 

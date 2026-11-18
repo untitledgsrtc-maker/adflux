@@ -11,6 +11,7 @@ import { useTeam } from '../../hooks/useTeam'
 import { useIncentive } from '../../hooks/useIncentive'
 import { TeamList } from '../../components/team/TeamList'
 import { TeamMemberModal } from '../../components/team/TeamMemberModal'
+import { useAuthStore } from '../../store/authStore'
 import '../../styles/team.css'
 
 const FILTERS = [
@@ -29,6 +30,8 @@ export default function TeamV2({ embedded = false }) {
   const [filter,  setFilter]   = useState('active')
   const [search,  setSearch]   = useState('')
   const [addOpen, setAddOpen]  = useState(false)
+  // Phase 621 - HR hires through the offer card (owner approval, Phase 618); direct Add Member is owner-only
+  const canAdd = useAuthStore(s => s.profile?.role) === 'admin'
   const [loadErr, setLoadErr]  = useState('')   // §HR: roster load failed — was a silent "No members found"
 
   async function load() { setLoadErr(''); const { error } = await fetchMembers(); if (error) setLoadErr('Could not load the team. Please retry.') }
@@ -53,7 +56,7 @@ export default function TeamV2({ embedded = false }) {
   return (
     <div className="v2d-team">
       {embedded ? (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+        canAdd && <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
           <button className="v2d-cta" onClick={() => setAddOpen(true)}>
             <UserPlus size={15} />
             <span>Add Member</span>
@@ -68,10 +71,10 @@ export default function TeamV2({ embedded = false }) {
               Manage your sales team, roles, and incentive profiles.
             </div>
           </div>
-          <button className="v2d-cta" onClick={() => setAddOpen(true)}>
+          {canAdd && <button className="v2d-cta" onClick={() => setAddOpen(true)}>
             <UserPlus size={15} />
             <span>Add Member</span>
-          </button>
+          </button>}
         </div>
       )}
 
