@@ -7,10 +7,11 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Lightbulb, Loader2 } from 'lucide-react'
+import { Lightbulb, Loader2, MessageCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { istTodayISO } from '../../utils/istDate'
 import { coachText, coachLink } from '../../utils/coachText'
+import { openWhatsApp } from '../../utils/whatsapp'
 
 function tone(v, good, ok) {
   if (v == null) return 'var(--v2-ink-2, #94a3b8)'
@@ -26,6 +27,7 @@ export default function CoachTeamV2() {
   const [error, setError] = useState('')
   const [lang, setLang] = useState('en')
   const [tips, setTips] = useState({})   // Phase 577: user_id -> latest AI tip
+  const [phones, setPhones] = useState({})   // Phase 616: user_id -> whatsapp_number
   const [group, setGroup] = useState('all')   // Phase 575/576: all | sales | office | ops
 
   const load = useCallback(async () => {
@@ -42,12 +44,27 @@ export default function CoachTeamV2() {
         const map = {}
         ;(t || []).forEach(x => { if (!map[x.user_id]) map[x.user_id] = x })
         setTips(map)
+        const { data: u } = await supabase.from('users').select('id, whatsapp_number').in('id', ids)
+        setPhones(Object.fromEntries((u || []).map(x => [x.id, x.whatsapp_number])))
       }
     }
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Phase 616 - send this person their AI tip + next-day actions on WhatsApp (in the page language)
+  const shareOnWhatsApp = (r) => {
+    const tip = tips[r.id]?.[lang]
+    const acts = (r.next_actions || []).map((a, i) => `${i + 1}. ${coachText(a.kind, a.detail)[lang]}`)
+    const gu = lang === 'gu'
+    const lines = [
+      gu ? `નમસ્તે ${r.name},` : `Hi ${r.name},`,
+      ...(tip ? ['', gu ? '*આજની ટીપ*' : '*Tip for you*', tip] : []),
+      ...(acts.length ? ['', gu ? '*આવતા કામના દિવસે*' : '*Next working day*', ...acts] : []),
+    ]
+    openWhatsApp(phones[r.id] || '', lines.join('\n'))
+  }
 
   const pill = (active) => ({
     minHeight: 36, padding: '0 14px', borderRadius: 999, fontSize: 13, cursor: 'pointer',
@@ -110,7 +127,17 @@ export default function CoachTeamV2() {
             <div key={r.id} style={{ padding: 14, borderRadius: 14, background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v2-line, #334155)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
                 <div style={{ fontFamily: 'var(--v2-display, "Space Grotesk")', fontSize: 17, fontWeight: 600, color: 'var(--v2-ink-0, #f1f5f9)' }}>{r.name}</div>
-                <div style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, background: 'var(--v2-bg-2, #0f172a)', color: 'var(--v2-ink-2, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{r.role}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {(tips[r.id] || (r.next_actions || []).length > 0) && (
+                    <button type="button" className="v2d-ghost" onClick={() => shareOnWhatsApp(r)}
+                      title={phones[r.id] ? `Send to ${r.name} on WhatsApp` : 'No WhatsApp number saved - pick the chat'}
+                      aria-label={`Send ${r.name} the tip on WhatsApp`}>
+                      <MessageCircle size={14} />
+                      <span>WhatsApp</span>
+                    </button>
+                  )}
+                  <div style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, background: 'var(--v2-bg-2, #0f172a)', color: 'var(--v2-ink-2, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{r.role}</div>
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 }}>
