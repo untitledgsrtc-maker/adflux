@@ -14,10 +14,27 @@ CREATE OR REPLACE FUNCTION public.recompute_lead_scores(p_ids uuid[] DEFAULT NUL
 AS $function$
 DECLARE v_n int;
 BEGIN
+  -- Phase 630: when a lead becomes Won/Lost, keep the last LIVE score in final_score
+  -- ("was X when lost"). Already-frozen values are kept; leaving Won/Lost clears them.
   INSERT INTO public.lead_scores (lead_id, score, parts, updated_at)
   SELECT c.lead_id, c.score, c.parts, now() FROM public.lead_score_calc(p_ids) c
   ON CONFLICT (lead_id) DO UPDATE
-     SET score = EXCLUDED.score, parts = EXCLUDED.parts, updated_at = now()
+     SET score = EXCLUDED.score, parts = EXCLUDED.parts, updated_at = now(),
+         final_score = CASE
+           WHEN EXCLUDED.parts->>'lead_stage' IN ('Won', 'Lost') THEN
+             COALESCE(public.lead_scores.final_score,
+                      CASE WHEN public.lead_scores.parts->>'lead_stage' IN ('New', 'Working', 'QuoteSent', 'Nurture')
+                           THEN public.lead_scores.score END)
+           ELSE NULL END,
+         final_at = CASE
+           WHEN EXCLUDED.parts->>'lead_stage' IN ('Won', 'Lost') THEN
+             COALESCE(public.lead_scores.final_at,
+                      CASE WHEN public.lead_scores.parts->>'lead_stage' IN ('New', 'Working', 'QuoteSent', 'Nurture') THEN now() END)
+           ELSE NULL END,
+         final_estimated = CASE
+           WHEN EXCLUDED.parts->>'lead_stage' IN ('Won', 'Lost') THEN
+             CASE WHEN public.lead_scores.final_score IS NOT NULL THEN public.lead_scores.final_estimated ELSE false END
+           ELSE false END
    WHERE public.lead_scores.score IS DISTINCT FROM EXCLUDED.score
       OR public.lead_scores.parts IS DISTINCT FROM EXCLUDED.parts;
   GET DIAGNOSTICS v_n = ROW_COUNT;

@@ -14,8 +14,11 @@ export function scoreTone(s) {
   return s >= 70 ? 'var(--v2-green, #22c55e)' : s >= 40 ? 'var(--v2-amber, #f59e0b)' : 'var(--v2-rose, #f43f5e)'
 }
 
-export function scoreTitle(score, parts) {
+export function scoreTitle(score, parts, finalScore, finalEstimated) {
   if (score == null) return 'Score not worked out yet'
+  if (finalScore != null && (parts?.lead_stage === 'Won' || parts?.lead_stage === 'Lost')) {
+    return `Score was ${finalScore} when ${parts.lead_stage === 'Won' ? 'won' : 'lost'}${finalEstimated ? ' (estimated)' : ''}`
+  }
   if (!parts) return `Lead score ${score}%`
   const meet = parts.who === 'tc' ? 'Said interested' : parts.who === 'handoff' ? 'Meeting or interested' : 'Meeting done'
   return [
@@ -28,13 +31,13 @@ export function scoreTitle(score, parts) {
   ].filter(Boolean).join(' · ')
 }
 
-export function LeadScoreRing({ score, parts, size = 30 }) {
+export function LeadScoreRing({ score, parts, size = 30, finalScore = null, finalEstimated = false }) {
   const stroke = size >= 60 ? 7 : 4
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
   const pct = score == null ? 0 : Math.max(0, Math.min(100, score)) / 100
   return (
-    <span title={scoreTitle(score, parts)} style={{ display: 'inline-flex', flexShrink: 0, position: 'relative', width: size, height: size }}>
+    <span title={scoreTitle(score, parts, finalScore, finalEstimated)} style={{ display: 'inline-flex', flexShrink: 0, position: 'relative', width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-label={score == null ? 'No score yet' : `Lead score ${score} percent`} role="img">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--v2-line)" strokeWidth={stroke} />
         {score != null && score > 0 && (
@@ -60,7 +63,7 @@ export function LeadScoreCard({ leadId, refreshKey, stage }) {
   useEffect(() => {
     if (!leadId) return undefined
     let alive = true
-    supabase.from('lead_scores').select('score, parts, updated_at').eq('lead_id', leadId).maybeSingle()
+    supabase.from('lead_scores').select('score, parts, updated_at, final_score, final_at, final_estimated').eq('lead_id', leadId).maybeSingle()
       .then(({ data, error }) => {
         if (!alive) return
         if (error) { setErr(error.message || 'Could not load the score'); return }
@@ -87,7 +90,16 @@ export function LeadScoreCard({ leadId, refreshKey, stage }) {
         ) : (stage === 'Won' || stage === 'Lost') ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <LeadScoreRing score={row.score} parts={p} size={72} />
-            <div style={{ fontSize: 13, color: 'var(--v2-ink-1)' }}>{stage === 'Won' ? 'Won — score is locked at 100.' : 'Lost — score is 0.'}</div>
+            <div style={{ fontSize: 13, color: 'var(--v2-ink-1)', lineHeight: 1.5 }}>
+              {stage === 'Won' ? 'Won — score is locked at 100.' : 'Lost — score is 0.'}
+              {/* Phase 630 — how well it was worked before the result. */}
+              {row.final_score != null && (
+                <div style={{ marginTop: 4, color: 'var(--v2-ink-0)' }}>
+                  Score was <b className="tabular-nums" style={{ color: scoreTone(row.final_score) }}>{row.final_score}</b> when {stage === 'Won' ? 'won' : 'lost'}
+                  {row.final_estimated ? <span style={{ color: 'var(--v2-ink-2)' }}> (estimated)</span> : null}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <>

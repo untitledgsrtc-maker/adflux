@@ -94,6 +94,7 @@ AS $function$
       'stage', p.stage_pts, 'talked', p.talked_pts, 'meet', p.meet_pts,
       'meet_kind', CASE WHEN p.met THEN 'meeting' WHEN p.interested THEN 'interested' END,
       -- 626.1: who the 15 points are judged as (drives the lead-page label).
+      'lead_stage', p.stage,   -- 630: lets recompute_lead_scores freeze the last live score on Won/Lost
       'who', CASE WHEN p.owner_role = 'telecaller' THEN 'tc' WHEN p.telecaller_id IS NOT NULL THEN 'handoff' ELSE 'sales' END,
       'ontime', p.ontime_pts, 'due_n', p.due_n, 'ontime_n', p.ontime_n,
       'overdue', -p.overdue_pts)

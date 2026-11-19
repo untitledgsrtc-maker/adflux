@@ -491,7 +491,7 @@ export default function LeadsV2() {
       if (cancelled || error || !Array.isArray(data)) return
       setScoreMap(prev => {
         const next = { ...prev }
-        data.forEach(r => { next[r.lead_id] = { score: r.score, parts: r.parts } })
+        data.forEach(r => { next[r.lead_id] = { score: r.score, parts: r.parts, final: r.final_score, est: r.final_estimated } })
         return next
       })
     })
@@ -1326,7 +1326,7 @@ export default function LeadsV2() {
                       days-dot (how stale). */}
                   <td className="td-lead">
                     <div className="name-cell" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <LeadScoreRing score={scoreMap[l.id]?.score} parts={scoreMap[l.id]?.parts} />
+                      <LeadScoreRing score={scoreMap[l.id]?.score} parts={scoreMap[l.id]?.parts} finalScore={scoreMap[l.id]?.final ?? null} finalEstimated={!!scoreMap[l.id]?.est} />
                       <span style={{
                         width: 1, height: 14,
                         background: 'var(--border)',
