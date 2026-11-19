@@ -1580,13 +1580,13 @@ export default function TeamDashboardV2() {
                         style={chip('var(--blue, #3B82F6)', 'rgba(59,130,246,0.12)')}
                         title={`${mq} quote${mq === 1 ? '' : 's'} this month · ${formatCurrency(mqA)}`}
                       >
-                        {mq} quote{mq === 1 ? '' : 's'} this month · {formatLakh(mqA)}
+                        {mq} quote{mq === 1 ? '' : 's'} · {formatLakh(mqA)}
                       </span>
                       <span
                         style={chip('var(--success, #10B981)', 'rgba(16,185,129,0.12)')}
                         title={`${mw} won this month · ${formatCurrency(mwA)}`}
                       >
-                        {mw} won this month · {formatLakh(mwA)}
+                        {mw} won · {formatLakh(mwA)}
                       </span>
                       {(pendingOutcomesByUser[r.id] || 0) > 0 && (
                         <span
