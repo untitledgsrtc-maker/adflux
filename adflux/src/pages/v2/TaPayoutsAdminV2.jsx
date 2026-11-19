@@ -516,9 +516,9 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
             <div className="v2d-page-kicker">HR · Finance</div>
             <h1 className="v2d-page-title">TA Claims</h1>
             <div className="v2d-page-sub">
-              Travel allowance computed from each rep's GPS pings. Daily DA + bike
-              (₹3/km) auto-calculated by city ceiling. Hotel is added by you per
-              day when the rep stayed overnight. Approve before finance pays out.
+              Bike TA is worked out from each rep's GPS (₹3/km, max 200 km a day). DA and
+              hotel are added only when a rep sends a claim and you approve it (capped at the
+              city's limit). Approve before finance pays out.
             </div>
           </div>
         </div>
@@ -529,7 +529,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       <V2Hero
         eyebrow={monthLabel(fMonth)}
         value={selectedRepName}
-        label={fUser ? `${rows.length} day${rows.length === 1 ? '' : 's'} · grand total ${fmtINR(totals.total)}` : 'pick a rep below'}
+        label={fUser ? (() => { const n = rows.filter(r => Number(r.total_amount) > 0).length; return `${n} day${n === 1 ? '' : 's'} with TA · grand total ${fmtINR(totals.total)}` })() : 'pick a rep below'}
         chip={fUser && rows.length ? `${Math.round(totals.km)} km this month` : null}
         accent={false}
       />
@@ -541,9 +541,9 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       {fUser && rows.length > 0 && (
         <RingMilestoneRow
           items={[
-            { value: Math.round(statusSplit.approved), target: Math.max(1, Math.round(statusSplit.total)), center: statusSplit.total ? Math.round(100 * statusSplit.approved / statusSplit.total) + '%' : '0%', label: 'Approved', sub: fmtINR(statusSplit.approved) },
-            { value: Math.round(statusSplit.paid),     target: Math.max(1, Math.round(statusSplit.total)), center: statusSplit.total ? Math.round(100 * statusSplit.paid / statusSplit.total) + '%' : '0%', label: 'Paid',     sub: fmtINR(statusSplit.paid) },
-            { value: Math.round(statusSplit.pending),  target: Math.max(1, Math.round(statusSplit.total)), center: statusSplit.total ? Math.round(100 * statusSplit.pending / statusSplit.total) + '%' : '0%', label: 'Pending',  sub: fmtINR(statusSplit.pending) },
+            { value: Math.round(statusSplit.approved), target: Math.max(1, Math.round(statusSplit.total)), center: statusSplit.total ? Math.round(100 * statusSplit.approved / statusSplit.total) + '%' : '0%', color: 'var(--v2-blue, #3b82f6)', label: 'Approved', sub: fmtINR(statusSplit.approved) },
+            { value: Math.round(statusSplit.paid),     target: Math.max(1, Math.round(statusSplit.total)), center: statusSplit.total ? Math.round(100 * statusSplit.paid / statusSplit.total) + '%' : '0%', color: 'var(--v2-green, #22c55e)', label: 'Paid',     sub: fmtINR(statusSplit.paid) },
+            { value: Math.round(statusSplit.pending),  target: Math.max(1, Math.round(statusSplit.total)), center: statusSplit.total ? Math.round(100 * statusSplit.pending / statusSplit.total) + '%' : '0%', color: 'var(--v2-amber, #f59e0b)', label: 'Pending',  sub: fmtINR(statusSplit.pending) },
           ]}
         />
       )}
@@ -619,9 +619,8 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                         </span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12 }}>
-                          {req.claim_date}
-                        </span>
+                        <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>{fmtDateShort(req.claim_date)}</div>
+                        <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{fmtDow(req.claim_date)}</div>
                       </td>
                       <td style={tdStyle}>
                         <span style={{
@@ -655,26 +654,18 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                             disabled={busy}
                             className="v2d-ghost"
                             title="Approve claim"
-                            style={{
-                              color: '#2BD8A0',
-                              borderColor: '#2BD8A044',
-                              background: 'rgba(43,216,160,.10)',
-                            }}
+                            style={approveBtn}
                           >
-                            <Check size={13} /> Approve
+                            <Check size={14} strokeWidth={1.6} /> Approve
                           </button>
                           <button
                             onClick={() => handleRejectRequest(req)}
                             disabled={busy}
                             className="v2d-ghost"
                             title="Reject claim"
-                            style={{
-                              color: '#FF6F61',
-                              borderColor: '#FF6F6144',
-                              background: 'rgba(255,111,97,.10)',
-                            }}
+                            style={rejectBtn}
                           >
-                            <X size={13} /> Reject
+                            <X size={14} strokeWidth={1.6} /> Reject
                           </button>
                         </div>
                       </td>
@@ -817,10 +808,11 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
             type="button"
             onClick={exportCsv}
             disabled={visibleRows.length === 0}
-            className="v2d-cta"
+            className="v2d-ghost"
             style={{ alignSelf: 'end', height: 38 }}
           >
-            <Download size={14} /> Export CSV
+            {/* Phase 632 — ghost: "Approve all pending" is the one yellow action on this page. */}
+            <Download size={14} strokeWidth={1.6} /> Export CSV
           </button>
         </div>
         {err && (
@@ -908,12 +900,10 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12,
       }}>
-        <TotalCard label="Days with TA" value={visibleRows.filter(r => Number(r.total_amount) > 0).length} kind="count" />
-        <TotalCard label="Total km"     value={totals.km.toFixed(1)} kind="raw" suffix=" km" />
-        <TotalCard label="Total DA"     value={totals.da} />
-        <TotalCard label="Total bike"   value={totals.bike} />
-        <TotalCard label="Total hotel"  value={totals.hotel} />
-        <TotalCard label="Grand total"  value={totals.total} accent />
+        {/* Phase 632 — days, km and grand total live in the hero above; this strip only splits the money. */}
+        <TotalCard label="Bike"   value={totals.bike} />
+        <TotalCard label="DA"     value={totals.da} />
+        <TotalCard label="Hotel"  value={totals.hotel} />
       </div>
 
       {/* ─── Body ─────────────────────────────────────── */}
@@ -950,7 +940,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                   <th style={{ ...thStyle, textAlign: 'right' }}>Hotel</th>
                   <th style={{ ...thStyle, textAlign: 'right' }}>Total</th>
                   <th style={thStyle}>Status</th>
-                  <th style={{ ...thStyle, width: 140, textAlign: 'right' }}>Actions</th>
+                  <th style={{ ...thStyle, width: 190, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -997,20 +987,24 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
                       {r.status === 'pending' ? (
-                        <input
-                          type="number"
-                          defaultValue={r.hotel_amount || 0}
-                          onClick={e => e.stopPropagation()}
-                          onBlur={e => setHotel(r, e.target.value)}
-                          style={{
-                            width: 80, textAlign: 'right',
-                            padding: '4px 8px', borderRadius: 6,
-                            background: 'var(--v2-bg-2)',
-                            border: '1px solid var(--v2-line)',
-                            color: 'var(--v2-ink-0)', fontSize: 12,
-                            fontFamily: 'inherit',
-                          }}
-                        />
+                        <label onClick={e => e.stopPropagation()} title="Hotel for this day (when the rep stayed overnight)"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px',
+                                   borderRadius: 'var(--v2-r-sm, 10px)', border: '1px dashed var(--v2-ink-2)',
+                                   background: 'var(--v2-bg-2)', cursor: 'text' }}>
+                          <span style={{ color: 'var(--v2-ink-2)', fontSize: 12 }}>₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            defaultValue={r.hotel_amount ? r.hotel_amount : ''}
+                            placeholder="add"
+                            aria-label="Hotel amount"
+                            onBlur={e => setHotel(r, e.target.value)}
+                            style={{
+                              width: 56, textAlign: 'right', padding: 0, border: 0, outline: 'none',
+                              background: 'transparent', color: 'var(--v2-ink-0)', fontSize: 12, fontFamily: 'inherit',
+                            }}
+                          />
+                        </label>
                       ) : (
                         <span style={{ fontFamily: 'inherit' }}>{fmtINR(r.hotel_amount)}</span>
                       )}
@@ -1028,21 +1022,22 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                             <button
                               onClick={() => setStatus(r, 'approved')}
                               className="v2d-ghost"
-                              title="Approve"
-                            ><Check size={13} /></button>
+                              title="Approve this day"
+                              style={approveBtn}
+                            ><Check size={14} strokeWidth={1.6} /> Approve</button>
                             <button
                               onClick={() => setStatus(r, 'rejected')}
                               className="v2d-ghost"
-                              title="Reject"
-                              style={{ color: 'var(--v2-rose)' }}
-                            ><X size={13} /></button>
+                              title="Reject this day"
+                              style={rejectBtn}
+                            ><X size={14} strokeWidth={1.6} /> Reject</button>
                           </>
                         )}
                         {r.status === 'approved' && (
                           <button
                             onClick={() => setStatus(r, 'paid')}
-                            className="v2d-cta"
-                            style={{ padding: '4px 10px', fontSize: 12 }}
+                            className="v2d-ghost"
+                            style={paidBtn}
                           >Mark paid</button>
                         )}
                         {(r.status === 'rejected' || r.status === 'paid') && (
@@ -1131,5 +1126,10 @@ const inputStyle = {
   fontSize: 13, outline: 'none',
   fontFamily: 'inherit', height: 38,
 }
+// Phase 632 — row action buttons: labelled, 32px tall, tokens only.
+const actionBase = { minHeight: 32, padding: '0 10px', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }
+const approveBtn = { ...actionBase, color: 'var(--v2-green, #22c55e)', borderColor: 'var(--v2-green, #22c55e)', background: 'var(--v2-green-soft, rgba(34,197,94,.12))' }
+const rejectBtn  = { ...actionBase, color: 'var(--v2-rose, #f43f5e)',  borderColor: 'var(--v2-rose, #f43f5e)',  background: 'var(--v2-rose-soft, rgba(244,63,94,.12))' }
+const paidBtn    = { ...actionBase, color: 'var(--v2-ink-0)', borderColor: 'var(--v2-line)' }
 const thStyle = { padding: '10px 14px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.08em' }
 const tdStyle = { padding: '12px 14px', fontSize: 13, color: 'var(--v2-ink-1)', verticalAlign: 'top' }

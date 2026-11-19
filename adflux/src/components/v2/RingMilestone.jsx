@@ -32,7 +32,7 @@ function ringColor(pct) {
   return 'var(--danger, #EF4444)'
 }
 
-export function RingMilestone({ value = 0, target = 1, label = '', sub = '', center = null }) {
+export function RingMilestone({ value = 0, target = 1, label = '', sub = '', center = null, color = null }) {
   // Phase 624: `center` replaces the v/target text (big rupee values overflowed the ring).
   const safeTarget = Math.max(1, Number(target) || 1)
   const v          = Math.max(0, Number(value) || 0)
@@ -62,7 +62,7 @@ export function RingMilestone({ value = 0, target = 1, label = '', sub = '', cen
           <circle
             cx={SIZE / 2} cy={SIZE / 2} r={RADIUS}
             fill="none"
-            stroke={ringColor(pct)}
+            stroke={color || ringColor(pct)}   // 632: a fixed colour when the ring means a status, not progress
             strokeWidth={STROKE}
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -129,6 +129,7 @@ export function RingMilestoneRow({ items = [] }) {
           label={it.label}
           sub={it.sub}
           center={it.center}
+          color={it.color}
         />
       ))}
     </div>
