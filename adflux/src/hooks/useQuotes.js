@@ -62,7 +62,7 @@ export function useQuotes() {
         // Phase 323 (audit H3) — dropped the quote_cities(*) embed: QuotesV2 never
         // reads line-items (verified), so embedding every line-item row per quote
         // was pure dead weight on every list load. team_all_quotes RPC can mirror.
-        .select('*, payments(amount_received, approval_status), follow_ups(follow_up_date, is_done)')
+        .select('*, payments(amount_received, approval_status), follow_ups(follow_up_date, is_done, done_at)')   // Phase 628 - done_at for the 'Done <date>' chip
         .order('created_at', { ascending: false })
       // Phase 11g — agency behaves like sales: own quotes only; admin sees all.
       // Phase 583: a sales manager (team_role) loads everything RLS lets him read:

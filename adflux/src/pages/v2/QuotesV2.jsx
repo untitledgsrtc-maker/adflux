@@ -715,9 +715,15 @@ export default function QuotesV2() {
                     <td>
                       {(() => {
                         const fu = nextFollowUp(q)
-                        return fu
-                          ? <FollowUpChip date={fu.date} done={fu.done} />
-                          : <span className="v2d-muted">—</span>
+                        // Phase 628 — a lost quote also shows WHEN it was lost.
+                        const lost = q.status === 'lost' && q.lost_at
+                        if (!fu && !lost) return <span className="v2d-muted">—</span>
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                            {fu && <FollowUpChip date={fu.date} done={fu.done} />}
+                            {lost && <span className="v2d-fu v2d-fu--overdue" title="Date this quote was marked lost">Lost {formatDate(q.lost_at)}</span>}
+                          </div>
+                        )
                       })()}
                     </td>
                     {/* Phase 29c — Edit always available except on lost.
@@ -941,11 +947,13 @@ export function nextFollowUp(q) {
 
   // No pending — show the latest done one as "✓ Done" so the column
   // doesn't read empty for quotes that have been worked through.
+  // Phase 628 — the chip shows the DAY it was actually done (done_at), latest first.
+  const doneDay = f => f.done_at || f.follow_up_date
   const done = list
     .filter(f => f && f.is_done && f.follow_up_date)
-    .sort((a, b) => String(b.follow_up_date).localeCompare(String(a.follow_up_date)))
+    .sort((a, b) => String(doneDay(b)).localeCompare(String(doneDay(a))))
   if (done.length) {
-    return { date: done[0].follow_up_date, done: true }
+    return { date: doneDay(done[0]), done: true }
   }
   return null
 }
@@ -958,7 +966,7 @@ function FollowUpChip({ date, done }) {
   else if (overdue) cls += ' v2d-fu--overdue'
   return (
     <span className={cls} style={done ? { display: 'inline-flex', alignItems: 'center', gap: 4 } : undefined}>
-      {done ? (<><CheckCircle2 size={12} /> Done</>) : formatDate(date)}
+      {done ? (<><CheckCircle2 size={12} /> Done {formatDate(date)}</>) : formatDate(date)}
     </span>
   )
 }
