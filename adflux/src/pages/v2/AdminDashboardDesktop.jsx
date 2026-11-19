@@ -36,7 +36,7 @@ import {
 // dashboard was showing wrong "today collected" / today-rep-strip
 // counts. `istTodayISO()` uses Intl.DateTimeFormat with timeZone
 // Asia/Kolkata — stable across the IST workday.
-import { istTodayISO } from '../../utils/istDate'
+import { istTodayISO, istDayOf } from '../../utils/istDate'
 import { thisMonth } from '../../utils/period'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import WaBillingBanner from '../../components/v2/WaBillingBanner'
@@ -841,8 +841,9 @@ export default function AdminDashboardDesktop() {
     // outstanding / etc. above.
     const repActivity = salesUsers.map(u => {
       const tgt = targetByUser[u.id] || { min_quotes: 2, min_followups: 5, min_calls: 0 }
+      // Phase 631 — "sent" = not a draft, dated by the IST day (was: drafts counted, UTC date).
       const sentToday = allQuotes.filter(q =>
-        q.created_by === u.id && (q.created_at || '').slice(0, 10) === todayDate
+        q.created_by === u.id && q.status !== 'draft' && istDayOf(q.created_at) === todayDate
       ).length
       const paymentsTodayCount = paymentsAll.filter(p =>
         p.received_by === u.id && (p.created_at || '').slice(0, 10) === todayDate
@@ -891,7 +892,9 @@ export default function AdminDashboardDesktop() {
           .not('lead_id', 'is', null)
       : { count: 0 }
     const rings = {
-      calls:    { done: realCalls || 0,    target: salesUsers.filter(u => idsToday.has(u.id)).reduce((a, u) => a + (Number(targetByUser[u.id]?.min_calls) || 0), 0) },
+      // Phase 631 — a telecaller with no saved daily_targets row counts 50 (the Team Live
+      // default); field sales have no call target. Was 0 for them -> 110 / 50 on 19 Nov.
+      calls:    { done: realCalls || 0,    target: salesUsers.filter(u => idsToday.has(u.id)).reduce((a, u) => a + (Number(targetByUser[u.id]?.min_calls) || (u.role === 'telecaller' ? 50 : 0)), 0) },
       meetings: { done: sumCtr('meetings'), target: salesUsers.filter(u => idsToday.has(u.id) && u.role === 'sales').reduce((a, u) => a + (Number(u.daily_targets?.meetings) || 5), 0) },   // Phase 605 - each rep's own target (was a flat 5)
       quotes:   { done: repActivity.reduce((a, r) => a + r.sentToday, 0), target: salesUsers.filter(u => idsToday.has(u.id)).reduce((a, u) => a + (Number(targetByUser[u.id]?.min_quotes ?? 2) || 0), 0) },
     }
