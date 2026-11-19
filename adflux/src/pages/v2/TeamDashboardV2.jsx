@@ -1596,19 +1596,22 @@ export default function TeamDashboardV2() {
                           {pendingOutcomesByUser[r.id]} no outcome
                         </span>
                       )}
-                      <button
-                        type="button"
-                        className="lead-rep-wa"
-                        onClick={shareCard}
-                        title={r.whatsapp_number ? `Send this summary to ${r.name} on WhatsApp` : 'No WhatsApp number saved - pick the chat in WhatsApp'}
-                        aria-label={`Share ${r.name}'s summary on WhatsApp`}
-                      >
-                        <MessageCircle size={14} strokeWidth={1.6} /> WhatsApp
-                      </button>
                     </div>
                   )
                 })()}
                 <div className="lead-rep-status">
+                  {/* Phase 626.1 — icon-only share, beside the status pill (the text pill wrapped the chip row). */}
+                  {!isHrView && (
+                    <button
+                      type="button"
+                      className="lead-rep-wa"
+                      onClick={shareCard}
+                      title={r.whatsapp_number ? `Send this summary to ${r.name} on WhatsApp` : 'No WhatsApp number saved - pick the chat in WhatsApp'}
+                      aria-label={`Share ${r.name}'s summary on WhatsApp`}
+                    >
+                      <MessageCircle size={16} strokeWidth={1.6} />
+                    </button>
+                  )}
                   {statusKind === 'in_field' && (
                     <Pill tone="success" title="Checked in + GPS ping within last 90 min">
                       <span className="lead-live-dot" style={{ marginRight: 5, width: 6, height: 6 }} />
