@@ -365,7 +365,7 @@ export default function useDaySummary({ dateISO } = {}) {
         // NOT a completed meeting/visit and must not inflate the tally.
         const note = r.notes || ''
         const isScheduled  = note.startsWith('Meeting scheduled')
-        const isAutoCheckin = note.startsWith("I'm here")
+        const isAutoCheckin = note.startsWith("I'm here") || note.startsWith('Over monthly limit')   // Phase 633
         const key = r.lead_id || `walkin_${r.id}`
         if (t === 'meeting'    && !isScheduled && !isAutoCheckin) meetingLeads.add(key)
         if (t === 'site_visit' && !isScheduled && !isAutoCheckin) siteVisitLeads.add(key)

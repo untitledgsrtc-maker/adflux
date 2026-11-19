@@ -42,7 +42,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import VoiceInput from '../voice/VoiceInput'
-import { toastError } from '../v2/Toast'
+import { toastError, pushToast } from '../v2/Toast'
 
 const TYPE_META = {
   call:        { label: 'Call',        Icon: Phone,         showOutcome: true,  showDuration: true,
@@ -245,7 +245,11 @@ export default function LogActivityModal({ lead, type = 'call', focusFollowup = 
       row.gps_lng        = gps.lng
       row.gps_accuracy_m = gps.acc
     }
-    const { error: err } = await supabase.from('lead_activities').insert([row])
+    const { data: saved, error: err } = await supabase.from('lead_activities').insert([row]).select('notes')
+    // Phase 633 — the 4th+ meeting on a lead this month is saved but not counted.
+    if (!err && String(saved?.[0]?.notes || '').startsWith('Over monthly limit')) {
+      pushToast('Saved - but this lead already had 3 meetings this month, so this one does not count toward your target.', 'warning')
+    }
     if (err) {
       setSaving(false)
       setError('Save failed: ' + err.message)

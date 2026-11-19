@@ -151,7 +151,7 @@ export default function ManagerDashboardV2() {
         const meetSeen = new Set()
         ;(meetRows || []).forEach(r => {
           const note = r.notes || ''
-          if (note.startsWith("I'm here · auto-check-in") || note.startsWith('Meeting scheduled')) return
+          if (note.startsWith("I'm here · auto-check-in") || note.startsWith('Meeting scheduled') || note.startsWith('Over monthly limit')) return   // Phase 633
           const key = `${r.created_by}|${r.lead_id || `walkin_${r.id}`}`
           if (meetSeen.has(key)) return
           meetSeen.add(key)

@@ -104,6 +104,13 @@ BEGIN
       RETURN NEW;
     END IF;
 
+    -- Phase 633 — skip a meeting over the 3-per-lead-per-month limit (saved, not counted;
+    -- the prefix is stamped by lead_activity_meeting_month_limit BEFORE INSERT).
+    IF NEW.notes IS NOT NULL
+       AND NEW.notes LIKE 'Over monthly limit%' THEN
+      RETURN NEW;
+    END IF;
+
     -- Phase 93.7 — revisit detection. Walk-ins (lead_id IS NULL) always
     -- bump (can't be dedupe'd).
     IF NEW.lead_id IS NOT NULL THEN
@@ -127,7 +134,8 @@ BEGIN
          -- ate the 13:00 real meeting's bump). Exclude BOTH.
          AND (prev.notes IS NULL
               OR (prev.notes NOT LIKE 'I''m here · auto-check-in%'
-                  AND prev.notes NOT LIKE 'Meeting scheduled%'));
+                  AND prev.notes NOT LIKE 'Meeting scheduled%'
+                  AND prev.notes NOT LIKE 'Over monthly limit%'));
 
       IF v_already_today > 0 THEN
         RETURN NEW;
@@ -157,6 +165,7 @@ NOTIFY pgrst, 'reload schema';
 -- SELECT
 --   pg_get_functiondef(p.oid) LIKE '%auto-check-in%'              AS p93_6_autocheckin_skip,
 --   pg_get_functiondef(p.oid) LIKE '%Meeting scheduled%'          AS p103e2_scheduled_skip,
+--   pg_get_functiondef(p.oid) LIKE '%Over monthly limit%'         AS p633_month_limit_skip,
 --   pg_get_functiondef(p.oid) LIKE '%v_already_today%'            AS p93_7_revisit_dedup,
 --   pg_get_functiondef(p.oid) LIKE '%prev.notes NOT LIKE%'        AS p127_prior_must_be_done,
 --   pg_get_functiondef(p.oid) LIKE '%bump_daily_counter%'         AS bumps_counter,

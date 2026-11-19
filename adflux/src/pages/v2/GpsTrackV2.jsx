@@ -59,6 +59,7 @@ const isAutoCheckinRow = (a) =>
 // the same — keep these in lockstep.
 const isScheduledMeetingRow = (a) =>
   (a?.notes || '').startsWith('Meeting scheduled')
+  || (a?.notes || '').startsWith('Over monthly limit')   // Phase 633 - 4th+ meeting on a lead this month: saved, not counted
 
 // Phase 93.7 (25 May 2026) — owner directive: "only unique meeting
 // can be count in KPI, revisit dont count in KPi". Second/third

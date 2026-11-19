@@ -56,7 +56,8 @@ BEGIN
      AND activity_type IN ('meeting', 'site_visit')
      AND (created_at AT TIME ZONE 'Asia/Kolkata')::date = p_date
      AND (notes IS NULL OR notes NOT LIKE 'I''m here · auto-check-in%')
-     AND (notes IS NULL OR notes NOT LIKE 'Meeting scheduled%');
+     AND (notes IS NULL OR notes NOT LIKE 'Meeting scheduled%')
+     AND (notes IS NULL OR notes NOT LIKE 'Over monthly limit%');   -- Phase 633
   INSERT INTO public.work_sessions (user_id, work_date, daily_counters)
   VALUES (p_user, p_date, jsonb_build_object('meetings', v_count))
   ON CONFLICT (user_id, work_date) DO UPDATE

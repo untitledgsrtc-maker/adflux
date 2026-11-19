@@ -35,7 +35,7 @@ import { useAuthStore } from '../../store/authStore'
 import VoiceInput from '../voice/VoiceInput'
 import PhotoCapture from './PhotoCapture'
 import CityAutocomplete from './CityAutocomplete'
-import { toastError } from '../v2/Toast'
+import { toastError, pushToast } from '../v2/Toast'
 import WhatsAppPromptModal from './WhatsAppPromptModal'
 import { findLeadByPhone } from '../../utils/leadDedup'
 import MeetingLocationBlock from './MeetingLocationBlock'
@@ -290,9 +290,13 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
       setSavedLead({ id: dup.id, name: dup.name, company: dup.company, phone, segment: 'PRIVATE' })
       ;(async () => {
         try {
-          const { error: actErr } = await supabase
-            .from('lead_activities').insert([activityPayload])
+          const { data: savedAct, error: actErr } = await supabase
+            .from('lead_activities').insert([activityPayload]).select('notes')
           if (actErr) toastError(actErr, 'Follow-up activity log failed — open the lead and re-log.')
+          // Phase 633 — the 4th+ meeting on a lead this month is saved but not counted.
+          else if (String(savedAct?.[0]?.notes || '').startsWith('Over monthly limit')) {
+            pushToast('Saved - but this lead already had 3 meetings this month, so this one does not count toward your target.', 'warning')
+          }
         } catch (e) {
           toastError(e, 'Network error logging follow-up.')
         }

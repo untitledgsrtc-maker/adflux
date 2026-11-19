@@ -228,7 +228,8 @@ BEGIN
        AND la.activity_type IN ('meeting', 'site_visit')
        AND (la.created_at AT TIME ZONE 'Asia/Kolkata')::date = p_date
        AND (la.notes IS NULL OR la.notes NOT LIKE 'Meeting scheduled%')
-       AND (la.notes IS NULL OR la.notes NOT LIKE 'I''m here · auto-check-in%');
+       AND (la.notes IS NULL OR la.notes NOT LIKE 'I''m here · auto-check-in%')
+       AND (la.notes IS NULL OR la.notes NOT LIKE 'Over monthly limit%');   -- Phase 633
   END IF;
 
   IF v_target = 0 THEN

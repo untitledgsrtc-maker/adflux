@@ -663,6 +663,7 @@ export default function RepProfileV2() {
         (a.activity_type === 'meeting' || a.activity_type === 'site_visit')
         && !(a.notes || '').startsWith('Meeting scheduled')
         && !(a.notes || '').startsWith("I'm here · auto-check-in")
+        && !(a.notes || '').startsWith('Over monthly limit')   // Phase 633
       const istDayOf = (iso) => {
         try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(iso)) }
         catch { return String(iso).slice(0, 10) }
