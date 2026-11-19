@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Download, MessageCircle, ChevronDown,
   Building2, Phone, Mail, MapPin, FileText, Calendar,
-  CheckCircle, CreditCard, X, Pencil, Trash2, Info
+  CheckCircle, CreditCard, X, Pencil, Trash2, Info, UserRound
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useQuotes } from '../hooks/useQuotes'
@@ -542,6 +542,13 @@ export default function QuoteDetail() {
           <ArrowLeft size={15} /> Back
         </button>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {/* Phase 627 — jump to the lead this quote belongs to (owner ask). */}
+          {quote?.lead_id && (
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/leads/${quote.lead_id}`)}
+              title="Open the lead for this quote">
+              <UserRound size={15} strokeWidth={1.6} /> Open lead
+            </button>
+          )}
           {/* Edit button: available to both admin and sales at every
               status except 'lost' — lost quotes are archival. This lets
               either role correct client details, swap cities, or
