@@ -907,6 +907,15 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start;
   gap: 6px;
 }
+/* Phase 626 — WhatsApp share of the card summary, pushed to the right of the chips. */
+.lead-rep-wa {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  min-height: 28px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--success); background: var(--success-soft, rgba(16,185,129,.12));
+  color: var(--success); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.lead-rep-wa:hover { background: rgba(16,185,129,.26); }
+.lead-rep-wa:focus-visible { outline: 2px solid var(--accent, #FFE600); outline-offset: 2px; }
 .lead-rep-big-av {
   width: 44px; height: 44px; border-radius: 50%;
   display: grid; place-items: center;

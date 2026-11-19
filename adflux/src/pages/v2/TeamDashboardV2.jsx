@@ -23,7 +23,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isSystemClose, keepInFollowupQueue } from '../../utils/followups'
 import { useNavigate } from 'react-router-dom'
-import { Users as UsersIcon, MapPin, Mic, Loader2 } from 'lucide-react'
+import { Users as UsersIcon, MapPin, Mic, Loader2, MessageCircle } from 'lucide-react'
+import { openWhatsApp } from '../../utils/whatsapp'
 import { Loader } from '@googlemaps/js-api-loader'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
@@ -385,7 +386,7 @@ export default function TeamDashboardV2() {
       // Phase 565: a sales head (not admin/HR) lists only his assigned reps + himself; the data tables are already RLS-limited.
       const isTeamHead = profile?.team_role === 'sales_manager' && !['admin', 'co_owner', 'hr', 'office_admin'].includes(profile?.role)
       let repsQ = supabase.from('users')
-          .select('id, name, team_role, city, daily_targets, is_active, profile_image_url, app_version')
+          .select('id, name, team_role, city, daily_targets, is_active, profile_image_url, app_version, whatsapp_number')
           .in('team_role', ['sales', 'sales_manager', 'telecaller'])
           .eq('is_active', true)
           .order('name')
@@ -1527,6 +1528,22 @@ export default function TeamDashboardV2() {
             : 0
           const barPct = isTC ? callPct : meetPct
           const barCls = barPct >= 80 ? '' : barPct >= 50 ? 'warn' : 'dng'
+          // Phase 626 — share this card's numbers to the rep on WhatsApp. Built and
+          // opened in the click handler with NO await (browsers block a later window.open).
+          const shareCard = (e) => {
+            e.stopPropagation()
+            const fu = followUpsByUser[r.id] || { pending: 0, done: 0 }
+            const lines = [
+              `*${r.name} · ${period?.label || 'Today'}*`,
+              isTC ? `Calls: ${callsHere}/${callsTarget}` : `Meetings: ${counters.meetings || 0}/${meetingsTarget || 0}`,
+              isTC ? `Qualified: ${qualifiedByUser[r.id] || 0}` : `New leads: ${leadsHere}/${leadsTarget}`,
+              `Follow-ups done: ${fu.done}/${fu.done + fu.pending}`,
+              `Overdue follow-ups: ${overdueFuByUser[r.id] || 0}`,
+              isTC ? null : `Quote chase: ${quoteChaseByUser[r.id] || 0} · Payment chase: ${paymentChaseByUser[r.id] || 0}`,
+              `This month: ${monthQuotesByUser[r.id] || 0} quotes (${formatLakh(monthQuoteAmtByUser[r.id] || 0)}) · ${monthWonByUser[r.id] || 0} won (${formatLakh(monthWonAmtByUser[r.id] || 0)})`,
+            ].filter(Boolean)
+            openWhatsApp(r.whatsapp_number || '', lines.join('\n'))
+          }
           return (
             <div
               className={`lead-rep-card ${isLive ? 'live' : ''}`}
@@ -1579,6 +1596,15 @@ export default function TeamDashboardV2() {
                           {pendingOutcomesByUser[r.id]} no outcome
                         </span>
                       )}
+                      <button
+                        type="button"
+                        className="lead-rep-wa"
+                        onClick={shareCard}
+                        title={r.whatsapp_number ? `Send this summary to ${r.name} on WhatsApp` : 'No WhatsApp number saved - pick the chat in WhatsApp'}
+                        aria-label={`Share ${r.name}'s summary on WhatsApp`}
+                      >
+                        <MessageCircle size={14} strokeWidth={1.6} /> WhatsApp
+                      </button>
                     </div>
                   )
                 })()}
