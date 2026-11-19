@@ -50,6 +50,7 @@ import LeadCallHistory  from '../../components/leads/LeadCallHistory'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
+import { LeadScoreCard } from '../../components/leads/LeadScore'   // Phase 625 - lead score ring + breakdown
 import { logCallAudit } from '../../utils/callAudit'
 import { markCallStart } from '../../utils/callTimer'
 import { openExternalUrl, openEmail } from '../../utils/openExternal'
@@ -1635,6 +1636,8 @@ export default function LeadDetailV2() {
 
         {/* RIGHT — side panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Phase 625 - lead score (refreshes when the timeline or stage changes). */}
+          <LeadScoreCard leadId={id} stage={lead.stage} refreshKey={`${activities.length}-${lead.stage}-${lead.updated_at || ''}`} />
           {/* Lead details — Phase 19 inline-edit. Phase 62.3 (20 May
               2026) — dropped "Click any field to edit" hint. The hover
               affordance + cursor change on each value already telegraphs

@@ -111,6 +111,7 @@ import { istDayOf } from '../../utils/istDate'  // Phase 311 — IST-bucket won_
 import FilterDrawer, { ActiveFilterChips } from '../../components/v2/FilterDrawer'
 // Phase 44.1 — daily leads-collected bar chart at top of /leads.
 import LeadsCollectedChart from '../../components/leads/LeadsCollectedChart'
+import { LeadScoreRing } from '../../components/leads/LeadScore'   // Phase 625 - score ring replaces the heat dot in the list
 
 /* The 5 tabs from the design — All + 4 groups. We re-use the
    underlying STAGE_GROUPS from useLeads but drop "in_progress"
@@ -477,6 +478,24 @@ export default function LeadsV2() {
     // statsMap is READ inside to skip cached ids — intentionally NOT a dep, else
     // every merge re-runs the effect (loop). paged changes on page/filter only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paged])
+
+  // Phase 625 — lead scores for THIS page only (one POST, never the whole list, section 45).
+  // Re-fetched on every page/filter/refresh change so a fresh call shows up; silent on error.
+  const [scoreMap, setScoreMap] = useState({})
+  useEffect(() => {
+    const ids = paged.map(l => l.id).filter(Boolean)
+    if (ids.length === 0) return undefined
+    let cancelled = false
+    supabase.rpc('lead_scores_for', { p_lead_ids: ids }).then(({ data, error }) => {
+      if (cancelled || error || !Array.isArray(data)) return
+      setScoreMap(prev => {
+        const next = { ...prev }
+        data.forEach(r => { next[r.lead_id] = { score: r.score, parts: r.parts } })
+        return next
+      })
+    })
+    return () => { cancelled = true }
   }, [paged])
 
   // Phase 62.8 — CSV export of currently selected rows. If nothing
@@ -1307,7 +1326,7 @@ export default function LeadsV2() {
                       days-dot (how stale). */}
                   <td className="td-lead">
                     <div className="name-cell" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <HeatDot heat={l.heat} />
+                      <LeadScoreRing score={scoreMap[l.id]?.score} parts={scoreMap[l.id]?.parts} />
                       <span style={{
                         width: 1, height: 14,
                         background: 'var(--border)',
