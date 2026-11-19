@@ -50,6 +50,7 @@ import LeadCallHistory  from '../../components/leads/LeadCallHistory'
 import WhatsAppPromptModal from '../../components/leads/WhatsAppPromptModal'
 import PostCallOutcomeModal from '../../components/leads/PostCallOutcomeModal'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
+import { STAGE_LABELS } from '../../hooks/useLeads'   // Phase 629 - stage names for the timeline
 import { LeadScoreCard } from '../../components/leads/LeadScore'   // Phase 625 - lead score ring + breakdown
 import { logCallAudit } from '../../utils/callAudit'
 import { markCallStart } from '../../utils/callTimer'
@@ -76,6 +77,8 @@ const ACTIVITY_ICON = {
   note:          Edit3,
   status_change: RefreshCw,
   imported:      Sparkles,
+  quote:         FileTextIcon,   // Phase 629
+  lead_added:    Sparkles,       // Phase 629
 }
 const ACTIVITY_COLOR = {
   call:          'blue',
@@ -86,6 +89,8 @@ const ACTIVITY_COLOR = {
   note:          'amber',
   status_change: 'purple',
   imported:      'purple',
+  quote:         'amber',
+  lead_added:    'blue',
 }
 const ACTIVITY_TITLE = {
   call:          'Call',
@@ -96,6 +101,8 @@ const ACTIVITY_TITLE = {
   note:          'Note',
   status_change: 'Stage change',
   imported:      'Imported',
+  quote:         'Quote',
+  lead_added:    'Lead added',
 }
 
 // Phase 32P — single source of truth for phone-number cleaning. Strip
@@ -230,6 +237,7 @@ export default function LeadDetailV2() {
   const [linkedQuotes, setLinkedQuotes] = useState([])
   const [openFollowUps, setOpenFollowUps] = useState([])
   const [presentations, setPresentations] = useState([]) // Phase 181 — logged GSRTC presentations for this lead
+  const [stageLog, setStageLog] = useState([])           // Phase 629 — every stage change (lead_stage_log)
   // Phase 93.17 (26 May 2026) — resilient GPS capture via shared
   // helper. Was: raw navigator.geolocation with 8s timeout + high-
   // accuracy → "Could not capture GPS: Timeout expired" on weak
@@ -577,9 +585,9 @@ export default function LeadDetailV2() {
     // lead. Separate from the main load() promises so a quote/RLS
     // hiccup doesn't break the page render.
     try {
-      const [qRes, fuRes, psRes] = await Promise.all([
+      const [qRes, fuRes, psRes, slRes] = await Promise.all([
         supabase.from('quotes')
-          .select('id, ref, status, segment, media_type, total_amount, created_at')
+          .select('id, ref, quote_number, status, segment, media_type, total_amount, created_at, won_at, lost_at')
           .eq('lead_id', id)
           .order('created_at', { ascending: false })
           .limit(20),
@@ -596,10 +604,22 @@ export default function LeadDetailV2() {
           .not('duration_seconds', 'is', null)
           .order('started_at', { ascending: false })
           .limit(20),
+        // Phase 629 — stage history from every path (menu, call outcome, quote lost, bulk, import).
+        supabase.from('lead_stage_log')
+          .select('id, old_stage, new_stage, lost_reason, changed_by, changed_at, note')
+          .eq('lead_id', id)
+          .order('changed_at', { ascending: false })
+          .limit(100),
       ])
       setLinkedQuotes(qRes.data || [])
       setOpenFollowUps(fuRes.data || [])
       setPresentations(psRes.data || [])
+      // Names in a second query (no users() embed, CLAUDE.md section 30).
+      const sl = slRes.data || []
+      const ids = [...new Set(sl.map(r => r.changed_by).filter(Boolean))]
+      const { data: us } = ids.length ? await supabase.from('users').select('id, name').in('id', ids) : { data: [] }
+      const nm = Object.fromEntries((us || []).map(u => [u.id, u.name]))
+      setStageLog(sl.map(r => ({ ...r, by_name: nm[r.changed_by] || null })))
     } catch (e) {
       // Non-fatal — leave cards empty.
       console.warn('[lead] linked load failed:', e?.message || e)
@@ -714,6 +734,36 @@ export default function LeadDetailV2() {
       },
     })
   }
+
+  /* ─── Phase 629 — the timeline = activities + every stage change + quote events +
+     "lead added". A stage-log row is skipped when a status_change activity was
+     logged within 2 minutes (the stage menu writes both). Newest first. ─── */
+  const timeline = useMemo(() => {
+    const stageName = s => STAGE_LABELS[s] || s
+    const stageActs = activities.filter(a => a.activity_type === 'status_change')
+    const rows = [...activities]
+    for (const r of stageLog) {
+      const t = Date.parse(r.changed_at)
+      const names = [r.new_stage, stageName(r.new_stage)].map(x => String(x).toLowerCase())
+      // same stage, logged by the stage menu within 2 minutes = the same change
+      if (stageActs.some(a => Math.abs(Date.parse(a.created_at) - t) < 120000
+            && names.some(n => String(a.notes || '').toLowerCase().includes(n)))) continue
+      rows.push({
+        id: `sl-${r.id}`, activity_type: 'status_change', created_at: r.changed_at,
+        notes: `${r.old_stage ? `${stageName(r.old_stage)} → ` : '→ '}${stageName(r.new_stage)}${r.lost_reason ? ` · ${r.lost_reason}` : ''}${r.note ? ` (${r.note})` : ''}`,
+        user: r.by_name ? { name: r.by_name } : null,
+      })
+    }
+    for (const q of linkedQuotes) {
+      const num = q.quote_number || q.ref || 'Quote'
+      const amt = q.total_amount ? ` · ${formatCurrency(q.total_amount)}` : ''
+      rows.push({ id: `qc-${q.id}`, activity_type: 'quote', created_at: q.created_at, notes: `${num} created${amt}` })
+      if (q.won_at && q.status === 'won')  rows.push({ id: `qw-${q.id}`, activity_type: 'quote', created_at: q.won_at,  notes: `${num} won${amt}` })
+      if (q.lost_at && q.status === 'lost') rows.push({ id: `ql-${q.id}`, activity_type: 'quote', created_at: q.lost_at, notes: `${num} lost${amt}` })
+    }
+    if (lead?.created_at) rows.push({ id: 'lead-added', activity_type: 'lead_added', created_at: lead.created_at, notes: lead.source ? `Source: ${lead.source}` : null })
+    return rows.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+  }, [activities, stageLog, linkedQuotes, lead?.created_at, lead?.source])
 
   /* ─── Stage history (status_change activities, oldest first) ─── */
   const stageHistory = useMemo(() => {
@@ -1562,17 +1612,17 @@ export default function LeadDetailV2() {
             <div>
               <div className="lead-card-title">Activity timeline</div>
               <div className="lead-card-sub">
-                {activities.length} {activities.length === 1 ? 'entry' : 'entries'} · last {Math.min(activities.length, 200)} shown
+                {timeline.length} {timeline.length === 1 ? 'entry' : 'entries'}
               </div>
             </div>
           </div>
-          {activities.length === 0 ? (
+          {timeline.length === 0 ? (
             <div className="lead-card-pad" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
               No activity yet — start with a call or note from the action buttons above.
             </div>
           ) : (
             <div className="lead-timeline">
-              {activities.map((a, i) => {
+              {timeline.map((a, i) => {
                 const Icon = ACTIVITY_ICON[a.activity_type] || Edit3
                 const color = ACTIVITY_COLOR[a.activity_type] || 'amber'
                 const dur = formatDuration(a.duration_seconds)
