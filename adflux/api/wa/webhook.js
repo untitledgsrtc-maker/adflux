@@ -601,16 +601,20 @@ async function storeInbound(payload) {
         // (existing behaviour), so this is INERT until that SQL runs (§45).
         if (repMap === null) {
           const { data: reps, error: repErr } = await admin.from('users')
-            .select('id, whatsapp_number').not('whatsapp_number', 'is', null).eq('is_active', true)
+            .select('id, whatsapp_number, signature_mobile').not('whatsapp_number', 'is', null).eq('is_active', true)
           // Only CACHE on a clean read. On a query error (incl. the column not
           // existing pre-SQL) leave repMap null so the next message retries — a
           // transient users-read failure must never mis-route a rep into the
           // customer funnel for the rest of this webhook (review finding F4).
           if (!repErr) {
             repMap = {}
+            // Phase 623: the company phone (signature_mobile) counts too, so a rep's
+            // hi from either their personal or company number reaches the assistant.
             for (const rr of (reps || [])) {
-              const k = String(rr.whatsapp_number).replace(/\D/g, '').slice(-10)
-              if (k) repMap[k] = rr.id
+              for (const n of [rr.signature_mobile, rr.whatsapp_number]) {
+                const k = String(n || '').replace(/\D/g, '').slice(-10)
+                if (k.length === 10) repMap[k] = rr.id
+              }
             }
           }
         }
