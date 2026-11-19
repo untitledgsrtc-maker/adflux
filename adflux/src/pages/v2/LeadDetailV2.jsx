@@ -587,7 +587,7 @@ export default function LeadDetailV2() {
     try {
       const [qRes, fuRes, psRes, slRes] = await Promise.all([
         supabase.from('quotes')
-          .select('id, ref, quote_number, status, segment, media_type, total_amount, created_at, won_at, lost_at')
+          .select('id, quote_number, status, segment, media_type, total_amount, created_at, won_at, lost_at')   // Phase 629.1: 'ref' does not exist on quotes - it failed this whole query (Quotes panel never showed)
           .eq('lead_id', id)
           .order('created_at', { ascending: false })
           .limit(20),
@@ -755,7 +755,7 @@ export default function LeadDetailV2() {
       })
     }
     for (const q of linkedQuotes) {
-      const num = q.quote_number || q.ref || 'Quote'
+      const num = q.quote_number || 'Quote'
       const amt = q.total_amount ? ` · ${formatCurrency(q.total_amount)}` : ''
       rows.push({ id: `qc-${q.id}`, activity_type: 'quote', created_at: q.created_at, notes: `${num} created${amt}` })
       if (q.won_at && q.status === 'won')  rows.push({ id: `qw-${q.id}`, activity_type: 'quote', created_at: q.won_at,  notes: `${num} won${amt}` })
@@ -1926,7 +1926,7 @@ export default function LeadDetailV2() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600,
                                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {q.ref || q.id.slice(0,8)}
+                          {q.quote_number || q.id.slice(0,8)}
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                           {q.media_type || q.segment || 'Quote'}
