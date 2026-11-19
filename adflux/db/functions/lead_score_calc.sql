@@ -32,7 +32,8 @@ AS $function$
      WHERE p_ids IS NULL OR ld.id = ANY (p_ids)
   ),
   x AS (
-    SELECT l.id, l.stage,
+    SELECT l.id, l.stage, l.telecaller_id,
+      (SELECT u.role FROM public.users u WHERE u.id = l.owner) AS owner_role,
       CASE l.stage WHEN 'New' THEN 5 WHEN 'Working' THEN 20 WHEN 'QuoteSent' THEN 35 WHEN 'Nurture' THEN 10 ELSE 0 END AS stage_pts,
       (   EXISTS (SELECT 1 FROM public.lead_activities a
                    WHERE a.lead_id = l.id AND a.created_at >= now() - interval '7 days'
@@ -50,7 +51,7 @@ AS $function$
                WHERE a.lead_id = l.id AND a.activity_type IN ('meeting', 'site_visit')
                  AND COALESCE(a.notes, '') NOT LIKE 'I''m here · auto-check-in%'
                  AND COALESCE(a.notes, '') NOT LIKE 'Meeting scheduled%') AS met,
-      (   (l.telecaller_id IS NOT NULL OR EXISTS (SELECT 1 FROM public.users u WHERE u.id = l.owner AND u.role = 'telecaller'))
+      (   (l.telecaller_id IS NOT NULL OR (SELECT u.role FROM public.users u WHERE u.id = l.owner) = 'telecaller')
       AND EXISTS (SELECT 1 FROM public.lead_activities a
                    WHERE a.lead_id = l.id AND a.activity_type = 'call' AND a.outcome = 'positive')
       ) AS interested,
@@ -92,6 +93,8 @@ AS $function$
     jsonb_build_object(
       'stage', p.stage_pts, 'talked', p.talked_pts, 'meet', p.meet_pts,
       'meet_kind', CASE WHEN p.met THEN 'meeting' WHEN p.interested THEN 'interested' END,
+      -- 626.1: who the 15 points are judged as (drives the lead-page label).
+      'who', CASE WHEN p.owner_role = 'telecaller' THEN 'tc' WHEN p.telecaller_id IS NOT NULL THEN 'handoff' ELSE 'sales' END,
       'ontime', p.ontime_pts, 'due_n', p.due_n, 'ontime_n', p.ontime_n,
       'overdue', -p.overdue_pts)
   FROM p;

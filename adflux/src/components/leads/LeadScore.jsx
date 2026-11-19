@@ -17,7 +17,7 @@ export function scoreTone(s) {
 export function scoreTitle(score, parts) {
   if (score == null) return 'Score not worked out yet'
   if (!parts) return `Lead score ${score}%`
-  const meet = parts.meet_kind === 'interested' ? 'Said interested' : 'Meeting done'
+  const meet = parts.who === 'tc' ? 'Said interested' : parts.who === 'handoff' ? 'Meeting or interested' : 'Meeting done'
   return [
     `Lead score ${score}%`,
     `Stage ${parts.stage ?? 0}`,
@@ -70,7 +70,10 @@ export function LeadScoreCard({ leadId, refreshKey, stage }) {
   }, [leadId, refreshKey])
 
   const p = row?.parts || {}
-  const meetLabel = p.meet_kind === 'interested' ? 'Said interested on a call' : 'Meeting or site visit done'
+  // 626.1 — telecallers do not do meetings: label by who owns the lead (parts.who).
+  const meetLabel = p.who === 'tc' ? 'Said interested on a call'
+    : p.who === 'handoff' ? 'Meeting done or said interested'
+    : 'Meeting or site visit done'
   return (
     <div className="lead-card">
       <div className="lead-card-head"><div className="lead-card-title">Lead score</div></div>
