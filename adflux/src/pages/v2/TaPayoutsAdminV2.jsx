@@ -508,10 +508,26 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
 
   return (
     <div className="v2d-ta" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Phase 624: page head now sits ABOVE the hero, and the hero eyebrow is just the
+          month, so "HR · Finance" no longer shows twice. */}
+      {!embedded && (
+        <div className="v2d-page-head">
+          <div>
+            <div className="v2d-page-kicker">HR · Finance</div>
+            <h1 className="v2d-page-title">TA Claims</h1>
+            <div className="v2d-page-sub">
+              Travel allowance computed from each rep's GPS pings. Daily DA + bike
+              (₹3/km) auto-calculated by city ceiling. Hotel is added by you per
+              day when the rep stayed overnight. Approve before finance pays out.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Phase 34R+ — V2Hero header. Replaces the bare page-head
           block. Eyebrow + selected rep + the month's grand total. */}
       <V2Hero
-        eyebrow={`HR · Finance · ${monthLabel(fMonth)}`}
+        eyebrow={monthLabel(fMonth)}
         value={selectedRepName}
         label={fUser ? `${rows.length} day${rows.length === 1 ? '' : 's'} · grand total ${fmtINR(totals.total)}` : 'pick a rep below'}
         chip={fUser && rows.length ? `${Math.round(totals.km)} km this month` : null}
@@ -525,25 +541,11 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       {fUser && rows.length > 0 && (
         <RingMilestoneRow
           items={[
-            { value: Math.round(statusSplit.approved), target: Math.max(1, Math.round(statusSplit.total)), label: 'Approved', sub: fmtINR(statusSplit.approved) },
-            { value: Math.round(statusSplit.paid),     target: Math.max(1, Math.round(statusSplit.total)), label: 'Paid',     sub: fmtINR(statusSplit.paid) },
-            { value: Math.round(statusSplit.pending),  target: Math.max(1, Math.round(statusSplit.total)), label: 'Pending',  sub: fmtINR(statusSplit.pending) },
+            { value: Math.round(statusSplit.approved), target: Math.max(1, Math.round(statusSplit.total)), center: statusSplit.total ? Math.round(100 * statusSplit.approved / statusSplit.total) + '%' : '0%', label: 'Approved', sub: fmtINR(statusSplit.approved) },
+            { value: Math.round(statusSplit.paid),     target: Math.max(1, Math.round(statusSplit.total)), center: statusSplit.total ? Math.round(100 * statusSplit.paid / statusSplit.total) + '%' : '0%', label: 'Paid',     sub: fmtINR(statusSplit.paid) },
+            { value: Math.round(statusSplit.pending),  target: Math.max(1, Math.round(statusSplit.total)), center: statusSplit.total ? Math.round(100 * statusSplit.pending / statusSplit.total) + '%' : '0%', label: 'Pending',  sub: fmtINR(statusSplit.pending) },
           ]}
         />
-      )}
-
-      {!embedded && (
-        <div className="v2d-page-head">
-          <div>
-            <div className="v2d-page-kicker">HR · Finance</div>
-            <h1 className="v2d-page-title">TA Payouts</h1>
-            <div className="v2d-page-sub">
-              Travel allowance computed from each rep's GPS pings. Daily DA + bike
-              (₹3/km) auto-calculated by city ceiling. Hotel is added by you per
-              day when the rep stayed overnight. Approve before finance pays out.
-            </div>
-          </div>
-        </div>
       )}
 
       {/* §HR: claim-queue load failed — the panel below hides when empty,

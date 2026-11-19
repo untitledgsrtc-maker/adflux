@@ -270,7 +270,7 @@ function CandidateCard({ r, calls, onPatch, onDelete, onCall, onSendOffer, onCon
         </button>
         <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,image/*" style={{ display: 'none' }}
           onChange={e => { uploadResume(e.target.files?.[0]); e.target.value = '' }} />
-        {!r.converted_user_id && (
+        {!r.converted_user_id && !['rejected', 'hired'].includes(r.stage) && (
           <button onClick={onSendOffer} style={{ ...actBtn, borderColor: 'var(--accent, #FFE600)', color: 'var(--accent)' }}>
             <Send size={14} /> Send offer
           </button>

@@ -158,6 +158,8 @@ export default function TeamDashboardV2() {
   // this flag to fetch the team bundle via ONE gated RPC (team_dashboard_bundle)
   // instead, so no broad RLS is needed and she stays own-only everywhere else.
   const canViewTeam = profile?.can_view_team_dashboard === true
+  // Phase 624: HR opens this page as "Attendance" - no sales money or reassign (her RLS returns 0 anyway).
+  const isHrView = profile?.role === 'hr'
 
   const [reps, setReps] = useState([])
   const [sessions, setSessions] = useState([])
@@ -1374,16 +1376,18 @@ export default function TeamDashboardV2() {
           <div className="lead-page-eyebrow">
             Field force · {reps.length} active reps · live
           </div>
-          <div className="lead-page-title">Team Dashboard</div>
+          <div className="lead-page-title">{isHrView ? 'Attendance' : 'Team Dashboard'}</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* Phase 82 — date filter at top of /team-dashboard. All
               KPIs (calls, voice, new leads, pipeline, follow-ups,
               quote-chase, payment-chase) reload when this changes. */}
           <PeriodPicker period={period} onChange={setPeriod} />
-          <button className="lead-btn lead-btn-primary" onClick={() => navigate('/leads')}>
-            <UsersIcon size={14} /> Reassign queue
-          </button>
+          {!isHrView && (
+            <button className="lead-btn lead-btn-primary" onClick={() => navigate('/leads')}>
+              <UsersIcon size={14} /> Reassign queue
+            </button>
+          )}
         </div>
       </div>
 
@@ -1416,9 +1420,11 @@ export default function TeamDashboardV2() {
         </div>
         <div className="lead-hero-stats">
           <HeroStat label="Reps active now"   value={`${live} / ${reps.length}`}   delta={`${reps.length - live} not checked-in`} down={live < reps.length} />
+          {!isHrView && (<>
           <HeroStat label="Calls today"       value={totalCallsToday}             delta="from call_logs"                          up={totalCallsToday > 0} />
           <HeroStat label="New leads added"   value={newLeadsToday}                delta="today"                                   up={newLeadsToday > 0} />
           <HeroStat label="Won today"         value={formatLakh(pipelineToday)}    delta="status=won"                              up={pipelineToday > 0} />
+          </>)}
         </div>
       </div>
 
@@ -1540,7 +1546,7 @@ export default function TeamDashboardV2() {
                 {/* Phase 112.7 — month quote / won VALUE capsules at the
                     marked spot (right of name, left of the status pill).
                     Compact ₹ in the pill; full ₹ on hover. */}
-                {(() => {
+                {!isHrView && (() => {
                   const mq  = monthQuotesByUser[r.id]   || 0
                   const mqA = monthQuoteAmtByUser[r.id] || 0
                   const mw  = monthWonByUser[r.id]      || 0

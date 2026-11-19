@@ -127,7 +127,7 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
     const inOnTime = work.filter((c) => c.kind === 'ok').length
     const hoursPct = work.length ? work.reduce((t, c) => t + Math.min(c.secs, 8 * 3600) / (8 * 3600), 0) / work.length : null
     const parts3 = [
-      { key: 'tasks', label: 'Tasks on time', max: 40, frac: due.length ? dueOnTime / due.length : null, note: due.length ? `${dueOnTime} of ${due.length} due` : 'No tasks due yet' },
+      { key: 'tasks', label: 'Tasks on time', max: 40, frac: due.length ? dueOnTime / due.length : null, note: due.length ? `${dueOnTime} of ${due.length} done by their due date` : 'No tasks due yet' },
       { key: 'clock', label: 'On-time clock-in', max: 30, frac: work.length ? inOnTime / work.length : null, note: work.length ? `${inOnTime} of ${work.length} working days` : 'No working days yet' },
       { key: 'hours', label: 'Hours vs 8 h a day', max: 30, frac: hoursPct, note: hoursPct == null ? 'No working days yet' : `${Math.round(hoursPct * 100)}% of target` },
     ]
@@ -153,8 +153,8 @@ export default function WorkProfileV2({ embedded = false, userId = null }) {
       {!embedded && (
         <div className="wk-head">
           <div>
-            <div className="wk-eyebrow">{own ? 'My profile' : 'Team member'}</div>
-            <h1 className="wk-title">{person?.name || 'Profile'}</h1>
+            {/* Phase 624: the name is on the card below; the heading no longer repeats it. */}
+            <h1 className="wk-title">{own ? 'My profile' : 'Team member'}</h1>
           </div>
           <Link to={own ? '/my-work' : '/team-work'} className="wk-btn o">Back</Link>
         </div>

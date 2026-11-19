@@ -32,7 +32,8 @@ function ringColor(pct) {
   return 'var(--danger, #EF4444)'
 }
 
-export function RingMilestone({ value = 0, target = 1, label = '', sub = '' }) {
+export function RingMilestone({ value = 0, target = 1, label = '', sub = '', center = null }) {
+  // Phase 624: `center` replaces the v/target text (big rupee values overflowed the ring).
   const safeTarget = Math.max(1, Number(target) || 1)
   const v          = Math.max(0, Number(value) || 0)
   const pct        = Math.min(1, v / safeTarget)
@@ -81,10 +82,12 @@ export function RingMilestone({ value = 0, target = 1, label = '', sub = '' }) {
             color: 'var(--text, #f1f5f9)',
           }}
         >
-          {v}
-          <span style={{ color: 'var(--text-subtle, #64748b)', fontSize: 12, fontWeight: 500, marginLeft: 1 }}>
-            /{safeTarget}
-          </span>
+          {center ?? (<>
+            {v}
+            <span style={{ color: 'var(--text-subtle, #64748b)', fontSize: 12, fontWeight: 500, marginLeft: 1 }}>
+              /{safeTarget}
+            </span>
+          </>)}
         </div>
       </div>
       <div
@@ -125,6 +128,7 @@ export function RingMilestoneRow({ items = [] }) {
           target={it.target}
           label={it.label}
           sub={it.sub}
+          center={it.center}
         />
       ))}
     </div>

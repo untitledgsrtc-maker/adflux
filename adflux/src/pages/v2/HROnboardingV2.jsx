@@ -62,6 +62,8 @@ export default function HROnboardingV2() {
   const userMap = useMemo(() => Object.fromEntries(users.map(u => [u.id, u])), [users])
   const assignedIds = useMemo(() => new Set(runs.map(r => r.user_id)), [runs])
   const assignable = useMemo(() => users.filter(u => u.is_active && !assignedIds.has(u.id)), [users, assignedIds])
+  // Phase 624: people who have left drop off the list (their old runs stay in the DB).
+  const shownRuns = useMemo(() => runs.filter(r => userMap[r.user_id]?.is_active !== false), [runs, userMap])
 
   async function assign(userId) {
     if (savingRef.current) return
@@ -114,11 +116,11 @@ export default function HROnboardingV2() {
         <div style={centerBox}><Loader2 size={22} className="spin" /></div>
       ) : err ? (
         <div style={{ ...centerBox, color: 'var(--danger)' }}>{err} <button onClick={load} style={ghostBtn}>Retry</button></div>
-      ) : runs.length === 0 ? (
+      ) : shownRuns.length === 0 ? (
         <div style={centerBox}><GraduationCap size={26} style={{ opacity: .5 }} /><div style={{ marginTop: 8 }}>No one is onboarding yet.</div></div>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
-          {runs.map(r => {
+          {shownRuns.map(r => {
             const prog = progByRun[r.id] || []
             const done = prog.filter(p => p.status === 'done').length
             const total = prog.length
@@ -132,7 +134,7 @@ export default function HROnboardingV2() {
                   <div style={{ flex: 1, minWidth: 180 }}>
                     <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
                       {u?.name || r.user_id.slice(0, 8)}
-                      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 8, textTransform: 'capitalize' }}>{tmpls[r.template_id]?.role || u?.role || ''}</span>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 8, textTransform: 'capitalize' }}>{(u?.role || tmpls[r.template_id]?.role || '').replace(/_/g, ' ')}</span>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-subtle)', marginTop: 2 }}>started {fmtDate(r.started_at)}</div>
                   </div>
