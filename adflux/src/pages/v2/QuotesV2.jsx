@@ -343,10 +343,20 @@ export default function QuotesV2() {
   }, [displayed])
 
   // Phase 615 - admin / sales head filtered to ONE rep: send that rep this summary on WhatsApp.
-  async function shareRepSummary() {
+  // Phase 622 - the rep's number is fetched when the rep is picked, NOT inside the click:
+  // an await before window.open made browsers block the WhatsApp tab as an unrequested pop-up.
+  const [repWa, setRepWa] = useState({ id: null, number: '' })
+  useEffect(() => {
+    if (!showTeam || repFilter === 'all') return undefined
+    let alive = true
+    supabase.from('users').select('whatsapp_number').eq('id', repFilter).maybeSingle()
+      .then(({ data }) => { if (alive) setRepWa({ id: repFilter, number: data?.whatsapp_number || '' }) })
+    return () => { alive = false }
+  }, [showTeam, repFilter])
+  function shareRepSummary() {
     const rep = repOptions.find(r => r.id === repFilter)
     const name = rep?.name || 'Rep'
-    const { data: u } = await supabase.from('users').select('whatsapp_number').eq('id', repFilter).maybeSingle()
+    const u = repWa.id === repFilter ? { whatsapp_number: repWa.number } : null
     const by = (st) => displayed.filter(q => q.status === st).length
     const period = filters.dateFrom || filters.dateTo
       ? `${filters.dateFrom ? formatDate(filters.dateFrom) : '...'} to ${filters.dateTo ? formatDate(filters.dateTo) : 'today'}`
