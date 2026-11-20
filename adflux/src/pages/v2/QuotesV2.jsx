@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { usePersistedState } from '../../hooks/usePersistedState'  // Phase 268 — remember filters across Back
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText, CheckCircle2, MessageCircle } from 'lucide-react'
+import { Plus, Search, X, ChevronDown, ChevronUp, ChevronsUpDown, Pencil, Trash2, FileText, CheckCircle2, MessageCircle, Copy } from 'lucide-react'
 // Phase 94 — path-param routing replaces the quoteIntent fallback.
 // Import retained for any future producer that still needs the
 // in-memory channel (e.g. external bookmark hand-offs). Currently
@@ -134,6 +134,21 @@ export default function QuotesV2() {
     }
     // Phase 612 - after Draft only admin may delete (DB quotes_no_delete_after_draft).
     return (q.status || 'draft') === 'draft' || profile?.role === 'admin'
+  }
+
+  // Phase 637 — copy a quote + its lines into a new Draft (duplicate_quote RPC), then open it.
+  async function duplicateQuote(e, q) {
+    e.stopPropagation()
+    const ok = await confirmDialog({
+      title: 'Duplicate quote?',
+      message: `Make a new draft copy of ${q.quote_number || 'this quote'} (same client and lines, new number). Payments, approvals and costs are not copied.`,
+      confirmLabel: 'Duplicate',
+    })
+    if (!ok) return
+    const { data: newId, error: dupErr } = await supabase.rpc('duplicate_quote', { p_quote_id: q.id })
+    if (dupErr || !newId) { toastError(dupErr, 'Could not duplicate the quote.'); return }
+    toastSuccess('Draft copy created - edit it and send.')
+    navigate(`/quotes/${newId}`)
   }
 
   async function deleteQuote(e, q) {
@@ -742,6 +757,17 @@ export default function QuotesV2() {
                             <Pencil size={13} />
                           </button>
                         )}
+                        {(!teamViewing || isSalesHead) && (
+                          <button
+                            type="button"
+                            className="v2d-ghost"
+                            title="Duplicate as a new draft"
+                            aria-label={`Duplicate ${q.quote_number || 'quote'}`}
+                            onClick={e => duplicateQuote(e, q)}
+                          >
+                            <Copy size={13} strokeWidth={1.6} />
+                          </button>
+                        )}
                         {canDeleteQuote(q) && (
                           <button
                             type="button"
@@ -843,6 +869,16 @@ export default function QuotesV2() {
                           onClick={e => editQuote(e, q)}
                         >
                           <Pencil size={13} /> Edit
+                        </button>
+                      )}
+                      {(!teamViewing || isSalesHead) && (
+                        <button
+                          type="button"
+                          className="v2d-ghost"
+                          style={{ flex: 1, padding: '8px 12px' }}
+                          onClick={e => duplicateQuote(e, q)}
+                        >
+                          <Copy size={13} strokeWidth={1.6} /> Duplicate
                         </button>
                       )}
                       {canDeleteQuote(q) && (
