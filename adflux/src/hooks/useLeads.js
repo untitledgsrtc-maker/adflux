@@ -145,10 +145,11 @@ export function useLeads() {
   const stageBulk = useCallback(async (ids, stage, extra = {}) => {
     if (!ids?.length) return { error: { message: 'No leads selected.' } }
     const patch = { stage, ...extra }
-    const { error: err } = await supabase
-      .from('leads')
-      .update(patch)
-      .in('id', ids)
+    // Phase 634 — batches of 50 (URL length + each move fires follow-up and score triggers): hundreds of ids in one .in() made the URL too long -> "Bad Request".
+    let err = null
+    for (let i = 0; i < ids.length && !err; i += 50) {
+      ;({ error: err } = await supabase.from('leads').update(patch).in('id', ids.slice(i, i + 50)))
+    }
     if (err) {
       console.error('[useLeads] bulk stage change failed:', err)
       return { error: err }
@@ -163,10 +164,10 @@ export function useLeads() {
   // they don't own.
   const deleteBulk = useCallback(async (ids) => {
     if (!ids?.length) return { error: { message: 'No leads selected.' } }
-    const { error: err } = await supabase
-      .from('leads')
-      .delete()
-      .in('id', ids)
+    let err = null   // Phase 634 — batches of 50, same as stageBulk
+    for (let i = 0; i < ids.length && !err; i += 50) {
+      ;({ error: err } = await supabase.from('leads').delete().in('id', ids.slice(i, i + 50)))
+    }
     if (err) {
       console.error('[useLeads] bulk delete failed:', err)
       return { error: err }
