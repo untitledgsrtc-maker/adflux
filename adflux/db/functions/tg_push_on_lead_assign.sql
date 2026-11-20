@@ -67,7 +67,9 @@ BEGIN
   IF (TG_OP = 'INSERT' AND NEW.assigned_to IS NOT NULL)
      OR (TG_OP = 'UPDATE'
          AND NEW.assigned_to IS NOT NULL
-         AND NEW.assigned_to IS DISTINCT FROM OLD.assigned_to) THEN
+         AND NEW.assigned_to IS DISTINCT FROM OLD.assigned_to
+         -- Phase 636: a bulk reassign (>20 leads) sends ONE summary push from reassign_leads_bulk.
+         AND COALESCE(current_setting('app.bulk_reassign', true), '') <> 'on') THEN
     v_title := 'New lead: ' || COALESCE(NEW.name, NEW.company, 'unnamed');
     v_body  := COALESCE(NEW.company, '') ||
                CASE WHEN NEW.phone IS NOT NULL THEN ' · ' || NEW.phone ELSE '' END;

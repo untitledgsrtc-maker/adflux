@@ -123,11 +123,28 @@ export function useLeads() {
   const reassignBulk = useCallback(async (ids, target_user_id, reason) => {
     if (!ids?.length) return { error: { message: 'No leads selected.' } }
     if (!target_user_id) return { error: { message: 'No target rep selected.' } }
-    const { data, error: err } = await supabase.rpc('reassign_leads_bulk', {
-      p_lead_ids:  ids,
-      p_new_owner: target_user_id,
-      p_reason:    reason || null,
-    })
+    // Phase 636 — batches of 50 (632 in one call hit the statement timeout). p_bulk_total tells
+    // the RPC the whole selection size (>20 = bulk mode: one summary push, spread follow-ups);
+    // p_last_batch sends that one push. Results are summed across batches.
+    const data = { total: 0, succeeded: 0, failed: 0, failures: [] }
+    let err = null
+    for (let i = 0; i < ids.length && !err; i += 50) {
+      const res = await supabase.rpc('reassign_leads_bulk', {
+        p_lead_ids:   ids.slice(i, i + 50),
+        p_new_owner:  target_user_id,
+        p_reason:     reason || null,
+        p_bulk_total: ids.length,
+        p_last_batch: i + 50 >= ids.length,
+      })
+      err = res.error
+      if (!err && res.data) {
+        data.total += res.data.total || 0
+        data.succeeded += res.data.succeeded || 0
+        data.failed += res.data.failed || 0
+        data.failures = data.failures.concat(res.data.failures || [])
+      }
+    }
+    if (err && data.succeeded > 0) err = { ...err, message: `${data.succeeded} of ${ids.length} moved, then: ${err.message}` }
     if (err) {
       console.error('[useLeads] bulk reassign RPC failed:', err)
       return { error: err }
