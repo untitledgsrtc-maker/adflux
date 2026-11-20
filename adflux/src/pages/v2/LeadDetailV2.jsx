@@ -1658,7 +1658,12 @@ export default function LeadDetailV2() {
                       )}
                       {(a.gps_lat && a.gps_lng) && (
                         <div className="tl-gps">
-                          <MapPin size={10} /> {Number(a.gps_lat).toFixed(4)}, {Number(a.gps_lng).toFixed(4)}
+                          {/* Phase 638 - tap opens the spot in Google Maps (app on phone, new tab on web). */}
+                          <button type="button" title="Open in Google Maps"
+                            onClick={() => openExternalUrl(`https://www.google.com/maps/search/?api=1&query=${a.gps_lat},${a.gps_lng}`)}
+                            style={{ display: 'inline-flex', gap: 4, alignItems: 'center', minHeight: 36, background: 'none', border: 0, padding: 0, font: 'inherit', color: 'var(--v2-blue)', textDecoration: 'underline', cursor: 'pointer' }}>
+                            <MapPin size={10} /> {Number(a.gps_lat).toFixed(4)}, {Number(a.gps_lng).toFixed(4)}
+                          </button>
                           {a.gps_accuracy_m ? ` · ±${a.gps_accuracy_m}m` : ''}
                         </div>
                       )}
