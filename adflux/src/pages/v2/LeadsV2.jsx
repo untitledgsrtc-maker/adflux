@@ -498,6 +498,28 @@ export default function LeadsV2() {
     return () => { cancelled = true }
   }, [paged])
 
+  // Phase 640 — cost per lead (salary + travel spent on it, all time), admin only.
+  // Same lazy per-page pattern as the scores above: one POST for the visible page,
+  // never the whole list (section 45). Server returns nothing for non-admin.
+  const showCost = profile?.role === 'admin'
+  const [costMap, setCostMap] = useState({})
+  useEffect(() => {
+    if (!showCost) return undefined
+    const ids = paged.map(l => l.id).filter(Boolean)
+    if (ids.length === 0) return undefined
+    let cancelled = false
+    supabase.rpc('lead_cost_for', { p_lead_ids: ids }).then(({ data, error }) => {
+      if (cancelled || error || !Array.isArray(data)) return
+      setCostMap(prev => {
+        const next = { ...prev }
+        ids.forEach(id => { next[id] = null })
+        data.forEach(r => { next[r.lead_id] = { cost: Number(r.cost), days: r.touch_days } })
+        return next
+      })
+    })
+    return () => { cancelled = true }
+  }, [paged, showCost])
+
   // Phase 62.8 — CSV export of currently selected rows. If nothing
   // selected, falls back to exporting the FILTERED set (so admin
   // can "click filter then export all"). Fields chosen to match the
@@ -1264,6 +1286,7 @@ export default function LeadsV2() {
                 <th style={{ textAlign: 'center' }} title="Total calls to this lead">Calls</th>
                 <th style={{ textAlign: 'center' }} title="Total in-app presentation time">Pres.</th>
                 <th style={{ textAlign: 'right' }}>Value</th>
+                {showCost && <th style={{ textAlign: 'right' }} title="Salary time + travel spent on this lead so far (admin only)">Cost</th>}
               </tr>
             </thead>
             <tbody>
@@ -1522,6 +1545,12 @@ export default function LeadsV2() {
                   <td className="mono" style={{ fontWeight: 600, fontFamily: 'var(--font-display)', textAlign: 'right' }}>
                     {l.expected_value ? formatCurrency(l.expected_value) : '—'}
                   </td>
+                  {showCost && (
+                    <td className="mono" style={{ fontSize: 12, textAlign: 'right', color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}
+                      title={costMap[l.id] ? `Worked on ${costMap[l.id].days} day${costMap[l.id].days === 1 ? '' : 's'}` : undefined}>
+                      {costMap[l.id] ? formatCurrency(costMap[l.id].cost) : '—'}
+                    </td>
+                  )}
                 </tr>
               )})}
             </tbody>
