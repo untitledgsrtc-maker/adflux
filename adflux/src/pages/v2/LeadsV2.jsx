@@ -1375,7 +1375,8 @@ export default function LeadsV2() {
                   >
                     {l.phone ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <span>{l.phone}</span>{/* Phase 34Z.76 */}
+                        {/* Phase 641 — cap width: one bad value (a Maps link saved as phone) stretched the whole column. */}
+                        <span title={l.phone} style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.phone}</span>{/* Phase 34Z.76 */}
                         {/* Phase 247.2 — team view is READ-ONLY: show the number,
                             hide Call/WhatsApp so she can't contact another rep's client. */}
                         {!teamViewing && (<>
@@ -1546,9 +1547,13 @@ export default function LeadsV2() {
                     {l.expected_value ? formatCurrency(l.expected_value) : '—'}
                   </td>
                   {showCost && (
-                    <td className="mono" style={{ fontSize: 12, textAlign: 'right', color: 'var(--text-muted)', fontFamily: 'var(--font-display)' }}
-                      title={costMap[l.id] ? `Worked on ${costMap[l.id].days} day${costMap[l.id].days === 1 ? '' : 's'}` : undefined}>
-                      {costMap[l.id] ? formatCurrency(costMap[l.id].cost) : '—'}
+                    <td className={costMap[l.id] ? 'td-cost td-cost-on' : 'td-cost'} style={{ textAlign: 'right', whiteSpace: 'nowrap' }}
+                      title={costMap[l.id] ? `Spent on this lead so far · worked on ${costMap[l.id].days} day${costMap[l.id].days === 1 ? '' : 's'}` : undefined}>
+                      {costMap[l.id] ? (
+                        <span className="lead-cost-chip">
+                          <span className="lead-cost-lbl">Cost</span>{formatCurrency(costMap[l.id].cost)}
+                        </span>
+                      ) : <span style={{ color: 'var(--text-subtle)' }}>—</span>}
                     </td>
                   )}
                 </tr>

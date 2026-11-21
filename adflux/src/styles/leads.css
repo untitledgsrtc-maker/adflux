@@ -689,6 +689,28 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 
   .lead-table tr.lead-row .name-cell .name { font-size: 14px; font-weight: 600; }
   .lead-table tr.lead-row .name-cell .company { font-size: 12px; }
+
+  /* Phase 641 — admin Cost chip on the phone card (row 3), only when there is a cost. */
+  .lead-table tr.lead-row > td.td-cost-on {   /* class, not :has() — older Android Chrome (Phase 93.16) */
+    display: block;
+    grid-column: 1 / -1;
+    grid-row: 3;
+    text-align: left !important;
+  }
+}
+
+/* Phase 641 — admin Cost chip (Leads list). Amber tint = money spent. */
+.lead-cost-chip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--warning-soft, rgba(245,158,11,0.12));
+  border: 1px solid var(--warning, #F59E0B);
+  color: var(--text, #f1f5f9);
+  font-family: var(--font-display); font-weight: 700; font-size: 13px;
+}
+.lead-cost-chip .lead-cost-lbl {
+  font-family: var(--font-sans); font-weight: 600; font-size: 12px;
+  color: var(--warning, #F59E0B); letter-spacing: .04em; text-transform: uppercase;
 }
 
 /* Phase 33A — global toast strip for /work. */
