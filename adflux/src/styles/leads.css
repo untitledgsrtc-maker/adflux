@@ -626,32 +626,27 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   .lead-table thead { display: none; }
   .lead-table,
   .lead-table tbody { display: block; width: 100%; }
+  /* Phase 642 — one-line phone card (owner pick, option 1 + stage tag):
+     [check] [score ring] Name ........ [Stage] [Rs] [Call]
+     Flex row; `order` puts the cells in that sequence whatever the DOM order. */
   .lead-table tr.lead-row {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    grid-template-rows: auto auto;
-    column-gap: 10px;
-    row-gap: 6px;
+    display: flex;
     align-items: center;
+    gap: 10px;
+    min-height: 56px;
     border: 1px solid var(--border);
-    /* tokens-on-scale per §6 UI checklist: radius 14 (--radius-lg)
-       + padding 10/14 lands on the 6/10/14/20 scale. Background
-       intentionally NOT set here so .lead-row-green/yellow/red
-       tints paint through. */
+    /* tokens-on-scale per §6 UI checklist. Background intentionally NOT
+       set here so .lead-row-green/yellow/red tints paint through. */
     border-radius: var(--radius-lg, 14px);
-    margin-bottom: 10px;
-    padding: 10px 14px;
+    margin-bottom: 8px;
+    padding: 8px 12px;
   }
-  /* Default rows need a card surface on mobile so they don't blend
-     into page bg. The tinted variants paint themselves via
-     .lead-row-green/yellow/red. */
   .lead-table tr.lead-row.lead-row-default {
     background: var(--surface);
   }
 
-  /* Universal hide: every <td> child of a mobile card is hidden by
-     default. Three selectors below explicitly turn back on the
-     three we want: checkbox, lead name, phone. */
+  /* Universal hide, then switch back on only the cells the card uses.
+     Explicit classes, not :has() (old Android Chrome, Phase 93.16). */
   .lead-table tr.lead-row > td {
     display: none;
     padding: 0;
@@ -659,43 +654,49 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   }
   .lead-table tr.lead-row > td.td-check,
   .lead-table tr.lead-row > td.td-lead,
-  .lead-table tr.lead-row > td.td-phone {
+  .lead-table tr.lead-row > td.td-stage,
+  .lead-table tr.lead-row > td.td-phone,
+  .lead-table tr.lead-row > td.td-cost-on {
     display: block;
+    flex: 0 0 auto;
+  }
+  .lead-table tr.lead-row > td.td-check { order: 0; }
+  .lead-table tr.lead-row > td.td-lead  { order: 1; flex: 1 1 auto; min-width: 0; }
+  .lead-table tr.lead-row > td.td-stage { order: 2; }
+  .lead-table tr.lead-row > td.td-cost-on { order: 3; }
+  .lead-table tr.lead-row > td.td-phone { order: 4; }
+
+  /* Name cell: ring + name on one line; separator, heat dot and second line go. */
+  .lead-table tr.lead-row .lead-sep,
+  .lead-table tr.lead-row .days-dot,
+  .lead-table tr.lead-row .name-cell .company { display: none; }
+  .lead-table tr.lead-row .name-cell { gap: 8px; min-width: 0; }
+  .lead-table tr.lead-row .name-cell > div { min-width: 0; }
+  .lead-table tr.lead-row .name-cell .name {
+    font-size: 14px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
-  /* Grid placement. Checkbox top-left, name top-right, phone full
-     width on row 2. */
-  .lead-table tr.lead-row > td.td-check {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .lead-table tr.lead-row > td.td-lead {
-    grid-column: 2 / 3;
-    grid-row: 1;
-    min-width: 0;
-  }
-  .lead-table tr.lead-row > td.td-phone {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    font-size: 13px;
-    color: var(--text);
-  }
-  /* When the checkbox td is absent (filtered.some(canReassign) was
-     false for this rep), the lead td auto-flows into col 1. Force
-     it back to span both cols so the layout doesn't collapse. */
-  .lead-table tr.lead-row:not(:has(> td.td-check)) > td.td-lead {
-    grid-column: 1 / -1;
+  /* Stage: just the chip (age chip stays on desktop). */
+  .lead-table tr.lead-row > td.td-stage > div > *:not(:first-child) { display: none; }
+  .lead-table tr.lead-row > td.td-stage .stage-chip { white-space: nowrap; }
+
+  /* Cost: plain amber figure, no box. */
+  .lead-table tr.lead-row > td.td-cost-on .lead-cost-chip {
+    padding: 0; border: 0; background: none;
+    color: var(--warning, #F59E0B); font-size: 13px;
   }
 
-  .lead-table tr.lead-row .name-cell .name { font-size: 14px; font-weight: 600; }
-  .lead-table tr.lead-row .name-cell .company { font-size: 12px; }
-
-  /* Phase 641 — admin Cost chip on the phone card (row 3), only when there is a cost. */
-  .lead-table tr.lead-row > td.td-cost-on {   /* class, not :has() — older Android Chrome (Phase 93.16) */
-    display: block;
-    grid-column: 1 / -1;
-    grid-row: 3;
-    text-align: left !important;
+  /* Phone cell: number + WhatsApp hidden; Call becomes a 36px button. */
+  .lead-table tr.lead-row > td.td-phone .lead-ph-num,
+  .lead-table tr.lead-row > td.td-phone .lead-wa { display: none; }
+  .lead-table tr.lead-row > td.td-phone .lead-call {
+    display: inline-flex !important;
+    align-items: center; justify-content: center;
+    min-width: 44px; height: 36px;
+    padding: 0 10px !important;
+    border-radius: var(--radius, 10px) !important;
+    font-size: 13px !important; font-weight: 600;
   }
 }
 
@@ -707,10 +708,6 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   border: 1px solid var(--warning, #F59E0B);
   color: var(--text, #f1f5f9);
   font-family: var(--font-display); font-weight: 700; font-size: 13px;
-}
-.lead-cost-chip .lead-cost-lbl {
-  font-family: var(--font-sans); font-weight: 600; font-size: 12px;
-  color: var(--warning, #F59E0B); letter-spacing: .04em; text-transform: uppercase;
 }
 
 /* Phase 33A — global toast strip for /work. */

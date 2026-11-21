@@ -1350,7 +1350,7 @@ export default function LeadsV2() {
                   <td className="td-lead">
                     <div className="name-cell" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <LeadScoreRing score={scoreMap[l.id]?.score} parts={scoreMap[l.id]?.parts} finalScore={scoreMap[l.id]?.final ?? null} finalEstimated={!!scoreMap[l.id]?.est} />
-                      <span style={{
+                      <span className="lead-sep" style={{
                         width: 1, height: 14,
                         background: 'var(--border)',
                         display: 'inline-block',
@@ -1376,11 +1376,12 @@ export default function LeadsV2() {
                     {l.phone ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         {/* Phase 641 — cap width: one bad value (a Maps link saved as phone) stretched the whole column. */}
-                        <span title={l.phone} style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.phone}</span>{/* Phase 34Z.76 */}
+                        <span className="lead-ph-num" title={l.phone} style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.phone}</span>{/* Phase 34Z.76 */}
                         {/* Phase 247.2 — team view is READ-ONLY: show the number,
                             hide Call/WhatsApp so she can't contact another rep's client. */}
                         {!teamViewing && (<>
                         <a
+                          className="lead-call"
                           href={`tel:${String(l.phone).replace(/\s/g, '')}`}
                           title="Call"
                           onClick={async () => {
@@ -1418,6 +1419,7 @@ export default function LeadsV2() {
                           href={`https://wa.me/${String(l.phone).replace(/\D/g, '').replace(/^(\d{10})$/, '91$1')}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          className="lead-wa"
                           title="WhatsApp"
                           onClick={async () => {
                             try {
@@ -1464,7 +1466,7 @@ export default function LeadsV2() {
                       </span>
                     )}
                   </td>
-                  <td>
+                  <td className="td-stage">
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
                       <StageChip stage={l.stage} />
                       {/* Phase 34L — age in current stage. Hidden for
@@ -1551,7 +1553,7 @@ export default function LeadsV2() {
                       title={costMap[l.id] ? `Spent on this lead so far · worked on ${costMap[l.id].days} day${costMap[l.id].days === 1 ? '' : 's'}` : undefined}>
                       {costMap[l.id] ? (
                         <span className="lead-cost-chip">
-                          <span className="lead-cost-lbl">Cost</span>{formatCurrency(costMap[l.id].cost)}
+                          {formatCurrency(costMap[l.id].cost)}
                         </span>
                       ) : <span style={{ color: 'var(--text-subtle)' }}>—</span>}
                     </td>
