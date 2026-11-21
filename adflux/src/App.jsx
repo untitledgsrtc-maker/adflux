@@ -53,6 +53,7 @@ const RepProfileV2 = lazyWithRetry(() => import('./pages/v2/RepProfileV2'))
 const TaPayoutsAdminV2 = lazyWithRetry(() => import('./pages/v2/TaPayoutsAdminV2'))
 // Phase 101.A3 JSX — agency commission payout admin page.
 const AgencyCommissionAdminV2 = lazyWithRetry(() => import('./pages/v2/AgencyCommissionAdminV2'))
+const LeadCostReportV2 = lazyWithRetry(() => import('./pages/v2/LeadCostReportV2')) // Phase 639
 const ClientsV2 = lazyWithRetry(() => import('./pages/v2/ClientsV2'))
 // ── Phase 12 — M1 Sales/Lead module ─────────────────────────────────
 const LeadsV2 = lazyWithRetry(() => import('./pages/v2/LeadsV2'))
@@ -632,6 +633,7 @@ export default function App() {
               surface. Backed by Phase 101.A3 SQL agency_commission_
               payouts table. admin+co_owner per acp_admin_all RLS. */}
           <Route path="/admin/agency-commission"   element={<RequirePrivileged><AgencyCommissionAdminV2 /></RequirePrivileged>} />
+          <Route path="/admin/lead-cost"           element={<RequirePrivileged><LeadCostReportV2 /></RequirePrivileged>} />
           {/* Phase 38 — People (consolidated). Old routes above stay
               as deep-links; sidebar uses /people. */}
           <Route path="/people"                    element={<RequireAccountsOrPrivileged><PeopleV2 /></RequireAccountsOrPrivileged>} />

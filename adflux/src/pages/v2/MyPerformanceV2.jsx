@@ -19,6 +19,7 @@ import TotalPayableCard from '../../components/incentives/TotalPayableCard'
 import PresentationStatCard from '../../components/incentives/PresentationStatCard' // Phase 181
 import SalarySlipsCard from '../../components/incentives/SalarySlipsCard' // Phase 185
 import DailyScoresCard from '../../components/incentives/DailyScoresCard' // Phase 186
+import MyLeadCostCard from '../../components/incentives/MyLeadCostCard' // Phase 639
 import AgencyEarningsView from '../../components/agency/AgencyEarningsView'
 import useAutoRefresh from '../../hooks/useAutoRefresh'
 import { useAuthStore } from '../../store/authStore'
@@ -82,6 +83,10 @@ export default function MyPerformanceV2() {
           Base + Variable + Incentive + TA/DA = one rupee number the
           rep can read first thing. Owner directive 15 May 2026. */}
       <TotalPayableCard key={`tp-${refreshKey}`} />
+
+      {/* Phase 639 — own cost per lead / meeting / call this month (own row only, server-gated).
+          Not keyed on refreshKey: a month-long query, fetched once per visit. */}
+      <MyLeadCostCard />
 
       {/* Phase 181 — time spent presenting the GSRTC deck this month. */}
       <PresentationStatCard key={`present-${refreshKey}`} />

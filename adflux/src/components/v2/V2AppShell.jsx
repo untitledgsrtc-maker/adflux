@@ -69,7 +69,7 @@ import {
   TrendingUp, UserCircle2, UserPlus, Contact2, MapPin, Tv, FileBox,
   Inbox, Sparkles, Phone, Sun, Mic, Clock as ClockIcon, Wallet, Megaphone, MessageCircle,
   IndianRupee, GraduationCap, Activity, Gauge, Briefcase,
-  ClipboardList, Lightbulb,
+  ClipboardList, Lightbulb, Calculator,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useQuoteStore } from '../../store/quoteStore'
@@ -112,6 +112,7 @@ const ADMIN_NAV = [
   // table. Wallet icon matches AgencyOfferView commission rate pill
   // (Phase 101.A2) for visual continuity.
   { to: '/admin/agency-commission', label: 'Agency Payouts', icon: Wallet },
+  { to: '/admin/lead-cost',   label: 'Cost per Lead',  icon: Calculator },   // Phase 639 - admin only, filtered below
   { to: '/hr',                label: 'HR',             icon: UserCircle2 },
   { to: '/renewal-tools',     label: 'Renewals',       icon: Repeat },
   // Campaign module — list/create campaigns (QR & Locations one click in). Token-free.
@@ -713,7 +714,8 @@ export function V2AppShell() {
   }
   // Phase 574 — Team Evening is admin + sales manager only; co_owner shares ADMIN_NAV but is govt-scoped (section 42).
   const nav = withOnboarding(withTeam(withSalesHeadApprovals(
-    baseNav.filter((n) => n.to !== '/coach' || profile?.role === 'admin' || profile?.team_role === 'sales_manager'))))
+    baseNav.filter((n) => (n.to !== '/coach' || profile?.role === 'admin' || profile?.team_role === 'sales_manager')
+      && (n.to !== '/admin/lead-cost' || profile?.role === 'admin')))))
   const mobileNav = withTeam(baseMobileNav)
 
   // Topbar search — commits to the shared quote-filter store and
