@@ -626,13 +626,18 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   .lead-table thead { display: none; }
   .lead-table,
   .lead-table tbody { display: block; width: 100%; }
-  /* Phase 642 — one-line phone card (owner pick, option 1 + stage tag):
-     [check] [score ring] Name ........ [Stage] [Rs] [Call]
-     Flex row; `order` puts the cells in that sequence whatever the DOM order. */
+  /* Phase 642 — one-row phone card (owner pick, option 1 + stage tag):
+     [check] [score ring] Name ........ [Stage] [Call]
+                                         [  Rs ]
+     Grid with explicit placement (DOM order differs); Rs stacks under the
+     stage chip so the name keeps room. Rows collapse when there is no Rs. */
   .lead-table tr.lead-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto;
     align-items: center;
-    gap: 10px;
+    column-gap: 8px;
+    row-gap: 2px;
     min-height: 56px;
     border: 1px solid var(--border);
     /* tokens-on-scale per §6 UI checklist. Background intentionally NOT
@@ -658,18 +663,18 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   .lead-table tr.lead-row > td.td-phone,
   .lead-table tr.lead-row > td.td-cost-on {
     display: block;
-    flex: 0 0 auto;
   }
-  .lead-table tr.lead-row > td.td-check { order: 0; }
-  .lead-table tr.lead-row > td.td-lead  { order: 1; flex: 1 1 auto; min-width: 0; }
-  .lead-table tr.lead-row > td.td-stage { order: 2; }
-  .lead-table tr.lead-row > td.td-cost-on { order: 3; }
-  .lead-table tr.lead-row > td.td-phone { order: 4; }
+  .lead-table tr.lead-row > td.td-check   { grid-column: 1; grid-row: 1 / 3; }
+  .lead-table tr.lead-row > td.td-lead    { grid-column: 2; grid-row: 1 / 3; min-width: 0; }
+  .lead-table tr.lead-row > td.td-stage   { grid-column: 3; grid-row: 1 / 3; justify-self: end; align-self: center; }
+  .lead-table tr.lead-row.has-cost > td.td-stage { grid-row: 1; align-self: end; }   /* Rs sits under it */
+  .lead-table tr.lead-row > td.td-cost-on { grid-column: 3; grid-row: 2; justify-self: end; align-self: start; line-height: 1.2; }
+  .lead-table tr.lead-row > td.td-phone   { grid-column: 4; grid-row: 1 / 3; }
 
   /* Name cell: ring + name on one line; separator, heat dot and second line go. */
-  .lead-table tr.lead-row .lead-sep,
+  .lead-table tr.lead-row .lead-sep,   /* !important: the divider has an inline display */
   .lead-table tr.lead-row .days-dot,
-  .lead-table tr.lead-row .name-cell .company { display: none; }
+  .lead-table tr.lead-row .name-cell .company { display: none !important; }
   .lead-table tr.lead-row .name-cell { gap: 8px; min-width: 0; }
   .lead-table tr.lead-row .name-cell > div { min-width: 0; }
   .lead-table tr.lead-row .name-cell .name {
@@ -679,7 +684,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 
   /* Stage: just the chip (age chip stays on desktop). */
   .lead-table tr.lead-row > td.td-stage > div > *:not(:first-child) { display: none; }
-  .lead-table tr.lead-row > td.td-stage .stage-chip { white-space: nowrap; }
+  .lead-table tr.lead-row > td.td-stage .stage-chip { white-space: nowrap; padding: 2px 8px; }
 
   /* Cost: plain amber figure, no box. */
   .lead-table tr.lead-row > td.td-cost-on .lead-cost-chip {

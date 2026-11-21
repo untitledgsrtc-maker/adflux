@@ -1316,7 +1316,7 @@ export default function LeadsV2() {
                 return (
                 <tr
                   key={l.id}
-                  className={`lead-row lead-row-${rowTone}`}
+                  className={`lead-row lead-row-${rowTone}${showCost && costMap[l.id] ? ' has-cost' : ''}`}
                   style={{ cursor: 'pointer' }}
                   onClick={(e) => {
                     const tag = (e.target?.tagName || '').toUpperCase()
