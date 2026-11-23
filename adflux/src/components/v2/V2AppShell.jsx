@@ -704,7 +704,8 @@ export function V2AppShell() {
   // nav is byte-unchanged when the flag is off. Same pattern as withTeam.
   // NOT for privileged users — they reach these via the People module already.
   const withSalesHeadApprovals = (arr) => {
-    if (profile?.is_sales_head !== true || isPrivileged) return arr
+    // Phase 644 - a sales head by team_role (Devang) also gets Leaves + TA Claims for his reps.
+    if ((profile?.is_sales_head !== true && profile?.team_role !== 'sales_manager') || isPrivileged) return arr
     const extra = []
     if (!arr.some((n) => n.to === '/admin/leaves')) extra.push({ to: '/admin/leaves', label: 'Leaves', icon: CheckSquare })
     if (!arr.some((n) => n.to === '/admin/ta-payouts')) extra.push({ to: '/admin/ta-payouts', label: 'TA Claims', icon: Wallet })

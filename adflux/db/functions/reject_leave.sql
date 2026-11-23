@@ -10,32 +10,40 @@
 -- 🔒 §41 NULL-guard: fail-closed on a NULL role (the `role IS NULL OR` short-circuit).
 -- ============================================================================
 
+-- Phase 644 (2026-11-23): gate also admits is_team_head_of(row owner) = an active
+-- team_role='sales_manager' deciding for HIS reps (manager_id = him), never his own; the
+-- score recompute runs under a transaction-local app.score_for = rep id so
+-- _assert_self_or_admin lets it through (see supabase_phase644_team_head_approvals.sql).
 CREATE OR REPLACE FUNCTION public.reject_leave(p_leave_id uuid, p_note text DEFAULT NULL)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
 DECLARE
   v_row record;
 BEGIN
+  SELECT user_id, leave_date, status INTO v_row FROM leaves WHERE id = p_leave_id;
+
   IF public.get_my_role() IS NULL
-     OR (public.get_my_role() NOT IN ('admin', 'co_owner') AND NOT public.is_sales_head()) THEN
+     OR (public.get_my_role() NOT IN ('admin', 'co_owner')
+         AND NOT public.is_sales_head()
+         AND NOT public.is_team_head_of(v_row.user_id)) THEN
     RAISE EXCEPTION 'Only admin/co_owner/sales-head can reject leaves'
       USING ERRCODE = '42501';
   END IF;
 
-  SELECT user_id, leave_date INTO v_row
-    FROM leaves WHERE id = p_leave_id AND status <> 'rejected';
-  IF NOT FOUND THEN RETURN; END IF;
+  IF v_row.user_id IS NULL OR v_row.status = 'rejected' THEN RETURN; END IF;
 
   UPDATE leaves
      SET status = 'rejected',
          admin_note = COALESCE(NULLIF(BTRIM(p_note), ''), admin_note)
    WHERE id = p_leave_id;
 
+  PERFORM set_config('app.score_for', v_row.user_id::text, true);
   PERFORM public.compute_daily_score(v_row.user_id, v_row.leave_date);
-END $function$;
+  PERFORM set_config('app.score_for', '', true);
+END $$;
 
 GRANT EXECUTE ON FUNCTION public.reject_leave(uuid, text) TO authenticated;
 NOTIFY pgrst, 'reload schema';

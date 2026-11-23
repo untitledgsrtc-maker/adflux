@@ -1,3 +1,5 @@
+-- !! Phase 644 (2026-11-23): leaves_manager_update / ta_requests_manager_update were redefined/dropped by supabase_phase644_team_head_approvals.sql.
+-- !! Re-running this file reverts the sales-head approvals. Re-run phase644 after it if you must.
 -- supabase_phase42_sales_manager.sql
 -- Phase 42 — sales_manager role foundation.
 -- 18 May 2026

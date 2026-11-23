@@ -19,34 +19,38 @@
 -- SUPERSEDES: supabase_phase33l_history_workflow.sql · supabase_phase97_2_rpc_role_gates.sql
 -- ============================================================================
 
+-- Phase 644 (2026-11-23): gate also admits is_team_head_of(row owner) = an active
+-- team_role='sales_manager' deciding for HIS reps (manager_id = him), never his own; the
+-- score recompute runs under a transaction-local app.score_for = rep id so
+-- _assert_self_or_admin lets it through (see supabase_phase644_team_head_approvals.sql).
 CREATE OR REPLACE FUNCTION public.approve_leave(p_leave_id uuid)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
 DECLARE
   v_row record;
 BEGIN
-  -- §41 NULL-guard (Phase 209): a NULL-role caller must NOT slip through the
-  -- 3-valued-logic hole (NULL NOT IN (...) → NULL → IF skips). Fail closed.
-  -- Sales Head (manager P3) may also approve her team's leaves (is_sales_head()
-  -- is fail-closed COALESCE→false; the `role IS NULL OR` short-circuit keeps a
-  -- NULL-role caller blocked). Admin/co_owner unchanged.
+  SELECT user_id, leave_date, status INTO v_row FROM leaves WHERE id = p_leave_id;
+
+  -- §41 NULL-guard kept: a NULL role never passes.
   IF public.get_my_role() IS NULL
-     OR (public.get_my_role() NOT IN ('admin', 'co_owner') AND NOT public.is_sales_head()) THEN
+     OR (public.get_my_role() NOT IN ('admin', 'co_owner')
+         AND NOT public.is_sales_head()
+         AND NOT public.is_team_head_of(v_row.user_id)) THEN
     RAISE EXCEPTION 'Only admin/co_owner/sales-head can approve leaves'
       USING ERRCODE = '42501';
   END IF;
 
-  SELECT user_id, leave_date INTO v_row
-    FROM leaves WHERE id = p_leave_id AND status <> 'approved';
-  IF NOT FOUND THEN RETURN; END IF;
+  IF v_row.user_id IS NULL OR v_row.status = 'approved' THEN RETURN; END IF;
 
   UPDATE leaves SET status = 'approved' WHERE id = p_leave_id;
 
+  PERFORM set_config('app.score_for', v_row.user_id::text, true);
   PERFORM public.compute_daily_score(v_row.user_id, v_row.leave_date);
-END $function$;
+  PERFORM set_config('app.score_for', '', true);
+END $$;
 
 NOTIFY pgrst, 'reload schema';
 -- VERIFY (all TRUE): gate present · sales-head widen · recompute · NULL-guard.

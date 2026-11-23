@@ -73,7 +73,10 @@ export default function LeavesAdminV2({ embedded = false }) {
   // so her writes go through the gated approve_leave / reject_leave RPCs (below), not
   // the direct UPDATE (which her RLS would deny). Page access via RequireApprovals.
   const isSalesHead = profile?.is_sales_head === true
-  const canApprove = isAdmin || isSalesHead
+  // Phase 644 - a sales head (team_role) approves HIS reps only, via the same gated RPCs.
+  const isTeamHead = profile?.team_role === 'sales_manager' && !isAdmin
+  const canApprove = isAdmin || isSalesHead || isTeamHead
+  const viaRpc = (isSalesHead || isTeamHead) && !isAdmin
 
   // Role gate — admin / co_owner / accounts / hr / sales-head see this page.
   useEffect(() => {
@@ -125,8 +128,8 @@ export default function LeavesAdminV2({ embedded = false }) {
     const monthEnd = `${mf}-${String(lastDay).padStart(2, '0')}`
 
     const [uRes, lRes] = await Promise.all([
-      supabase.from('users')
-        .select('id, name, role, is_active')
+      (isTeamHead ? supabase.from('users').select('id, name, role, is_active').or(`manager_id.eq.${profile.id},id.eq.${profile.id}`)   // Phase 644 - his reps + himself
+                  : supabase.from('users').select('id, name, role, is_active'))
         // Phase 273 — include hr + accounts (they take leave too → their name
         // shows in the table + they appear in the rep filter). Agency dropped
         // (commission-only, no leave/payroll).
@@ -148,7 +151,7 @@ export default function LeavesAdminV2({ embedded = false }) {
     setLoading(false)
   }
 
-  useEffect(() => { if (isAdmin) load() }, [isAdmin, fMonthFilter])
+  useEffect(() => { if (canApprove) load() }, [canApprove, fMonthFilter])   // Phase 644 - was isAdmin: a sales head saw an empty list
 
   // Map user_id → name for the table display.
   const userMap = useMemo(() => {
@@ -262,7 +265,7 @@ export default function LeavesAdminV2({ embedded = false }) {
   async function handleApprove(row) {
     setActingOn(row.id)
     let error
-    if (isSalesHead && !isAdmin) {
+    if (viaRpc) {
       // Sales Head → gated RPC (does the flip + recompute atomically, is_sales_head-gated).
       const r = await supabase.rpc('approve_leave', { p_leave_id: row.id })
       error = r.error
@@ -288,7 +291,7 @@ export default function LeavesAdminV2({ embedded = false }) {
     }))) return
     setActingOn(row.id)
     let error
-    if (isSalesHead && !isAdmin) {
+    if (viaRpc) {
       const r = await supabase.rpc('reject_leave', { p_leave_id: row.id, p_note: null })
       error = r.error
     } else {
@@ -346,7 +349,9 @@ export default function LeavesAdminV2({ embedded = false }) {
       )}
 
       {/* ─── Add leave form ─────────────────────────────── */}
+      {(isAdmin || err) && (
       <div className="v2d-panel" style={{ padding: 16 }}>
+        {isAdmin && (
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
           gap: 10, alignItems: 'end',
@@ -447,6 +452,7 @@ export default function LeavesAdminV2({ embedded = false }) {
             <Plus size={14} /> {saving ? 'Saving…' : 'Save leave'}
           </button>
         </div>
+        )}
         {err && (
           <div style={{
             marginTop: 10, padding: '8px 12px', borderRadius: 8,
@@ -457,6 +463,7 @@ export default function LeavesAdminV2({ embedded = false }) {
           </div>
         )}
       </div>
+      )}
 
       {/* Phase 273 — rep + month review filters. Month reloads the list (any
           month); rep + status narrow the loaded rows. Pending requests always
@@ -617,7 +624,7 @@ export default function LeavesAdminV2({ embedded = false }) {
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
-                          {status === 'pending' && (
+                          {status === 'pending' && (isAdmin || row.user_id !== profile?.id) && (
                             <>
                               <button
                                 onClick={() => handleApprove(row)}
@@ -647,14 +654,14 @@ export default function LeavesAdminV2({ embedded = false }) {
                               </button>
                             </>
                           )}
-                          <button
+                          {isAdmin && <button
                             onClick={() => handleDelete(row)}
                             className="v2d-ghost"
                             title="Delete leave"
                             style={{ color: 'var(--v2-rose, #EF4444)' }}
                           >
                             <Trash2 size={13} />
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>

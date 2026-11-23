@@ -1,3 +1,5 @@
+-- !! Phase 644 (2026-11-23): _assert_self_or_admin were redefined/dropped by supabase_phase644_team_head_approvals.sql.
+-- !! Re-running this file reverts the sales-head approvals. Re-run phase644 after it if you must.
 -- supabase_phase97_2_rpc_role_gates.sql
 --
 -- Phase 97.2 — close audit findings F-104, F-101, F-102, F-108.

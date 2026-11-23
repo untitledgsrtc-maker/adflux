@@ -230,6 +230,7 @@ function RequireApprovals({ children }) {
   const { isPrivileged, profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
   const ok = isPrivileged || ['accounts', 'hr', 'office_admin'].includes(profile?.role) || profile?.is_sales_head === true
+    || profile?.team_role === 'sales_manager'   // Phase 644 - his reps' leaves + TA only (RPC + RLS scoped)
   if (!ok) return <Navigate to="/quotes" replace />
   return children
 }

@@ -126,7 +126,11 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
   // Sales Head (manager P3) — approves her team's TA/DA via the gated
   // sales_head_* RPCs (her RLS denies the direct UPDATE). Page via RequireApprovals.
   const isSalesHead = profile?.is_sales_head === true
-  const canApprove = isAdmin || isSalesHead
+  // Phase 644 - a sales head (team_role) approves / rejects HIS reps' travel only,
+  // through the gated RPCs. Mark paid, hotel edit, recompute and city ceilings stay admin.
+  const isTeamHead = profile?.team_role === 'sales_manager' && !isAdmin
+  const canApprove = isAdmin || isSalesHead || isTeamHead
+  const viaRpc = (isSalesHead || isTeamHead) && !isAdmin
 
   useEffect(() => {
     if (profile && !canApprove) navigate('/work')
@@ -163,8 +167,9 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
   useEffect(() => {
     if (!canApprove) return
     ;(async () => {
-      const { data } = await supabase.from('users')
-        .select('id, name, role')
+      let q = supabase.from('users').select('id, name, role')
+      if (isTeamHead) q = q.eq('manager_id', profile.id)   // Phase 644 - his reps only
+      const { data } = await q
         // Phase 225 — agency (Phase 101.A2) + telecaller dropped: neither does
         // field travel, so neither earns TA/DA (TCs are phone-only). Active
         // reps only — deactivated members shouldn't clutter the TA list.
@@ -198,6 +203,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       .lte('ta_date', monthEnd)
       .order('ta_date', { ascending: true })
     if (fUser !== 'ALL') q = q.eq('user_id', fUser)
+    if (viaRpc) q = q.neq('user_id', profile?.id)   // Phase 644 - his reps' days, never his own
     const { data, error } = await q
     setLoading(false)
     if (error) { setErr(error.message); return }
@@ -217,10 +223,12 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     // render. Fix — split into two plain selects and merge client-side.
     // No FK embed = no edge cases.
     setReqErr('')
-    const { data: reqs, error: reqError } = await supabase
+    let reqQ = supabase
       .from('ta_da_requests')
       .select('id, user_id, claim_date, kind, claim_km, claim_amount, city, reason, receipt_url, status, created_at')
       .eq('status', 'pending')
+    if (viaRpc) reqQ = reqQ.neq('user_id', profile?.id)   // Phase 644 - a head never decides his own claim
+    const { data: reqs, error: reqError } = await reqQ
       .order('created_at', { ascending: false })
       .limit(50)
     if (reqError) {
@@ -324,7 +332,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     setBulkBusy(true)
     const ids = targets.map(r => r.id)
     let error
-    if (isSalesHead && !isAdmin) {
+    if (viaRpc) {
       const r = await supabase.rpc('sales_head_approve_ta_rows', { p_ids: ids })
       error = r.error
     } else {
@@ -362,7 +370,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
   async function handleApproveRequest(req) {
     setRequestActingOn(req.id)
     let error
-    if (isSalesHead && !isAdmin) {
+    if (viaRpc) {
       const r = await supabase.rpc('sales_head_approve_ta_request', { p_id: req.id })
       error = r.error
     } else {
@@ -382,7 +390,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
     if (note === null) return
     setRequestActingOn(req.id)
     let error
-    if (isSalesHead && !isAdmin) {
+    if (viaRpc) {
       const r = await supabase.rpc('sales_head_reject_ta_request', { p_id: req.id, p_note: note?.trim() || null })
       error = r.error
     } else {
@@ -418,6 +426,15 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
 
   // Inline status flip — admin tags a row approved / rejected / paid.
   async function setStatus(row, nextStatus) {
+    if (viaRpc) {   // Phase 644 - approve / reject only
+      const fn = nextStatus === 'approved' ? 'sales_head_approve_ta_rows'
+               : nextStatus === 'rejected' ? 'sales_head_reject_ta_rows' : null
+      if (!fn) return
+      const { error } = await supabase.rpc(fn, { p_ids: [row.id] })
+      if (error) { toastError(error, 'Status update failed: ' + error.message); return }
+      loadRows(true)
+      return
+    }
     const patch = { status: nextStatus }
     if (nextStatus === 'approved') {
       patch.approved_by = profile?.id
@@ -682,6 +699,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       {/* Phase 33I (B9 fix) — admin can adjust DA, bike rate, hotel
           and radius per city without going to Supabase Studio. Useful
           when reps report falling outside a city's detection radius. */}
+      {!viaRpc && (
       <div className="v2d-panel" style={{ padding: 0, overflow: 'hidden' }}>
         <button
           type="button"
@@ -764,6 +782,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
           </div>
         )}
       </div>
+      )}
 
       {/* ─── Filters ──────────────────────────────────── */}
       <div className="v2d-panel" style={{ padding: 14 }}>
@@ -792,7 +811,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
               ))}
             </select>
           </div>
-          <button
+          {!viaRpc && <button
             type="button"
             onClick={handleRecompute}
             disabled={recomputing || !fUser || fUser === 'ALL'}
@@ -803,7 +822,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
               : 'Re-run compute_daily_ta for every day in this month. Approved/paid days are preserved.'}
           >
             <RefreshCw size={14} /> {recomputing ? 'Recomputing…' : 'Recompute month'}
-          </button>
+          </button>}
           <button
             type="button"
             onClick={exportCsv}
@@ -986,7 +1005,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                       {fmtINR(r.bike_amount)}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
-                      {r.status === 'pending' ? (
+                      {r.status === 'pending' && !viaRpc ? (
                         <label onClick={e => e.stopPropagation()} title="Hotel for this day (when the rep stayed overnight)"
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px',
                                    borderRadius: 'var(--v2-r-sm, 10px)', border: '1px dashed var(--v2-ink-2)',
@@ -1033,14 +1052,14 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                             ><X size={14} strokeWidth={1.6} /> Reject</button>
                           </>
                         )}
-                        {r.status === 'approved' && (
+                        {r.status === 'approved' && !viaRpc && (
                           <button
                             onClick={() => setStatus(r, 'paid')}
                             className="v2d-ghost"
                             style={paidBtn}
                           >Mark paid</button>
                         )}
-                        {(r.status === 'rejected' || r.status === 'paid') && (
+                        {(r.status === 'rejected' || r.status === 'paid') && !viaRpc && (
                           <button
                             onClick={() => setStatus(r, 'pending')}
                             className="v2d-ghost"

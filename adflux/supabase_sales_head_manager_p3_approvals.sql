@@ -1,3 +1,5 @@
+-- !! Phase 644 (2026-11-23): the 3 TA RPCs were redefined/dropped by supabase_phase644_team_head_approvals.sql.
+-- !! Re-running this file reverts the sales-head approvals. Re-run phase644 after it if you must.
 -- =====================================================================
 -- Sales Head — MANAGER module, P3: TA/DA approval RPCs (2026-08-07)
 -- Owner-approved. Spec: docs/SALES_HEAD_MANAGER_SPEC.md §1 (approvals).
