@@ -696,17 +696,25 @@ export function V2AppShell() {
       .then(({ count }) => { if (alive) setHasOnboarding((count || 0) > 0) })
     return () => { alive = false }
   }, [profile?.id])
-  // Phase 652 - pending count on the "Approvals" link (payments + quote prices waiting),
+  // Phase 652/653 - pending counts on nav links: Approvals = payments + quote prices waiting,
+  // People = leaves + TA/DA claims waiting (same counts as the dashboard action queue),
   // re-read on every page change so it drops after approving. Admin/co_owner only
   // (the only navs with /pending-approvals); two head-only counts, no rows.
-  const [approvalsCount, setApprovalsCount] = useState(0)
+  const [navBadges, setNavBadges] = useState({})
   useEffect(() => {
     if (!isPrivileged) return
     let alive = true
     Promise.all([
       supabase.from('payments').select('id', { count: 'exact', head: true }).eq('approval_status', 'pending'),
       supabase.from('quote_price_approvals').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    ]).then(([p, q]) => { if (alive) setApprovalsCount((p.count || 0) + (q.count || 0)) })
+      supabase.from('leaves').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('ta_da_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    ]).then(([p, q, l, t]) => {
+      if (alive) setNavBadges({
+        '/pending-approvals': (p.count || 0) + (q.count || 0),
+        '/people': (l.count || 0) + (t.count || 0),
+      })
+    })
     return () => { alive = false }
   }, [isPrivileged, location.pathname])
   const withOnboarding = (arr) =>
@@ -790,7 +798,7 @@ export function V2AppShell() {
               >
                 <Icon size={17} />
                 <span>{item.label}</span>
-                {item.to === '/pending-approvals' && approvalsCount > 0 && <span className="v2d-nav-badge" aria-label={`${approvalsCount} waiting`}>{approvalsCount}</span>}
+                {navBadges[item.to] > 0 && <span className="v2d-nav-badge" aria-label={`${navBadges[item.to]} waiting`}>{navBadges[item.to]}</span>}
               </Link>
             )
           })}
@@ -1128,7 +1136,7 @@ export function V2AppShell() {
                   >
                     <Icon size={17} />
                     <span>{item.label}</span>
-                    {item.to === '/pending-approvals' && approvalsCount > 0 && <span className="v2d-nav-badge" aria-label={`${approvalsCount} waiting`}>{approvalsCount}</span>}
+                    {navBadges[item.to] > 0 && <span className="v2d-nav-badge" aria-label={`${navBadges[item.to]} waiting`}>{navBadges[item.to]}</span>}
                   </Link>
                 )
               })}
