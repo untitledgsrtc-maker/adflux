@@ -717,6 +717,20 @@ export function V2AppShell() {
     })
     return () => { alive = false }
   }, [isPrivileged, location.pathname])
+  // Phase 654 - sales head: his reps' pending leaves / TA claims on his Leaves + TA Claims
+  // links (RLS limits rows to his reps + himself; his own are left out - he cannot decide them).
+  const isTeamHeadNav = profile?.team_role === 'sales_manager' && !isPrivileged
+  useEffect(() => {
+    if (!isTeamHeadNav || !profile?.id) return
+    let alive = true
+    Promise.all([
+      supabase.from('leaves').select('id', { count: 'exact', head: true }).eq('status', 'pending').neq('user_id', profile.id),
+      supabase.from('ta_da_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending').neq('user_id', profile.id),
+    ]).then(([l, t]) => {
+      if (alive) setNavBadges({ '/admin/leaves': l.count || 0, '/admin/ta-payouts': t.count || 0 })
+    })
+    return () => { alive = false }
+  }, [isTeamHeadNav, profile?.id, location.pathname])
   const withOnboarding = (arr) =>
     hasOnboarding && !arr.some((n) => n.to === '/my-onboarding')
       ? [...arr, { to: '/my-onboarding', label: 'My Onboarding', icon: GraduationCap }] : arr
