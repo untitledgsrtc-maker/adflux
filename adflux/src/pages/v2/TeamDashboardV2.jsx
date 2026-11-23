@@ -27,6 +27,7 @@ import { Users as UsersIcon, MapPin, Mic, Loader2, MessageCircle } from 'lucide-
 import { openWhatsApp } from '../../utils/whatsapp'
 import { Loader } from '@googlemaps/js-api-loader'
 import { supabase } from '../../lib/supabase'
+import { fetchAllPages } from '../../utils/fetchAllPages'
 import { useAuthStore } from '../../store/authStore'
 import { LeadAvatar, Pill } from '../../components/leads/LeadShared'
 import { formatCurrency } from '../../utils/formatters'
@@ -488,9 +489,11 @@ export default function TeamDashboardV2() {
         // A one-time heal stamps done_at=now() on backlog rows; without
         // this they inflate "Today F-up done" (Rima read 241 — ~142 of
         // them were the Phase 131 cleanup, not her work).
-        supabase.from('follow_ups')
+        // Phase 645 - >1000 rows company-wide: read every page (was a random 1000, numbers jumped per refresh).
+        fetchAllPages((f, t) => supabase.from('follow_ups')
           .select('assigned_to, is_done, follow_up_date, done_at, done_note, cadence_type, lead:leads(stage)')
-          .or(`and(is_done.eq.true,done_at.gte.${startOfDay},done_at.lt.${endOfDay}),and(is_done.eq.false,follow_up_date.gte.${period.startIso},follow_up_date.lt.${period.endIso})`),
+          .or(`and(is_done.eq.true,done_at.gte.${startOfDay},done_at.lt.${endOfDay}),and(is_done.eq.false,follow_up_date.gte.${period.startIso},follow_up_date.lt.${period.endIso})`)
+          .order('id').range(f, t)),
         // Phase 82 — quote-chase: status='sent' quotes whose latest
         // touch is stale. Owner: "daily quote followup". Fetched as
         // a broad list; we filter client-side to status='sent' AND
@@ -535,10 +538,11 @@ export default function TeamDashboardV2() {
         // Phase 93.4 — overdue follow-ups (not gated by period filter;
         // overdue is always-now). Pulled separately from fuRes which
         // is window-gated. Pending only.
-        supabase.from('follow_ups')
+        fetchAllPages((f, t) => supabase.from('follow_ups')   // Phase 645 - ~1,500 rows
           .select('assigned_to, cadence_type, lead:leads(stage)')
           .lt('follow_up_date', today)
-          .eq('is_done', false),
+          .eq('is_done', false)
+          .order('id').range(f, t)),
 
         // Phase 89.1 + 89.6 + 89.8 + 89.9 — geo-tagged meeting /
         // site_visit activities as permanent pins on the live
@@ -581,11 +585,12 @@ export default function TeamDashboardV2() {
         // Phase 128.2 — -7d floor so the count matches the TC page's own
         // overdue window (one definition both sides; ancient overdue rows
         // are a data-hygiene problem, not "due now").
-        supabase.from('follow_ups')
+        fetchAllPages((f, t) => supabase.from('follow_ups')   // Phase 645 - ~2,100 rows
           .select('assigned_to, lead_id, id')
           .eq('is_done', false)
           .gte('follow_up_date', cbFloor)
-          .lte('follow_up_date', today),
+          .lte('follow_up_date', today)
+          .order('id').range(f, t)),
 
         // Phase 112.5/.7 — quotes CREATED this calendar month, per
         // created_by (count + total value).
