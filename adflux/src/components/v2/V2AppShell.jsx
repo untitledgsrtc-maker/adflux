@@ -696,6 +696,19 @@ export function V2AppShell() {
       .then(({ count }) => { if (alive) setHasOnboarding((count || 0) > 0) })
     return () => { alive = false }
   }, [profile?.id])
+  // Phase 652 - pending count on the "Approvals" link (payments + quote prices waiting),
+  // re-read on every page change so it drops after approving. Admin/co_owner only
+  // (the only navs with /pending-approvals); two head-only counts, no rows.
+  const [approvalsCount, setApprovalsCount] = useState(0)
+  useEffect(() => {
+    if (!isPrivileged) return
+    let alive = true
+    Promise.all([
+      supabase.from('payments').select('id', { count: 'exact', head: true }).eq('approval_status', 'pending'),
+      supabase.from('quote_price_approvals').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    ]).then(([p, q]) => { if (alive) setApprovalsCount((p.count || 0) + (q.count || 0)) })
+    return () => { alive = false }
+  }, [isPrivileged, location.pathname])
   const withOnboarding = (arr) =>
     hasOnboarding && !arr.some((n) => n.to === '/my-onboarding')
       ? [...arr, { to: '/my-onboarding', label: 'My Onboarding', icon: GraduationCap }] : arr
@@ -777,6 +790,7 @@ export function V2AppShell() {
               >
                 <Icon size={17} />
                 <span>{item.label}</span>
+                {item.to === '/pending-approvals' && approvalsCount > 0 && <span className="v2d-nav-badge" aria-label={`${approvalsCount} waiting`}>{approvalsCount}</span>}
               </Link>
             )
           })}
@@ -1114,6 +1128,7 @@ export function V2AppShell() {
                   >
                     <Icon size={17} />
                     <span>{item.label}</span>
+                    {item.to === '/pending-approvals' && approvalsCount > 0 && <span className="v2d-nav-badge" aria-label={`${approvalsCount} waiting`}>{approvalsCount}</span>}
                   </Link>
                 )
               })}
