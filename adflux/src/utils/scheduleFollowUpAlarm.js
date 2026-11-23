@@ -152,3 +152,31 @@ export async function scheduleManyFollowUpAlarms(followUps) {
     await scheduleFollowUpAlarm(fu)
   }
 }
+
+/**
+ * Phase 660 — cancel "ghost" alarms. A follow-up closed by the server
+ * (lead Lost, cadence cancel, auto-close after a call, nightly job) never
+ * reaches the phone, so its alarm still rang. Look at this phone's pending
+ * follow-up alarms and cancel the ones whose follow-up is confirmed done.
+ * Exact: only ids the DB returns as is_done=true are touched, so alarms
+ * outside the backfill window are kept.
+ *
+ * @param {(ids: string[]) => Promise<Set<string>|null>} openIdsOf — returns
+ *   the subset of ids still open, or null on error (then nothing is cancelled).
+ */
+export async function cancelClosedFollowUpAlarms(openIdsOf) {
+  if (!Capacitor.isNativePlatform()) return
+  try {
+    const { notifications = [] } = await LocalNotifications.getPending()
+    const pending = notifications
+      .filter(n => n.id >= 2_000_000_001 && n.extra?.followup_id)
+      .map(n => ({ id: n.id, fu: n.extra.followup_id }))
+    if (pending.length === 0) return
+    const open = await openIdsOf([...new Set(pending.map(p => p.fu))])
+    if (!open) return
+    const ghosts = pending.filter(p => !open.has(p.fu)).map(p => ({ id: p.id }))
+    if (ghosts.length) await LocalNotifications.cancel({ notifications: ghosts })
+  } catch (e) {
+    console.warn('[localnotif] ghost cleanup failed:', e?.message || e)
+  }
+}

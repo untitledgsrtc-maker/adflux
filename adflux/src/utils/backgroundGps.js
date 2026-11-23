@@ -98,6 +98,17 @@ const WATCHDOG_MS    = 30000   // 30 s (Phase 180, was 120000/2 min) — faster 
                                // shrinks each bridging segment below the 120 km/h TA
                                // gate instead of it being dropped as a teleport (§73 #2).
 const MAX_BACKOFF    = 8       // cap: ~16 min between re-arm tries while GPS off
+// Phase 660 - a watcher the phone's battery saver froze still has an id, so the
+// old "only re-arm a missing watcher" rule never recovered it (2-3 h midday gaps).
+// Re-arm once if no fix for this long; a rep sitting in a meeting costs one re-arm.
+const STALE_MS       = 30 * 60 * 1000
+let aliveAt          = null   // last fix, or watcher (re)start
+// Phase 660 - pings that fail to upload (no signal) are kept on the phone and sent
+// later with their real capture time; was: dropped, so dead zones lost km.
+const QUEUE_KEY     = 'bg_gps_queue_v1'
+const QUEUE_MAX     = 500
+const QUEUE_MAX_AGE = 24 * 60 * 60 * 1000
+let flushing        = false
 
 /**
  * Build the watcher option object. requestPermissions is true on the
@@ -136,12 +147,17 @@ function onWatcherEvent(userId, location, error) {
   }
   if (!location) return
   lastFixAt = Date.now()
-  writePing(userId, location).catch((e) =>
-    console.warn('[bg-gps] write failed:', e?.message || e)
-  )
+  aliveAt = lastFixAt
+  writePing(userId, location)
+    .then(() => flushQueue(userId))
+    .catch((e) => {
+      console.warn('[bg-gps] write failed, queued:', e?.message || e)
+      queuePing(userId, location)
+    })
 }
 
 async function addWatcherFor(userId, distanceFilter, requestPermissions) {
+  aliveAt = Date.now()
   return BackgroundGeolocation.addWatcher(
     watcherOptions(distanceFilter, requestPermissions),
     (location, error) => onWatcherEvent(userId, location, error),
@@ -246,8 +262,10 @@ export async function rearmBackgroundGps(userId) {
 }
 
 // ─── Watchdog ───────────────────────────────────────────────────────
-// Backstop for the event-driven re-arm. It re-arms ONLY when the
-// watcher is actually dead (activeWatcherId === null) — i.e. addWatcher
+// Phase 660: ALSO re-arms a live watcher with no fix for STALE_MS (30 min) - a
+// battery-saver-frozen watcher keeps its id but never fires again.
+// Backstop for the event-driven re-arm. Originally it re-armed ONLY when the
+// watcher was actually dead (activeWatcherId === null) — i.e. addWatcher
 // threw at start because GPS was off, which is the dominant cause of
 // the km under-count. It deliberately does NOT re-arm a live-but-quiet
 // watcher (a stationary rep at a meeting produces no movement fixes but
@@ -275,7 +293,13 @@ function stopWatchdog() {
 
 function watchdogTick() {
   if (!activeUserId) return
-  if (activeWatcherId) return          // watcher alive — quiet ≠ dead
+  if (activeWatcherId) {               // watcher alive — quiet ≠ dead, unless quiet for 30 min
+    if (aliveAt && Date.now() - aliveAt > STALE_MS) {
+      aliveAt = Date.now()
+      rearmBackgroundGps(activeUserId).catch(() => {})
+    }
+    return
+  }
   if (watchdogSkips > 0) { watchdogSkips--; return }
   // Watcher is dead (failed to start, GPS was off). Try once.
   rearmBackgroundGps(activeUserId).then(() => {
@@ -313,6 +337,56 @@ async function writePing(userId, location) {
     source:     'interval',   // pre-existing enum value
   }])
   if (error) throw error
+}
+
+function pingRow(userId, location) {
+  const lat = Number(location.latitude).toFixed(7)
+  const lng = Number(location.longitude).toFixed(7)
+  if (!isFinite(parseFloat(lat)) || !isFinite(parseFloat(lng))) return null
+  return {
+    user_id: userId, lat, lng,
+    accuracy_m: location.accuracy != null ? Math.round(Number(location.accuracy)) : null,
+    source: 'interval',
+  }
+}
+
+function readQueue() {
+  try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]') } catch { return [] }
+}
+function writeQueue(q) {
+  try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q.slice(-QUEUE_MAX))) } catch { /* storage full/blocked */ }
+}
+
+function queuePing(userId, location) {
+  const row = pingRow(userId, location)
+  if (!row) return
+  const t = Number(location.time) || Date.now()
+  writeQueue([...readQueue(), { ...row, captured_at: new Date(t).toISOString() }])
+}
+
+// Send queued pings one by one (a duplicate must not sink the rest). Stops at the
+// first network error and keeps the remainder for the next successful fix.
+async function flushQueue(userId) {
+  if (flushing) return
+  const q = readQueue()
+  if (q.length === 0) return
+  flushing = true
+  try {
+    const cutoff = Date.now() - QUEUE_MAX_AGE
+    const keep = []
+    let stopped = false
+    for (const r of q) {
+      if (!(Date.parse(r.captured_at) >= cutoff)) continue            // too old: drop
+      if (stopped || r.user_id !== userId) { keep.push(r); continue }  // another user's pings wait for them
+      const { error } = await supabase.from('gps_pings').insert([r])
+      // no code = network failure: keep it and stop; a DB rejection (dup, policy) is dropped
+      if (error && !error.code) { keep.push(r); stopped = true }
+    }
+    // pings queued while we were flushing were appended after the snapshot
+    writeQueue([...keep, ...readQueue().slice(q.length)])
+  } finally {
+    flushing = false
+  }
 }
 
 /**

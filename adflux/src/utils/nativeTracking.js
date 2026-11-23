@@ -72,7 +72,10 @@ export function setActiveProfile({ role, teamRole } = {}) {
   // Permission + ingest-context are checked inside start. Old GPS path
   // keeps running as the live backup (both write; the 100m min-segment
   // filter keeps km accurate).
-  if (isFieldSales()) {
+  // Phase 660 - operation executives are GPS-tracked for TA (Phase 230) but never got
+  // the native service (1-3% shift coverage). Service only: GPS-off / net-off event
+  // rows stay field-sales (those tables' RLS doesn't admit them).
+  if (isFieldSales() || cachedRole === 'operation_executive') {
     startNativeLocationTracking().catch(() => {})
   }
 }
@@ -434,6 +437,17 @@ const netGapTracker = createNetGapTracker({
   record: async (lostMs, regainedMs) => {
     const userId = await safeUserId()
     if (!userId) { await enqueue({ type: 'net_gap', lostMs, regainedMs }); return }
+    // Phase 660 - a doze-throttled probe failure is not proof of offline. If any GPS
+    // ping from this phone REACHED the server inside the gap (created_at), the phone
+    // was online: drop it. 9 of 14 recorded gaps had live pings inside them.
+    try {
+      const { count, error } = await supabase.from('gps_pings')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', new Date(lostMs).toISOString())
+        .lte('created_at', new Date(regainedMs - 60000).toISOString())   // queued pings flush right at reconnect
+      if (!error && count > 0) return
+    } catch { /* check failed: record as before */ }
     await insertNetGap(userId, lostMs, regainedMs)
   },
 })

@@ -59,7 +59,7 @@ import { startCallHistoryPoller, stopCallHistoryPoller } from '../../utils/callH
 // profile.id) — that filter limits to caller's own follow-ups
 // regardless of RLS scope, so Renuka (sales_manager) backfills
 // only her own alarms, not Dhara/Rima's.
-import { scheduleManyFollowUpAlarms } from '../../utils/scheduleFollowUpAlarm'
+import { scheduleManyFollowUpAlarms, cancelClosedFollowUpAlarms } from '../../utils/scheduleFollowUpAlarm'
 import { supabase } from '../../lib/supabase'
 import { istTodayISO, istTodayPlusDays } from '../../utils/istDate'
 import NativeOnboarding from '../native/NativeOnboarding'
@@ -596,6 +596,15 @@ export function V2AppShell() {
           note:           fu.note,
         }))
         await scheduleManyFollowUpAlarms(rows)
+        // Phase 660 - drop alarms for follow-ups the server already closed
+        // Only ids the DB returns as is_done=true count as closed; anything not
+        // visible (RLS, other assignee, deleted) is kept, never cancelled blindly.
+        if (!cancelled) await cancelClosedFollowUpAlarms(async (ids) => {
+          const { data: done, error: e2 } = await supabase.from('follow_ups')
+            .select('id').in('id', ids.slice(0, 300)).eq('is_done', true)
+          if (e2) return null
+          return new Set(ids.filter(id => !(done || []).some(r => r.id === id)))
+        })
       } catch (e) {
         console.warn('[phase96] backfill failed:', e?.message || e)
       }
@@ -1066,7 +1075,7 @@ export function V2AppShell() {
           <AppUpdateBanner />
           {/* Phase 180 — one-time GPS-capture setup prompt. Field-sales only,
               native-only, gated to APK >= 96014 (where the deep-links exist). */}
-          <GpsSetupPrompt enabled={profile?.role === 'sales' && profile?.team_role !== 'sales_manager'} />
+          <GpsSetupPrompt enabled={(profile?.role === 'sales' && profile?.team_role !== 'sales_manager') || profile?.role === 'operation_executive'} />
           {/* Phase 250 — telecallers get the BATTERY half only. They have no km
               to protect, but an app the OS is free to kill loses the post-call
               outcome and the follow-up with it. Separate done-key, so a rep who
