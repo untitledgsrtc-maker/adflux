@@ -85,6 +85,26 @@ function blobToBase64(blob) {
   })
 }
 
+// Phase 660 — native save + share for any page-made file (CSV, PNG, PDF). The APK
+// WebView drops <a download> of blob:/data: links; main.jsx routes those here.
+// Written under pdfs/ because that is a folder the app's file-sharing config allows.
+export async function saveFileNative(blob, fileName) {
+  const name = String(fileName || '').replace(/\s+/g, '-').replace(/[^A-Za-z0-9._-]/g, '').replace(/^\.+/, '') || 'download'
+  const base64 = await blobToBase64(blob)
+  const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+    import('@capacitor/filesystem'),
+    import('@capacitor/share'),
+  ])
+  const path = `pdfs/${name}`
+  await Filesystem.writeFile({ path, data: base64, directory: Directory.Cache, recursive: true })
+  const { uri } = await Filesystem.getUri({ path, directory: Directory.Cache })
+  try {
+    await Share.share({ title: name, files: [uri], dialogTitle: 'Save or share' })
+  } catch (e) {
+    if (!/cancel/i.test(e?.message || String(e))) throw e
+  }
+}
+
 function anchorDownload(blob, fileName) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

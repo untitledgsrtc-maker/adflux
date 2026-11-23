@@ -26,7 +26,8 @@ export async function downloadToCache(url, fileName) {
     const base64 = btoa(binary)
 
     const { Filesystem, Directory } = await import('@capacitor/filesystem')
-    const name = fileName || 'brochure.pdf'
+    // Phase 660 - must sit under pdfs/ (file_paths.xml); the cache root threw in ShareDirect
+    const name = 'pdfs/' + (fileName || 'brochure.pdf')
     await Filesystem.writeFile({
       path: name, data: base64, directory: Directory.Cache, recursive: true,
     })

@@ -86,6 +86,23 @@ if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()) {
   }).catch(() => { /* dynamic import disabled */ })
 }
 
+// Phase 660 — APK downloads. The Android WebView silently drops <a download> of
+// page-made files (blob:/data:), so CSV / QR / Govt PDF / offer-letter buttons did
+// nothing. On native only, route those clicks to save-and-share. Every caller
+// builds the link and calls a.click(), so one patch covers all of them.
+if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()) {
+  const nativeClick = HTMLAnchorElement.prototype.click
+  HTMLAnchorElement.prototype.click = function () {
+    const href = this.href || ''
+    if (!this.hasAttribute('download') || !/^(blob|data):/.test(href)) return nativeClick.call(this)
+    const name = this.getAttribute('download') || 'download'
+    const blobP = fetch(href).then((r) => r.blob())   // start now: callers revoke the blob URL right after click()
+    Promise.all([blobP, import('./utils/savePdf'), import('./components/v2/Toast')])
+      .then(([blob, m, t]) => m.saveFileNative(blob, name).catch((e) => t.toastError(e, 'Could not save the file')))
+      .catch((e) => import('./components/v2/Toast').then((t) => t.toastError(e, 'Could not save the file')).catch(() => {}))
+  }
+}
+
 // Phase 87.7 — native dialer auto-launch on Capacitor APK.
 // Owner directive 22 May 2026: tap any tel:<number> link inside the
 // installed app should open the OS dialer directly, no "Open with..."

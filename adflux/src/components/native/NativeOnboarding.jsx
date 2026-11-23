@@ -245,30 +245,13 @@ export default function NativeOnboarding({ userId, onClose }) {
             </div>
             <button
               style={primaryBtn}
-              onClick={() => {
-                // Phase 66 (21 May 2026) — owner reported "tap → nothing
-                // happens". Earlier the button only flipped state. Now
-                // we fire an Android intent that launches the system
-                // battery-optimization settings page directly. WebView
-                // honours `intent://` URIs natively.
-                //   - APPLICATION_DETAILS_SETTINGS lands on this app's
-                //     info page (one tap to Battery → Unrestricted).
-                //   - Falls back to IGNORE_BATTERY_OPTIMIZATION_SETTINGS
-                //     (system-wide list) if package URI fails.
-                try {
-                  const pkg = 'in.untitledad.app'
-                  const intentUrl =
-                    `intent://#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;` +
-                    `package=${pkg};data=package:${pkg};end`
-                  window.location.href = intentUrl
-                } catch (e) {
-                  // Fallback: system-wide battery-optimization list.
-                  try {
-                    window.location.href =
-                      'intent://#Intent;action=android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS;end'
-                  } catch (_) { /* swallow — user can navigate manually */ }
-                }
-                setBattOpened(true)
+              onClick={async () => {
+                // Phase 660 - the old intent:// link did nothing in Capacitor (the
+                // WebView can't open it) yet showed "opened". Use the native
+                // TrackingPlugin call (same one GpsSetupPrompt uses).
+                const { requestBatteryUnrestricted } = await import('../../utils/nativeTracking')
+                const res = await requestBatteryUnrestricted()
+                if (res !== null) setBattOpened(true)
               }}
             >
               {battOpened
