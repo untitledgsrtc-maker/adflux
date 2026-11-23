@@ -21,7 +21,7 @@ const istParts = () => {
 const ITEMS = [
   { key: 'checkin',      time: '9:45',  label: 'Team checked in',                         auto: true, to: '/team-dashboard', lateAt: 630 },
   { key: 'meeting',      time: '9:50',  label: 'Morning team meeting',                                                       lateAt: 615 },
-  { key: 'approvals',    time: '10:00', label: 'Leaves, TA and quote prices cleared',     auto: true, to: '/admin/leaves',    lateAt: 660 },
+  { key: 'approvals',    time: '10:00', label: 'Quote prices cleared',                    auto: true, to: '/quote-approvals', lateAt: 660 },   // Phase 657 - owner: leaves + TA out
   { key: 'callbacks',    time: '10:15', label: 'Old callbacks reviewed',                              to: '/manager',         lateAt: 720 },
   { key: 'check_1pm',    time: '1:00',  label: 'Team Live check: anyone idle or GPS off',             to: '/team-dashboard',  lateAt: 840 },
   { key: 'check_4pm',    time: '4:00',  label: 'Team Live check: anyone idle or GPS off',             to: '/team-dashboard',  lateAt: 1020 },
@@ -43,12 +43,10 @@ export default function HeadChecklistCard() {
     const { data: reps } = await supabase.from('users').select('id').eq('manager_id', profile.id).eq('is_active', true)
     const ids = (reps || []).map((r) => r.id)
     const none = ['00000000-0000-0000-0000-000000000000']
-    const [tk, ses, lv, pl, pt, pq] = await Promise.all([
+    const [tk, ses, lv, pq] = await Promise.all([
       supabase.from('head_checklist').select('item, done_at').eq('user_id', profile.id).eq('day', today),
       supabase.from('work_sessions').select('user_id, check_in_at, evening_summary_sent_at').eq('work_date', today).in('user_id', ids.length ? ids : none),
       supabase.from('leaves').select('user_id').eq('leave_date', today).eq('status', 'approved').eq('is_half_day', false).in('user_id', ids.length ? ids : none),
-      supabase.from('leaves').select('id', { count: 'exact', head: true }).eq('status', 'pending').neq('user_id', profile.id),
-      supabase.from('ta_da_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending').neq('user_id', profile.id),
       supabase.from('quote_price_approvals').select('id', { count: 'exact', head: true }).eq('status', 'pending').neq('requested_by', profile.id),
     ])
     if (tk.error) { toastError(tk.error, 'Could not load your checklist'); return }
@@ -59,7 +57,7 @@ export default function HeadChecklistCard() {
     const inCount = sessions.filter((s) => s.check_in_at && !onLeave.has(s.user_id)).length
     const shared = sessions.filter((s) => s.evening_summary_sent_at).length
     const working = sessions.filter((s) => s.check_in_at).length
-    const pending = (pl.count || 0) + (pt.count || 0) + (pq.count || 0)
+    const pending = pq.count || 0
     setAuto({
       checkin:   { done: expected > 0 && inCount >= expected, note: `${inCount} of ${expected}` },
       approvals: { done: pending === 0, note: pending ? `${pending} waiting` : 'none waiting' },
