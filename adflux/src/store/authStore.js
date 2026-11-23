@@ -77,6 +77,11 @@ export const useAuthStore = create((set, get) => ({
   },
 
   signOut: async () => {
+    // Phase 660 - drop this phone's push token on real sign-out only (needs the session for RLS)
+    await Promise.race([
+      import('../utils/nativePush').then((m) => m.deregisterNativePush()).catch(() => {}),
+      new Promise((r) => setTimeout(r, 2500)),   // offline must never block logout
+    ])
     await supabase.auth.signOut()
     set({ user: null, profile: null })
   },

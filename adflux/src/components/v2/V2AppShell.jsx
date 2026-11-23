@@ -44,7 +44,7 @@ import IncentiveMiniPill from '../incentives/IncentiveMiniPill'
 import { ensurePushOnLogin } from '../../utils/pushNotifications'
 import { startBackgroundGps, stopBackgroundGps } from '../../utils/backgroundGps'
 import { setActiveProfile as setTrackingProfile, runForegroundProbe } from '../../utils/nativeTracking'
-import { registerNativePush, deregisterNativePush } from '../../utils/nativePush'
+import { registerNativePush } from '../../utils/nativePush'
 import { startCallHistoryPoller, stopCallHistoryPoller } from '../../utils/callHistoryIngest'
 // Phase 96.0 (2026-05-27) — cold-start backfill of LocalNotification
 // alarms. Covers follow-ups created before this APK was installed
@@ -541,7 +541,8 @@ export function V2AppShell() {
     registerNativePush(profile.id).catch((e) =>
       console.warn('[v2-shell] fcm register failed:', e?.message || e)
     )
-    return () => { deregisterNativePush().catch(() => {}) }
+    // Phase 660 - no deregister on unmount: CheckInGate unmounts the shell each
+    // morning and that wiped every Android token. Sign-out deregisters (authStore).
   }, [profile?.id])
 
   // Phase 96.0 (2026-05-27) — backfill AlarmManager alarms for any

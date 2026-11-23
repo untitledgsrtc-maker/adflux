@@ -429,6 +429,8 @@ export async function deregisterNativePush() {
   const user = activeUser
   activeUser = null
   registered = false
+  // Phase 660 - drop listeners so the next sign-in doesn't stack duplicates
+  await PushNotifications.removeAllListeners().catch(() => {})
   try {
     await supabase
       .from('push_subscriptions')

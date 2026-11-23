@@ -96,6 +96,14 @@ serve(async (req) => {
   // Service-role client — bypasses RLS so we can read every device.
   const sb = createClient(SB_URL, SB_KEY)
 
+  // Phase 660 — never push to an inactive (ex-staff) user: lead names were
+  // reaching phones of people who left. Drop their devices so it stops for good.
+  const { data: who } = await sb.from('users').select('is_active').eq('id', user_id).maybeSingle()
+  if (who && who.is_active === false) {
+    await sb.from('push_subscriptions').delete().eq('user_id', user_id)
+    return json({ sent: 0, reason: 'inactive user' })
+  }
+
   // Check opt-out prefs. Only enforce when explicitly told what
   // category we are. If pref row missing, default to send.
   // (Caller can pass category to enable opt-out checking; v1 ships
