@@ -230,11 +230,15 @@ export default function AdminDashboardDesktop() {
       // to top 3 client-side after grouping.
       (async () => {
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-        return supabase.from('lead_activities')
-          .select('lead_id, created_at, leads(id, name, company, stage, assigned_to)')
+        // Phase 648 - full 7 days (was the newest 500 of ~2,900 = about 1 day). Working leads
+        // filtered server-side (~1,500 rows) and every page read.
+        return fetchAllPages((f, t) => supabase.from('lead_activities')
+          .select('lead_id, created_at, leads!inner(id, name, company, stage, assigned_to)')
+          .eq('leads.stage', 'Working')
           .gte('created_at', sevenDaysAgo)
           .order('created_at', { ascending: false })
-          .limit(500)
+          .order('id')
+          .range(f, t))
       })(),
       // Phase 41.3 — Today's morning brief delivery status. push_log
       // captures every enqueued push with success/error; brief pushes
