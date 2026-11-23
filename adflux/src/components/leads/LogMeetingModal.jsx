@@ -31,6 +31,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, MapPin, Loader2, Building2, Camera } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { hasRealWord } from '../../utils/leadName'
 import { useAuthStore } from '../../store/authStore'
 import VoiceInput from '../voice/VoiceInput'
 import PhotoCapture from './PhotoCapture'
@@ -223,6 +224,7 @@ export default function LogMeetingModal({ onClose, onSaved, mode = 'meeting' }) 
     setError('')
     if (!company.trim()) { fail('Company / shop name is required.'); return }
     if (!contact.trim()) { fail('Person name is required — who did you meet?'); return }
+    if (!hasRealWord(contact)) { fail('Type the person\'s real name (at least 2 letters).'); return }   // Phase 650
     if (!phone.trim())   { fail('Mobile number is required — without it the lead can\'t be followed up.'); return }
     if (!city.trim())    { fail('City is required.'); return }
     if (!outcome)        { fail('Pick an outcome — Good / Maybe / Lost.'); return }

@@ -18,6 +18,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { confirmDialog } from '../../components/v2/ConfirmDialog' // Phase 181 — post-meeting Start Presentation
 import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap, Camera, MapPin } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { hasRealWord } from '../../utils/leadName'
 import { useAuthStore } from '../../store/authStore'
 import PhotoCapture from '../../components/leads/PhotoCapture'
 import VoiceInput   from '../../components/voice/VoiceInput'
@@ -184,6 +185,10 @@ export default function LeadFormV2() {
     setError('')
     if (!form.name.trim()) {
       setError('Person name is required.')
+      return
+    }
+    if (!hasRealWord(form.name)) {   // Phase 650 - '.', '~', emoji etc. are not names
+      setError('Type the person\'s real name (at least 2 letters).')
       return
     }
     // Phase 33B.3 (11 May 2026) — owner locked the required-field set
