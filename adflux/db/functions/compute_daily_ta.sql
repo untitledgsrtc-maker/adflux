@@ -1,3 +1,7 @@
+-- PHASE 664 (24-11-2026, owner-approved, option A): the day window was
+-- p_date::timestamptz = UTC midnight (DB TimeZone is UTC), i.e. 05:30-05:30 IST, so
+-- midnight-05:30 pings landed on the PREVIOUS day and bridged nights into fake km
+-- (e.g. 95 km on a 1-ping Sunday). Both windows now use the IST calendar day.
 -- PHASE 663 (24-11-2026, owner-approved): no longer called per ping. gps_pings marks
 -- (user, IST day) in ta_dirty; cron 'recompute-ta-dirty' calls this every 10 min.
 -- See supabase_phase663_ta_batch_10min.sql. This function body is unchanged.
@@ -98,8 +102,8 @@ BEGIN
     SELECT captured_at, lat, lng, accuracy_m
       FROM public.gps_pings
      WHERE user_id = p_user_id
-       AND captured_at >= p_date::timestamptz
-       AND captured_at <  (p_date + 1)::timestamptz
+       AND captured_at >= (p_date::timestamp AT TIME ZONE 'Asia/Kolkata')        -- Phase 664: IST calendar day
+       AND captured_at <  ((p_date + 1)::timestamp AT TIME ZONE 'Asia/Kolkata')
        AND (accuracy_m IS NULL OR accuracy_m <= 50)
      ORDER BY captured_at ASC
   LOOP
@@ -130,8 +134,8 @@ BEGIN
     FROM public.gps_pings gp
     CROSS JOIN LATERAL public.detect_city(gp.lat, gp.lng) dc
    WHERE gp.user_id = p_user_id
-     AND gp.captured_at >= p_date::timestamptz
-     AND gp.captured_at <  (p_date + 1)::timestamptz
+     AND gp.captured_at >= (p_date::timestamp AT TIME ZONE 'Asia/Kolkata')
+     AND gp.captured_at <  ((p_date + 1)::timestamp AT TIME ZONE 'Asia/Kolkata')
      AND (gp.accuracy_m IS NULL OR gp.accuracy_m <= 50)
    GROUP BY dc.city_name, dc.category, dc.is_home, dc.bike_per_km
    ORDER BY COUNT(*) DESC
@@ -206,6 +210,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%v_seg_speed <= 120%'            AS speed_120,
 --   pg_get_functiondef(p.oid) LIKE '%ta_override%'                   AS claim_override_path,
 --   pg_get_functiondef(p.oid) LIKE '%daily_ta.status = ''pending''%' AS never_overwrite_approved,
---   pg_get_functiondef(p.oid) LIKE '%LEAST(v_total_km, 200)%'        AS daily_cap_200_live
+--   pg_get_functiondef(p.oid) LIKE '%LEAST(v_total_km, 200)%'        AS daily_cap_200_live,
+--   pg_get_functiondef(p.oid) LIKE '%AT TIME ZONE ''Asia/Kolkata'')%' AS ist_day_window_664
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'compute_daily_ta';
