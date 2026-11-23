@@ -501,7 +501,7 @@ export default function LeadsV2() {
   // Phase 640 — cost per lead (salary + travel spent on it, all time), admin only.
   // Same lazy per-page pattern as the scores above: one POST for the visible page,
   // never the whole list (section 45). Server returns nothing for non-admin.
-  const showCost = profile?.role === 'admin'
+  const showCost = profile?.role === 'admin' || profile?.team_role === 'sales_manager'   // Phase 651 - head: his reps' cost only (server-side)
   const [costMap, setCostMap] = useState({})
   useEffect(() => {
     if (!showCost) return undefined
@@ -1286,7 +1286,7 @@ export default function LeadsV2() {
                 <th style={{ textAlign: 'center' }} title="Total calls to this lead">Calls</th>
                 <th style={{ textAlign: 'center' }} title="Total in-app presentation time">Pres.</th>
                 <th style={{ textAlign: 'right' }}>Value</th>
-                {showCost && <th style={{ textAlign: 'right' }} title="Salary time + travel spent on this lead so far (admin only)">Cost</th>}
+                {showCost && <th style={{ textAlign: 'right' }} title="Salary time + travel spent on this lead so far">Cost</th>}
               </tr>
             </thead>
             <tbody>

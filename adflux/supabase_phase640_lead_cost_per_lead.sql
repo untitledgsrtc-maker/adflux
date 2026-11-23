@@ -1,3 +1,4 @@
+-- !! Phase 651 (2026-11-23) replaced this function (sales head access). Re-running this file removes it; re-run phase651 after.
 -- =============================================================================
 -- Phase 640 · Cost per lead on the Leads list (2026-11-21, owner-approved)
 --
