@@ -899,9 +899,10 @@ export default function TeamDashboardV2() {
       if (cancelled) return
       if (!acts || acts.length === 0) { setPendingOutcomesByUser({}); return }
       // Drop orphan taps whose call was resolved (SAME shared rule as the rep card, §71).
-      const { data: resolved } = await applyResolvedCallFilters(
+      // Phase 647 - ~1,100 resolved calls in 3 days; .limit(4000) still stopped at 1000.
+      const { data: resolved } = await fetchAllPages((f, t) => applyResolvedCallFilters(
         supabase.from('lead_activities').select('lead_id, created_by, created_at')
-      ).order('created_at', { ascending: false }).limit(4000)
+      ).order('created_at', { ascending: false }).order('id').range(f, t))
       if (cancelled) return
       const survivors = excludeResolvedSiblings(acts, resolved || [])
       const leadIds = [...new Set(survivors.map(a => a.lead_id))]

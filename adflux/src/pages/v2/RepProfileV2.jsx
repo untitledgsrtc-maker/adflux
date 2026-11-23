@@ -40,6 +40,7 @@ import {
   CheckCircle2, Clock,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { fetchAllPages } from '../../utils/fetchAllPages'
 import { useAuthStore } from '../../store/authStore'
 import { pushToast, toastError, toastSuccess } from '../../components/v2/Toast'
 import { confirmDialog } from '../../components/v2/ConfirmDialog'
@@ -582,10 +583,12 @@ export default function RepProfileV2() {
         // Activities this month (meetings + site_visit + qualifications).
         // id + notes + lead_id needed for the §33 done-meeting contract
         // (exclusions + unique-lead-per-day dedup) applied below.
-        supabase.from('lead_activities')
+        fetchAllPages((f, t) => supabase.from('lead_activities')   // Phase 647 - a telecaller passes 1,800 a month
           .select('id, activity_type, created_at, notes, lead_id')
           .eq('created_by', userId)
-          .gte('created_at', monthStart),
+          .gte('created_at', monthStart)
+          .order('id')
+          .range(f, t)),
         // Leads currently assigned (active stages)
         supabase.from('leads').select('id', { count: 'exact', head: true })
           .or(`assigned_to.eq.${userId},telecaller_id.eq.${userId}`)

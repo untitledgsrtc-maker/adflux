@@ -23,6 +23,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, MapPin, FileText, Upload, CheckCircle2, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { fetchAllPages } from '../../utils/fetchAllPages'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../v2/Toast'
 import { formatCurrency, formatDate } from '../../utils/formatters'
@@ -116,7 +117,7 @@ export default function TaDaRequestPanel() {
     const today = new Date()
     today.setHours(0,0,0,0)
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
-    const [{ data: dt }, { data: reqs }, { data: pings }] = await Promise.all([
+    const [{ data: dt }, { data: reqs }] = await Promise.all([
       supabase.from('daily_ta')
         .select('km_traveled, bike_amount, da_amount, hotel_amount, total_amount')
         .eq('user_id', profile.id)
@@ -127,24 +128,29 @@ export default function TaDaRequestPanel() {
         .eq('user_id', profile.id)
         .order('created_at', { ascending: false })
         .limit(20),
-      supabase.from('gps_pings')
-        .select('lat, lng, captured_at, accuracy_m')
-        .eq('user_id', profile.id)
-        .gte('captured_at', today.toISOString())
-        .lt('captured_at', tomorrow.toISOString())
-        .order('captured_at', { ascending: true }),
     ])
-    const summary = summariseTrack(pings || [])
     setTodayRow(dt || null)
-    setLiveTrack(summary)
     setRequests(reqs || [])
+    setLoading(false)
+    // Phase 647 - one day can pass 6,000 pings (the old read kept only the first 1000 -> km too low).
+    // Read every page AFTER the panel shows, so a heavy-GPS day does not hold the spinner.
+    const { data: pings } = await fetchAllPages((f, t) => supabase.from('gps_pings')
+      .select('lat, lng, captured_at, accuracy_m')
+      .eq('user_id', profile.id)
+      .gte('captured_at', today.toISOString())
+      .lt('captured_at', tomorrow.toISOString())
+      .order('captured_at', { ascending: true })
+      .order('id')
+      .range(f, t))
+    const summary = summariseTrack(pings || [])
+    setLiveTrack(summary)
     // Pre-fill the override field with the live km so the rep doesn't
     // have to retype. Override is opt-in: leave as-is = confirm GPS.
     // Owner: "If person not override it should be counted as GPS tracked."
+    // Never overwrite what the rep typed while the pings were loading.
     if (Number(summary?.km || 0) > 0) {
-      setClaimKm(String(summary.km))
+      setClaimKm(prev => (prev === '' ? String(summary.km) : prev))
     }
-    setLoading(false)
   }
   useEffect(() => { reload() /* eslint-disable-next-line */ }, [profile?.id])
 

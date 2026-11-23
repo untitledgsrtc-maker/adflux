@@ -76,8 +76,8 @@ export default function CampaignSegmentsV2() {
     setLoading(false)
 
     // Distinct lead sources for the dropdown (bounded read).
-    const { data: srcRows } = await supabase.from('leads').select('source').limit(4000)
-    const uniq = [...new Set((srcRows || []).map((r) => r.source).filter(Boolean))].sort()
+    const { data: srcRows } = await supabase.rpc('lead_sources')   // Phase 647 - was a random 1000 of ~13k leads
+    const uniq = [...new Set(srcRows || [])].sort()
     setSources(uniq)
   }, [])
 

@@ -10,6 +10,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, PhoneCall, CheckSquare, Square } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { fetchAllPages } from '../../utils/fetchAllPages'
 import { keepInFollowupQueue } from '../../utils/followups'
 import { istTodayISO } from '../../utils/istDate'
 import { confirmDialog } from '../v2/ConfirmDialog'
@@ -39,14 +40,16 @@ export default function OldCallbacksPanel({ reps }) {
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
-    const { data, error: err } = await supabase
+    // Phase 647 - read every page (.limit(1500) still stopped at the 1000-row server cap).
+    const { data, error: err } = await fetchAllPages((f, t) => supabase
       .from('follow_ups')
       .select('id, follow_up_date, follow_up_time, note, assigned_to, lead_id, cadence_type, lead:leads(id, name, company, stage)')
       .eq('is_done', false)
       .not('lead_id', 'is', null)
       .lte('follow_up_date', today)
       .order('follow_up_date', { ascending: true })
-      .limit(1500)
+      .order('id')
+      .range(f, t))
     if (err) { setError(err.message || 'Could not load callbacks'); setLoading(false); return }
     setRows((data || []).filter(keepInFollowupQueue))
     setPicked(new Set())

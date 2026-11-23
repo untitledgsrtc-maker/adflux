@@ -217,11 +217,13 @@ export default function AdminDashboardDesktop() {
       // Phase 41.2 — Reps in field RIGHT NOW. Distinct users with a
       // gps_ping in the last 30 minutes. Single SELECT then we de-dupe
       // client-side (count distinct over time-windowed rows is cheap).
-      supabase.from('gps_pings')
+      // Phase 647 - ~700 pings an hour at peak; .limit(500) could drop a rep whose last ping was older.
+      fetchAllPages((f, t) => supabase.from('gps_pings')
         .select('user_id, created_at, lat, lng, users(name)')   // Phase 643 - name for non-sales staff (ops) who also ping
         .gte('created_at', liveCutoffIso)
         .order('created_at', { ascending: false })
-        .limit(500),
+        .order('id')
+        .range(f, t)),
       // Phase 41.3 — Top hot leads. Leads in stage=Working with any
       // activity in the last 7 days. Sorted by activity-count desc
       // (most-touched = hottest). Limit 50 server-side; we collapse

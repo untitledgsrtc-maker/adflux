@@ -110,13 +110,10 @@ export default function LeadsCollectedChart({ onDayClick }) {
 
       // Build distinct source list (separate query so the dropdown
       // shows all sources, not just ones in current date range).
-      const { data: src } = await supabase
-        .from('leads')
-        .select('source')
-        .not('source', 'is', null)
-        .limit(2000)
+      // Phase 647 - distinct sources server-side (the old read got a random 1000 of ~13k leads).
+      const { data: src } = await supabase.rpc('lead_sources')
       if (cancelled) return
-      const uniq = Array.from(new Set((src || []).map(r => r.source).filter(Boolean))).sort()
+      const uniq = Array.from(new Set(src || [])).sort()
       setSources(uniq)
 
       setLoading(false)

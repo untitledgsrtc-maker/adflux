@@ -29,6 +29,7 @@ import {
   ArrowLeft, Upload, AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, Copy,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { fetchAllPages } from '../../utils/fetchAllPages'
 import { useAuthStore } from '../../store/authStore'
 import { pushToast, toastError, toastSuccess } from '../../components/v2/Toast'
 
@@ -630,10 +631,14 @@ export default function LeadUploadV2() {
     // Phone-based dedup against existing leads (created_by = me).
     const existingPhones = new Set()
     {
-      const { data: ex } = await supabase
+      // Phase 647 - every page: a bulk importer has 4,000+ leads, the old read stopped at 1000
+      // so phones past that were not checked and duplicates got inserted.
+      const { data: ex } = await fetchAllPages((f, t) => supabase
         .from('leads')
         .select('phone')
         .eq('created_by', profile.id)
+        .order('id')
+        .range(f, t))
       ;(ex || []).forEach(r => r.phone && existingPhones.add(r.phone))
     }
 
