@@ -1,3 +1,6 @@
+-- PHASE 663 (24-11-2026, owner-approved): no longer called per ping. gps_pings marks
+-- (user, IST day) in ta_dirty; cron 'recompute-ta-dirty' calls this every 10 min.
+-- See supabase_phase663_ta_batch_10min.sql. This function body is unchanged.
 -- ============================================================================
 -- db/functions/compute_daily_ta.sql — CANONICAL HOME (Phase 178 / Stage 2)
 -- ============================================================================

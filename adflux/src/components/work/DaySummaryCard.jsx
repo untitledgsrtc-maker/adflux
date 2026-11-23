@@ -149,6 +149,13 @@ export default function DaySummaryCard({
       // never sends a stale snapshot (daily_ta + counters grow through
       // the day; the old code shared load-time state, forcing a reshare).
       // Falls back to current state if the refetch fails.
+      // Phase 663 - km/TA is now recomputed every 10 min, not per ping, so bring
+      // this rep's day up to date first. Same server formula; failure is harmless
+      // (falls back to the last 10-min figure).
+      await Promise.race([
+        supabase.rpc('compute_daily_ta', { p_user_id: profile.id, p_date: istTodayISO() }).then(() => {}, () => {}),
+        new Promise((r) => setTimeout(r, 4000)),   // never hold the share longer than 4s
+      ])
       const fresh = await refresh()
       const text = formatDaySummaryText(fresh || data)
       openWhatsAppShare(text)
