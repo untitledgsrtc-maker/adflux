@@ -726,8 +726,10 @@ export function V2AppShell() {
     Promise.all([
       supabase.from('leaves').select('id', { count: 'exact', head: true }).eq('status', 'pending').neq('user_id', profile.id),
       supabase.from('ta_da_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending').neq('user_id', profile.id),
-    ]).then(([l, t]) => {
-      if (alive) setNavBadges({ '/admin/leaves': l.count || 0, '/admin/ta-payouts': t.count || 0 })
+      // Phase 655 - his reps' quote prices waiting (RLS qpa_manager_read), never his own request
+      supabase.from('quote_price_approvals').select('id', { count: 'exact', head: true }).eq('status', 'pending').neq('requested_by', profile.id),
+    ]).then(([l, t, q]) => {
+      if (alive) setNavBadges({ '/admin/leaves': l.count || 0, '/admin/ta-payouts': t.count || 0, '/quote-approvals': q.count || 0 })
     })
     return () => { alive = false }
   }, [isTeamHeadNav, profile?.id, location.pathname])
