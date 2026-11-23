@@ -76,6 +76,7 @@ import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../compone
 // deferred to Phase 76.4b pending owner sign-off).
 import DaySummaryCard from '../../components/work/DaySummaryCard'
 import HeadChecklistCard from '../../components/manager/HeadChecklistCard'   // Phase 656
+import HeadTeamScoreHero from '../../components/manager/HeadTeamScoreHero'   // Phase 659
 import MorningGreetGate from '../../components/work/MorningGreetGate'
 import EveningWrapBanner from '../../components/work/EveningWrapBanner'
 import GpsOffBanner from '../../components/work/GpsOffBanner'
@@ -1429,9 +1430,10 @@ function DayStatusSurface(props) {
   // Variant D — day done
   if (dayDone) {
     const tone = (counters.meetings || 0) >= (targets.meetings || 5) ? 'good' : 'warn'
+    const isHead = profile?.team_role === 'sales_manager'   // Phase 659
     return (
       <>
-        <V2Hero
+        {isHead ? <HeadTeamScoreHero userId={profile.id} eyebrow="Today · day done" /> : <V2Hero
           eyebrow="Today · day done"
           value="Day done."
           label="Final counters below."
@@ -1440,12 +1442,12 @@ function DayStatusSurface(props) {
             text: tone === 'good' ? 'target hit' : `${(targets.meetings || 5) - (counters.meetings || 0)} short`,
           }}
           accent={tone === 'good'}
-        />
+        />}
         <div className="m-counters">
           {/* Phase 87.3 — hide Meetings counter for TC. Same logic
               as TodaySummaryCard: role=telecaller catches Dhara,
               Rima, Renuka (TC head). */}
-          {profile?.role !== 'telecaller' && (
+          {profile?.role !== 'telecaller' && !isHead && (
             <Counter num={counters.meetings || 0} target={targets.meetings} label="Meetings" tone={counters.meetings >= targets.meetings ? 'good' : 'warn'} />
           )}
           <Counter num={counters.calls || 0} target={targets.calls} label="Calls" tone={counters.calls >= targets.calls ? 'good' : 'warn'} />
@@ -1495,6 +1497,20 @@ function DayStatusSurface(props) {
     // Phase 35.0 — progress ring + bullet stats + View pipeline CTA.
     // Mockup spec line 188-247 of _design_reference/newsalesui/.../app.jsx.
     const pct = ((counters.meetings || 0) / (targets.meetings || 5)) * 100
+    // Phase 659 - sales head is scored on his team, not his own meetings
+    if (profile?.team_role === 'sales_manager') {
+      return (
+        <HeadTeamScoreHero
+          userId={profile.id}
+          eyebrow={session?.check_in_at ? `In · ${formatTime(session.check_in_at)}` : 'In progress'}
+          footerStats={[
+            { label: 'calls',     value: counters.calls || 0,     tint: 'var(--v2-yellow, #FFE600)' },
+            { label: 'new leads', value: counters.new_leads || 0, tint: 'var(--v2-yellow, #FFE600)' },
+          ]}
+          footerCta={{ label: 'View pipeline', onClick: () => navigate('/leads') }}
+        />
+      )
+    }
     return (
       <>
         <V2Hero
