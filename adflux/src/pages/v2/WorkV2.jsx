@@ -75,6 +75,7 @@ import { EmptyState, ActionButton, MonoNumber, StatusBadge } from '../../compone
 // mounts; no productive flow is gated in this phase (button-blocking
 // deferred to Phase 76.4b pending owner sign-off).
 import DaySummaryCard from '../../components/work/DaySummaryCard'
+import HeadChecklistCard from '../../components/manager/HeadChecklistCard'   // Phase 656
 import MorningGreetGate from '../../components/work/MorningGreetGate'
 import EveningWrapBanner from '../../components/work/EveningWrapBanner'
 import GpsOffBanner from '../../components/work/GpsOffBanner'
@@ -1094,6 +1095,9 @@ export default function WorkV2() {
             share today's report even after (auto-)checkout. The card's
             own 19:00 IST + dismiss gates still apply, and its checkout CTA
             self-hides once checkedOut — only Share remains. */}
+        {/* Phase 656 - sales head's daily routine (renders null for everyone else) */}
+        {profile?.team_role === 'sales_manager' && <HeadChecklistCard />}
+
         {checkedIn && (
           <DaySummaryCard
             onCheckOut={doCheckOut}
