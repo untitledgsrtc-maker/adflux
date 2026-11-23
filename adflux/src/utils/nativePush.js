@@ -395,6 +395,25 @@ export async function registerNativePush(userId) {
   }
 }
 
+// Phase 662 - record the phone make/model (owner: check which phones can auto-record
+// calls). Stored in user_agent as "capacitor-android; <model>; Android <ver>".
+async function deviceLabel() {
+  let model = '', ver = ''
+  try {
+    const hi = await Promise.race([   // never let this hold up the token save
+      navigator.userAgentData?.getHighEntropyValues?.(['model', 'platformVersion']),
+      new Promise((r) => setTimeout(r, 1500)),
+    ])
+    model = hi?.model || ''
+    ver = hi?.platformVersion || ''
+  } catch { /* not supported */ }
+  if (!model || !ver) {
+    const m = /Android ([\d.]+); ([^;)]+?)(?: Build|\))/.exec(navigator.userAgent || '')
+    if (m) { ver = ver || m[1]; model = model || m[2] }
+  }
+  return ['capacitor-android', model, ver && `Android ${ver}`].filter(Boolean).join('; ')
+}
+
 /**
  * Persist the FCM token to push_subscriptions. Uses the existing
  * table with two new columns (platform + fcm_token) — see
@@ -414,7 +433,7 @@ async function saveFcmToken(userId, fcmToken) {
     auth:       '',           // not used for FCM
     platform:   'android',
     fcm_token:  fcmToken,
-    user_agent: 'capacitor-android',
+    user_agent: await deviceLabel(),
     last_seen_at: new Date().toISOString(),
   }
   // ON CONFLICT (endpoint) DO UPDATE — same pattern as the web push
