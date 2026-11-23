@@ -369,7 +369,20 @@ export async function registerNativePush(userId) {
   // already; if the rep skipped, register() will throw — we swallow
   // and the rep can re-grant via Settings later.
   try {
-    const perm = await PushNotifications.checkPermissions()
+    let perm = await PushNotifications.checkPermissions()
+    if (perm?.receive !== 'granted') {
+      // Phase 661 - a rep who refused at onboarding was never asked again. Re-ask
+      // once per app start, but only after onboarding finished (it asks itself).
+      const { Preferences } = await import('@capacitor/preferences')
+      const { value: onboarded } = await Preferences.get({ key: `native-onboarding-done-${userId}` })
+      if (onboarded) {
+        perm = await PushNotifications.requestPermissions()
+        if (perm?.receive !== 'granted') {
+          // Android stops showing the dialog after repeated refusals: say where to fix it.
+          pushToast('Notifications are off. Turn them on in phone Settings > Apps > Untitled OS > Notifications.', 'info')
+        }
+      }
+    }
     if (perm?.receive !== 'granted') {
       console.info('[fcm] permission not granted yet; skip register')
       registered = true  // don't keep retrying every shell mount

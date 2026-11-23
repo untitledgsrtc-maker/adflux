@@ -34,6 +34,11 @@
 --      supabase_phase93_8_notification_cleanup.sql
 --      supabase_phase97_a400_fu_due_unique_tag.sql
 --
+-- PHASE 661 (24-11-2026): skips rep-made (auto_generated=false) follow-ups whose
+--    assignee has an Android device seen in 14 days - they ring via the on-phone
+--    alarm (scheduleFollowUpAlarm.js). Owner: keep phone alarm, stop the server push.
+--    Server-made rows keep the push (no phone alarm until app restart). Running this file is no longer a no-op until applied once.
+--
 -- REVERT: re-run this file. TRIPWIRE: VERIFY block at the bottom.
 -- ============================================================================
 
@@ -73,6 +78,15 @@ BEGIN
        AND (v_today_ist::timestamp + fu.follow_up_time::interval) >= v_window_lower
        AND (v_today_ist::timestamp + fu.follow_up_time::interval) <= v_window_upper
        AND fu.assigned_to       IS NOT NULL
+       -- Phase 661 (owner 24-11-2026): a follow-up the rep saved in the APK already
+       -- has a phone alarm, so the server push rang it twice. Skip ONLY those:
+       -- rep-made rows (auto_generated = false) for a rep with a live Android device.
+       -- Server-made rows (first call, quote chase, 10:00 cadence) never get a phone
+       -- alarm until the app restarts, so they keep the server push.
+       AND NOT (fu.auto_generated = false AND EXISTS (
+             SELECT 1 FROM public.push_subscriptions ps
+              WHERE ps.user_id = fu.assigned_to AND ps.platform = 'android'
+                AND ps.last_seen_at > now() - interval '14 days'))
   LOOP
     PERFORM public.enqueue_push(
       r.assigned_to,
@@ -103,7 +117,7 @@ GRANT EXECUTE ON FUNCTION public.push_followup_due_reminders() TO authenticated;
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All six must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All seven must be TRUE.
 -- ============================================================================
 -- SELECT
 --   pg_get_functiondef(p.oid) LIKE '%is_push_allowed_now%'       AS quiet_hours_gate,
@@ -111,6 +125,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%reminder_sent_at  IS NULL%' AS dedup_filter,
 --   pg_get_functiondef(p.oid) LIKE '%SET reminder_sent_at = now()%' AS dedup_stamp,
 --   pg_get_functiondef(p.oid) LIKE '%enqueue_push%'             AS calls_enqueue_push,
---   pg_get_functiondef(p.oid) LIKE '%interval ''5 minutes''%'    AS window_5min
+--   pg_get_functiondef(p.oid) LIKE '%interval ''5 minutes''%'    AS window_5min,
+--   pg_get_functiondef(p.oid) LIKE '%platform = ''android''%'    AS skips_apk_users
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'push_followup_due_reminders';
