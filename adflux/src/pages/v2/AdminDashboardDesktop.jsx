@@ -218,7 +218,7 @@ export default function AdminDashboardDesktop() {
       // gps_ping in the last 30 minutes. Single SELECT then we de-dupe
       // client-side (count distinct over time-windowed rows is cheap).
       supabase.from('gps_pings')
-        .select('user_id, created_at, lat, lng')
+        .select('user_id, created_at, lat, lng, users(name)')   // Phase 643 - name for non-sales staff (ops) who also ping
         .gte('created_at', liveCutoffIso)
         .order('created_at', { ascending: false })
         .limit(500),
@@ -320,7 +320,7 @@ export default function AdminDashboardDesktop() {
       if (!liveRepsById.has(ping.user_id)) liveRepsById.set(ping.user_id, ping)
     }
     const liveReps = Array.from(liveRepsById.entries()).map(([user_id, ping]) => ({
-      user_id, lastPing: ping.created_at, lat: ping.lat, lng: ping.lng,
+      user_id, lastPing: ping.created_at, lat: ping.lat, lng: ping.lng, name: ping.users?.name || null,
     }))
     // Phase 41.3 — Hot leads. Group activities by lead, keep only
     // stage=Working, sort by touch count desc, take top 3.
@@ -2254,7 +2254,7 @@ function RepsInFieldCard({ rows = [], salesUsers = [], onOpen }) {
       <div className="v2d-panel-h">
         <div>
           <div className="v2d-panel-t">Reps in field right now</div>
-          <div className="v2d-panel-s">GPS ping in last 30 min · live</div>
+          <div className="v2d-panel-s">GPS ping in last 60 min · live</div>
         </div>
         {count > 0 && (
           <button className="v2d-banner-cta" onClick={onOpen}>Open map</button>
@@ -2281,7 +2281,7 @@ function RepsInFieldCard({ rows = [], salesUsers = [], onOpen }) {
                 color: 'var(--v2-green, #10B981)',
                 borderRadius: 999, fontWeight: 600,
               }}>
-                {nameById.get(r.user_id) || '—'}
+                {nameById.get(r.user_id) || r.name || '—'}
               </span>
             ))}
             {rows.length > 12 && (
