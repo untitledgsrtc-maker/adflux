@@ -856,8 +856,8 @@ export default function RepProfileV2() {
       {user.role !== 'agency' && !WORK_ONLY_ROLES.includes(user.role) && (
         <>
           {/* Same score view the person sees on /my-performance */}
-          <PerformanceScoreCard userId={user.id} role={user.role} />
-          <DailyScoresCard userId={user.id} role={user.role} />
+          <PerformanceScoreCard userId={user.id} role={user.role} teamRole={user.team_role} />
+          <DailyScoresCard userId={user.id} role={user.role} teamRole={user.team_role} />
         </>
       )}
       {/* Work staff: Work score + check-in attendance + tasks, same as Team Work -> member page */}

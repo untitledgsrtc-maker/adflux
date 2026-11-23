@@ -69,6 +69,18 @@
 --                             Owner decision 2026-10-12. Re-score of past Sept+ leave days =
 --                             supabase_phase358_leave_score_and_oct2.sql.
 --
+--      • Sales head (23 Nov 2026, Phase 658) - a user with team_role 'sales_manager' who has
+--                             at least one active rep (users.manager_id = him) is scored on his TEAM,
+--                             not his own meetings: score_pct = the average score_pct of his active
+--                             reps' NON-excluded daily_performance rows that day. meetings_done = reps
+--                             counted, meetings_target = his active team size. His own Sunday / holiday
+--                             / leave exclusions still apply; a day with no rep score yet is excluded
+--                             ('No team score yet'). Applies from 1 NOV 2026 (owner chose to re-score
+--                             all of November - no November salary was paid to him). After a rep's row
+--                             is written, the head's row for that date is recomputed (cascade, via the
+--                             Phase 644 app.score_for GUC; wrapped so a cascade error can never block a
+--                             rep's save). Owner decision 2026-11-23.
+--
 -- OWNER DECISION (do NOT "fix" without his sign-off): the CALL branch counts a
 --    call on  outcome IS NOT NULL OR ≥10s  — looser than the ≥10s-only counter.
 --    Tightening it to ≥10s-only would lower some reps' scores/pay. Owner said
@@ -99,6 +111,9 @@ DECLARE
   v_activity   text;
   v_lv_type    text;
   v_lv_reason  text;
+  v_team_role  text;   -- Phase 658
+  v_head       uuid;   -- Phase 658
+  v_prev_for   text;   -- Phase 658
 BEGIN
   -- Phase 97.2 F-102 — caller may only compute their own score (admin/
   -- co_owner exempt). PRESERVED.
@@ -148,8 +163,8 @@ BEGIN
     END IF;
   END IF;
 
-  SELECT role, daily_targets
-    INTO v_role, v_targets
+  SELECT role, daily_targets, team_role
+    INTO v_role, v_targets, v_team_role
     FROM users
    WHERE id = p_user_id;
 
@@ -163,6 +178,42 @@ BEGIN
   -- the ops_uptime_to_daily_performance trigger. Sales/telecaller/agency/admin
   -- are unchanged (they fall through).
   IF v_role IN ('operation_executive', 'operation_head', 'hr', 'accounts', 'office_staff', 'staff') THEN
+    RETURN;
+  END IF;
+
+  -- Phase 658 (owner 2026-11-23): sales head = his team's average score. See header.
+  IF v_team_role = 'sales_manager' AND p_date >= DATE '2026-11-01'
+     AND EXISTS (SELECT 1 FROM users r WHERE r.manager_id = p_user_id AND COALESCE(r.is_active, true)) THEN
+    SELECT COUNT(*) INTO v_target
+      FROM users r WHERE r.manager_id = p_user_id AND COALESCE(r.is_active, true);
+    SELECT COUNT(*), AVG(d.score_pct)
+      INTO v_done, v_pct
+      FROM daily_performance d
+      JOIN users r ON r.id = d.user_id
+     WHERE r.manager_id = p_user_id
+       AND COALESCE(r.is_active, true)
+       AND d.work_date = p_date
+       AND d.is_excluded = false;
+    IF v_done = 0 AND NOT v_excluded THEN
+      v_excluded := true;
+      v_reason   := 'No team score yet';
+    END IF;
+    v_pct := LEAST(100, COALESCE(v_pct, 0));
+
+    INSERT INTO daily_performance (
+      user_id, work_date, meetings_done, meetings_target,
+      score_pct, is_excluded, excluded_reason, calculated_at
+    ) VALUES (
+      p_user_id, p_date, v_done, v_target,
+      v_pct, v_excluded, v_reason, now()
+    )
+    ON CONFLICT (user_id, work_date) DO UPDATE
+      SET meetings_done   = EXCLUDED.meetings_done,
+          meetings_target = EXCLUDED.meetings_target,
+          score_pct       = EXCLUDED.score_pct,
+          is_excluded     = EXCLUDED.is_excluded,
+          excluded_reason = EXCLUDED.excluded_reason,
+          calculated_at   = now();
     RETURN;
   END IF;
 
@@ -252,6 +303,26 @@ BEGIN
         is_excluded     = EXCLUDED.is_excluded,
         excluded_reason = EXCLUDED.excluded_reason,
         calculated_at   = now();
+
+  -- Phase 658: refresh this rep's sales head for the same day (his score = team average).
+  IF p_date >= DATE '2026-11-01' THEN
+    SELECT h.id INTO v_head
+      FROM users r JOIN users h ON h.id = r.manager_id
+     WHERE r.id = p_user_id
+       AND h.team_role = 'sales_manager'
+       AND COALESCE(h.is_active, true)
+       AND COALESCE(r.is_active, true);
+    IF v_head IS NOT NULL AND v_head <> p_user_id THEN
+      v_prev_for := current_setting('app.score_for', true);
+      BEGIN
+        PERFORM set_config('app.score_for', v_head::text, true);
+        PERFORM public.compute_daily_score(v_head, p_date);
+      EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'Phase 658 head score refresh failed for %: %', v_head, SQLERRM;
+      END;
+      PERFORM set_config('app.score_for', COALESCE(v_prev_for, ''), true);
+    END IF;
+  END IF;
 END $function$;
 
 GRANT EXECUTE ON FUNCTION public.compute_daily_score(uuid, date) TO authenticated;
@@ -259,7 +330,7 @@ GRANT EXECUTE ON FUNCTION public.compute_daily_score(uuid, date) TO authenticate
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All nine must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All ten must be TRUE.
 -- A FALSE means an older copy of compute_daily_score was re-run and stripped a
 -- locked fix → re-run this file to restore the canonical version.
 -- ============================================================================
@@ -274,6 +345,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%IN (''meeting'', ''site_visit'')%'      AS has_site_visit_scored,
 --   (pg_get_functiondef(p.oid) LIKE '%l.status = ''approved''%'
 --     AND pg_get_functiondef(p.oid) LIKE '%is_half_day, false) = false%'
---     AND pg_get_functiondef(p.oid) LIKE '%DATE ''2026-09-01''%')            AS has_358_leave_excl
+--     AND pg_get_functiondef(p.oid) LIKE '%DATE ''2026-09-01''%')            AS has_358_leave_excl,
+--   pg_get_functiondef(p.oid) LIKE '%No team score yet%'                   AS has_658_head_team_score
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'compute_daily_score';

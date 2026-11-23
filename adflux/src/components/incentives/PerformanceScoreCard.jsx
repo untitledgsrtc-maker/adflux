@@ -106,7 +106,7 @@ function monthStart() {
   return `${istCurrentMonthYM()}-01`
 }
 
-export default function PerformanceScoreCard({ userId: propUserId, hideHeader, role: propRole }) {
+export default function PerformanceScoreCard({ userId: propUserId, hideHeader, role: propRole, teamRole: propTeamRole }) {
   const { profile: me } = useAuth()
   // Admin person page passes the viewed person's role; own page passes nothing (unchanged).
   const profile = propUserId && propRole ? { ...me, role: propRole } : me
@@ -163,7 +163,9 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader, r
   const isTelecaller = profile?.role === 'telecaller'
   const activityNoun     = isTelecaller ? 'call'           : 'meeting'
   const activityNounPlur = isTelecaller ? 'calls'          : 'meetings'
-  const targetNoun       = isTelecaller ? 'call target'    : 'meeting target'
+  // Phase 658 - a sales head is scored on his team's average score, not his own meetings.
+  const isHead = (propUserId ? propTeamRole : me?.team_role) === 'sales_manager'
+  const targetNoun       = isHead ? 'team target' : isTelecaller ? 'call target'    : 'meeting target'
   // Phase 34Z.36 — 0-working-day guard. monthly_score RPC was
   // returning avg_score_pct=100 when no days had been counted yet
   // (PG AVG() of zero rows → NULL → COALESCE on the RPC side to 100
@@ -350,7 +352,9 @@ export default function PerformanceScoreCard({ userId: propUserId, hideHeader, r
               </span>
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.4 }}>
-              Score = ({activityNounPlur} done ÷ daily {activityNoun} target) × 100, averaged across {days} working day{days !== 1 ? 's' : ''} this month.
+              {isHead
+                ? <>Score = your team's average score each day, averaged across {days} working day{days !== 1 ? 's' : ''} this month.</>
+                : <>Score = ({activityNounPlur} done ÷ daily {activityNoun} target) × 100, averaged across {days} working day{days !== 1 ? 's' : ''} this month.</>}
             </div>
           </div>
         )

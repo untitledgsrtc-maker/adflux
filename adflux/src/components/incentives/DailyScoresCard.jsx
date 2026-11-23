@@ -23,11 +23,12 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function pad2(n) { return String(n).padStart(2, '0') }
 
-export default function DailyScoresCard({ userId: propUserId, role: propRole } = {}) {
+export default function DailyScoresCard({ userId: propUserId, role: propRole, teamRole: propTeamRole } = {}) {
   const me = useAuthStore((s) => s.profile)
   // Admin person page passes the viewed person; own page passes nothing (unchanged).
   const profile = propUserId ? { id: propUserId, role: propRole } : me
   const isTC = profile?.role === 'telecaller'
+  const isHead = (propUserId ? propTeamRole : me?.team_role) === 'sales_manager'   // Phase 658: row = team average
 
   // Current IST month = the max month the rep can view (no future).
   const nowYM = istCurrentMonthYM() // 'YYYY-MM'
@@ -182,7 +183,7 @@ export default function DailyScoresCard({ userId: propUserId, role: propRole } =
                     <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--text-subtle, #64748b)' }}>
                       {excluded
                         ? (r.excluded_reason || 'Off day')
-                        : <span className="tabular-nums">{r.meetings_done}/{r.meetings_target} {isTC ? 'calls' : 'meetings'}</span>}
+                        : <span className="tabular-nums">{isHead ? `Team average · ${r.meetings_done} of ${r.meetings_target} reps` : `${r.meetings_done}/${r.meetings_target} ${isTC ? 'calls' : 'meetings'}`}</span>}
                     </div>
                     <div className="tabular-nums" style={{ fontSize: 13, fontWeight: 700, color: scoreColor, width: 48, textAlign: 'right' }}>
                       {excluded ? '—' : `${Math.round(pct)}%`}
