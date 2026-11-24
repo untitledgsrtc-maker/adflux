@@ -843,7 +843,7 @@ export default function RepProfileV2() {
         display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
         color: 'var(--text-muted)', fontSize: 12.5,
       }}>
-        <Link to="/people" style={{ color: 'inherit', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <Link to={isHR ? '/team' : '/people'} style={{ color: 'inherit', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <ArrowLeft size={14} /> Back to People
         </Link>
         <span style={{ opacity: .4 }}>·</span>
@@ -1027,6 +1027,8 @@ export default function RepProfileV2() {
         </div>
       </SectionCard>
 
+      {/* Phase 669 - sales actuals read tables HR cannot see, so they showed 0 */}
+      {!isHR && (<>
       {/* ─── 3. KPI actuals ────────────────────────────────────────── */}
       <SectionCard title="Today / week / month" sub={`Calls counted = duration ≥ 10 sec · ${monthLabel}`}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1083,9 +1085,11 @@ export default function RepProfileV2() {
           </div>
         </div>
       </SectionCard>
+      </>)}
 
       </>)}
 
+      {!isHR && (<>
       {/* ─── 4. Salary ────────────────────────────────────────────── */}
       <SectionCard
         title={`Salary · ${monthLabel}`}
@@ -1140,7 +1144,10 @@ export default function RepProfileV2() {
           </div>
         )}
       </SectionCard>
+      </>)}
 
+      {/* Phase 669 - HR cannot see pay or sales figures (they showed as errors / zeros) */}
+      {!isHR && (<>
       {!WORK_ONLY_ROLES.includes(user.role) && (<>
       {/* ─── 5. Incentive ─────────────────────────────────────────── */}
       {/* HR D1 (§290): "Pay incentive" button removed — incentive is now EARNED
@@ -1173,13 +1180,14 @@ export default function RepProfileV2() {
       </SectionCard>
 
       </>)}
+      </>)}
 
       {/* ─── 6. TA / DA ───────────────────────────────────────────── */}
       <SectionCard
         title="TA / DA"
         sub={`Pending claims: ${taSummary.pending} · Approved this month: ${fmtINR(taSummary.approvedMonth)}`}
         action={
-          <Link to="/people?tab=ta" style={{
+          <Link to={isHR ? '/admin/ta-payouts' : '/people?tab=ta'} style={{
             background: 'transparent', border: '1px solid var(--v2-line, var(--border))',
             color: 'var(--v2-ink-1, var(--text))', borderRadius: 10,
             padding: '8px 12px', cursor: 'pointer', display: 'inline-flex',
@@ -1204,7 +1212,7 @@ export default function RepProfileV2() {
         title="Leaves"
         sub={`${leavesSummary.used} days used this year · ${leavesSummary.paid} paid · ${leavesSummary.unpaid} unpaid · ${leavesSummary.pending} pending`}
         action={
-          <Link to="/people?tab=leaves" style={{
+          <Link to={isHR ? '/admin/leaves' : '/people?tab=leaves'} style={{
             background: 'transparent', border: '1px solid var(--v2-line, var(--border))',
             color: 'var(--v2-ink-1, var(--text))', borderRadius: 10,
             padding: '8px 12px', cursor: 'pointer', display: 'inline-flex',

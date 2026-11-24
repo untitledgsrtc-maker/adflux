@@ -178,6 +178,15 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
 
     setSaving(true)
     setServerError('')
+    // Phase 669 - an offer sent from the Hiring page (no candidate picked) is linked to the
+    // Recruit card with the same email, so the card shows the offer and Convert marks it hired.
+    let candidateId = prefill?.candidate_id || null
+    if (!candidateId) {
+      const { data: c } = await supabase.from('hr_candidates').select('id')
+        .ilike('email', form.candidate_email.trim().replace(/[%_\\]/g, '\\$&')).is('converted_user_id', null)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      candidateId = c?.id || null
+    }
     const { data, error } = await createOffer({
       candidate_name:              form.candidate_name.trim(),
       candidate_email:             form.candidate_email.trim().toLowerCase(),
@@ -206,7 +215,7 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
       segment_access:              form.segment_access,
       allow_ta: !!form.allow_ta, allow_da: !!form.allow_da, allow_hotel: !!form.allow_hotel, allow_other: !!form.allow_other,
       min_calls: Number(form.min_calls) || 0, min_quotes: Number(form.min_quotes) || 0, min_followups: Number(form.min_followups) || 0,
-      candidate_id:                prefill?.candidate_id || null,
+      candidate_id:                candidateId,
     })
     setSaving(false)
 

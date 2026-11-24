@@ -624,7 +624,7 @@ export default function LeavesAdminV2({ embedded = false }) {
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
-                          {status === 'pending' && (isAdmin || row.user_id !== profile?.id) && (
+                          {status === 'pending' && (['admin', 'co_owner'].includes(profile?.role) || row.user_id !== profile?.id) && (
                             <>
                               <button
                                 onClick={() => handleApprove(row)}

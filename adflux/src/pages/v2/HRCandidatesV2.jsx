@@ -50,6 +50,7 @@ export default function HRCandidatesV2() {
   const [showAdd, setShowAdd] = useState(false)
   const [callFor, setCallFor] = useState(null)  // candidate being logged
   const [offerFor, setOfferFor] = useState(null)  // candidate being sent an offer
+  const [offerMap, setOfferMap] = useState({})     // Phase 669: candidate_id -> live offer status
 
   // call counts + latest outcome per candidate — server-side aggregate RPC
   // (§66/§274: never pull raw call rows to count client-side; the ~1000-row cap
@@ -71,6 +72,13 @@ export default function HRCandidatesV2() {
     if (error) { setErr(error.message); setLoading(false); return }
     const list = data || []
     setRows(list)
+    // Phase 669 - live offers per candidate, so the card shows the offer instead of a second
+    // "Send offer", and a candidate marked Hired before any offer can still be sent one.
+    const { data: offs } = await supabase.from('hr_offers').select('candidate_id, status')
+      .not('candidate_id', 'is', null).neq('status', 'cancelled')
+    const om = {}
+    for (const o of offs || []) om[o.candidate_id] = o.status
+    setOfferMap(om)
     // Phase 284 — auto-fetch device calls to these candidates (native-only,
     // best-effort), THEN load the counts so they reflect the fresh device rows.
     try { await syncCandidateCalls(list, profile?.id) } catch { /* best-effort */ }
@@ -175,7 +183,7 @@ export default function HRCandidatesV2() {
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {filtered.map(r => (
-            <CandidateCard key={r.id} r={r} calls={callMap[r.id]}
+            <CandidateCard key={r.id} r={r} calls={callMap[r.id]} offerStatus={offerMap[r.id]}
               onPatch={patch} onDelete={removeCandidate} onCall={() => setCallFor(r)}
               onSendOffer={() => setOfferFor(r)}
               onConvert={profile?.role === 'admin' ? () => nav('/hr/new-user', { state: { prefill: { name: r.name, email: r.email, phone: r.phone, candidate_id: r.id } } }) : null}
@@ -192,7 +200,7 @@ export default function HRCandidatesV2() {
           Done / X (onClose). candidate_phone → the WhatsApp button opens THIS candidate's chat. */}
       {offerFor && <SendOfferModal
         prefill={{ candidate_name: offerFor.name || '', candidate_email: offerFor.email || '', candidate_phone: offerFor.phone || '', candidate_id: offerFor.id || null }}
-        onClose={() => setOfferFor(null)}
+        onClose={() => { setOfferFor(null); load() }}
         onCreated={(o) => { toastSuccess(o?.status === 'approved' ? 'Offer created — copy the link or share it on WhatsApp.' : 'Offer sent to the owner for approval.') }} />}
 
       <style>{`.spin{animation:hrspin 1s linear infinite}@keyframes hrspin{to{transform:rotate(360deg)}}`}</style>
@@ -201,7 +209,7 @@ export default function HRCandidatesV2() {
 }
 
 // ─── candidate card ──────────────────────────────────────────────────────────
-function CandidateCard({ r, calls, onPatch, onDelete, onCall, onSendOffer, onConvert, onReload }) {
+function CandidateCard({ r, calls, offerStatus, onPatch, onDelete, onCall, onSendOffer, onConvert, onReload }) {
   const [busy, setBusy] = useState(false)
   const fileRef = useRef(null)
   const meta = STAGE_META[r.stage] || STAGES[0]
@@ -270,7 +278,12 @@ function CandidateCard({ r, calls, onPatch, onDelete, onCall, onSendOffer, onCon
         </button>
         <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,image/*" style={{ display: 'none' }}
           onChange={e => { uploadResume(e.target.files?.[0]); e.target.value = '' }} />
-        {!r.converted_user_id && !['rejected', 'hired'].includes(r.stage) && (
+        {!r.converted_user_id && offerStatus && (
+          <span style={{ ...chip, background: 'var(--accent-soft, rgba(255,230,0,.14))', color: 'var(--accent)' }}>
+            Offer {String(offerStatus).replace(/_/g, ' ')}
+          </span>
+        )}
+        {!r.converted_user_id && !offerStatus && r.stage !== 'rejected' && (
           <button onClick={onSendOffer} style={{ ...actBtn, borderColor: 'var(--accent, #FFE600)', color: 'var(--accent)' }}>
             <Send size={14} /> Send offer
           </button>

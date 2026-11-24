@@ -25,6 +25,7 @@ import { offerLoginArgs, offerTargets } from '../../utils/hrOffer'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { formatCurrency } from '../../utils/formatters'
 import { toastError, toastSuccess } from '../v2/Toast'
+import { confirmDialog } from '../v2/ConfirmDialog'
 import SendEmailModal from '../v2/SendEmailModal'
 import { useAuthStore } from '../../store/authStore'
 
@@ -368,18 +369,18 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
       const { data: activeT } = await supabase.from('daily_targets').select('id').eq('user_id', userId).is('effective_to', null).limit(1)
       if (!activeT?.length) {
         const { error: tErr } = await supabase.from('daily_targets').insert([{ user_id: userId, ...targets, effective_from: offer.joining_date || new Date().toISOString().split('T')[0] }])
-        if (tErr) console.warn('[offer-convert] targets failed:', tErr.message)
+        if (tErr) toastError(tErr, 'Login created, but daily targets were not saved - set them on the profile.')
       }
     }
     if (offer.candidate_id) {
-      const { error: cErr } = await supabase.from('hr_candidates').update({ converted_user_id: userId }).eq('id', offer.candidate_id)
-      if (cErr) console.warn('[offer-convert] candidate link failed:', cErr.message)
+      const { error: cErr } = await supabase.from('hr_candidates').update({ converted_user_id: userId, stage: 'hired' }).eq('id', offer.candidate_id)
+      if (cErr) toastError(cErr, 'Login created, but the Recruit card was not updated.')
     }
 
     // Auto-start the hire's onboarding from their role template (best-effort;
     // no template for the role -> returns null, no error).
     const { error: obErr } = await supabase.rpc('create_onboarding_run', { p_user_id: userId })
-    if (obErr) console.warn('[offer-convert] onboarding run failed:', obErr.message)
+    if (obErr) toastError(obErr, 'Login created, but onboarding did not start - start it from Onboarding.')
 
     // Link the offer back to the user.
     const { error: linkErr } = await updateOffer(offer.id, {
@@ -482,8 +483,15 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
   }
 
   async function handleCancel() {
-    if (!window.confirm('Cancel this offer? The invite link will stop working immediately.')) return
-    await cancelOffer(offer.id)
+    if (!(await confirmDialog({
+      title: 'Cancel this offer?',
+      message: 'The invite link will stop working immediately.',
+      confirmLabel: 'Cancel offer',
+      cancelLabel: 'Keep it',
+      danger: true,
+    }))) return
+    const res = await cancelOffer(offer.id)
+    if (res?.error) { toastError(res.error, 'Could not cancel the offer.'); return }
     onChanged?.()
     onClose()
   }

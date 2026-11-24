@@ -38,7 +38,7 @@ export default function HRHomeV2() {
         supabase.from('leaves').select('id, user_id, leave_date, leave_type, is_half_day, created_at').eq('status', 'pending').order('created_at').limit(50),
         supabase.from('ta_da_requests').select('id, user_id, claim_date, kind, claim_amount, city, created_at').eq('status', 'pending').order('created_at').limit(50),
         supabase.from('hr_candidates').select('id, name, role_applied, created_at').eq('stage', 'applied').order('created_at').limit(50),
-        supabase.from('hr_offers').select('id, candidate_name, position, status, created_at, updated_at').in('status', ['pending_approval', 'approved', 'draft', 'sent', 'filled', 'accepted']).order('updated_at').limit(50),
+        supabase.from('hr_offers').select('id, candidate_id, candidate_name, position, status, created_at, updated_at').in('status', ['pending_approval', 'approved', 'draft', 'sent', 'filled', 'accepted']).order('updated_at').limit(50),
       ])
       const bad = [lv, ta, cand, of].find(r => r.error)
       if (!alive) return
@@ -56,9 +56,11 @@ export default function HRHomeV2() {
     if (!data) return []
     const n = (id) => data.names[id] || 'Someone'
     const rows = [
-      ...data.lv.map(r => ({ key: 'l' + r.id, Icon: CalendarCheck, kind: 'Leave', who: n(r.user_id), what: `${dd(r.leave_date)}${r.is_half_day ? ' (half day)' : ''}${r.leave_type ? ' · ' + r.leave_type : ''}`, at: r.created_at, action: 'Approve / reject', go: '/admin/leaves' })),
+      // Phase 669 - HR's own leave goes to the owner, not onto her own to-do list.
+      ...data.lv.filter(r => ['admin', 'co_owner'].includes(profile?.role) || r.user_id !== profile?.id).map(r => ({ key: 'l' + r.id, Icon: CalendarCheck, kind: 'Leave', who: n(r.user_id), what: `${dd(r.leave_date)}${r.is_half_day ? ' (half day)' : ''}${r.leave_type ? ' · ' + r.leave_type : ''}`, at: r.created_at, action: 'Approve / reject', go: '/admin/leaves' })),
       ...data.ta.map(r => ({ key: 't' + r.id, Icon: Wallet, kind: 'TA / DA claim', who: n(r.user_id), what: `${money(r.claim_amount)} · ${r.kind || 'claim'}${r.city ? ' · ' + r.city : ''} · ${dd(r.claim_date)}`, at: r.created_at, action: 'Check claim', go: '/admin/ta-payouts' })),
-      ...data.cand.map(r => ({ key: 'c' + r.id, Icon: ClipboardList, kind: 'New candidate', who: r.name, what: r.role_applied || 'applied', at: r.created_at, action: 'Call / shortlist', go: '/hr/candidates' })),
+      // Phase 669 - a candidate who already has an open offer is not a 'new candidate' job.
+      ...data.cand.filter(r => !data.of.some(o => o.candidate_id === r.id)).map(r => ({ key: 'c' + r.id, Icon: ClipboardList, kind: 'New candidate', who: r.name, what: r.role_applied || 'applied', at: r.created_at, action: 'Call / shortlist', go: '/hr/candidates' })),
       ...data.of.flatMap(r => {
         const base = { Icon: FileText, who: r.candidate_name, what: r.position || '', at: r.updated_at || r.created_at }
         if (r.status === 'pending_approval') return isOwner ? [{ ...base, key: 'o' + r.id, kind: 'Offer to approve', action: 'Approve salary', go: `/hr/offers?offer=${r.id}` }] : []
@@ -69,7 +71,7 @@ export default function HRHomeV2() {
       }),
     ]
     return rows.sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
-  }, [data, isOwner])
+  }, [data, isOwner, profile?.id, profile?.role])
 
   const hiring = useMemo(() => {
     const st = (...s) => (data?.of || []).filter(o => s.includes(o.status)).length
