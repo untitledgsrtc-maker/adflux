@@ -614,6 +614,16 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
   const dayScore = scored.length ? Math.round(onTimeToday / scored.length * 100) : null
   const proc = items.filter((i) => i.status === 'in_process').length
   const late = items.filter((i) => i.status !== 'finished' && i.status !== 'postponed' && dueState(i.due, i.status).cls === 'bad').length
+  // Phase 688 (owner 24-11-2026): time at work (first clock-in to last clock-out, or now if a timer runs) vs time on task timers.
+  // Only when the person used Work timers today; display / report only, never touches pay.
+  const span = (() => {
+    const ap = (entries || []).filter((e) => e.status === 'approved')
+    if (!ap.length) return null
+    const first = ap.find((e) => !(e.source === 'added_later' && istHourOf(e.started_at) < 7)) || ap[0]
+    const end = ap.some((e) => !e.ended_at) ? Date.now() : Math.max(...ap.filter((e) => e.ended_at).map((e) => new Date(e.ended_at).getTime()))
+    const atWork = Math.max(0, (end - new Date(first.started_at).getTime()) / 1000)
+    return { atWork, gap: Math.max(0, atWork - secs) }
+  })()
   // The WhatsApp window MUST open straight from the tap: iPhone blocks a link opened after an
   // await (that is why the share did nothing and only "Last shared" updated). So the text is built
   // from the entries already on the page, opened first, and the "shared" mark is saved afterwards.
@@ -651,6 +661,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         `• Clock in:  ${inRow ? fmtTimeIST(inRow.started_at) : (att?.check_in_at ? fmtTimeIST(att.check_in_at) : '-')}`,
         `• Clock out: ${running ? `${fmtTimeIST(new Date().toISOString())} (timer still running)` : (last ? fmtTimeIST(last.ended_at) : (att?.check_out_at ? fmtTimeIST(att.check_out_at) : '-'))}`,
         `• Hours:     ${fmtDur(total)}`,
+        ...(span ? [`• At work (clock in to clock out): ${fmtDur(span.atWork)}`, `• On tasks: ${fmtDur(total)} · Not on a task: ${fmtDur(Math.max(0, span.atWork - total))}`] : []),
         '',
         '📊 *BY CLIENT*',
         ...(proj.length ? proj.map(([pid, sec]) => `• ${projName(pid) || 'Other'}: ${fmtDur(sec)}`) : ['• -']),
@@ -679,6 +690,8 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
             const l = ap.filter((e) => e.ended_at).slice(-1)[0]
             return l ? fmtTimeIST(l.ended_at) : '-'
           })()}</span></div>
+          {span && <div className="wk-row"><span className="wk-mu">At work (in to out)</span><span className="wk-num">{fmtDur(span.atWork)}</span></div>}
+          {span && <div className="wk-row"><span className="wk-mu">Not on a task</span><span className="wk-num" style={{ color: span.gap >= 3600 ? 'var(--warning)' : undefined }}>{fmtDur(span.gap)}</span></div>}
           <div className="wk-row"><span className="wk-mu">Finished</span><span className="wk-num">{finished}</span></div>
           <div className="wk-row"><span className="wk-mu">In process</span><span className="wk-num">{proc}</span></div>
           <div className="wk-row"><span className="wk-mu">Late</span><span className="wk-num" style={{ color: late ? 'var(--danger)' : undefined }}>{late}</span></div>

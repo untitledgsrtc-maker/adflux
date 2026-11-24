@@ -5,13 +5,15 @@
 // Per person: today's score, today's actions done, 14-day done-rate, and the
 // 3 actions they got for the next working day. Worst done-rate first.
 
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Lightbulb, Loader2, MessageCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { istTodayISO } from '../../utils/istDate'
 import { coachText, coachLink } from '../../utils/coachText'
 import { openWhatsApp } from '../../utils/whatsapp'
+import { addDaysISO, fmtDateShort } from '../../utils/workUtils'
+import DateField from '../../components/work/DateField'
 
 // Phase 687 - readable role tag (was the raw code, e.g. OPERATION_EXECUTIVE)
 const ROLE_LABEL = { operation_executive: 'Ops executive', operation_head: 'Ops head', office_admin: 'Office admin', staff: 'Work team', hr: 'HR' }
@@ -32,10 +34,17 @@ export default function CoachTeamV2() {
   const [tips, setTips] = useState({})   // Phase 577: user_id -> latest AI tip
   const [phones, setPhones] = useState({})   // Phase 616: user_id -> whatsapp_number
   const [group, setGroup] = useState('all')   // Phase 575/576: all | sales | office | ops
+  // Phase 688: pick the day, one person, and see the movement over the last N days
+  const today = istTodayISO()
+  const [day, setDay] = useState(today)
+  const [person, setPerson] = useState('')
+  const [span, setSpan] = useState(14)
+  const [hist, setHist] = useState([])
+  const [histErr, setHistErr] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
-    const { data, error: err } = await supabase.rpc('coach_team_view', { p_date: istTodayISO() })
+    const { data, error: err } = await supabase.rpc('coach_team_view', { p_date: day })
     if (err) setError(err.message || 'Could not load the team')
     else {
       setRows(data || [])
@@ -52,9 +61,31 @@ export default function CoachTeamV2() {
       }
     }
     setLoading(false)
-  }, [])
+  }, [day])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    let alive = true
+    setHistErr('')
+    supabase.rpc('coach_history', { p_from: addDaysISO(day, -(span - 1)), p_to: day }).then(({ data, error: e }) => {
+      if (!alive) return
+      if (e) { setHistErr(e.message || 'Could not load the chart'); setHist([]) } else setHist(data || [])
+    })
+    return () => { alive = false }
+  }, [day, span])
+  const series = useMemo(() => {
+    const days = Array.from({ length: span }, (_, i) => addDaysISO(day, i - (span - 1)))
+    const pick = hist.filter((h) => !person || h.user_id === person)
+    const avg = (arr) => { const v = arr.filter((x) => x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null }
+    return days.map((d) => {
+      const rowsD = pick.filter((h) => h.day === d)
+      return {
+        day: d,
+        score: avg(rowsD.map((h) => h.score)),
+        done: avg(rowsD.map((h) => (h.checked > 0 ? Math.round(100 * h.done / h.checked) : null))),
+      }
+    })
+  }, [hist, person, day, span])
 
   // Phase 616 - send this person their AI tip + next-day actions on WhatsApp (in the page language)
   const shareOnWhatsApp = (r) => {
@@ -96,6 +127,34 @@ export default function CoachTeamV2() {
         </div>
       </div>
 
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <DateField value={day} max={today} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label="Pick the day"
+          style={{ width: 170, minHeight: 36 }} className="v2d-ghost" />
+        {day !== today && <button type="button" style={pill(false)} onClick={() => setDay(today)}>Today</button>}
+        <select value={person} onChange={(e) => setPerson(e.target.value)} aria-label="Pick a person"
+          style={{ minHeight: 36, padding: '0 12px', borderRadius: 999, border: '1px solid var(--v2-line, #334155)', background: 'var(--v2-bg-1, #1e293b)', color: 'var(--v2-ink-1, #cbd5e1)', fontSize: 13, maxWidth: '100%' }}>
+          <option value="">Everyone</option>
+          {[...rows].sort((a, b) => String(a.name).localeCompare(String(b.name))).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </select>
+      </div>
+
+      {/* Phase 688: movement chart - day score % and actions done % */}
+      <div style={{ padding: 14, borderRadius: 14, background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v2-line, #334155)', marginBottom: 14 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v2-ink-0, #f1f5f9)' }}>
+            {person ? (rows.find((r) => r.id === person)?.name || 'Person') : 'Team average'} · last {span} days to {fmtDateShort(day)}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[7, 14, 30].map((n) => <button key={n} type="button" style={pill(span === n)} onClick={() => setSpan(n)}>{n} days</button>)}
+          </div>
+        </div>
+        {histErr ? (
+          <div style={{ color: 'var(--v2-rose, #EF4444)', fontSize: 13 }}>{histErr}</div>
+        ) : (
+          <MoveChart data={series} />
+        )}
+      </div>
+
       {loading && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40, color: 'var(--v2-ink-2, #94a3b8)' }}>
           <Loader2 size={20} style={{ animation: 'spin 1s linear infinite', marginRight: 8 }} /> Loading team…
@@ -126,7 +185,7 @@ export default function CoachTeamV2() {
 
       {!loading && !error && rows.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(360px, 100%), 1fr))', gap: 12 }}>
-          {rows.filter(r => group === 'all' || (group === 'office' ? r.score_kind === 'ontime' : group === 'ops' ? r.score_kind === 'uptime' : r.score_kind === 'day')).map(r => (
+          {rows.filter(r => !person || r.id === person).filter(r => group === 'all' || (group === 'office' ? r.score_kind === 'ontime' : group === 'ops' ? r.score_kind === 'uptime' : r.score_kind === 'day')).map(r => (
             <div key={r.id} style={{ minWidth: 0, padding: 14, borderRadius: 14, background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v2-line, #334155)' }}>
               {/* Phase 687 - header wraps on a phone (a long role tag pushed the card past the screen edge) */}
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
@@ -146,8 +205,8 @@ export default function CoachTeamV2() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 }}>
                 {[
-                  [r.score_kind === 'ontime' ? 'On time (month)' : r.score_kind === 'uptime' ? 'Uptime today' : 'Score today', r.score_today == null ? '–' : `${r.score_today}%`, tone(r.score_today, r.score_kind === 'ontime' ? 85 : 70, r.score_kind === 'ontime' ? 60 : 40)],
-                  ['Done today', r.actions_today ? `${r.done_today}/${r.actions_today}` : '–', 'var(--v2-ink-0, #f1f5f9)'],
+                  [r.score_kind === 'ontime' ? 'On time (month)' : r.score_kind === 'uptime' ? (day === today ? 'Uptime today' : 'Uptime') : (day === today ? 'Score today' : 'Day score'), r.score_today == null ? '–' : `${r.score_today}%`, tone(r.score_today, r.score_kind === 'ontime' ? 85 : 70, r.score_kind === 'ontime' ? 60 : 40)],
+                  [day === today ? 'Done today' : 'Done that day', r.actions_today ? `${r.done_today}/${r.actions_today}` : '–', 'var(--v2-ink-0, #f1f5f9)'],
                   ['14-day done', r.done_rate_14d == null ? '–' : `${r.done_rate_14d}%`, tone(r.done_rate_14d, 70, 40)],
                 ].map(([label, val, color]) => (
                   <div key={label} style={{ padding: 8, borderRadius: 10, background: 'var(--v2-bg-2, #0f172a)', border: '1px solid var(--v2-line, #334155)' }}>
@@ -184,6 +243,58 @@ export default function CoachTeamV2() {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+// Phase 688: two-line chart, 0-100 %, gaps where a day has no number (Sunday, holiday, no tasks due)
+function MoveChart({ data }) {
+  const W = 640, H = 170, L = 34, R = 10, T = 10, B = 24
+  const x = (i) => L + (data.length <= 1 ? 0 : (i * (W - L - R)) / (data.length - 1))
+  const y = (v) => T + (H - T - B) * (1 - v / 100)
+  const segs = (key) => {
+    const out = []; let cur = []
+    data.forEach((d, i) => { if (d[key] == null) { if (cur.length) out.push(cur); cur = [] } else cur.push([x(i), y(d[key])]) })
+    if (cur.length) out.push(cur)
+    return out
+  }
+  const lines = [['score', 'Day score %', 'var(--v2-blue, #3B82F6)'], ['done', 'Actions done %', 'var(--v2-green, #10B981)']]
+  const has = data.some((d) => d.score != null || d.done != null)
+  const ticks = data.length > 1 ? [0, Math.floor((data.length - 1) / 2), data.length - 1] : [0]
+  const last = (key) => [...data].reverse().find((d) => d[key] != null)?.[key]
+  return (
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)', marginBottom: 6 }}>
+        {lines.map(([k, label, col]) => (
+          <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 14, height: 3, borderRadius: 999, background: col }} aria-hidden="true" />
+            {label}{last(k) != null ? ` · latest ${last(k)}%` : ''}
+          </span>
+        ))}
+      </div>
+      {!has ? (
+        <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--v2-ink-2, #94a3b8)' }}>No scores or actions in these days yet.</div>
+      ) : (
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Day score and actions done over ${data.length} days`}>
+          {[0, 50, 100].map((v) => (
+            <g key={v}>
+              <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke="var(--v2-line, #334155)" strokeWidth="1" />
+              <text x={L - 6} y={y(v) + 4} fontSize="11" textAnchor="end" fill="var(--v2-ink-2, #94a3b8)">{v}%</text>
+            </g>
+          ))}
+          {ticks.map((i) => (
+            <text key={i} x={x(i)} y={H - 6} fontSize="11" textAnchor={i === 0 ? 'start' : i === data.length - 1 ? 'end' : 'middle'} fill="var(--v2-ink-2, #94a3b8)">{fmtDateShort(data[i].day).slice(0, 5)}</text>
+          ))}
+          {lines.map(([k, , col]) => (
+            <g key={k}>
+              {segs(k).filter((pts) => pts.length > 1).map((pts, j) => (
+                <polyline key={j} points={pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')} fill="none" stroke={col} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+              ))}
+              {data.map((d, i) => d[k] == null ? null : <circle key={i} cx={x(i)} cy={y(d[k])} r="3" fill={col}><title>{`${fmtDateShort(d.day)}: ${d[k]}%`}</title></circle>)}
+            </g>
+          ))}
+        </svg>
       )}
     </div>
   )
