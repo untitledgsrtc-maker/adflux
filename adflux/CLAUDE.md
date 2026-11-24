@@ -22237,3 +22237,7 @@ Owner 24-11-2026 (HR may approve TA + deactivate). `supabase_phase667_hr_fixes.s
 ## 670 · Blank screen after a deploy: fetch new version before reload (2026-11-24)
 
 Seen live: a page opened while a deploy was publishing kept the OLD start page in the service-worker cache; its lazy page files were gone from the server (served as HTML) and the one-time reload (Phase 430) reloaded the same old copy, leaving a blank screen. `reloadToNewVersion()` (ErrorBoundary.jsx) now calls registration.update(), waits for the new worker to take over (sw.js skipWaiting + claim, max 5 s), then reloads. Used by reloadOnceForStaleChunk (vite:preloadError + error boundary) and App.jsx lazyWithRetry. Never unregisters the worker (that would drop web-push subscriptions).
+
+## 671 · HR/Accounts off the sales dashboard + deploy-timing rule (2026-11-24)
+
+DashboardV2 sends role hr to /hr and accounts to /people (login can reach /dashboard before the profile loads). Verified live as HR. Phase 670 wait raised 5 s -> 30 s: the new service worker must download ~350 files before it takes over. ROOT CAUSE of blank screens (reproduced live): each Vercel deploy removes the previous build files at once (old /assets/*.js return index.html), so a phone mid-download of one version when the next deploy lands is left with missing files. RULE: do not push twice within ~5 minutes; batch changes into one push. Longer-term option: Vercel Skew Protection keeps the old build reachable.
