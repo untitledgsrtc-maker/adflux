@@ -22253,3 +22253,7 @@ Owner 24-11-2026. `trg_work_parts_hr_only_self` + `trg_work_templates_hr_only_se
 ## 674 · HR screens UI/UX fixes (2026-11-24)
 
 From a ui-ux-pro-max review of all 12 HR screens at 375 px. MOBILE_NAV_HR (5 items: HR Home, Recruit, Leaves, TA Claims, Team Work) replaces the 11-item phone bar for hr; the full HR_NAV stays in the side menu. RepProfileV2: HR no longer sees the Performance & pay / score cards (showed 0 + a raw permission error) or Edit profile; back link reads "Back to Team". TeamDashboardV2 (Sales attendance): rep KPI tiles hidden for HR (she cannot read sales data, showed 0), push pill not clickable for HR, bigger View track tap area. TaPayoutsAdminV2: day table becomes labelled cards under 720 px (.ta-days + data-label), bigger hotel box; city ceilings editor only admin/co_owner (`canTuneTa`, matches ceilings_admin RLS) and Recompute only admin/co_owner/accounts (`canRecomputeTa`, matches _assert_self_or_admin). Leaves add form hides own name + co_owner for non-admin roles. aria-labels on Recruit delete + Team card icon buttons. Guardian: no frozen contract touched.
+
+## 675 · Sales attendance Online/Push labels for HR (2026-11-24)
+
+HR (and office_admin) cannot read push_subscriptions (device push keys), so every rep read "Online off / Push off" on Sales attendance. team_push_last_seen() (user_id + last-seen time only) now answers co_owner/hr/office_admin; TeamDashboardV2 uses it for hr/office_admin. Table RLS unchanged (HR still sees only her own row). HR phone-bar label Team Work -> Work (was cut off).

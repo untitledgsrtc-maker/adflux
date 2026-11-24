@@ -291,7 +291,7 @@ const MOBILE_NAV_HR = [
   { to: '/hr/candidates',     label: 'Recruit',        icon: Contact2 },
   { to: '/admin/leaves',      label: 'Leaves',         icon: CheckSquare },
   { to: '/admin/ta-payouts',  label: 'TA Claims',      icon: Wallet },
-  { to: '/team-work',         label: 'Team Work',      icon: ClipboardList },
+  { to: '/team-work',         label: 'Work',           icon: ClipboardList },   // 'Team Work' was cut off on a phone
 ]
 
 // Phase 391 - phone bottom nav for the office admin (5 items; the sidebar list above has 8).

@@ -813,7 +813,8 @@ export default function TeamDashboardV2() {
         // Phase 586 — a sales manager (not admin/HR) cannot read push_subscriptions (it holds device
         // push keys); he gets only last-seen times for himself + his assigned reps from a safe lookup.
         const isTeamHeadOnly = profile?.team_role === 'sales_manager' && !['admin', 'co_owner', 'hr', 'office_admin'].includes(profile?.role)
-        const { data: pushRows } = isTeamHeadOnly
+        // Phase 675: HR / Office Admin cannot read push_subscriptions either - same safe lookup (times only)
+        const { data: pushRows } = (isTeamHeadOnly || ['hr', 'office_admin'].includes(profile?.role))
           ? await supabase.rpc('team_push_last_seen')
           : await supabase
             .from('push_subscriptions')
