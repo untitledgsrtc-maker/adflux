@@ -29,8 +29,21 @@ export function offerLoginArgs(offer) {
   }
 }
 
+// Phase 665/676 - which daily targets a role is scored on (mirrors compute_daily_score):
+// telecaller = calls/day, sales = meetings/day, any head = team average, everyone else = not scored.
+// Takes a designation row ({ auth_role, team_role }). One rule for Add Member + Send offer.
+export function designationTargetKind(d) {
+  if (!d) return 'none'
+  if (d.team_role === 'sales_manager') return 'team'
+  if (d.auth_role === 'telecaller') return 'telecaller'
+  if (d.auth_role === 'sales') return 'sales'
+  return 'none'
+}
+
 // Daily targets to save with the login, or null when the offer sets none.
 export function offerTargets(offer) {
   const t = { min_calls: Number(offer.min_calls) || 0, min_quotes: Number(offer.min_quotes) || 0, min_followups: Number(offer.min_followups) || 0 }
-  return (t.min_calls || t.min_quotes || t.min_followups) ? t : null
+  const meetings = Number(offer.min_meetings) || 0   // Phase 676 - sales meeting target
+  if (meetings > 0) t.min_meetings = meetings
+  return (t.min_calls || t.min_quotes || t.min_followups || meetings) ? t : null
 }

@@ -24,6 +24,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { UserPlus, Save, AlertTriangle, CheckCircle2, ArrowLeft, Send } from 'lucide-react'
+import { designationTargetKind } from '../../utils/hrOffer'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess, pushToast } from '../../components/v2/Toast'
@@ -40,16 +41,6 @@ const SEGMENTS = [
   { v: 'GOVERNMENT', label: 'Government' },
   { v: 'ALL',        label: 'Both (Private + Government)' },
 ]
-
-// Phase 665 - which daily targets a designation is scored on (mirrors compute_daily_score):
-// telecaller = calls/day, sales = meetings/day, any head = team average, rest = not scored.
-function designationTargetKind(d) {
-  if (!d) return 'none'
-  if (d.team_role === 'sales_manager') return 'team'
-  if (d.auth_role === 'telecaller') return 'telecaller'
-  if (d.auth_role === 'sales') return 'sales'
-  return 'none'
-}
 
 export default function HRNewUserV2() {
   const navigate = useNavigate()

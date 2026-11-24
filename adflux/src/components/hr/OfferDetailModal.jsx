@@ -533,7 +533,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
                   <input value={apprNote} onChange={e => setApprNote(e.target.value)} placeholder="e.g. make it 22,000, joining 1 Dec" /></div>
               </div>
               <div style={{ fontSize: '.8rem', color: 'var(--gray)', margin: '4px 0 10px' }}>
-                Manager: {offer.manager_id ? 'set' : 'none'} · Segment: {offer.segment_access || 'PRIVATE'} · TA {offer.allow_ta ? 'on' : 'off'} · DA {offer.allow_da ? 'on' : 'off'} · Hotel {offer.allow_hotel ? 'on' : 'off'} · Targets {Number(offer.min_calls) || 0} calls / {Number(offer.min_quotes) || 0} quotes / {Number(offer.min_followups) || 0} follow-ups
+                Manager: {offer.manager_id ? 'set' : 'none'} · Segment: {offer.segment_access || 'PRIVATE'} · TA {offer.allow_ta ? 'on' : 'off'} · DA {offer.allow_da ? 'on' : 'off'} · Hotel {offer.allow_hotel ? 'on' : 'off'} · Targets {Number(offer.min_meetings) > 0 ? `${offer.min_meetings} meetings` : `${Number(offer.min_calls) || 0} calls`} / {Number(offer.min_quotes) || 0} quotes a week / {Number(offer.min_followups) || 0} follow-ups
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button className="btn btn-y" onClick={approve} disabled={apprBusy}><Check size={14} style={{ marginRight: 6 }} />{apprBusy ? 'Saving...' : 'Approve'}</button>

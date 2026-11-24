@@ -14,7 +14,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { X, Copy, Check, MessageSquare } from 'lucide-react'
 import { useOffers, buildOfferUrl } from '../../hooks/useOffers'
-import { offerWhatsAppText } from '../../utils/hrOffer'
+import { offerWhatsAppText, designationTargetKind } from '../../utils/hrOffer'
 import { supabase } from '../../lib/supabase'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { phoneLast10 } from '../../utils/phone'
@@ -69,7 +69,7 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
     manager_id:                  '',
     segment_access:              'PRIVATE',
     allow_ta: false, allow_da: false, allow_hotel: false, allow_other: true,
-    min_calls: '', min_quotes: '', min_followups: '',
+    min_calls: '', min_quotes: '', min_followups: '', min_meetings: '',
   })
   const [errors, setErrors]       = useState({})
   const [saving, setSaving]       = useState(false)
@@ -106,6 +106,7 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
   // Until a role is picked, keep the sales-shaped layout (incentive
   // shown) so the modal never looks half-empty on first open.
   const hasIncentive = picked ? !!picked.has_incentive : true
+  const targetKind = designationTargetKind(picked)   // Phase 676
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -125,7 +126,17 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
       ...(d ? {
         allow_ta: !!d.default_allow_ta, allow_da: !!d.default_allow_da,
         allow_hotel: !!d.default_allow_hotel, allow_other: d.default_allow_other !== false,
-        min_calls: d.default_min_calls || '', min_quotes: d.default_min_quotes || '', min_followups: d.default_min_followups || '',
+        // Phase 676 - targets follow the role: telecaller calls, sales meetings, heads / other roles none
+        ...(() => {
+          const k = designationTargetKind(d)
+          const scored = k === 'telecaller' || k === 'sales'
+          return {
+            min_calls: k === 'telecaller' ? (d.default_min_calls || 50) : '',
+            min_meetings: k === 'sales' ? 5 : '',
+            min_quotes: scored ? (d.default_min_quotes || '') : '',
+            min_followups: scored ? (d.default_min_followups || '') : '',
+          }
+        })(),
       } : {}),
     }))
     setErrors(e => ({ ...e, designation_id: '', position: '' }))
@@ -215,6 +226,7 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
       segment_access:              form.segment_access,
       allow_ta: !!form.allow_ta, allow_da: !!form.allow_da, allow_hotel: !!form.allow_hotel, allow_other: !!form.allow_other,
       min_calls: Number(form.min_calls) || 0, min_quotes: Number(form.min_quotes) || 0, min_followups: Number(form.min_followups) || 0,
+      min_meetings: Number(form.min_meetings) || 0,
       candidate_id:                candidateId,
     })
     setSaving(false)
@@ -548,11 +560,19 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
               </label>
             ))}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-            <Field label="Calls / day"><input type="number" min="0" value={form.min_calls} onChange={e => set('min_calls', e.target.value)} /></Field>
-            <Field label="Quotes / day"><input type="number" min="0" value={form.min_quotes} onChange={e => set('min_quotes', e.target.value)} /></Field>
-            <Field label="Follow-ups / day"><input type="number" min="0" value={form.min_followups} onChange={e => set('min_followups', e.target.value)} /></Field>
-          </div>
+          {(targetKind === 'telecaller' || targetKind === 'sales') ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              {targetKind === 'telecaller'
+                ? <Field label="Calls / day (scored)"><input type="number" min="0" value={form.min_calls} onChange={e => set('min_calls', e.target.value)} /></Field>
+                : <Field label="Meetings / day (scored)"><input type="number" min="0" value={form.min_meetings} onChange={e => set('min_meetings', e.target.value)} /></Field>}
+              <Field label="Quotes / week"><input type="number" min="0" value={form.min_quotes} onChange={e => set('min_quotes', e.target.value)} /></Field>
+              <Field label="Follow-ups / day"><input type="number" min="0" value={form.min_followups} onChange={e => set('min_followups', e.target.value)} /></Field>
+            </div>
+          ) : picked && (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              {targetKind === 'team' ? 'Team heads are scored on their team\'s average - no personal daily target.' : 'This role is not scored - no daily targets needed.'}
+            </div>
+          )}
 
           <Field label="Place (for acceptance)">
             <input

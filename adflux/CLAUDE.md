@@ -22257,3 +22257,7 @@ From a ui-ux-pro-max review of all 12 HR screens at 375 px. MOBILE_NAV_HR (5 ite
 ## 675 · Sales attendance Online/Push labels for HR (2026-11-24)
 
 HR (and office_admin) cannot read push_subscriptions (device push keys), so every rep read "Online off / Push off" on Sales attendance. team_push_last_seen() (user_id + last-seen time only) now answers co_owner/hr/office_admin; TeamDashboardV2 uses it for hr/office_admin. Table RLS unchanged (HR still sees only her own row). HR phone-bar label Team Work -> Work (was cut off).
+
+## 676 · Send offer targets follow the role (2026-11-24)
+
+Phase 665 missed SendOfferModal (still asked sales for Calls / day; "Quotes / day" was really per week). designationTargetKind moved to src/utils/hrOffer.js (shared by HRNewUserV2 + SendOfferModal). Offer form: telecaller = calls/day, sales = meetings/day (default 5), quotes / week, follow-ups; heads + other roles show a note, no targets. hr_offers.min_meetings added (supabase_phase676); offerTargets copies it to daily_targets on Convert. Offer detail line shows meetings for sales.
