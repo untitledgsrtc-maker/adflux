@@ -261,9 +261,9 @@ export default function TeamWorkV2() {
                 ) : (
                   <div className="wk-list">
                     {needs.map((r) => (
-                      <div key={r.key} className="wk-row wk-hov" style={{ padding: '16px 20px', gap: 16 }} onClick={r.go}>
+                      <div key={r.key} className="wk-row wk-hov wk-need" style={{ padding: '16px 20px', gap: 16 }} onClick={r.go}>
                         <span className="wk-tile" style={{ background: r.tone === 'bad' ? 'rgba(239,68,68,.14)' : 'rgba(245,158,11,.14)', color: r.tone === 'bad' ? 'var(--danger)' : 'var(--warning)' }}><r.icon size={16} aria-hidden="true" /></span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="wk-need-txt" style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 500 }}>{r.text}</div>
                           <div className="wk-sm" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.sub}</div>
                         </div>

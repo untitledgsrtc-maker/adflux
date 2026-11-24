@@ -70,3 +70,10 @@
   .wk-hseg:nth-child(2n+1) { padding-left: 0; }
   .wk-hseg .wk-num { font-size: 26px !important; white-space: nowrap; }
 }
+/* Phase 678 - "Needs you" rows on a phone: text gets its own line, pill + button underneath */
+@media (max-width: 560px) {
+  .wk-need { flex-wrap: wrap; }
+  .wk-need > .wk-need-txt { flex: 1 1 calc(100% - 60px) !important; }
+  .wk-need > .wk-pill { margin-left: 48px; }
+  .wk-need > .wk-btn { margin-left: auto; }
+}
