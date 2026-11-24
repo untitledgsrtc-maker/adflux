@@ -42,7 +42,7 @@ export default function CoachTeamV2() {
   const [span, setSpan] = useState(14)
   const [hist, setHist] = useState([])
   const [histErr, setHistErr] = useState('')
-  // Phase 690: office team month score (tasks given 40 + hours 35 + in by 10:15 25), 1st of the month up to the picked day (today = up to yesterday)
+  // Phase 690: office team month score (tasks given 20 + hours 50 + in by 10:15 30), 1st of the month up to the picked day (today = up to yesterday)
   const [office, setOffice] = useState({})
   useEffect(() => {
     let alive = true
@@ -231,7 +231,7 @@ export default function CoachTeamV2() {
 
               {r.score_kind === 'ontime' && office[r.id] && office[r.id].score != null && (
                 <div style={{ marginTop: 8, fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)' }}>
-                  Tasks given {Math.round(office[r.id].task_pts)}/40 ({office[r.id].given_on_time} of {office[r.id].given} on time) · Hours {Math.round(office[r.id].hours_pts)}/35 ({Math.round(office[r.id].hours)}h) · In by 10:15 {Math.round(office[r.id].punct_pts)}/25 ({office[r.id].on_time_days} of {office[r.id].full_days} days)
+                  Tasks given {Math.round(office[r.id].task_pts)}/20 ({office[r.id].given_on_time} of {office[r.id].given} on time) · Hours {Math.round(office[r.id].hours_pts)}/50 ({Math.round(office[r.id].hours)}h) · In by 10:15 {Math.round(office[r.id].punct_pts)}/30 ({office[r.id].on_time_days} of {office[r.id].full_days} days)
                 </div>
               )}
 

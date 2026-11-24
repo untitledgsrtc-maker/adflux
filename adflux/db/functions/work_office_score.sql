@@ -3,11 +3,12 @@
 -- ============================================================================
 -- The OFFICE TEAM's score (owner decision 2026-11-25; pays from 1 Dec 2026 via monthly_score):
 -- roles staff / hr / accounts / office_admin. Out of 100:
---   TASKS 40       on-time % of tasks GIVEN by someone else (task creator <> the person; system /
+--   (weights changed 2026-11-25 by owner: no team head yet -> tasks 20, hours 50, punctuality 30)
+--   TASKS 20       on-time % of tasks GIVEN by someone else (task creator <> the person; system /
 --                  repeating tasks count as given), scaled down when fewer than 1 given task per
 --                  working day. Own tasks never count. On time = same rule as work_ontime_stats.
---   HOURS 35       approved timer hours / (8 h x working days), capped at 100%.
---   PUNCTUALITY 25 share of full working days with the first LIVE clock-in at or before 10:15 IST
+--   HOURS 50       approved timer hours / (8 h x working days), capped at 100%.
+--   PUNCTUALITY 30 share of full working days with the first LIVE clock-in at or before 10:15 IST
 --                  (office opens 10:00 + 15 min grace, owner 2026-11-25)
 --                  (hand-added entries do not count as a clock-in).
 -- Working day = not Sunday / holiday (is_off_day), not an approved full-day leave, not before the
@@ -74,9 +75,9 @@ AS $function$
   pts AS (
     SELECT wd.wd, wd.full_days, tk.n, tk.ok, hr.h, pu.n AS pn,
            CASE WHEN wd.wd = 0 OR tk.n = 0 THEN 0
-                ELSE 40 * (tk.ok::numeric / tk.n) * LEAST(1, tk.n / wd.wd) END AS t_pts,
-           CASE WHEN wd.wd = 0 THEN 0 ELSE 35 * LEAST(1, hr.h / (8 * wd.wd)) END AS h_pts,
-           CASE WHEN wd.full_days = 0 THEN 25 ELSE 25 * pu.n::numeric / wd.full_days END AS p_pts
+                ELSE 20 * (tk.ok::numeric / tk.n) * LEAST(1, tk.n / wd.wd) END AS t_pts,
+           CASE WHEN wd.wd = 0 THEN 0 ELSE 50 * LEAST(1, hr.h / (8 * wd.wd)) END AS h_pts,
+           CASE WHEN wd.full_days = 0 THEN 30 ELSE 30 * pu.n::numeric / wd.full_days END AS p_pts
       FROM wd, tk, hr, pu
   )
   SELECT CASE WHEN wd = 0 THEN NULL ELSE ROUND(t_pts + h_pts + p_pts, 1) END,

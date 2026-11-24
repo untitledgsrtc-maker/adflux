@@ -613,7 +613,7 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
   if (!evening) return null
   const osDay = os?.day?.score != null ? os.day : null
   const osMonth = os?.month?.score != null ? os.month : null
-  const osTxt = (o) => `Tasks ${Math.round(o.task_pts)}/40 · Hours ${Math.round(o.hours_pts)}/35 · In by 10:15 ${Math.round(o.punct_pts)}/25`
+  const osTxt = (o) => `Tasks ${Math.round(o.task_pts)}/20 · Hours ${Math.round(o.hours_pts)}/50 · In by 10:15 ${Math.round(o.punct_pts)}/30`
   const finished = items.filter((i) => i.status === 'finished' && i.finishedDay === today).length   // finished TODAY only
   // Phase 518: day score (ESTIMATE) = tasks finished today WITH a due date that were on time (finished before the due day, or on the due day
   // at/before the due time - the on-time test of work_ontime_stats). Unlike the pay rule it does not skip declined / sent-back tasks or approved

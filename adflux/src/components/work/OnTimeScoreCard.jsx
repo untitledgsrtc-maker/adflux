@@ -13,7 +13,7 @@ export const MIN_TASKS = 3
 export function monthStartISO() { return istTodayISO().slice(0, 8) + '01' }
 
 // Phase 690 - the office team (staff, HR, Accounts, Office Admin) is scored by work_office_score:
-// tasks given on time 40 + hours 35 + in by 10:15 25. Pays from December 2026; shown from now so people see it coming.
+// tasks given on time 20 + hours 50 + in by 10:15 30. Pays from December 2026; shown from now so people see it coming.
 export const OFFICE_ROLES = ['staff', 'hr', 'accounts', 'office_admin']
 export function paidOnTime(role) { return OFFICE_ROLES.includes(role) }
 export const NEW_SCORE_PAYS = () => monthStartISO() >= '2026-12-01'
@@ -92,9 +92,9 @@ export default function OnTimeScoreCard({ userId }) {
   const b = scoreBand(score)
   const wd = Number(o?.work_days) || 0
   const parts = o ? [
-    ['Tasks given to you, done on time', `${o.given_on_time} of ${o.given}`, o.task_pts, 40],
-    ['Hours on tasks', `${Math.round(Number(o.hours))}h of ${Math.round(wd * 8)}h`, o.hours_pts, 35],
-    ['In by 10:15', `${o.on_time_days} of ${o.full_days} days`, o.punct_pts, 25],
+    ['Tasks given to you, done on time', `${o.given_on_time} of ${o.given}`, o.task_pts, 20],
+    ['Hours on tasks', `${Math.round(Number(o.hours))}h of ${Math.round(wd * 8)}h`, o.hours_pts, 50],
+    ['In by 10:15', `${o.on_time_days} of ${o.full_days} days`, o.punct_pts, 30],
   ] : []
   return (
     <div className="wk-card">
@@ -137,6 +137,6 @@ export function OnTimeCell({ userId }) {
   if (o === undefined) return <span className="wk-sm">...</span>
   if (!o || o.score == null) return <span className="wk-sm">-{repTxt}</span>
   const b = scoreBand(Number(o.score))
-  const tip = `Work score this month: tasks ${Math.round(o.task_pts)}/40 (${o.given_on_time} of ${o.given} given done on time), hours ${Math.round(o.hours_pts)}/35 (${Math.round(o.hours)}h), in by 10:15 ${Math.round(o.punct_pts)}/25 (${o.on_time_days} of ${o.full_days} days)`
+  const tip = `Work score this month: tasks ${Math.round(o.task_pts)}/20 (${o.given_on_time} of ${o.given} given done on time), hours ${Math.round(o.hours_pts)}/50 (${Math.round(o.hours)}h), in by 10:15 ${Math.round(o.punct_pts)}/30 (${o.on_time_days} of ${o.full_days} days)`
   return <span className={`wk-pill ${b.cls}`} title={tip}>Score {Math.round(o.score)}{repTxt}</span>
 }

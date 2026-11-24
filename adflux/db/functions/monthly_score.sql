@@ -120,7 +120,7 @@ BEGIN
   END IF;
 
   -- Phase 690 (owner 2026-11-25): from December 2026 the OFFICE team (staff, hr, accounts, office_admin)
-  -- is scored by work_office_score: tasks given 40 + hours 35 + clock-in by 10:15 25. Same pay curve
+  -- is scored by work_office_score: tasks given 20 + hours 50 + clock-in by 10:15 30. Same pay curve
   -- (>= 85 full, < 60 zero, linear between). Running month = through yesterday. No working day -> full cap.
   -- working_days reports the working days counted. Earlier months keep the rules below (paid months never move).
   IF v_role IN ('staff', 'hr', 'accounts', 'office_admin') AND p_month_start >= DATE '2026-12-01' THEN
