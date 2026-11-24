@@ -110,6 +110,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
                     </div>
                     <div style={{ margin: '8px 0 0 24px' }}>
                       <span className={`wk-pill ${dp.cls}`}><Pi size={13} aria-hidden="true" /> {dp.text}</span>
+                      {it.stuck && <span className="wk-pill warn" style={{ marginLeft: 6 }} title="In process, but no time logged on it for 2 days">No time in 2 days</span>}
                     </div>
                     {it.status === 'postponed' && (
                       <div className="wk-sm" style={{ margin: '8px 0 0 24px' }}>
@@ -122,7 +123,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
                     {showCost && it.status === 'finished' && it.cost != null && (
                       <div className="wk-row" style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'var(--surface-2)' }}>
                         <span className="wk-sm">{fmtDur(it.seconds)} tracked</span>
-                        <b className="wk-num">Rs {Number(it.cost).toLocaleString('en-IN')}</b>
+                        <b className="wk-num">₹{Math.round(Number(it.cost)).toLocaleString('en-IN')}</b>
                       </div>
                     )}
                     <div className="wk-row" style={{ marginTop: 12, flexWrap: 'wrap', gap: 8 }}>

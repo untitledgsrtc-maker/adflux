@@ -348,3 +348,17 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
   .wk-dc-act { margin-left: 0; width: 100%; }
   .wk-dc-act .wk-btn { flex: 1 1 100%; min-height: 44px; }
 }
+
+/* Phase 684 - Team Work phone fixes */
+/* a long client / person name made the card's grid wider than the phone (right side cut off) */
+.wk-pc, .wk-pp { grid-template-columns: minmax(0, 1fr); }
+/* a card header with many items (timeline client legend) wraps instead of pushing the card wide */
+.wk-ch { flex-wrap: wrap; }
+/* swipeable pill rows: no grey scrollbar under them */
+.wk-tabs { scrollbar-width: none; }
+.wk-tabs::-webkit-scrollbar { display: none; }
+/* People card footer: info on one line, buttons on their own line at the same spot on every card */
+.wk-pp-ctl { display: flex; align-items: center; gap: 8px; width: 100%; }
+.wk-pp-ctl .wk-headsw { display: inline-flex; align-items: center; gap: 8px; }
+.wk-pp-ctl .wk-headsw .wk-sw { display: inline-block; flex: none; }
+.wk-pp-ctl .wk-rm { margin-left: auto; }

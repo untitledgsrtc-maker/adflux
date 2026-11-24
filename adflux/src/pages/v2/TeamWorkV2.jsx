@@ -68,6 +68,10 @@ export default function TeamWorkV2() {
   const [showLater, setShowLater] = useState(false)   // Tasks board: also show open tasks due after the chosen range
   const [busy, setBusy] = useState(false)
   const latch = useRef(false)
+  const [recentPartIds, setRecentPartIds] = useState(() => new Set())   // Phase 684: parts with time logged in the last 2 days
+  const [taskQ, setTaskQ] = useState('')                                // Phase 684: Tasks board search
+  const [picked, setPicked] = useState(() => new Set())                 // Phase 684: forgotten-time rows ticked for bulk approve
+  const pageRef = useRef(null)
 
   const [from, to] = useMemo(() => {
     if (range === 'today') return [today, today]
@@ -97,6 +101,8 @@ export default function TeamWorkV2() {
       supabase.from('work_report_shares').select('user_id,shared_at').eq('work_date', today),
       // Phase 444: idle "I was working" claims in the last 7 days (per person), to spot repeat claimers
       supabase.from('work_time_entries').select('user_id,status').like('note', 'Said working while idle%').gte('created_at', dayStartISO(addDaysISO(today, -7))),
+      // Phase 684: which task parts had any time logged in the last 2 days (for the "no time in 2 days" marker)
+      supabase.from('work_time_entries').select('part_id').not('part_id', 'is', null).gte('started_at', dayStartISO(addDaysISO(today, -2))).limit(3000),
     ])
     const e = q.slice(0, 8).find((r) => r.error)
     if (e) { setErr(e.error.message || 'Could not load.'); setLoading(false); return }
@@ -108,10 +114,18 @@ export default function TeamWorkV2() {
     setTemplates(q[6].data || []); setReport(rep); setCost(q[8].data)
     const m = {}; (q[9].data?.by_task || []).forEach((t) => { m[t.task_id] = t }); setCostMap(m)
     setShares(q[10].data || [])
+    setRecentPartIds(new Set((q[12]?.data || []).map((r) => r.part_id)))
     setLoading(false)
   }, [uid, from, to, today, canCost])
 
   useEffect(() => { load() }, [load])
+  // Phase 684: on a phone the pill rows scroll sideways; keep the chosen range and tab in view
+  useEffect(() => {
+    pageRef.current?.querySelectorAll('.wk-tabs .wk-tab.on').forEach((b) => {
+      const row = b.parentElement
+      if (row && row.scrollWidth > row.clientWidth) row.scrollLeft = Math.max(0, b.offsetLeft - (row.clientWidth - b.offsetWidth) / 2)
+    })
+  }, [tab, range, loading])
   useAutoRefresh(load, { userId: uid, pollSeconds: 60 })
   useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i) }, [])
 
@@ -167,7 +181,7 @@ export default function TeamWorkV2() {
       return showLater || p.status === 'in_process' || !d || d <= addDaysISO(to, 2) || isNewPart(p)
     }
     return parts
-      .filter((p) => inRange(p) && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient) && (!onlyLate || (p.status !== 'finished' && p.status !== 'postponed' && dueState(p.due_date || p.task?.due_date, p.status).cls === 'bad')))
+      .filter((p) => inRange(p) && (!taskQ.trim() || (p.task?.title || '').toLowerCase().includes(taskQ.trim().toLowerCase()) || (p.label || '').toLowerCase().includes(taskQ.trim().toLowerCase())) && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient) && (!onlyLate || (p.status !== 'finished' && p.status !== 'postponed' && dueState(p.due_date || p.task?.due_date, p.status).cls === 'bad')))
       .map((p) => ({
         postponedUntil: p.postponed_until, postponeCount: p.postpone_count || 0,
         postponedBy: [...(p.postponed_by_users || []).map((id) => nameOf(id)), p.postponed_by_client ? `${p.postponed_by_client} (client)` : ''].filter(Boolean).join(', '),
@@ -175,8 +189,9 @@ export default function TeamWorkV2() {
         urgent: !!p.task?.is_urgent, client: projName(p.task?.project_id), due: p.due_date || p.task?.due_date, dueTime: p.due_time, assigneeId: p.assignee_id,
         assigneeName: nameOf(p.assignee_id), assigneePhoto: users.find((u) => u.id === p.assignee_id)?.profile_image_url || null, partsTotal: total[p.task_id] || 1, partsDone: done[p.task_id] || 0,
         seconds: taskCostByTask[p.task_id]?.seconds ?? p.seconds, cost: taskCostByTask[p.task_id]?.cost ?? null,
+        stuck: p.status === 'in_process' && !!p.created_at && Date.parse(p.created_at) < Date.parse(dayStartISO(addDaysISO(today, -2))) && !recentPartIds.has(p.id) && !running.some((r) => r.part_id === p.id),
       }))
-  }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask, users, from, to, showLater, today, onlyLate])
+  }, [parts, fPerson, fClient, projName, nameOf, taskCostByTask, users, from, to, showLater, today, onlyLate, taskQ, recentPartIds, running])
   const laterCount = useMemo(() => showLater ? 0 : parts.filter((p) => p.status !== 'finished' && p.status !== 'postponed' && p.status !== 'in_process' && (p.due_date || p.task?.due_date) > addDaysISO(to, 2) && !(!p.task?.is_auto && p.created_at && new Date(p.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === today) && (!fPerson || p.assignee_id === fPerson) && (!fClient || p.task?.project_id === fClient)).length, [parts, to, today, showLater, fPerson, fClient])
 
   if (authLoading || !uid) return null
@@ -209,7 +224,7 @@ export default function TeamWorkV2() {
   const firedToday = parts.filter((p) => p.task?.template_id && p.task?.created_at >= dayStartISO(today))
 
   return (
-    <div className="wk wk-glass">
+    <div className="wk wk-glass" ref={pageRef}>
       <div className="wk-head">
         <div>
           <div className="wk-eyebrow">{new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</div>
@@ -357,11 +372,12 @@ export default function TeamWorkV2() {
       {!loading && !err && tab === 'tasks' && (
         <>
           <HeroSegs eyebrow="Board · filtered" segs={[
-            ['In process', String(items.filter((i) => i.status === 'in_process').length), 'Being worked on'],
+            ['In process', String(items.filter((i) => i.status === 'in_process').length), items.some((i) => i.stuck) ? `${items.filter((i) => i.stuck).length} with no time in 2 days` : 'Being worked on'],
             ['Assigned', String(items.filter((i) => i.status === 'assigned').length), 'Not started'],
             ['Overdue', String(lateOnBoard), onlyLate ? 'Showing overdue only' : 'Tap to filter', () => setOnlyLate((v) => !v), onlyLate],
           ]} />
           <div className="wk-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+            <input className="wk-input" style={{ width: 220 }} type="search" placeholder="Search tasks" value={taskQ} onChange={(e) => setTaskQ(e.target.value)} aria-label="Search tasks by name" />
             <select className="wk-input" style={{ width: 220 }} value={fPerson} onChange={(e) => setFPerson(e.target.value)} aria-label="Filter by person">
               <option value="">All people</option>{memberIds.map((id) => <option key={id} value={id}>{nameOf(id)}</option>)}
             </select>
@@ -415,16 +431,41 @@ export default function TeamWorkV2() {
         const secs = (e) => Math.max(0, (new Date(e.ended_at) - new Date(e.started_at)) / 1000 - (e.break_seconds || 0))
         const total = pending.reduce((t, e) => t + secs(e), 0)
         const users_ = (id) => users.find((u) => u.id === id)
+        // Phase 684: rows with a warning (repeat idle claims, or an early-morning start) are never ticked by "Select all"
+        const flagged = (e) => istHourOf(e.started_at) < 7 || (String(e.note || '').startsWith('Said working while idle') && claims.filter((c) => c.user_id === e.user_id).length >= 3)
+        const sel = pending.filter((e) => picked.has(e.id))
+        const togglePick = (id) => setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+        const approveSelected = async () => {
+          if (!sel.length || latch.current) return
+          const hrs = fmtDur(sel.reduce((t, e) => t + secs(e), 0))
+          if (!(await confirmDialog({ title: `Approve ${sel.length} ${sel.length === 1 ? 'request' : 'requests'}?`, message: `${hrs} of forgotten time gets added to these people's hours.`, confirmLabel: 'Approve' }))) return
+          latch.current = true; setBusy(true)
+          let ok = 0, failed = 0
+          for (const e of sel) { const { error } = await supabase.rpc('work_decide_time', { p_entry: e.id, p_approve: true }); if (error) failed++; else ok++ }
+          latch.current = false; setBusy(false); setPicked(new Set())
+          if (failed) toastError(null, `${ok} approved, ${failed} could not be approved.`); else toastSuccess(`${ok} approved.`)
+          load()
+        }
         return (
           <>
             <HeroSegs eyebrow="Waiting for you" segs={[['Requests', `${pending.length} ${pending.length === 1 ? 'request' : 'requests'}`, pending.length ? `Forgotten time, ${fmtDur(total)} in total` : 'Forgotten time']]} />
             <div className="wk-card flush">
-              <div className="wk-ch"><h3><span className="wk-tile" style={{ background: 'rgba(16,185,129,.14)', color: 'var(--success)' }}><Check size={16} aria-hidden="true" /></span>Forgotten-time requests</h3></div>
+              <div className="wk-ch"><h3><span className="wk-tile" style={{ background: 'rgba(16,185,129,.14)', color: 'var(--success)' }}><Check size={16} aria-hidden="true" /></span>Forgotten-time requests</h3>
+                {pending.length > 1 && (
+                  <div className="wk-grp" style={{ gap: 8 }}>
+                    <button className="wk-btn o sm" disabled={busy} onClick={() => setPicked(sel.length ? new Set() : new Set(pending.filter((e) => !flagged(e)).map((e) => e.id)))}>
+                      {sel.length ? 'Clear ticks' : `Select all without warnings (${pending.filter((e) => !flagged(e)).length})`}
+                    </button>
+                    <button className="wk-btn y sm" disabled={busy || !sel.length} onClick={approveSelected}><Check size={14} aria-hidden="true" /> Approve selected ({sel.length})</button>
+                  </div>
+                )}
+              </div>
               {pending.length === 0 ? <div className="wk-empty"><b>Nothing waiting</b>Added-later time shows here for your OK.</div> : (
                 <div className="wk-list">
                   {pending.map((e) => (
                     <div key={e.id} className="wk-row" style={{ padding: '14px 20px', gap: 16, flexWrap: 'wrap' }}>
                       <span className="wk-grp" style={{ flexWrap: 'nowrap', minWidth: 190, gap: 12 }}>
+                        <input type="checkbox" checked={picked.has(e.id)} onChange={() => togglePick(e.id)} aria-label={`Tick ${nameOf(e.user_id)}'s request`} style={{ width: 20, height: 20, accentColor: 'var(--accent)', flex: 'none', cursor: 'pointer' }} />
                         <UserAvatar className="wk-av" name={nameOf(e.user_id)} url={users_(e.user_id)?.profile_image_url} size={36} />
                         <span><div style={{ fontWeight: 500 }}>{nameOf(e.user_id)}</div><div className="wk-sm wk-num">{fmtDateShort(e.started_at.slice(0, 10))} · {fmtTimeIST(e.started_at)}-{fmtTimeIST(e.ended_at)}</div></span>
                       </span>
@@ -563,17 +604,18 @@ function PeopleTab({ members, users, nameOf, runBy, byPerson, projName, now, isA
                 <div className="wk-pp-foot">
                   <span className="wk-sm">{open} open {open === 1 ? 'task' : 'tasks'}</span>
                   {isAdmin && paidOnTime(u.role) && <OnTimeCell userId={m.user_id} />}
-                  <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {/* Phase 684 - controls on their own line, same spot on every card; remove sits apart and asks first */}
+                  <div className="wk-pp-ctl">
                     {isAdmin && (
-                      <>
-                        <button type="button" role="switch" aria-checked={m.is_head} aria-label={`Head: ${nm}`} title={m.is_head ? 'Head' : 'Not a head'} disabled={busy}
-                          className={`wk-sw${m.is_head ? ' on' : ''}`} onClick={() => onSet(m.user_id, true, !m.is_head)}><i /></button>
-                        <span className="wk-sm">Head</span>
-                      </>
+                      <button type="button" role="switch" aria-checked={m.is_head} aria-label={`Head: ${nm}`} title={m.is_head ? 'Head' : 'Not a head'} disabled={busy}
+                        className="wk-btn g sm wk-headsw" onClick={() => onSet(m.user_id, true, !m.is_head)}>
+                        <span className={`wk-sw${m.is_head ? ' on' : ''}`} aria-hidden="true"><i /></span>Head
+                      </button>
                     )}
                     <Link to={`/work-profile?user=${m.user_id}`} className="wk-btn o sm">Profile</Link>
-                    {isAdmin && <button className="wk-btn g sm" aria-label={`Remove ${nm}`} title="Remove from timeclock" disabled={busy} onClick={() => onSet(m.user_id, false, false)}><Trash2 size={15} aria-hidden="true" /></button>}
-                  </span>
+                    {isAdmin && <button className="wk-btn g sm wk-rm" aria-label={`Remove ${nm}`} title="Remove from timeclock" disabled={busy}
+                      onClick={async () => { if (await confirmDialog({ title: `Remove ${pretty} from Team Work?`, message: 'They stop showing on the timeclock and in Team Work. Their past hours stay. You can add them back with Add person.', confirmLabel: 'Remove', danger: true })) onSet(m.user_id, false, false) }}><Trash2 size={15} aria-hidden="true" /></button>}
+                  </div>
                 </div>
               </div>
             )
@@ -701,7 +743,7 @@ function ClientsTab({ projects, report, cost, canCost, parts, nameOf, onAdd, onU
                 <div className="wk-pc-foot">
                   <span className="wk-pc-av">{st.people.slice(0, 4).map((id) => <UserAvatar key={id} className="wk-av" userId={id} name={nameOf ? nameOf(id) : ''} />)}{st.people.length > 4 && <i>+{st.people.length - 4}</i>}</span>
                   <span className="wk-num">{fmtDur(hours[p.id]?.seconds || 0)}</span>
-                  {canCost && <span className="wk-num">{costBy[p.id] ? `Rs ${Number(costBy[p.id].cost).toLocaleString('en-IN')}` : '-'}</span>}
+                  {canCost && <span className="wk-num">{costBy[p.id] ? `\u20B9${Math.round(Number(costBy[p.id].cost)).toLocaleString('en-IN')}` : '-'}</span>}
                   <span className="wk-num">{st.open} open</span>
                 </div>
               </div>
@@ -774,7 +816,7 @@ function TimelineTab({ photoOf, memberIds, nameOf, byPerson, from, to, projName 
           ['Tracked', fmtDur(totalSecs), `${peopleWorked} ${peopleWorked === 1 ? 'person' : 'people'} worked`],
           ['Days', String(days), single ? 'One day' : 'In this range'],
         ]} />}
-    <div style={{ display: 'grid', gridTemplateColumns: open ? 'minmax(0,1.3fr) minmax(0,1fr)' : '1fr', gap: 16, alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: open ? 'minmax(0,1.3fr) minmax(0,1fr)' : 'minmax(0,1fr)', gap: 16, alignItems: 'start' }}>
       <div className="wk-card flush">
         <div className="wk-ch"><h3>{single ? (isToday ? 'Today, by person' : `${fmtDateShort(from)}, by person`) : 'Days, by person'}</h3>
           {single && legend.length > 0 && <div className="wk-grp" style={{ gap: 12 }}>{legend.map((n) => <span key={n} className="wk-sm"><span className="wk-dot" style={{ background: clientColor(n === 'Internal' ? '' : n), width: 8, height: 8, marginRight: 6 }} />{n}</span>)}</div>}
@@ -868,9 +910,9 @@ function HoursTab({ report, cost, canCost, projName, nameOf, taskTitles, taskCli
     <div>
       {canCost && cost && cost.total_cost != null && (
         <HeroSegs eyebrow={`Cost · ${rangeLabel}`} segs={[
-          ['Team cost', `Rs ${Number(cost.total_cost).toLocaleString('en-IN')}`, 'Salary-based'],
+          ['Team cost', `\u20B9${Math.round(Number(cost.total_cost)).toLocaleString('en-IN')}`, 'Salary-based'],
           ['Hours tracked', fmtDur(cost.total_seconds)],
-          ['Cost per hour', `Rs ${cost.total_seconds ? Math.round(cost.total_cost / (cost.total_seconds / 3600)) : 0}`, 'Average'],
+          ['Cost per hour', `\u20B9${cost.total_seconds ? Math.round(cost.total_cost / (cost.total_seconds / 3600)).toLocaleString('en-IN') : 0}`, 'Average'],
           ['Not on any task', `${cost.total_seconds ? Math.round(cost.unassigned_seconds / cost.total_seconds * 100) : 0}%`, fmtDur(cost.unassigned_seconds || 0)],
         ]} />
       )}
@@ -889,7 +931,7 @@ function HoursTab({ report, cost, canCost, projName, nameOf, taskTitles, taskCli
                     <span className="wk-num">{pc}%</span>
                   </div>
                   <div className="wk-bar-h"><i style={{ width: `${pc}%`, background: col }} /></div>
-                  <div className="wk-sm" style={{ marginTop: 4 }}>{fmtDur(p.seconds)}{canCost && costBy[p.project_id] ? ` · Rs ${Number(costBy[p.project_id].cost).toLocaleString('en-IN')}` : ''}</div>
+                  <div className="wk-sm" style={{ marginTop: 4 }}>{fmtDur(p.seconds)}{canCost && costBy[p.project_id] ? ` · \u20B9${Math.round(Number(costBy[p.project_id].cost)).toLocaleString('en-IN')}` : ''}</div>
                 </div>
               )
             })}
@@ -916,7 +958,7 @@ function HoursTab({ report, cost, canCost, projName, nameOf, taskTitles, taskCli
                       ) : <span className="wk-num">{t.people}</span>}
                     </td>
                     <td className="wk-num" style={{ textAlign: 'right' }}>{fmtDur(t.seconds)}</td>
-                    <td className="wk-num" style={{ textAlign: 'right' }}>Rs {Number(t.cost).toLocaleString('en-IN')}</td>
+                    <td className="wk-num" style={{ textAlign: 'right' }}>₹{Math.round(Number(t.cost)).toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
               </tbody>
