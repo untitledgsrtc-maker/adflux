@@ -203,8 +203,8 @@ function StepEditor({ st, idx, total, onPatch, onDelete, onMove }) {
       <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <span style={{ fontSize: 12, color: 'var(--text-subtle)', textAlign: 'center' }}>{idx + 1}</span>
-          <button onClick={() => onMove(st, -1)} disabled={idx === 0} style={miniBtn}><ChevronUp size={14} /></button>
-          <button onClick={() => onMove(st, 1)} disabled={idx === total - 1} style={miniBtn}><ChevronDown size={14} /></button>
+          <button onClick={() => onMove(st, -1)} disabled={idx === 0} style={miniBtn} aria-label="Move step up"><ChevronUp size={14} /></button>
+          <button onClick={() => onMove(st, 1)} disabled={idx === total - 1} style={miniBtn} aria-label="Move step down"><ChevronDown size={14} /></button>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <input value={title} onChange={e => setTitle(e.target.value)} onBlur={() => title !== st.title && onPatch(st.id, { title: title.trim() || 'Step' })}
@@ -241,8 +241,8 @@ function StepEditor({ st, idx, total, onPatch, onDelete, onMove }) {
               </>
             )}
 
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--text-muted)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={st.has_test} onChange={e => onPatch(st.id, { has_test: e.target.checked })} /> Has test
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 36, fontSize: 12.5, color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <input type="checkbox" style={{ width: 18, height: 18, accentColor: 'var(--accent, #FFE600)' }} checked={st.has_test} onChange={e => onPatch(st.id, { has_test: e.target.checked })} /> Has test
             </label>
             {st.has_test && (
               <button onClick={() => setShowTest(v => !v)} style={actBtn}><ListChecks size={14} /> Questions</button>
@@ -251,7 +251,7 @@ function StepEditor({ st, idx, total, onPatch, onDelete, onMove }) {
 
           {st.has_test && showTest && <QuestionEditor stepId={st.id} />}
         </div>
-        <button onClick={() => onDelete(st)} style={{ ...miniBtn, color: 'var(--text-subtle)' }}><Trash2 size={14} /></button>
+        <button onClick={() => onDelete(st)} style={{ ...miniBtn, color: 'var(--text-subtle)' }} aria-label="Delete step"><Trash2 size={14} /></button>
       </div>
     </div>
   )
@@ -293,6 +293,7 @@ function QuestionEditor({ stepId }) {
   }
 
   async function del(id) {
+    if (!(await confirmDialog({ title: 'Delete question?', message: 'Delete this test question?', confirmLabel: 'Delete', danger: true }))) return
     const { error } = await supabase.from('onboarding_step_questions').delete().eq('id', id)
     if (error) { toastError(error, 'Could not delete.'); return }
     setQs(x => x.filter(y => y.id !== id))
@@ -316,7 +317,7 @@ function QuestionEditor({ stepId }) {
                   ))}
                 </div>
               </div>
-              <Trash2 size={14} onClick={() => del(x.id)} style={{ cursor: 'pointer', color: 'var(--text-subtle)', flexShrink: 0 }} />
+              <button onClick={() => del(x.id)} style={{ ...miniBtn, color: 'var(--text-subtle)', flexShrink: 0 }} aria-label="Delete question"><Trash2 size={14} /></button>
             </div>
           ))}
         </div>
@@ -346,7 +347,7 @@ const inp = { width: '100%', padding: '8px 10px', borderRadius: 10, border: '1px
 const sel_ = { ...inp, width: 'auto', cursor: 'pointer' }
 const tab = { padding: '7px 12px', borderRadius: 999, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }
 const tabOn = { border: '1px solid var(--accent, #FFE600)', background: 'var(--accent-soft, rgba(255,230,0,.14))', color: 'var(--accent, #FFE600)' }
-const miniBtn = { display: 'grid', placeItems: 'center', width: 26, height: 22, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2, #334155)', color: 'var(--text-muted)', cursor: 'pointer' }
+const miniBtn = { display: 'grid', placeItems: 'center', width: 34, height: 34, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2, #334155)', color: 'var(--text-muted)', cursor: 'pointer' }
 const actBtn = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2, #334155)', color: 'var(--text)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }
 const primaryBtn = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: 'none', background: 'var(--accent, #FFE600)', color: 'var(--accent-fg, #0f172a)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }
 const ghostBtn = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }

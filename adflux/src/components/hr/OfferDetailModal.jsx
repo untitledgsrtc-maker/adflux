@@ -23,7 +23,8 @@ import { supabase } from '../../lib/supabase'
 import { useOffers, buildOfferUrl, STATUS_META } from '../../hooks/useOffers'
 import { offerLoginArgs, offerTargets } from '../../utils/hrOffer'
 import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
-import { formatCurrency } from '../../utils/formatters'
+import { formatCurrency, formatDate } from '../../utils/formatters'
+import { istTodayISO } from '../../utils/istDate'
 import { toastError, toastSuccess } from '../v2/Toast'
 import { confirmDialog } from '../v2/ConfirmDialog'
 import SendEmailModal from '../v2/SendEmailModal'
@@ -334,7 +335,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
         const payload = {
           user_id:        userId,
           monthly_salary: salaryNum,
-          join_date:      offer.joining_date || new Date().toISOString().split('T')[0],
+          join_date:      offer.joining_date || istTodayISO(),
           is_active:      true,
         }
         if (seedIncentive) {
@@ -370,7 +371,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
     if (targets) {
       const { data: activeT } = await supabase.from('daily_targets').select('id').eq('user_id', userId).is('effective_to', null).limit(1)
       if (!activeT?.length) {
-        const { error: tErr } = await supabase.from('daily_targets').insert([{ user_id: userId, ...targets, effective_from: offer.joining_date || new Date().toISOString().split('T')[0] }])
+        const { error: tErr } = await supabase.from('daily_targets').insert([{ user_id: userId, ...targets, effective_from: offer.joining_date || istTodayISO() }])
         if (tErr) toastError(tErr, 'Login created, but daily targets were not saved - set them on the profile.')
       }
     }
@@ -570,7 +571,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
             <Row label="Candidate Email" value={offer.candidate_email} />
             <Row label="Position"        value={offer.position} />
             <Row label="Territory"       value={offer.territory} />
-            <Row label="Joining Date"    value={offer.joining_date} />
+            <Row label="Joining Date"    value={offer.joining_date ? formatDate(offer.joining_date) : ''} />
             <Row label="Fixed Salary"    value={offer.fixed_salary_monthly
               ? `${formatCurrency(offer.fixed_salary_monthly)} / month`
               : null} />
@@ -628,7 +629,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
               <Section title="Candidate personal details">
                 <Row label="Full Legal Name"  value={offer.full_legal_name} />
                 <Row label="Father's Name"    value={offer.fathers_name} />
-                <Row label="Date of Birth"    value={offer.dob} />
+                <Row label="Date of Birth"    value={offer.dob ? formatDate(offer.dob) : ''} />
                 <Row label="Mobile"           value={offer.mobile} />
                 <Row label="Personal Email"   value={offer.personal_email} />
                 <Row label="Qualification"    value={offer.qualification} />

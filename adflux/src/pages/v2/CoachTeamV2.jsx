@@ -282,11 +282,11 @@ function MoveChart({ data }) {
           {[0, 50, 100].map((v) => (
             <g key={v}>
               <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke="var(--v2-line, #334155)" strokeWidth="1" />
-              <text x={L - 6} y={y(v) + 4} fontSize="11" textAnchor="end" fill="var(--v2-ink-2, #94a3b8)">{v}%</text>
+              <text x={L - 6} y={y(v) + 4} fontSize="12" textAnchor="end" fill="var(--v2-ink-2, #94a3b8)">{v}%</text>
             </g>
           ))}
           {ticks.map((i) => (
-            <text key={i} x={x(i)} y={H - 6} fontSize="11" textAnchor={i === 0 ? 'start' : i === data.length - 1 ? 'end' : 'middle'} fill="var(--v2-ink-2, #94a3b8)">{fmtDateShort(data[i].day).slice(0, 5)}</text>
+            <text key={i} x={x(i)} y={H - 6} fontSize="12" textAnchor={i === 0 ? 'start' : i === data.length - 1 ? 'end' : 'middle'} fill="var(--v2-ink-2, #94a3b8)">{fmtDateShort(data[i].day).slice(0, 5)}</text>
           ))}
           {lines.map(([k, , col]) => (
             <g key={k}>

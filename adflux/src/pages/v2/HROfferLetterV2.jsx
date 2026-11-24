@@ -30,6 +30,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { toastError, toastSuccess } from '../../components/v2/Toast'
 import { downloadOfferLetter } from '../../components/hr/OfferLetterPDF'
+import { istTodayISO } from '../../utils/istDate'
 
 const STATES = [
   'Gujarat', 'Maharashtra', 'Rajasthan', 'Madhya Pradesh', 'Delhi',
@@ -62,7 +63,7 @@ export default function HROfferLetterV2() {
     pincode:                       '',
     pan_number:                    '',
     place:                         'Vadodara',
-    joining_date:                  new Date().toISOString().slice(0, 10),
+    joining_date:                  istTodayISO(),
     monthly_salary:                '',
     incentive_sales_multiplier:    '2',
     incentive_new_client_rate:     '0.03',
@@ -84,7 +85,7 @@ export default function HROfferLetterV2() {
         { data: ds,  error: dsErr },
       ] = await Promise.all([
         supabase.from('users')
-          .select('id, name, email, phone, city, role, team_role, segment_access')
+          .select('id, name, email, whatsapp_number, signature_mobile, city, role, team_role, segment_access')
           .eq('id', userId).single(),
         supabase.from('staff_incentive_profiles')
           .select('user_id, monthly_salary')
@@ -172,7 +173,7 @@ export default function HROfferLetterV2() {
         full_legal_name:  user.name,
         candidate_email:  user.email,
         personal_email:   user.email,
-        mobile:           user.phone || '',
+        mobile:           user.whatsapp_number || user.signature_mobile || '',
         fathers_name:     form.fathers_name.trim(),
         pan_number:       form.pan_number.trim() || null,
 
@@ -245,7 +246,7 @@ export default function HROfferLetterV2() {
         </button>
         <div>
           <div style={{ fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-            Hiring · Phase 50.3
+            Hiring
           </div>
           <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 24, color: 'var(--text)' }}>
             Offer letter — {user.name}
