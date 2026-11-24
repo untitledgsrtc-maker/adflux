@@ -362,3 +362,9 @@ textarea.wk-input { height: auto; padding: 12px; min-height: 84px; resize: verti
 .wk-pp-ctl .wk-headsw { display: inline-flex; align-items: center; gap: 8px; }
 .wk-pp-ctl .wk-headsw .wk-sw { display: inline-block; flex: none; }
 .wk-pp-ctl .wk-rm { margin-left: auto; }
+/* Phase 685 - on a phone the timeline's client colour list is one swipeable line, not 15 rows above the chart */
+@media (max-width: 720px) {
+  .wk-tl-legend { flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; padding-bottom: 2px; }
+  .wk-tl-legend::-webkit-scrollbar { display: none; }
+  .wk-tl-legend > span { white-space: nowrap; flex: none; }
+}

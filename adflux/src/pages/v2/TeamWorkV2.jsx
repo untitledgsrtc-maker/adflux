@@ -819,7 +819,7 @@ function TimelineTab({ photoOf, memberIds, nameOf, byPerson, from, to, projName 
     <div style={{ display: 'grid', gridTemplateColumns: open ? 'minmax(0,1.3fr) minmax(0,1fr)' : 'minmax(0,1fr)', gap: 16, alignItems: 'start' }}>
       <div className="wk-card flush">
         <div className="wk-ch"><h3>{single ? (isToday ? 'Today, by person' : `${fmtDateShort(from)}, by person`) : 'Days, by person'}</h3>
-          {single && legend.length > 0 && <div className="wk-grp" style={{ gap: 12 }}>{legend.map((n) => <span key={n} className="wk-sm"><span className="wk-dot" style={{ background: clientColor(n === 'Internal' ? '' : n), width: 8, height: 8, marginRight: 6 }} />{n}</span>)}</div>}
+          {single && legend.length > 0 && <div className="wk-grp wk-tl-legend" style={{ gap: 12 }}>{legend.map((n) => <span key={n} className="wk-sm"><span className="wk-dot" style={{ background: clientColor(n === 'Internal' ? '' : n), width: 8, height: 8, marginRight: 6 }} />{n}</span>)}</div>}
         </div>
         {rows.length === 0 && <div className="wk-empty">No one is on the timeclock yet.</div>}
         {single ? (
