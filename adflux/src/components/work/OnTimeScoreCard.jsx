@@ -13,7 +13,7 @@ export const MIN_TASKS = 3
 export function monthStartISO() { return istTodayISO().slice(0, 8) + '01' }
 
 // Phase 690 - the office team (staff, HR, Accounts, Office Admin) is scored by work_office_score:
-// tasks given on time 40 + hours 35 + in by 09:45 25. Pays from December 2026; shown from now so people see it coming.
+// tasks given on time 40 + hours 35 + in by 10:15 25. Pays from December 2026; shown from now so people see it coming.
 export const OFFICE_ROLES = ['staff', 'hr', 'accounts', 'office_admin']
 export function paidOnTime(role) { return OFFICE_ROLES.includes(role) }
 export const NEW_SCORE_PAYS = () => monthStartISO() >= '2026-12-01'
@@ -94,7 +94,7 @@ export default function OnTimeScoreCard({ userId }) {
   const parts = o ? [
     ['Tasks given to you, done on time', `${o.given_on_time} of ${o.given}`, o.task_pts, 40],
     ['Hours on tasks', `${Math.round(Number(o.hours))}h of ${Math.round(wd * 8)}h`, o.hours_pts, 35],
-    ['In by 9:45', `${o.on_time_days} of ${o.full_days} days`, o.punct_pts, 25],
+    ['In by 10:15', `${o.on_time_days} of ${o.full_days} days`, o.punct_pts, 25],
   ] : []
   return (
     <div className="wk-card">
@@ -116,7 +116,7 @@ export default function OnTimeScoreCard({ userId }) {
         {!pays && s && <div className="wk-sm" style={{ marginTop: 6 }}>November pay still uses tasks finished on time: <b className="wk-num">{s.pct == null ? 'not enough tasks' : `${Math.round(s.pct)}%`}</b>. This new score decides the variable from 1 December.</div>}
         {s && <div className="wk-sm" style={{ marginTop: 6 }}>Variable so far: <b className="wk-num">{formatCurrency(s.earned)}</b> of {formatCurrency(s.cap)}</div>}
         {rep && rep.days > 0 && <div className="wk-sm" style={{ marginTop: 6 }}>Evening reports shared: <b className="wk-num">{rep.shared} of {rep.days}</b> working days. For information only - it does not change your pay.</div>}
-        <div className="wk-sm" style={{ marginTop: 6, opacity: 0.8 }}>Only tasks someone else gives you count. Target 8 hours a working day; start your first timer by 9:45. Sundays, holidays and approved leave are left out. Counts up to yesterday.</div>
+        <div className="wk-sm" style={{ marginTop: 6, opacity: 0.8 }}>Only tasks someone else gives you count. Target 8 hours a working day. Office starts 10:00 - start your first timer by 10:15. Sundays, holidays and approved leave are left out. Counts up to yesterday.</div>
       </div>
     </div>
   )
@@ -137,6 +137,6 @@ export function OnTimeCell({ userId }) {
   if (o === undefined) return <span className="wk-sm">...</span>
   if (!o || o.score == null) return <span className="wk-sm">-{repTxt}</span>
   const b = scoreBand(Number(o.score))
-  const tip = `Work score this month: tasks ${Math.round(o.task_pts)}/40 (${o.given_on_time} of ${o.given} given done on time), hours ${Math.round(o.hours_pts)}/35 (${Math.round(o.hours)}h), in by 9:45 ${Math.round(o.punct_pts)}/25 (${o.on_time_days} of ${o.full_days} days)`
+  const tip = `Work score this month: tasks ${Math.round(o.task_pts)}/40 (${o.given_on_time} of ${o.given} given done on time), hours ${Math.round(o.hours_pts)}/35 (${Math.round(o.hours)}h), in by 10:15 ${Math.round(o.punct_pts)}/25 (${o.on_time_days} of ${o.full_days} days)`
   return <span className={`wk-pill ${b.cls}`} title={tip}>Score {Math.round(o.score)}{repTxt}</span>
 }

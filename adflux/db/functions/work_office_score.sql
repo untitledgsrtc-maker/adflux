@@ -7,7 +7,8 @@
 --                  repeating tasks count as given), scaled down when fewer than 1 given task per
 --                  working day. Own tasks never count. On time = same rule as work_ontime_stats.
 --   HOURS 35       approved timer hours / (8 h x working days), capped at 100%.
---   PUNCTUALITY 25 share of full working days with the first LIVE clock-in at or before 09:45 IST
+--   PUNCTUALITY 25 share of full working days with the first LIVE clock-in at or before 10:15 IST
+--                  (office opens 10:00 + 15 min grace, owner 2026-11-25)
 --                  (hand-added entries do not count as a clock-in).
 -- Working day = not Sunday / holiday (is_off_day), not an approved full-day leave, not before the
 -- joining date. Half-day leave = half a day for tasks and hours, not judged for punctuality.
@@ -68,7 +69,7 @@ AS $function$
        AND (SELECT MIN((e.started_at AT TIME ZONE 'Asia/Kolkata')::time)
               FROM public.work_time_entries e
              WHERE e.user_id = p_user_id AND e.source = 'timer' AND e.status <> 'declined'
-               AND (e.started_at AT TIME ZONE 'Asia/Kolkata')::date = d.day) <= TIME '09:45'
+               AND (e.started_at AT TIME ZONE 'Asia/Kolkata')::date = d.day) <= TIME '10:15'
   ),
   pts AS (
     SELECT wd.wd, wd.full_days, tk.n, tk.ok, hr.h, pu.n AS pn,

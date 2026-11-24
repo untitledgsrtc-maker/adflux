@@ -85,7 +85,8 @@ export default async function handler(req) {
 
   const userMsg = `Person: ${firstName || 'team member'}, a ${ROLE_TEXT[facts.role] || 'team member'}.
 Their numbers (last 28 days unless the name says otherwise; actions_done_pct_14d = share of the daily suggested actions they completed in the last 14 days):
-${JSON.stringify(facts)}`
+${JSON.stringify(facts)}${facts.work_score_month ? `
+Their work score this month (work_score_month) has three parts: tasks GIVEN by someone else and done on time (out of 40; tasks they write for themselves do not count), hours on task timers against 8 hours a working day (out of 35), and days their first timer started by 10:15 (out of 25; office opens 10:00). Coach the part with the most points missing.` : ''}`
 
   let en = '', gu = ''
   try {
