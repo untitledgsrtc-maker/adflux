@@ -317,7 +317,7 @@ export function SendOfferModal({ onClose, onCreated, prefill, editOffer = null }
         <div className="md">
           <div className="md-h">
             <div className="md-t">Sent to the owner for approval</div>
-            <button className="md-x" onClick={onClose}><X size={18} /></button>
+            <button className="md-x" aria-label="Close" onClick={onClose}><X size={18} /></button>
           </div>
           <div className="md-b">
             <p style={{ fontSize: '.9rem', lineHeight: 1.5 }}>
@@ -340,7 +340,7 @@ export function SendOfferModal({ onClose, onCreated, prefill, editOffer = null }
         <div className="md">
           <div className="md-h">
             <div className="md-t">Offer created — share with candidate</div>
-            <button className="md-x" onClick={onClose}><X size={18} /></button>
+            <button className="md-x" aria-label="Close" onClick={onClose}><X size={18} /></button>
           </div>
 
           <div className="md-b">
@@ -410,7 +410,7 @@ export function SendOfferModal({ onClose, onCreated, prefill, editOffer = null }
       <div className="md">
         <div className="md-h">
           <div className="md-t">{editOffer ? 'Edit offer' : 'Send Offer'}</div>
-          <button className="md-x" onClick={onClose}><X size={18} /></button>
+          <button className="md-x" aria-label="Close" onClick={onClose}><X size={18} /></button>
         </div>
 
         <div className="md-b">

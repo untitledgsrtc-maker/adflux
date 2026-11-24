@@ -376,7 +376,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
       <div className="md">
         <div className="md-h">
           <div className="md-t">{mode === 'add' ? 'Add Team Member' : 'Edit Member'}</div>
-          <button className="md-x" onClick={onClose}><X size={18} /></button>
+          <button className="md-x" aria-label="Close" onClick={onClose}><X size={18} /></button>
         </div>
 
         <div className="md-b">

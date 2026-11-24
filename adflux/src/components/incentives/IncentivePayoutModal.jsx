@@ -93,7 +93,7 @@ export function IncentivePayoutModal({ staff, monthYear, monthLabel, computed, o
           <div className="md-t">
             Incentive Payout — {staff?.name || '—'} · {formatMonthYear(monthYear)}
           </div>
-          <button className="md-x" onClick={onClose}><X size={18} /></button>
+          <button className="md-x" aria-label="Close" onClick={onClose}><X size={18} /></button>
         </div>
 
         <div className="md-b" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

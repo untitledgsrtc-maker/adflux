@@ -1536,6 +1536,7 @@
   .v2d-qlist { display: flex; }
   .v2d-tab-row { width: 100%; overflow-x: auto; flex-wrap: nowrap; padding: 3px; }
   .v2d-tab-pill { padding: 6px 11px; font-size:12px; }
+  .v2d-hr-toolbar .v2d-tab-pill { min-height: 36px; }
   .v2d-tab-count { font-size:12px; padding: 1px 6px; }
   .v2d-filter-row { gap: 8px; }
   .v2d-date-group { width: 100%; }

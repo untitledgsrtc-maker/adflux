@@ -2222,7 +2222,7 @@ export default function GovtProposalDetailV2() {
                   Mark proposal as Sent
                 </div>
                 <button
-                  className="md-x"
+                  className="md-x" aria-label="Close"
                   onClick={() => setShowSentModal(false)}
                   disabled={sentModalBusy || generatingPdf}
                 >✕</button>

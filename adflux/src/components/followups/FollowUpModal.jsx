@@ -63,7 +63,7 @@ export function FollowUpModal({ followUp, mode = 'reschedule', onClose, onResche
               <span>{clientName}</span>
             </div>
           </div>
-          <button className="md-x" onClick={onClose}>✕</button>
+          <button className="md-x" aria-label="Close" onClick={onClose}>✕</button>
         </div>
 
         <div className="md-b">

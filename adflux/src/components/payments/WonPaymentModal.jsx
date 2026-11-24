@@ -225,7 +225,7 @@ export function WonPaymentModal({
               Record payment if collected — or leave blank to mark Won with payment pending
             </div>
           </div>
-          <button className="md-x" onClick={onClose}>✕</button>
+          <button className="md-x" aria-label="Close" onClick={onClose}>✕</button>
         </div>
         <div className="md-b">
           {/* Phase 34R+ — V2Hero strip replacing the previous yellow

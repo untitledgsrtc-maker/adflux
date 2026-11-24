@@ -60,7 +60,7 @@ export default function HRHomeV2() {
     const rows = [
       // Phase 669 - HR's own leave goes to the owner, not onto her own to-do list.
       ...data.lv.filter(r => ['admin', 'co_owner'].includes(profile?.role) || r.user_id !== profile?.id).map(r => ({ key: 'l' + r.id, Icon: CalendarCheck, kind: 'Leave', who: n(r.user_id), what: `${dd(r.leave_date)}${r.is_half_day ? ' (half day)' : ''}${r.leave_type ? ' · ' + r.leave_type : ''}`, at: r.created_at, action: 'Approve / reject', go: '/admin/leaves' })),
-      ...data.ta.map(r => ({ key: 't' + r.id, Icon: Wallet, kind: 'TA / DA claim', who: n(r.user_id), what: `${r.kind === 'ta_override' ? `${r.claim_km || 0} km` : money(r.claim_amount)} · ${TA_KIND[r.kind] || r.kind || 'claim'}${r.city ? ' · ' + r.city : ''} · ${dd(r.claim_date)}`, at: r.created_at, action: 'Check claim', go: '/admin/ta-payouts' })),
+      ...data.ta.map(r => ({ key: 't' + r.id, Icon: Wallet, kind: 'TA / DA claim', who: n(r.user_id), what: `${r.kind === 'ta_override' ? `${r.claim_km || 0} km` : (r.claim_amount == null ? 'amount not filled' : money(r.claim_amount))} · ${TA_KIND[r.kind] || r.kind || 'claim'}${r.city ? ' · ' + r.city : ''} · ${dd(r.claim_date)}`, at: r.created_at, action: 'Check claim', go: '/admin/ta-payouts' })),
       // Phase 669 - a candidate who already has an open offer is not a 'new candidate' job.
       ...data.cand.filter(r => !data.of.some(o => o.candidate_id === r.id)).map(r => ({ key: 'c' + r.id, Icon: ClipboardList, kind: 'New candidate', who: r.name, what: r.role_applied || 'applied', at: r.created_at, action: 'Call / shortlist', go: '/hr/candidates' })),
       ...data.of.flatMap(r => {
