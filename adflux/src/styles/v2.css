@@ -828,6 +828,8 @@
 .v2d-period button:hover:not(:disabled):not(.is-active) { color: var(--v2-ink-0); background: rgba(255,255,255,.04); }
 .v2d-period button:disabled { opacity: 0.35; cursor: not-allowed; }
 .v2d-period .is-active { background: var(--v2-yellow); color: var(--v2-yellow-ink); }
+/* Phase 682 - period arrows were 42x26 on a phone; give them a finger-sized target */
+@media (max-width: 720px) { .v2d-period button { min-height: 36px; } .v2d-period button[aria-label="Previous period"], .v2d-period button[aria-label="Next period"] { min-width: 40px; } }
 
 .v2d-cta { background: var(--v2-yellow); color: var(--v2-yellow-ink); border: 0; font-family: var(--v2-display); font-weight: 700; font-size: 13px; padding: 10px 18px; border-radius: var(--v2-r-pill); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: var(--v2-shadow-fab); white-space: nowrap; }
 .v2d-cta:hover { transform: translateY(-1px); }
