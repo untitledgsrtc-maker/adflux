@@ -250,7 +250,9 @@ export default function CoachTeamV2() {
 
 // Phase 688: two-line chart, 0-100 %, gaps where a day has no number (Sunday, holiday, no tasks due)
 function MoveChart({ data }) {
-  const W = 640, H = 170, L = 34, R = 10, T = 10, B = 24
+  // drawn at phone size on a phone, so the labels stay readable instead of shrinking with the picture
+  const narrow = typeof window !== 'undefined' && window.innerWidth < 560
+  const W = narrow ? 340 : 640, H = narrow ? 190 : 170, L = 34, R = 10, T = 10, B = 24
   const x = (i) => L + (data.length <= 1 ? 0 : (i * (W - L - R)) / (data.length - 1))
   const y = (v) => T + (H - T - B) * (1 - v / 100)
   const segs = (key) => {
