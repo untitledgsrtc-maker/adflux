@@ -22261,3 +22261,7 @@ HR (and office_admin) cannot read push_subscriptions (device push keys), so ever
 ## 676 · Send offer targets follow the role (2026-11-24)
 
 Phase 665 missed SendOfferModal (still asked sales for Calls / day; "Quotes / day" was really per week). designationTargetKind moved to src/utils/hrOffer.js (shared by HRNewUserV2 + SendOfferModal). Offer form: telecaller = calls/day, sales = meetings/day (default 5), quotes / week, follow-ups; heads + other roles show a note, no targets. hr_offers.min_meetings added (supabase_phase676); offerTargets copies it to daily_targets on Convert. Offer detail line shows meetings for sales.
+
+## 677 · HR offer roles + Proprietor team role (2026-11-24)
+
+All 16 designations tested as HR in a rolled-back transaction: 13 create logins; Proprietor / Partner in Government / Admin are refused (HR mint ceiling). SendOfferModal now hides auth_role admin/co_owner designations for hr. designations Proprietor team_role owner -> admin (owner failed users_team_role_check for everyone).

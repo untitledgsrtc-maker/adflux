@@ -20,6 +20,7 @@ import { shortenUrl, openWhatsApp } from '../../utils/whatsapp'
 import { phoneLast10 } from '../../utils/phone'
 import { formatCurrency } from '../../utils/formatters'
 import { confirmDialog } from '../v2/ConfirmDialog'
+import { useAuthStore } from '../../store/authStore'
 
 function Field({ label, required, error, hint, children }) {
   return (
@@ -91,7 +92,8 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
       .select('id, name, auth_role, team_role, has_incentive, default_allow_ta, default_allow_da, default_allow_hotel, default_allow_other, default_min_calls, default_min_quotes, default_min_followups')
       .eq('is_active', true)
       .order('display_order')
-      .then(({ data }) => { if (alive && data) setDesignations(data) })
+      // Phase 677 - HR cannot create owner / partner / admin logins, so those roles are not offered to her
+      .then(({ data }) => { if (alive && data) setDesignations(useAuthStore.getState().profile?.role === 'hr' ? data.filter(d => !['admin', 'co_owner'].includes(d.auth_role)) : data) })
     // Phase 618 - managers for the new hire (same list HRNewUserV2 uses)
     supabase.from('users').select('id, name, team_role').in('team_role', ['sales_manager', 'admin']).eq('is_active', true).order('name')
       .then(({ data }) => { if (alive && data) setManagers(data) })
