@@ -36,6 +36,19 @@ export function useTeam() {
     if (!readErr) store.upsertMember(data)
     return { data, error: readErr }
   }
+  // Phase 680 - HR edits everyday details through hr_update_member, then re-reads the row.
+  const hrUpdateMember = async (id, w) => {
+    const { error } = await supabase.rpc('hr_update_member', {
+      p_user_id: id, p_name: w.name, p_designation: w.designation,
+      p_whatsapp_number: w.whatsapp_number, p_signature_mobile: w.signature_mobile,
+      p_city: w.city, p_wa_business: w.wa_business,
+    })
+    if (error) return { data: null, error }
+    const { data, error: readErr } = await supabase
+      .from('users').select('*, staff_incentive_profiles(*)').eq('id', id).single()
+    if (!readErr) store.upsertMember(data)
+    return { data, error: readErr }
+  }
   const deactivateMember = (id) => setActive(id, false)
   const reactivateMember = (id) => setActive(id, true)
 
@@ -75,6 +88,7 @@ export function useTeam() {
     activeMembers: store.members.filter(m => m.is_active),
     fetchMembers,
     updateMember,
+    hrUpdateMember,
     deactivateMember,
     reactivateMember,
     deleteMember,

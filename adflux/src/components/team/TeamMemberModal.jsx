@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { supabase, supabaseSignup } from '../../lib/supabase'
 import { useTeam } from '../../hooks/useTeam'
+import { useAuthStore } from '../../store/authStore'
 
 // Phase 11g — owner spec (4 May 2026): agency role added.
 // Phase 26b — owner spec (7 May 2026): telecaller + office_staff
@@ -64,7 +65,11 @@ function Field({ label, required, error, hint, children }) {
 }
 
 export function TeamMemberModal({ mode = 'add', member = null, onClose, onSuccess }) {
-  const { updateMember } = useTeam()
+  const { updateMember, hrUpdateMember } = useTeam()
+  // Phase 680 - HR edits everyday details through hr_update_member (she has no direct
+  // update on users). Role / segment / agency terms stay admin-only, so they lock for her.
+  const myRole = useAuthStore(s => s.profile?.role)
+  const hrEdit = mode === 'edit' && myRole === 'hr'
 
   const [form, setForm] = useState({
     name:           member?.name || '',
@@ -351,7 +356,9 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
         onClose()
         return
       }
-      const { error } = await updateMember(member.id, updatePayload)
+      const { error } = hrEdit
+        ? await hrUpdateMember(member.id, wanted)
+        : await updateMember(member.id, updatePayload)
       if (error) {
         setServerError(error.message || 'Failed to update member')
         setSaving(false)
@@ -416,7 +423,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
           )}
 
           <Field label="Role" required>
-            <select value={form.role} onChange={e => set('role', e.target.value)} disabled={freshLoading}>
+            <select value={form.role} onChange={e => set('role', e.target.value)} disabled={freshLoading || hrEdit}>
               {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               {!ROLES.some(r => r.value === form.role) && (
                 <option value={form.role}>{OTHER_ROLE_LABELS[form.role] || form.role}</option>
@@ -474,6 +481,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
               <select
                 value={form.segment_access}
                 onChange={e => set('segment_access', e.target.value)}
+                disabled={hrEdit}
               >
                 {SEGMENT_SCOPES.map(s => (
                   <option key={s.value} value={s.value}>{s.label}</option>
@@ -506,6 +514,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
                   placeholder="e.g. 5.00"
                   value={form.agency_commission_percent}
                   onChange={e => set('agency_commission_percent', e.target.value)}
+                  disabled={hrEdit}
                   style={errors.agency_commission_percent ? { borderColor: 'var(--red)' } : {}}
                 />
               </Field>
@@ -529,7 +538,7 @@ export function TeamMemberModal({ mode = 'add', member = null, onClose, onSucces
                 <select
                   value={form.default_signer_user_id}
                   onChange={e => set('default_signer_user_id', e.target.value)}
-                  disabled={signersLoading || signers.length === 0}
+                  disabled={hrEdit || signersLoading || signers.length === 0}
                 >
                   <option value="">— unassigned (agency cannot ship govt yet) —</option>
                   {signers.map(s => (
