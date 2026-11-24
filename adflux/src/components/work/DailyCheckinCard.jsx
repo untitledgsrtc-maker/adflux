@@ -33,7 +33,7 @@ function Line({ label, done, total, missing, closed, note, canSend, kind, onSend
                 <div className="wk-grp" style={{ gap: 6 }}>
                   <span className="wk-sm">Not yet:</span>
                   {shown.map((n) => canSend
-                    ? <button key={n.id} type="button" className={`wk-pill ${sel.includes(n.id) ? 'ok' : 'warn'}`} style={{ cursor: 'pointer', border: 0 }} aria-pressed={sel.includes(n.id)} onClick={() => toggle(n.id)}>{sel.includes(n.id) ? '\u2713 ' : ''}{first(n.name)}</button>
+                    ? <button key={n.id} type="button" className={`wk-pill ${sel.includes(n.id) ? 'ok' : 'warn'}`} style={{ cursor: 'pointer', border: 0, height: 32 }} aria-pressed={sel.includes(n.id)} onClick={() => toggle(n.id)}>{sel.includes(n.id) ? '\u2713 ' : ''}{first(n.name)}</button>
                     : <span key={n.id} className="wk-pill warn">{first(n.name)}</span>)}
                   {!all && missing.length > 5 && <button className="wk-btn g sm" onClick={() => setAll(true)}>+{missing.length - 5} more</button>}
                   {all && missing.length > 5 && <button className="wk-btn g sm" onClick={() => setAll(false)}>Less</button>}

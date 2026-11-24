@@ -21,7 +21,9 @@ const ago = (ts) => {
   const days = Math.floor((Date.now() - Date.parse(ts)) / 86400000)
   return days <= 0 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`
 }
-const money = (n) => 'Rs ' + Math.round(Number(n) || 0).toLocaleString('en-IN')
+const money = (n) => '\u20B9' + Math.round(Number(n) || 0).toLocaleString('en-IN')
+// same labels the TA Claims page shows (Phase 36.7 kinds)
+const TA_KIND = { ta_override: 'TA km', da_night: 'DA night', hotel: 'Hotel', other: 'Other' }
 
 export default function HRHomeV2() {
   const nav = useNavigate()
@@ -36,7 +38,7 @@ export default function HRHomeV2() {
     ;(async () => {
       const [lv, ta, cand, of] = await Promise.all([
         supabase.from('leaves').select('id, user_id, leave_date, leave_type, is_half_day, created_at').eq('status', 'pending').order('created_at').limit(50),
-        supabase.from('ta_da_requests').select('id, user_id, claim_date, kind, claim_amount, city, created_at').eq('status', 'pending').order('created_at').limit(50),
+        supabase.from('ta_da_requests').select('id, user_id, claim_date, kind, claim_amount, claim_km, city, created_at').eq('status', 'pending').order('created_at').limit(50),
         supabase.from('hr_candidates').select('id, name, role_applied, created_at').eq('stage', 'applied').order('created_at').limit(50),
         supabase.from('hr_offers').select('id, candidate_id, candidate_name, position, status, created_at, updated_at').in('status', ['pending_approval', 'approved', 'draft', 'sent', 'filled', 'accepted']).order('updated_at').limit(50),
       ])
@@ -58,7 +60,7 @@ export default function HRHomeV2() {
     const rows = [
       // Phase 669 - HR's own leave goes to the owner, not onto her own to-do list.
       ...data.lv.filter(r => ['admin', 'co_owner'].includes(profile?.role) || r.user_id !== profile?.id).map(r => ({ key: 'l' + r.id, Icon: CalendarCheck, kind: 'Leave', who: n(r.user_id), what: `${dd(r.leave_date)}${r.is_half_day ? ' (half day)' : ''}${r.leave_type ? ' · ' + r.leave_type : ''}`, at: r.created_at, action: 'Approve / reject', go: '/admin/leaves' })),
-      ...data.ta.map(r => ({ key: 't' + r.id, Icon: Wallet, kind: 'TA / DA claim', who: n(r.user_id), what: `${money(r.claim_amount)} · ${r.kind || 'claim'}${r.city ? ' · ' + r.city : ''} · ${dd(r.claim_date)}`, at: r.created_at, action: 'Check claim', go: '/admin/ta-payouts' })),
+      ...data.ta.map(r => ({ key: 't' + r.id, Icon: Wallet, kind: 'TA / DA claim', who: n(r.user_id), what: `${r.kind === 'ta_override' ? `${r.claim_km || 0} km` : money(r.claim_amount)} · ${TA_KIND[r.kind] || r.kind || 'claim'}${r.city ? ' · ' + r.city : ''} · ${dd(r.claim_date)}`, at: r.created_at, action: 'Check claim', go: '/admin/ta-payouts' })),
       // Phase 669 - a candidate who already has an open offer is not a 'new candidate' job.
       ...data.cand.filter(r => !data.of.some(o => o.candidate_id === r.id)).map(r => ({ key: 'c' + r.id, Icon: ClipboardList, kind: 'New candidate', who: r.name, what: r.role_applied || 'applied', at: r.created_at, action: 'Call / shortlist', go: '/hr/candidates' })),
       ...data.of.flatMap(r => {

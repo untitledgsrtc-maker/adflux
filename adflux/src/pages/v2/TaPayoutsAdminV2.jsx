@@ -606,7 +606,9 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
             </div>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+            {/* Phase 679 - claim requests are labelled cards on a phone too, so Approve / Reject are in view */}
+            <style>{TA_CARD_CSS}</style>
+            <table className="ta-days" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--v2-line)', color: 'var(--v2-ink-2)' }}>
                   <th style={thStyle}>Rep</th>
@@ -633,16 +635,16 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                   }[req.kind] || { label: req.kind, bg: 'rgba(255,255,255,0.06)', fg: 'var(--v2-ink-1)' }
                   return (
                     <tr key={req.id} style={{ borderBottom: '1px solid var(--v2-line)' }}>
-                      <td style={tdStyle}>
+                      <td data-label="Rep" style={tdStyle}>
                         <span style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>
                           {req.users?.name || '—'}
                         </span>
                       </td>
-                      <td style={tdStyle}>
+                      <td data-label="Date" style={tdStyle}>
                         <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>{fmtDateShort(req.claim_date)}</div>
                         <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{fmtDow(req.claim_date)}</div>
                       </td>
-                      <td style={tdStyle}>
+                      <td data-label="Kind" style={tdStyle}>
                         <span style={{
                           display: 'inline-block', padding: '2px 10px',
                           borderRadius: 999, fontSize: 12, fontWeight: 600,
@@ -652,13 +654,13 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                           {kindMeta.label}
                         </span>
                       </td>
-                      <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>
+                      <td data-label="Claim" style={{ ...tdStyle, textAlign: 'right', fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>
                         {claimDisplay}
                       </td>
-                      <td style={tdStyle}>
+                      <td data-label="City" style={tdStyle}>
                         <span style={{ color: 'var(--v2-ink-1)' }}>{req.city || '—'}</span>
                       </td>
-                      <td style={tdStyle}>
+                      <td data-label="Reason" style={tdStyle}>
                         <span style={{
                           color: 'var(--v2-ink-2)', fontSize: 12,
                           display: 'inline-block', maxWidth: 220,
@@ -667,7 +669,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                           {req.reason || '—'}
                         </span>
                       </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                      <td data-label="Action" style={{ ...tdStyle, textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
                           <button
                             onClick={() => handleApproveRequest(req)}
@@ -857,6 +859,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
           display: 'inline-flex', gap: 4, padding: 3,
           background: 'var(--v2-bg-2)', borderRadius: 999,
           border: '1px solid var(--v2-line)',
+          maxWidth: '100%', overflowX: 'auto',  // Phase 679: phone was clipping Paid / Rejected
         }}>
           {[
             { key: 'all',      label: 'All' },
@@ -949,13 +952,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
         ) : (
           <div style={{ overflowX: 'auto' }}>
             {/* Phase 674 - on a phone each TA day is a labelled card instead of a 10-column table */}
-            <style>{`@media (max-width: 720px) {
-              .ta-days thead { display: none; }
-              .ta-days, .ta-days tbody, .ta-days tr, .ta-days td { display: block; width: 100%; }
-              .ta-days tr { border: 1px solid var(--v2-line, var(--border)); border-radius: 14px; margin-bottom: 10px; padding: 6px 12px; }
-              .ta-days td { display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: right !important; padding: 6px 0 !important; border: 0 !important; }
-              .ta-days td::before { content: attr(data-label); color: var(--v2-ink-2, var(--text-muted)); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; text-align: left; }
-            }`}</style>
+            <style>{TA_CARD_CSS}</style>
             <table className="v2d-table ta-days" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--v2-line)', color: 'var(--v2-ink-2)' }}>
@@ -1161,5 +1158,15 @@ const actionBase = { minHeight: 32, padding: '0 10px', fontSize: 12, fontWeight:
 const approveBtn = { ...actionBase, color: 'var(--v2-green, #22c55e)', borderColor: 'var(--v2-green, #22c55e)', background: 'var(--v2-green-soft, rgba(34,197,94,.12))' }
 const rejectBtn  = { ...actionBase, color: 'var(--v2-rose, #f43f5e)',  borderColor: 'var(--v2-rose, #f43f5e)',  background: 'var(--v2-rose-soft, rgba(244,63,94,.12))' }
 const paidBtn    = { ...actionBase, color: 'var(--v2-ink-0)', borderColor: 'var(--v2-line)' }
+// Phase 674 / 679 - on a phone each TA day and each claim request is a labelled card, not a wide table
+const TA_CARD_CSS = `@media (max-width: 720px) {
+  .ta-days { min-width: 0 !important; }
+  .ta-days thead { display: none; }
+  .ta-days, .ta-days tbody, .ta-days tr, .ta-days td { display: block; width: 100%; }
+  .ta-days tr { border: 1px solid var(--v2-line, var(--border)); border-radius: 14px; margin-bottom: 10px; padding: 6px 12px; }
+  .ta-days td { display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: right !important; padding: 6px 0 !important; border: 0 !important; }
+  .ta-days td::before { content: attr(data-label); color: var(--v2-ink-2, var(--text-muted)); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; text-align: left; }
+  .ta-days td span[title] { white-space: normal !important; max-width: 70% !important; }
+}`
 const thStyle = { padding: '10px 14px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '.08em' }
 const tdStyle = { padding: '12px 14px', fontSize: 13, color: 'var(--v2-ink-1)', verticalAlign: 'top' }
