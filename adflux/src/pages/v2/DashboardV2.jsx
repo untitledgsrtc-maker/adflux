@@ -53,6 +53,10 @@ export default function DashboardV2() {
   if (profile?.role === 'staff')               return <Navigate to="/my-work" replace />
   // Phase 391 - office admin never sees the sales dashboard.
   if (profile?.role === 'office_admin')        return <Navigate to="/office" replace />
+  // Phase 671 - HR and Accounts never see the sales dashboard either (login can reach /dashboard before the
+  // profile is loaded; once it is, send them home - same landing as RootRedirect).
+  if (profile?.role === 'hr')                  return <Navigate to="/hr" replace />
+  if (profile?.role === 'accounts')            return <Navigate to="/people" replace />
 
   // Phase 595 - sales head gets the admin dashboard scoped to his team (see isMgr inside)
   if (isPrivileged || profile?.team_role === 'sales_manager') return <AdminDashboardDesktop />
