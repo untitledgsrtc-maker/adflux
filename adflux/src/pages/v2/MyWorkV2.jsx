@@ -417,7 +417,7 @@ export default function MyWorkV2() {
       )}
 
       {newTask && (
-        <NewTaskModal projects={projects} users={users} meId={uid} onAddProject={addProject}
+        <NewTaskModal projects={projects} users={profile?.role === 'hr' ? users.filter((u) => u.id === uid) /* Phase 673: HR adds tasks only for herself */ : users} meId={uid} onAddProject={addProject}
           onClose={() => setNewTask(false)} onCreated={() => { setNewTask(false); load() }} />
       )}
       {openTask && (

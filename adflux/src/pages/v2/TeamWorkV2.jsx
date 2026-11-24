@@ -203,7 +203,7 @@ export default function TeamWorkV2() {
   const memberIds = members.map((m) => m.user_id)
   const sharedSet = new Set(shares.map((s) => s.user_id))
   const needs = [
-    !viewOnly && pending.length > 0 && { key: 'pend', icon: Clock, tone: 'warn', pill: 'Waiting', action: 'Review', text: `${pending.length} forgotten-time request${pending.length > 1 ? 's' : ''}`, sub: [...new Set(pending.map((e) => nameOf(e.user_id).split(' ')[0]))].join(', '), go: () => setTab('approvals') },
+    pending.length > 0 && { key: 'pend', icon: Clock, tone: 'warn', pill: 'Waiting', action: 'Review', text: `${pending.length} forgotten-time request${pending.length > 1 ? 's' : ''}`, sub: [...new Set(pending.map((e) => nameOf(e.user_id).split(' ')[0]))].join(', '), go: () => setTab('approvals') },
     lateParts.length > 0 && { key: 'late', icon: AlertTriangle, tone: 'bad', pill: 'Overdue', action: 'Open', text: `${lateParts.length} task${lateParts.length > 1 ? 's' : ''} past due date`, sub: [...new Set(lateParts.map((p) => p.task?.title).filter(Boolean))].slice(0, 2).join(' · '), go: () => setTab('tasks') },
   ].filter(Boolean)
   const firedToday = parts.filter((p) => p.task?.template_id && p.task?.created_at >= dayStartISO(today))
@@ -233,7 +233,7 @@ export default function TeamWorkV2() {
       )}
 
       <div className="wk-tabs" role="tablist" style={{ width: '100%', display: 'flex', overflowX: 'auto' }}>
-        {TABS.filter(([k]) => (k !== 'insights' || isAdmin) && !(viewOnly && ['clients', 'activity', 'approvals'].includes(k))).map(([k, l]) => (
+        {TABS.filter(([k]) => (k !== 'insights' || isAdmin) && !(viewOnly && ['clients', 'activity'].includes(k))   /* Phase 673: HR approves forgotten time again */).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} className={`wk-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
             {l}{k === 'approvals' && pending.length > 0 && <span className="wk-cnt">{pending.length}</span>}
           </button>
