@@ -100,7 +100,7 @@ const OpsFixV2 = lazyWithRetry(() => import('./pages/v2/OpsFixV2'))
 const MessagesV2 = lazyWithRetry(() => import('./pages/v2/MessagesV2'))
 const PushDebugV2 = lazyWithRetry(() => import('./pages/v2/PushDebugV2'))
 const TelecallerV2 = lazyWithRetry(() => import('./pages/v2/TelecallerV2'))
-import ErrorBoundary       from './components/v2/ErrorBoundary'
+import ErrorBoundary, { reloadToNewVersion } from './components/v2/ErrorBoundary'
 const VoiceLogV2 = lazyWithRetry(() => import('./pages/v2/VoiceLogV2'))
 const FollowUpsV2 = lazyWithRetry(() => import('./pages/v2/FollowUpsV2'))
 const EveningVoiceV2 = lazyWithRetry(() => import('./pages/v2/EveningVoiceV2'))
@@ -130,7 +130,7 @@ function lazyWithRetry(factory) {
     const last = Number(sessionStorage.getItem('chunkReloadAt')) || 0
     if (Date.now() - last > 10000) {
       sessionStorage.setItem('chunkReloadAt', String(Date.now()))
-      window.location.reload()
+      reloadToNewVersion()   // Phase 670: fetch the new version first, else the reload can stay on the old one
       return new Promise(() => {})   // hold render until the reload takes over
     }
     throw err

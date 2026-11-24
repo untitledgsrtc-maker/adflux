@@ -13,6 +13,25 @@ import { Component } from 'react'
 
 // Phase 430 - a new deploy removes the old page files; a phone still on the old version then fails to load a page
 // ("Failed to fetch dynamically imported module"). Reload once automatically to pick up the new version.
+// Phase 670 - reloading alone can come back to the SAME old version: the offline copy (service worker) still
+// holds the old start page, which asks for files the new deploy removed -> blank screen. So ask the worker for
+// the new version first; a new worker takes over by itself (sw.js skipWaiting + claim). Wait for it at most 5 s,
+// then reload either way. Push subscriptions are untouched (the worker is updated, never removed).
+export function reloadToNewVersion() {
+  const go = () => window.location.reload()
+  const sw = typeof navigator !== 'undefined' && navigator.serviceWorker
+  if (!sw || !sw.getRegistration) { go(); return }
+  let done = false
+  const finish = () => { if (!done) { done = true; go() } }
+  sw.addEventListener('controllerchange', finish, { once: true })
+  setTimeout(finish, 5000)
+  sw.getRegistration()
+    .then(reg => (reg ? reg.update() : null))
+    .then(() => sw.getRegistration())
+    .then(reg => { if (!reg || (!reg.installing && !reg.waiting)) finish() })   // already newest: reload now
+    .catch(finish)
+}
+
 export function reloadOnceForStaleChunk(err) {
   const m = String(err?.message || err || '')
   if (!/dynamically imported module|Importing a module script failed|Loading chunk|error loading dynamically/i.test(m)) return false
@@ -21,7 +40,7 @@ export function reloadOnceForStaleChunk(err) {
     if (Date.now() - last < 60000) return false
     sessionStorage.setItem('stale_chunk_reload', String(Date.now()))
   } catch { /* storage blocked: still try once */ }
-  window.location.reload()
+  reloadToNewVersion()
   return true
 }
 
