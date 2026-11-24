@@ -22265,3 +22265,7 @@ Phase 665 missed SendOfferModal (still asked sales for Calls / day; "Quotes / da
 ## 677 · HR offer roles + Proprietor team role (2026-11-24)
 
 All 16 designations tested as HR in a rolled-back transaction: 13 create logins; Proprietor / Partner in Government / Admin are refused (HR mint ceiling). SendOfferModal now hides auth_role admin/co_owner designations for hr. designations Proprietor team_role owner -> admin (owner failed users_team_role_check for everyone).
+
+## 678 · Team Work summary readable on a phone (2026-11-24)
+
+work-glass.css @media (max-width: 560px): .wk-hsegs 2x2 grid, ring below (.wkg-herow column), title row wraps, numbers no-wrap 26px. Only TeamWorkV2 uses .wk-hsegs / .wkg-herow; desktop unchanged.

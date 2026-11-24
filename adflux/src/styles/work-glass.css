@@ -56,3 +56,17 @@
   .wk-glass *, .wk-glass *::before, .wk-glass *::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; }
   .wkg-ring .fg { stroke-dashoffset: var(--wkg-off, 238.8); }
 }
+
+/* Phase 678 - Team Work summary on a phone: 4 numbers in a 2x2 grid, ring below, title + button stack.
+   Was one row of 4 squeezed columns (labels ran into each other, numbers broke over lines). */
+@media (max-width: 560px) {
+  .wkg-herow { flex-direction: column; align-items: stretch; }
+  .wkg-herow > .wkg-ring { align-self: center; }
+  .wk-hero > .wk-row:first-child, .wkg-main > .wk-row:first-child { flex-wrap: wrap; gap: 10px; }
+  .wk-hsegs { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; row-gap: 14px; }
+  .wk-hseg, .wk-hseg:first-child { padding: 0 12px; }
+  .wk-hseg + .wk-hseg { border-left: 0; }
+  .wk-hseg:nth-child(2n) { border-left: 1px solid rgba(255, 255, 255, .16); }
+  .wk-hseg:nth-child(2n+1) { padding-left: 0; }
+  .wk-hseg .wk-num { font-size: 26px !important; white-space: nowrap; }
+}
