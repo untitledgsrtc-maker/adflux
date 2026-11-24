@@ -34,6 +34,9 @@ export default function TeamWorkV2() {
   const role = profile?.role
   const isAdmin = role === 'admin'
   const canCost = role === 'admin' || role === 'accounts'
+  // Phase 672 - HR opens Team Work VIEW-ONLY (sees everyone; no change buttons). The database refuses her changes
+  // anyway (every change function is head-only). A head who is also HR keeps full head controls.
+  const viewOnly = role === 'hr'
   const today = istTodayISO()
 
   const [tab, setTab] = useState('overview')
@@ -200,7 +203,7 @@ export default function TeamWorkV2() {
   const memberIds = members.map((m) => m.user_id)
   const sharedSet = new Set(shares.map((s) => s.user_id))
   const needs = [
-    pending.length > 0 && { key: 'pend', icon: Clock, tone: 'warn', pill: 'Waiting', action: 'Review', text: `${pending.length} forgotten-time request${pending.length > 1 ? 's' : ''}`, sub: [...new Set(pending.map((e) => nameOf(e.user_id).split(' ')[0]))].join(', '), go: () => setTab('approvals') },
+    !viewOnly && pending.length > 0 && { key: 'pend', icon: Clock, tone: 'warn', pill: 'Waiting', action: 'Review', text: `${pending.length} forgotten-time request${pending.length > 1 ? 's' : ''}`, sub: [...new Set(pending.map((e) => nameOf(e.user_id).split(' ')[0]))].join(', '), go: () => setTab('approvals') },
     lateParts.length > 0 && { key: 'late', icon: AlertTriangle, tone: 'bad', pill: 'Overdue', action: 'Open', text: `${lateParts.length} task${lateParts.length > 1 ? 's' : ''} past due date`, sub: [...new Set(lateParts.map((p) => p.task?.title).filter(Boolean))].slice(0, 2).join(' · '), go: () => setTab('tasks') },
   ].filter(Boolean)
   const firedToday = parts.filter((p) => p.task?.template_id && p.task?.created_at >= dayStartISO(today))
@@ -214,7 +217,7 @@ export default function TeamWorkV2() {
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <Link to="/my-work" className="wk-btn o">My work</Link>
-          <button className="wk-btn y" onClick={() => setNewTask(true)}><Plus size={16} aria-hidden="true" /> New task</button>
+          {!viewOnly && <button className="wk-btn y" onClick={() => setNewTask(true)}><Plus size={16} aria-hidden="true" /> New task</button>}
         </div>
       </div>
 
@@ -230,7 +233,7 @@ export default function TeamWorkV2() {
       )}
 
       <div className="wk-tabs" role="tablist" style={{ width: '100%', display: 'flex', overflowX: 'auto' }}>
-        {TABS.filter(([k]) => k !== 'insights' || isAdmin).map(([k, l]) => (
+        {TABS.filter(([k]) => (k !== 'insights' || isAdmin) && !(viewOnly && ['clients', 'activity', 'approvals'].includes(k))).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} className={`wk-tab${tab === k ? ' on' : ''}`} onClick={() => setTab(k)}>
             {l}{k === 'approvals' && pending.length > 0 && <span className="wk-cnt">{pending.length}</span>}
           </button>
@@ -314,8 +317,8 @@ export default function TeamWorkV2() {
                             <span className="wk-num">{fmtClock((now - new Date(r.started_at)) / 1000)}</span>
                             <div className="wk-sm">since {fmtTimeIST(r.started_at)}</div>
                           </span>
-                          <button type="button" className="wk-btn g sm" disabled={busy} title="Stop this timer (for example a forgotten timer)"
-                            onClick={async () => { if (await confirmDialog({ title: 'Stop this timer?', message: nameOf(r.user_id).split(' ')[0] + "'s running timer will stop now. They get a notice and can start it again.", confirmLabel: 'Stop timer', danger: true })) rpc('work_stop_person_timer', { p_user: r.user_id }, 'Timer stopped.') }}>Stop</button>
+                          {!viewOnly && <button type="button" className="wk-btn g sm" disabled={busy} title="Stop this timer (for example a forgotten timer)"
+                            onClick={async () => { if (await confirmDialog({ title: 'Stop this timer?', message: nameOf(r.user_id).split(' ')[0] + "'s running timer will stop now. They get a notice and can start it again.", confirmLabel: 'Stop timer', danger: true })) rpc('work_stop_person_timer', { p_user: r.user_id }, 'Timer stopped.') }}>Stop</button>}
                         </span>
                       </div>
                     ))}
@@ -375,8 +378,8 @@ export default function TeamWorkV2() {
               </button>
             )}
           </div>
-          <div className="wk-sm" style={{ marginTop: 8 }}>Drag a card to change its status. A task with several people finishes when every part is finished.</div>
-          <WorkBoard items={items} uid={uid} showCost={canCost} actForAll onMove={(id, to2) => rpc('work_move_part', { p_part: id, p_to: to2 })}
+          {!viewOnly && <div className="wk-sm" style={{ marginTop: 8 }}>Drag a card to change its status. A task with several people finishes when every part is finished.</div>}
+          <WorkBoard items={items} uid={uid} showCost={canCost} readOnly={viewOnly} actForAll onMove={(id, to2) => rpc('work_move_part', { p_part: id, p_to: to2 })}
             onStart={(it) => rpc('work_move_part', { p_part: it.id, p_to: 'in_process' })} onFinish={(it) => rpc('work_move_part', { p_part: it.id, p_to: 'finished' })} onOpen={setOpenTask} onPostpone={(it) => setPostponing(it)} />
         </>
       )}
@@ -457,7 +460,7 @@ export default function TeamWorkV2() {
           onClose={() => setNewTask(false)} onCreated={() => { setNewTask(false); load() }} />
       )}
       {openTask && (
-        <TaskDetailModal taskId={openTask} uid={uid} isHead nameOf={nameOf} projectName={projName}
+        <TaskDetailModal taskId={openTask} uid={uid} isHead={!viewOnly} nameOf={nameOf} projectName={projName}
           onClose={() => setOpenTask(null)} onChanged={load} />
       )}
     </div>

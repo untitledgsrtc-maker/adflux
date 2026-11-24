@@ -28,7 +28,7 @@ function duePill(it) {
   return { cls: 'ok', Icon: Check, text: `On track, ${short}` }
 }
 
-export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, onPostpone, uid, runningPartId = null, showCost, actForAll, emptyText = 'Drop a task here' }) {
+export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, onPostpone, uid, runningPartId = null, showCost, actForAll, readOnly = false, emptyText = 'Drop a task here' }) {
   const [drag, setDrag] = useState(null)
   const [over, setOver] = useState('')
   const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches)
@@ -63,7 +63,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
               onDragLeave={() => setOver('')}
               onDrop={(e) => {
                 e.preventDefault(); setOver('')
-                if (drag && drag.status !== c.key) { if (c.key === 'postponed') onPostpone?.(drag); else onMove(drag.id, c.key) }
+                if (!readOnly && drag && drag.status !== c.key) { if (c.key === 'postponed') onPostpone?.(drag); else onMove(drag.id, c.key) }
                 setDrag(null)
               }}
             >
@@ -76,14 +76,14 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
               </div>
               <div className="wk-bar"><i style={{ width: `${Math.round(rows.length / total * 100)}%`, background: c.color }} /></div>
               {rows.map((it) => {
-                const mine = !!actForAll || it.assigneeId === uid
+                const mine = !readOnly && (!!actForAll || it.assigneeId === uid)   // Phase 672: view-only board shows no action buttons
                 const dp = duePill(it)
                 const Pi = dp.Icon
                 return (
                   <div
                     key={it.id}
                     className={`wk-tk${drag?.id === it.id ? ' drag' : ''}${it.status === 'finished' ? ' done' : ''}${dp.cls === 'bad' && it.status !== 'finished' ? ' late' : ''}${it.urgent && it.status !== 'finished' ? ' urgent' : ''}`}
-                    draggable
+                    draggable={!readOnly}
                     tabIndex={0}
                     onDragStart={(e) => { setDrag(it); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', it.id) }}
                     onDragEnd={() => { setDrag(null); setOver('') }}
@@ -91,7 +91,7 @@ export default function WorkBoard({ items, onMove, onOpen, onStart, onFinish, on
                       if (e.key === 'Enter') onOpen(it.taskId)
                       const order = ['assigned', 'in_process', 'finished']
                       const i = order.indexOf(it.status)
-                      if (i < 0) return   // postponed: use the Bring back button
+                      if (i < 0 || readOnly) return   // postponed: use the Bring back button
                       if (e.key === 'ArrowRight' && i < 2) onMove(it.id, order[i + 1])
                       if (e.key === 'ArrowLeft' && i > 0) onMove(it.id, order[i - 1])
                     }}

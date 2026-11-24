@@ -263,7 +263,8 @@ const HR_NAV = [
   { to: '/admin/leaves',      label: 'Leaves',         icon: CheckSquare },
   { to: '/admin/ta-payouts',  label: 'TA Claims',      icon: Wallet },
   { to: '/team',              label: 'Team',           icon: Users },
-  { to: '/team-dashboard',    label: 'Attendance',     icon: MapPin },
+  { to: '/team-dashboard',    label: 'Sales attendance', icon: MapPin },
+  { to: '/team-work',         label: 'Team Work',      icon: ClipboardList },   // Phase 672 - all staff hours + tasks, view-only for HR
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
   { to: '/work-profile',      label: 'My profile',     icon: UserCircle2 },   // Phase 452 - hours, calendar and tasks page for people with no Work-staff menu
 ]
