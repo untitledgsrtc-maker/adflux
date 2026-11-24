@@ -151,6 +151,7 @@ function Section({ title, children }) {
 export function OfferDetailModal({ offer, onClose, onChanged }) {
   const { updateOffer, cancelOffer, markSent } = useOffers()
   const isOwner = useAuthStore(s => s.profile?.role) === 'admin'
+  const isHR = useAuthStore(s => s.profile?.role) === 'hr'   // Phase 667: HR cannot reuse a staff email
   const [apprSalary, setApprSalary] = useState(String(offer.fixed_salary_monthly ?? ''))
   const [apprNote, setApprNote] = useState('')
   const [apprBusy, setApprBusy] = useState(false)
@@ -764,8 +765,12 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
                       background: 'rgba(245,158,11,.10)', border: '1px solid rgba(245,158,11,.35)',
                       borderRadius: 6, padding: 8, fontSize: '.8rem', color: 'var(--fg)', marginBottom: 8,
                     }}>
-                      This email already has a login. Convert will link it and keep
-                      its <strong>existing password</strong> (the one below is ignored).
+                      {!isHR ? (<>
+                        This email already has a login. Convert will link it and keep
+                        its <strong>existing password</strong> (the one below is ignored).
+                      </>) : (
+                        'This email already belongs to a staff member. Convert will be refused - use the new person\'s own email, or ask the admin.'
+                      )}
                     </div>
                   )}
                   {convertErr && (

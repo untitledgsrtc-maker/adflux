@@ -9,6 +9,7 @@ import UserAvatar from '../common/UserAvatar'
 import { MemberStatsCard } from './MemberStatsCard'
 import { TeamMemberModal } from './TeamMemberModal'
 import { useTeam } from '../../hooks/useTeam'
+import { toastError } from '../v2/Toast'
 
 function ConfirmDialog({ title, body, variant = 'danger', onConfirm, onCancel, loading }) {
   return (
@@ -54,10 +55,14 @@ function MemberCard({ member, settings, onDeactivate, onReactivate, onEdit }) {
   async function handleConfirm() {
     setActing(true)
     setDeleteErr('')
-    if (confirm === 'deactivate') {
-      await onDeactivate(member.id)
-    } else if (confirm === 'reactivate') {
-      await onReactivate(member.id)
+    if (confirm === 'deactivate' || confirm === 'reactivate') {
+      // Phase 667 - the result used to be ignored, so a refused change looked like it worked.
+      const res = await (confirm === 'deactivate' ? onDeactivate : onReactivate)(member.id)
+      if (res?.error) {
+        toastError(res.error, confirm === 'deactivate' ? 'Could not deactivate.' : 'Could not reactivate.')
+        setActing(false)
+        return
+      }
     } else if (confirm === 'delete') {
       const { error } = await deleteMember(member.id)
       if (error) {

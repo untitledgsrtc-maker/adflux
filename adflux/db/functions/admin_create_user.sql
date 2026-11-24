@@ -60,6 +60,21 @@ BEGIN
   -- is NOT overwritten — use Studio Auth UI to change.
   SELECT id INTO v_uid FROM auth.users WHERE email = v_email_l;
 
+  -- Phase 667 (owner 2026-11-24): HR may NOT re-point an existing staff member's login.
+  -- Reusing an email used to overwrite that person's role / team / allowances (the owner
+  -- included). HR can still re-run a Convert that half-finished (row made in the last day).
+  -- A login with no staff row (a deleted ex-employee) is refused too, unless made in the last day.
+  IF v_caller_role = 'hr' AND v_uid IS NOT NULL THEN
+    SELECT u.role, u.created_at INTO v_existing FROM public.users u WHERE u.id = v_uid;
+    IF (FOUND AND (v_existing.role IN ('admin', 'co_owner')
+                   OR COALESCE(v_existing.created_at, '-infinity'::timestamptz) < now() - interval '1 day'))
+       OR (NOT FOUND AND EXISTS (SELECT 1 FROM auth.users a WHERE a.id = v_uid
+                                  AND COALESCE(a.created_at, '-infinity'::timestamptz) < now() - interval '1 day')) THEN
+      RAISE EXCEPTION 'This email already belongs to an existing staff member. Use the new person''s own email, or ask the admin.'
+        USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
   IF v_uid IS NULL THEN
     v_uid := gen_random_uuid();
     INSERT INTO auth.users (
