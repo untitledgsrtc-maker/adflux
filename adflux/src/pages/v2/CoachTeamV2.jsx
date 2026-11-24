@@ -13,6 +13,9 @@ import { istTodayISO } from '../../utils/istDate'
 import { coachText, coachLink } from '../../utils/coachText'
 import { openWhatsApp } from '../../utils/whatsapp'
 
+// Phase 687 - readable role tag (was the raw code, e.g. OPERATION_EXECUTIVE)
+const ROLE_LABEL = { operation_executive: 'Ops executive', operation_head: 'Ops head', office_admin: 'Office admin', staff: 'Work team', hr: 'HR' }
+
 function tone(v, good, ok) {
   if (v == null) return 'var(--v2-ink-2, #94a3b8)'
   if (v >= good) return 'var(--v2-green, #10B981)'
@@ -124,10 +127,11 @@ export default function CoachTeamV2() {
       {!loading && !error && rows.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(360px, 100%), 1fr))', gap: 12 }}>
           {rows.filter(r => group === 'all' || (group === 'office' ? r.score_kind === 'ontime' : group === 'ops' ? r.score_kind === 'uptime' : r.score_kind === 'day')).map(r => (
-            <div key={r.id} style={{ padding: 14, borderRadius: 14, background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v2-line, #334155)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                <div style={{ fontFamily: 'var(--v2-display, "Space Grotesk")', fontSize: 17, fontWeight: 600, color: 'var(--v2-ink-0, #f1f5f9)' }}>{r.name}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div key={r.id} style={{ minWidth: 0, padding: 14, borderRadius: 14, background: 'var(--v2-bg-1, #1e293b)', border: '1px solid var(--v2-line, #334155)' }}>
+              {/* Phase 687 - header wraps on a phone (a long role tag pushed the card past the screen edge) */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                <div style={{ minWidth: 0, fontFamily: 'var(--v2-display, "Space Grotesk")', fontSize: 17, fontWeight: 600, color: 'var(--v2-ink-0, #f1f5f9)' }}>{r.name}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
                   {(tips[r.id] || (r.next_actions || []).length > 0) && (
                     <button type="button" className="v2d-ghost" onClick={() => shareOnWhatsApp(r)}
                       title={phones[r.id] ? `Send to ${r.name} on WhatsApp` : 'No WhatsApp number saved - pick the chat'}
@@ -136,7 +140,7 @@ export default function CoachTeamV2() {
                       <span>WhatsApp</span>
                     </button>
                   )}
-                  <div style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, background: 'var(--v2-bg-2, #0f172a)', color: 'var(--v2-ink-2, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{r.role}</div>
+                  <div style={{ fontSize: 12, padding: '3px 8px', borderRadius: 999, background: 'var(--v2-bg-2, #0f172a)', color: 'var(--v2-ink-2, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{ROLE_LABEL[r.role] || String(r.role || '').replace(/_/g, ' ')}</div>
                 </div>
               </div>
 
