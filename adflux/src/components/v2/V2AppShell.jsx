@@ -265,6 +265,7 @@ const HR_NAV = [
   { to: '/team',              label: 'Team',           icon: Users },
   { to: '/team-dashboard',    label: 'Sales attendance', icon: MapPin },
   { to: '/team-work',         label: 'Team Work',      icon: ClipboardList },   // Phase 672 - all staff hours + tasks, view-only for HR
+  { to: '/coach',             label: 'Team Evening',   icon: Lightbulb },   // Phase 686 - HR sees scores and next-day actions
   { to: '/my-work',           label: 'My Work',        icon: Briefcase },   // Phase 417 - every role that can be given a Work task can open it
   { to: '/work-profile',      label: 'My profile',     icon: UserCircle2 },   // Phase 452 - hours, calendar and tasks page for people with no Work-staff menu
 ]
@@ -772,7 +773,7 @@ export function V2AppShell() {
   }
   // Phase 574 — Team Evening is admin + sales manager only; co_owner shares ADMIN_NAV but is govt-scoped (section 42).
   const nav = withOnboarding(withTeam(withSalesHeadApprovals(
-    baseNav.filter((n) => (n.to !== '/coach' || profile?.role === 'admin' || profile?.team_role === 'sales_manager')
+    baseNav.filter((n) => (n.to !== '/coach' || profile?.role === 'admin' || profile?.role === 'hr' || profile?.team_role === 'sales_manager')
       && (n.to !== '/admin/lead-cost' || profile?.role === 'admin')))))
   const mobileNav = withTeam(baseMobileNav)
 

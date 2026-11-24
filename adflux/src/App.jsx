@@ -264,7 +264,8 @@ function RequireManager({ children }) {
 function RequireCoachTeam({ children }) {
   const { profile, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  if (profile?.role !== 'admin' && profile?.team_role !== 'sales_manager') return <Navigate to="/" replace />
+  // Phase 686: HR sees Team Evening too (coach_team_view lets her in like the admin)
+  if (profile?.role !== 'admin' && profile?.role !== 'hr' && profile?.team_role !== 'sales_manager') return <Navigate to="/" replace />
   return children
 }
 
