@@ -131,6 +131,9 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
   const isTeamHead = profile?.team_role === 'sales_manager' && !isAdmin
   const canApprove = isAdmin || isSalesHead || isTeamHead
   const viaRpc = (isSalesHead || isTeamHead) && !isAdmin
+  // Phase 674 - hide controls the database refuses for this role (they looked like they worked)
+  const canTuneTa      = ['admin', 'co_owner'].includes(profile?.role)
+  const canRecomputeTa = ['admin', 'co_owner', 'accounts'].includes(profile?.role)
 
   useEffect(() => {
     if (profile && !canApprove) navigate('/work')
@@ -699,7 +702,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
       {/* Phase 33I (B9 fix) — admin can adjust DA, bike rate, hotel
           and radius per city without going to Supabase Studio. Useful
           when reps report falling outside a city's detection radius. */}
-      {!viaRpc && (
+      {canTuneTa && (   /* Phase 674: only admin / co-owner can save city limits */
       <div className="v2d-panel" style={{ padding: 0, overflow: 'hidden' }}>
         <button
           type="button"
@@ -811,7 +814,7 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
               ))}
             </select>
           </div>
-          {!viaRpc && <button
+          {canRecomputeTa && <button   /* Phase 674: recompute is refused for other roles */
             type="button"
             onClick={handleRecompute}
             disabled={recomputing || !fUser || fUser === 'ALL'}
@@ -945,7 +948,15 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="v2d-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            {/* Phase 674 - on a phone each TA day is a labelled card instead of a 10-column table */}
+            <style>{`@media (max-width: 720px) {
+              .ta-days thead { display: none; }
+              .ta-days, .ta-days tbody, .ta-days tr, .ta-days td { display: block; width: 100%; }
+              .ta-days tr { border: 1px solid var(--v2-line, var(--border)); border-radius: 14px; margin-bottom: 10px; padding: 6px 12px; }
+              .ta-days td { display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: right !important; padding: 6px 0 !important; border: 0 !important; }
+              .ta-days td::before { content: attr(data-label); color: var(--v2-ink-2, var(--text-muted)); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; text-align: left; }
+            }`}</style>
+            <table className="v2d-table ta-days" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--v2-line)', color: 'var(--v2-ink-2)' }}>
                   <th style={thStyle}>Date</th>
@@ -968,18 +979,18 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                     onClick={() => navigate(`/admin/gps/${r.user_id}/${r.ta_date}`)}
                     title="Open this day's GPS route"
                     style={{ borderBottom: '1px solid var(--v2-line)', cursor: 'pointer' }}>
-                    <td style={tdStyle}>
+                    <td data-label="Date" style={tdStyle}>
                       <div style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>{fmtDateShort(r.ta_date)}</div>
                       <div style={{ fontSize: 12, color: 'var(--v2-ink-2)' }}>{fmtDow(r.ta_date)}</div>
                     </td>
                     {fUser === 'ALL' && (
-                      <td style={tdStyle}>
+                      <td data-label="Rep" style={tdStyle}>
                         <span style={{ fontWeight: 600, color: 'var(--v2-ink-0)' }}>
                           {users.find(u => u.id === r.user_id)?.name || '—'}
                         </span>
                       </td>
                     )}
-                    <td style={tdStyle}>
+                    <td data-label="City" style={tdStyle}>
                       {r.primary_city ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <MapPin size={12} style={{ color: 'var(--v2-ink-2)' }} />
@@ -995,16 +1006,16 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                         {r.gps_pings_count || 0} GPS pings
                       </div>
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit' }}>
+                    <td data-label="KM" style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit' }}>
                       {Number(r.km_traveled || 0).toFixed(1)}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit' }}>
+                    <td data-label="DA" style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit' }}>
                       {fmtINR(r.da_amount)}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit' }}>
+                    <td data-label="Bike" style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit' }}>
                       {fmtINR(r.bike_amount)}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    <td data-label="Hotel" style={{ ...tdStyle, textAlign: 'right' }}>
                       {r.status === 'pending' && !viaRpc ? (
                         <label onClick={e => e.stopPropagation()} title="Hotel for this day (when the rep stayed overnight)"
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px',
@@ -1019,8 +1030,8 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                             aria-label="Hotel amount"
                             onBlur={e => setHotel(r, e.target.value)}
                             style={{
-                              width: 56, textAlign: 'right', padding: 0, border: 0, outline: 'none',
-                              background: 'transparent', color: 'var(--v2-ink-0)', fontSize: 12, fontFamily: 'inherit',
+                              width: 72, minHeight: 32, textAlign: 'right', padding: '4px 0', border: 0, outline: 'none',   // Phase 674: bigger box
+                              background: 'transparent', color: 'var(--v2-ink-0)', fontSize: 14, fontFamily: 'inherit',
                             }}
                           />
                         </label>
@@ -1028,13 +1039,13 @@ export default function TaPayoutsAdminV2({ embedded = false }) {
                         <span style={{ fontFamily: 'inherit' }}>{fmtINR(r.hotel_amount)}</span>
                       )}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit', fontWeight: 600, color: 'var(--v2-ink-0)' }}>
+                    <td data-label="Total" style={{ ...tdStyle, textAlign: 'right', fontFamily: 'inherit', fontWeight: 600, color: 'var(--v2-ink-0)' }}>
                       {fmtINR(r.total_amount)}
                     </td>
-                    <td style={tdStyle}>
+                    <td data-label="Status" style={tdStyle}>
                       <span style={statusChipStyle(r.status)}>{r.status}</span>
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    <td data-label="Actions" style={{ ...tdStyle, textAlign: 'right' }}>
                       <div onClick={e => e.stopPropagation()} style={{ display: 'inline-flex', gap: 4 }}>
                         {r.status === 'pending' && (
                           <>

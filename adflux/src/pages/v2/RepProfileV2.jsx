@@ -844,7 +844,7 @@ export default function RepProfileV2() {
         color: 'var(--text-muted)', fontSize: 12.5,
       }}>
         <Link to={isHR ? '/team' : '/people'} style={{ color: 'inherit', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <ArrowLeft size={14} /> Back to People
+          <ArrowLeft size={14} /> {isHR ? 'Back to Team' : 'Back to People'}
         </Link>
         <span style={{ opacity: .4 }}>·</span>
         <Link to={`/admin/gps/${user.id}`} style={{ color: 'var(--v2-yellow, #FFE600)', textDecoration: 'none' }}>
@@ -861,7 +861,7 @@ export default function RepProfileV2() {
           user.manager?.name ? `reports to ${user.manager.name}` : null,
           user.city,
         ].filter(Boolean).join(' · ')}
-        action={
+        action={!isHR &&   /* Phase 674: HR cannot save staff records (admin edits them) */
           <button onClick={() => setEditProfileOpen(true)} style={{
             background: 'transparent', border: '1px solid var(--v2-line, var(--border))',
             color: 'var(--v2-ink-1, var(--text))', borderRadius: 10,
@@ -894,8 +894,9 @@ export default function RepProfileV2() {
       {/* ─── 1a. Performance & pay (Phase 163, Issue 5) ───────────── */}
       {/* Agency = commission-only partner; the score/salary math does
           not apply, so the card is skipped for them. */}
-      {user.role !== 'agency' && !WORK_ONLY_ROLES.includes(user.role) && <RepPerformanceCard userId={user.id} />}
-      {user.role !== 'agency' && !WORK_ONLY_ROLES.includes(user.role) && (
+      {/* Phase 674: HR cannot read pay or scores - the box showed 0 everywhere plus a technical error */}
+      {!isHR && user.role !== 'agency' && !WORK_ONLY_ROLES.includes(user.role) && <RepPerformanceCard userId={user.id} />}
+      {!isHR && user.role !== 'agency' && !WORK_ONLY_ROLES.includes(user.role) && (
         <>
           {/* Same score view the person sees on /my-performance */}
           <PerformanceScoreCard userId={user.id} role={user.role} teamRole={user.team_role} />

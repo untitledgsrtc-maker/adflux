@@ -364,7 +364,10 @@ export default function LeavesAdminV2({ embedded = false }) {
               style={inputStyle}
             >
               <option value="">— pick rep —</option>
-              {users.filter(u => u.is_active && u.role !== 'admin').map(u => (
+              {/* Phase 674 - HR / Accounts / Office Admin cannot add their own approved leave (the owner decides it),
+                  and leave for the owner / partner is the owner's call */}
+              {users.filter(u => u.is_active && u.role !== 'admin'
+                && (['admin', 'co_owner'].includes(profile?.role) || (u.id !== profile?.id && u.role !== 'co_owner'))).map(u => (
                 <option key={u.id} value={u.id}>{u.name} · {u.role}</option>
               ))}
             </select>

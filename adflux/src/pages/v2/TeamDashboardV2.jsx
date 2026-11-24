@@ -1637,7 +1637,8 @@ export default function TeamDashboardV2() {
                   )}
                 </div>
               </div>
-              <div className="lead-rep-kpis">
+              {/* Phase 674: HR cannot see sales data, these tiles showed 0 */}
+              {!isHrView && <div className="lead-rep-kpis">
                 {/* Phase 73 — Meet tile hidden for TC (they don't do
                     field meetings; their target is call-only). Sales
                     reps still see Meet against their personal target. */}
@@ -1719,7 +1720,7 @@ export default function TeamDashboardV2() {
                     </div>
                   )
                 })()}
-              </div>
+              </div>}
               {/* Phase 82 — three new KPI tiles per rep card:
                     F-up   pending/done follow_ups in the window
                     Quote  status='sent' & >3d no update (chase me)
@@ -1750,6 +1751,7 @@ export default function TeamDashboardV2() {
                 const crCls = callsHere === 0 ? '' :
                               connectRate >= 30 ? 'suc' :
                               connectRate >= 15 ? 'warn' : 'dng'
+                if (isHrView) return null   // Phase 674
                 return (
                   <div className="lead-rep-kpis" style={{ marginTop: 6 }}>
                     <div
@@ -1902,7 +1904,7 @@ export default function TeamDashboardV2() {
                   >
                     {gpsTracked && pill('GPS',    gpsOn)}
                     {pill('Online', onlineOk)}
-                    {pill('Push',   pushOn, () => setPushTarget({ id: r.id, name: r.name }))}
+                    {pill('Push',   pushOn, isHrView ? null : () => setPushTarget({ id: r.id, name: r.name }))}   {/* Phase 674: HR cannot send pushes */}
                     {/* Phase 208 — installed app version (— until the rep opens
                         the reporting build). Neutral chip: info, not health.
                         B9 — EXACT 'web' (browser/PWA) turns the chip amber:
@@ -1982,7 +1984,7 @@ export default function TeamDashboardV2() {
                       background: 'transparent', border: 0,
                       color: 'var(--accent, #FFE600)',
                       fontSize: 12, fontWeight: 600,
-                      cursor: 'pointer', padding: 0,
+                      cursor: 'pointer', padding: '8px 4px', minHeight: 32,   // Phase 674: bigger tap area
                       textDecoration: 'underline',
                     }}
                     title="View today's GPS track on a map"

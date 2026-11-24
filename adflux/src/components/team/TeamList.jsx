@@ -120,6 +120,8 @@ function MemberCard({ member, settings, onDeactivate, onReactivate, onEdit }) {
           <button
             className="btn btn-ghost btn-icon"
             title="View stats"
+            aria-label={expanded ? 'Hide stats' : 'View stats'}
+            aria-expanded={expanded}
             onClick={() => setExpanded(e => !e)}
           >
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -128,6 +130,9 @@ function MemberCard({ member, settings, onDeactivate, onReactivate, onEdit }) {
           <div style={{ position: 'relative' }}>
             <button
               className="btn btn-ghost btn-icon"
+              aria-label={`More actions for ${member.name}`}
+              aria-expanded={menuOpen}
+              title="More actions"
               onClick={() => setMenuOpen(m => !m)}
             >
               <MoreVertical size={16} />

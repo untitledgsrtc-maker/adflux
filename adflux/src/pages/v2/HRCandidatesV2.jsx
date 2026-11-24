@@ -294,8 +294,8 @@ function CandidateCard({ r, calls, offerStatus, onPatch, onDelete, onCall, onSen
           </button>
         )}
         {r.converted_user_id && <span style={{ ...chip, background: 'var(--success-soft, rgba(16,185,129,.12))', color: 'var(--success)' }}>Login created</span>}
-        <button onClick={() => onDelete(r)} style={{ ...actBtn, marginLeft: 'auto', borderColor: 'transparent', color: 'var(--text-subtle)' }}>
-          <Trash2 size={14} />
+        <button onClick={() => onDelete(r)} aria-label={`Delete ${r.name || 'candidate'}`} title="Delete candidate" style={{ ...actBtn, marginLeft: 'auto', borderColor: 'transparent', color: 'var(--text-subtle)' }}>
+          <Trash2 size={14} aria-hidden="true" />
         </button>
       </div>
 

@@ -285,6 +285,15 @@ const OFFICE_ADMIN_NAV = [
   { to: '/work-profile',      label: 'My profile',     icon: UserCircle2 },   // Phase 452 - hours, calendar and tasks page for people with no Work-staff menu
 ]
 
+// Phase 674 - HR phone bar: 5 most-used items (11 did not fit a phone). Full HR_NAV stays in the menu.
+const MOBILE_NAV_HR = [
+  { to: '/hr',                label: 'HR Home',        icon: UserCircle2 },
+  { to: '/hr/candidates',     label: 'Recruit',        icon: Contact2 },
+  { to: '/admin/leaves',      label: 'Leaves',         icon: CheckSquare },
+  { to: '/admin/ta-payouts',  label: 'TA Claims',      icon: Wallet },
+  { to: '/team-work',         label: 'Team Work',      icon: ClipboardList },
+]
+
 // Phase 391 - phone bottom nav for the office admin (5 items; the sidebar list above has 8).
 const MOBILE_NAV_OFFICE_ADMIN = [
   { to: '/office',            label: 'Office',         icon: LayoutDashboard },
@@ -672,7 +681,7 @@ export function V2AppShell() {
   const baseMobileNav =
     isPrivileged   ? MOBILE_NAV_ADMIN :
     isManager      ? MOBILE_NAV_MANAGER :
-    isHR           ? HR_NAV :
+    isHR           ? MOBILE_NAV_HR :
     isOfficeAdmin  ? MOBILE_NAV_OFFICE_ADMIN :
     isAccounts     ? ACCOUNTS_NAV :
     isOps          ? (profile?.role === 'operation_head' ? MOBILE_NAV_OPS_HEAD : MOBILE_NAV_OPS_EXEC) :
