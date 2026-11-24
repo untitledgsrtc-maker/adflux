@@ -44,6 +44,8 @@
 --      supabase_phase97_2_rpc_role_gates.sql
 --
 -- REVERT: re-run this file. TRIPWIRE: VERIFY block at the bottom.
+-- PHASE 690 CHANGE (25 Nov 2026): office team (staff/hr/accounts/office_admin) scored by work_office_score from Dec 2026.
+--    Revert: delete the Phase 690 IF branch (the old 'staff' on-time branch below takes over again).
 -- PHASE 585 CHANGE (17 Nov 2026): pro-rata from the joining date (calendar days), from Nov 2026.
 --    Revert: remove the v_join / v_factor block and re-run this file.
 -- ============================================================================
@@ -67,6 +69,7 @@ DECLARE
   v_won int := 0;         -- Phase 414: work team on-time tasks
   v_join   date;          -- Phase 585: joining date (staff_incentive_profiles.join_date)
   v_factor numeric := 1;  -- Phase 585: share of the month after joining
+  v_wd     numeric;       -- Phase 690: office working days counted
 BEGIN
   PERFORM public._assert_self_or_admin(p_user_id);
 
@@ -116,10 +119,23 @@ BEGIN
     v_var_cap := v_var_cap * v_factor;
   END IF;
 
-  -- Phase 666 (owner 2026-11-24): HR, Accounts and Office Admin move onto the same on-time
-  -- rule from December 2026. Earlier months keep 'no score = full variable', so paid months never move.
-  IF v_role = 'staff'
-     OR (v_role IN ('hr', 'accounts', 'office_admin') AND p_month_start >= DATE '2026-12-01') THEN
+  -- Phase 690 (owner 2026-11-25): from December 2026 the OFFICE team (staff, hr, accounts, office_admin)
+  -- is scored by work_office_score: tasks given 40 + hours 35 + clock-in by 09:45 25. Same pay curve
+  -- (>= 85 full, < 60 zero, linear between). Running month = through yesterday. No working day -> full cap.
+  -- working_days reports the working days counted. Earlier months keep the rules below (paid months never move).
+  IF v_role IN ('staff', 'hr', 'accounts', 'office_admin') AND p_month_start >= DATE '2026-12-01' THEN
+    SELECT s.score, s.work_days INTO v_avg, v_wd
+      FROM public.work_office_score(p_user_id, p_month_start,
+             LEAST((p_month_start + INTERVAL '1 month')::date - 1,
+                   (now() AT TIME ZONE 'Asia/Kolkata')::date - 1)) s;
+    v_days := CEIL(COALESCE(v_wd, 0))::int;
+    IF v_avg IS NULL THEN
+      v_avg := 100; v_var_earned := v_var_cap;
+    ELSIF v_avg >= 85 THEN v_var_earned := v_var_cap;
+    ELSIF v_avg <  60 THEN v_var_earned := 0;
+    ELSE  v_var_earned := v_var_cap * (v_avg - 60) / 25;
+    END IF;
+  ELSIF v_role = 'staff' THEN
     -- Phase 414 (owner 2026-10-19): the WORK TEAM's variable = tasks finished ON TIME (work_ontime_stats).
     -- >= 85% on time -> full cap; < 60% -> 0; in between linear. Fewer than 3 counted tasks -> full cap
     -- (not enough to judge). avg_score_pct / working_days report on-time % / counted tasks.
@@ -162,7 +178,7 @@ GRANT EXECUTE ON FUNCTION public.monthly_score(uuid, date) TO authenticated;
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All six must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All must be TRUE.
 -- ============================================================================
 -- SELECT
 --   pg_get_functiondef(p.oid) LIKE '%_assert_self_or_admin%'      AS auth_gate,
@@ -173,7 +189,8 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%v_avg > 75%'                 AS rule3_above75_full,
 --   pg_get_functiondef(p.oid) LIKE '%v_avg < 50%'                 AS sub50_zero_variable,
 --   pg_get_functiondef(p.oid) LIKE '%work_ontime_stats%'          AS work_staff_ontime,
---   pg_get_functiondef(p.oid) LIKE '%''office_admin'') AND p_month_start >= DATE ''2026-12-01''%' AS office_ontime_666,
+--   pg_get_functiondef(p.oid) LIKE '%work_office_score%'          AS office_score_690,
+--   pg_get_functiondef(p.oid) LIKE '%''office_admin'') AND p_month_start >= DATE ''2026-12-01''%' AS office_dec_branch_690,
 --   pg_get_functiondef(p.oid) LIKE '%daily_performance%'          AS reads_daily_perf,
 --   pg_get_functiondef(p.oid) LIKE '%staff_incentive_profiles%'   AS reads_salary_profile
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace

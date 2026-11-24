@@ -20,7 +20,7 @@ import WorkBoard from '../../components/work/WorkBoard'
 import NewTaskModal from '../../components/work/NewTaskModal'
 import PostponeModal from '../../components/work/PostponeModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
-import OnTimeScoreCard, { paidOnTime } from '../../components/work/OnTimeScoreCard'
+import OnTimeScoreCard, { paidOnTime, loadOfficeScores } from '../../components/work/OnTimeScoreCard'
 import CoachActions from '../../components/coach/CoachActions'
 import UserAvatar from '../../components/common/UserAvatar'
 import WorkCalendar from '../../components/work/WorkCalendar'
@@ -598,7 +598,22 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
     window.addEventListener('focus', f)
     return () => { clearInterval(t); window.removeEventListener('focus', f) }
   }, [evening, onShared])
+  // Phase 690: office team score for today + this month so far (same work_office_score as pay). Fetched before the tap so WhatsApp opens straight away.
+  const [os, setOs] = useState(null)
+  useEffect(() => {
+    if (!evening || !uid) return undefined
+    let on = true
+    const mine = (rows) => (rows || []).find((x) => x.user_id === uid) || null
+    const pull = () => Promise.all([loadOfficeScores(today, today), loadOfficeScores(today.slice(0, 8) + '01', today)])
+      .then(([d, m]) => { if (on) setOs({ day: mine(d), month: mine(m) }) })
+    pull()
+    const t = setInterval(pull, 60000)
+    return () => { on = false; clearInterval(t) }
+  }, [evening, uid, today])
   if (!evening) return null
+  const osDay = os?.day?.score != null ? os.day : null
+  const osMonth = os?.month?.score != null ? os.month : null
+  const osTxt = (o) => `Tasks ${Math.round(o.task_pts)}/40 · Hours ${Math.round(o.hours_pts)}/35 · In by 9:45 ${Math.round(o.punct_pts)}/25`
   const finished = items.filter((i) => i.status === 'finished' && i.finishedDay === today).length   // finished TODAY only
   // Phase 518: day score (ESTIMATE) = tasks finished today WITH a due date that were on time (finished before the due day, or on the due day
   // at/before the due time - the on-time test of work_ontime_stats). Unlike the pay rule it does not skip declined / sent-back tasks or approved
@@ -653,9 +668,11 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
         `• In process: ${proc}${proc ? ' 🟡' : ''}`,
         `• Late:       ${late}${late ? ' 🔴' : ''}`,
         // Same line on every report: a person with no finished-with-due-date task today shows '-' instead of silently dropping the line.
-        dayScore != null
-          ? `⭐ *DAY SCORE (estimate): ${dayScore}%* (${onTimeToday} of ${scored.length} finished on time)`
-          : '⭐ *DAY SCORE (estimate): -* (no task finished today with a due date)',
+        ...(osDay
+          ? [`⭐ *DAY SCORE: ${Math.round(osDay.score)}/100* (${osTxt(osDay)})`, ...(osMonth ? [`📈 Month so far: ${Math.round(osMonth.score)}/100`] : [])]
+          : [dayScore != null
+            ? `⭐ *DAY SCORE (estimate): ${dayScore}%* (${onTimeToday} of ${scored.length} finished on time)`
+            : '⭐ *DAY SCORE (estimate): -* (no task finished today with a due date)']),
         '',
         '⏱ *TIME*',
         `• Clock in:  ${inRow ? fmtTimeIST(inRow.started_at) : (att?.check_in_at ? fmtTimeIST(att.check_in_at) : '-')}`,
@@ -695,7 +712,11 @@ function EveningCard({ hour, entries, items, secs, name, projName, shared, uid, 
           <div className="wk-row"><span className="wk-mu">Finished</span><span className="wk-num">{finished}</span></div>
           <div className="wk-row"><span className="wk-mu">In process</span><span className="wk-num">{proc}</span></div>
           <div className="wk-row"><span className="wk-mu">Late</span><span className="wk-num" style={{ color: late ? 'var(--danger)' : undefined }}>{late}</span></div>
-          <div className="wk-row"><span className="wk-mu">Day score (estimate)</span><span className="wk-num">{dayScore == null ? '-' : `${dayScore}% · ${onTimeToday} of ${scored.length} on time`}</span></div>
+          {osDay ? <>
+            <div className="wk-row"><span className="wk-mu">Day score</span><span className="wk-num">{Math.round(osDay.score)} / 100</span></div>
+            <div className="wk-sm" style={{ textAlign: 'right' }}>{osTxt(osDay)}</div>
+            {osMonth && <div className="wk-row"><span className="wk-mu">Month so far</span><span className="wk-num">{Math.round(osMonth.score)} / 100</span></div>}
+          </> : <div className="wk-row"><span className="wk-mu">Day score (estimate)</span><span className="wk-num">{dayScore == null ? '-' : `${dayScore}% · ${onTimeToday} of ${scored.length} on time`}</span></div>}
         </div>
         <div className="wk-field" style={{ margin: 0 }}><label htmlFor="ev-note">Note (optional)</label>
           <textarea id="ev-note" className="wk-input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder="Anything the team should know" /></div>

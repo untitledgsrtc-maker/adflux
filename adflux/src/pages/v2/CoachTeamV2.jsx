@@ -13,6 +13,7 @@ import { istTodayISO } from '../../utils/istDate'
 import { coachText, coachLink } from '../../utils/coachText'
 import { openWhatsApp } from '../../utils/whatsapp'
 import { addDaysISO, fmtDateShort } from '../../utils/workUtils'
+import { loadOfficeScores } from '../../components/work/OnTimeScoreCard'
 import DateField from '../../components/work/DateField'
 
 // Phase 687 - readable role tag (was the raw code, e.g. OPERATION_EXECUTIVE)
@@ -41,6 +42,16 @@ export default function CoachTeamV2() {
   const [span, setSpan] = useState(14)
   const [hist, setHist] = useState([])
   const [histErr, setHistErr] = useState('')
+  // Phase 690: office team month score (tasks given 40 + hours 35 + in by 9:45 25), 1st of the month up to the picked day (today = up to yesterday)
+  const [office, setOffice] = useState({})
+  useEffect(() => {
+    let alive = true
+    const to = day === today ? addDaysISO(today, -1) : day
+    const from = to.slice(0, 8) + '01'
+    if (to < from) { setOffice({}); return undefined }
+    loadOfficeScores(from, to).then((rows) => { if (alive) setOffice(Object.fromEntries((rows || []).map((x) => [x.user_id, x]))) })
+    return () => { alive = false }
+  }, [day, today])
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -205,7 +216,9 @@ export default function CoachTeamV2() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 }}>
                 {[
-                  [r.score_kind === 'ontime' ? 'On time (month)' : r.score_kind === 'uptime' ? (day === today ? 'Uptime today' : 'Uptime') : (day === today ? 'Score today' : 'Day score'), r.score_today == null ? '–' : `${r.score_today}%`, tone(r.score_today, r.score_kind === 'ontime' ? 85 : 70, r.score_kind === 'ontime' ? 60 : 40)],
+                  r.score_kind === 'ontime'
+                    ? ['Month score', office[r.id]?.score == null ? '–' : `${Math.round(office[r.id].score)}`, tone(office[r.id]?.score == null ? null : Number(office[r.id].score), 85, 60)]
+                    : [r.score_kind === 'uptime' ? (day === today ? 'Uptime today' : 'Uptime') : (day === today ? 'Score today' : 'Day score'), r.score_today == null ? '–' : `${r.score_today}%`, tone(r.score_today, 70, 40)],
                   [day === today ? 'Done today' : 'Done that day', r.actions_today ? `${r.done_today}/${r.actions_today}` : '–', 'var(--v2-ink-0, #f1f5f9)'],
                   ['14-day done', r.done_rate_14d == null ? '–' : `${r.done_rate_14d}%`, tone(r.done_rate_14d, 70, 40)],
                 ].map(([label, val, color]) => (
@@ -215,6 +228,12 @@ export default function CoachTeamV2() {
                   </div>
                 ))}
               </div>
+
+              {r.score_kind === 'ontime' && office[r.id] && office[r.id].score != null && (
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--v2-ink-2, #94a3b8)' }}>
+                  Tasks given {Math.round(office[r.id].task_pts)}/40 ({office[r.id].given_on_time} of {office[r.id].given} on time) · Hours {Math.round(office[r.id].hours_pts)}/35 ({Math.round(office[r.id].hours)}h) · In by 9:45 {Math.round(office[r.id].punct_pts)}/25 ({office[r.id].on_time_days} of {office[r.id].full_days} days)
+                </div>
+              )}
 
               {tips[r.id] && (
                 <div style={{ marginTop: 10, padding: 8, borderRadius: 10, background: 'var(--v2-bg-2, #0f172a)', border: '1px solid var(--v2-line, #334155)', fontSize: 13, lineHeight: 1.4, color: 'var(--v2-ink-1, #cbd5e1)' }}>
