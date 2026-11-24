@@ -29,7 +29,7 @@ const OFFER_COLS = `
   converted_user_id, converted_at,
   approved_by, approved_at, approval_note,
   manager_id, segment_access, allow_ta, allow_da, allow_hotel, allow_other,
-  min_calls, min_quotes, min_followups, candidate_id,
+  min_calls, min_quotes, min_followups, min_meetings, candidate_id,
   created_by, created_at, updated_at
 `
 

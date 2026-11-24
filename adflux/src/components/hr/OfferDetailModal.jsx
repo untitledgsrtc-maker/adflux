@@ -18,7 +18,7 @@
 // does not carry the offer salary over).
 
 import { useState, useRef } from 'react'
-import { X, Download, UserPlus, Copy, Check, MessageSquare, Mail, KeyRound, FileText, Send, Undo2 } from 'lucide-react'
+import { X, Download, UserPlus, Copy, Check, MessageSquare, Mail, KeyRound, FileText, Send, Undo2, Pencil } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useOffers, buildOfferUrl, STATUS_META } from '../../hooks/useOffers'
 import { offerLoginArgs, offerTargets } from '../../utils/hrOffer'
@@ -28,6 +28,7 @@ import { toastError, toastSuccess } from '../v2/Toast'
 import { confirmDialog } from '../v2/ConfirmDialog'
 import SendEmailModal from '../v2/SendEmailModal'
 import { useAuthStore } from '../../store/authStore'
+import { SendOfferModal } from './SendOfferModal'
 
 // Phase 109.4 — open a private PAN/Aadhaar card via a short-lived signed
 // URL (the hr-offer-pii bucket is NOT public; staff-only SELECT RLS gates
@@ -177,6 +178,7 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
   const [showConvertForm, setShowConvertForm] = useState(false)
   const [shortUrlValue, setShort]   = useState('')
   const [copiedKey, setCopiedKey]   = useState(null)
+  const [editOpen, setEditOpen]     = useState(false)   // Phase 681
 
   const meta = STATUS_META[offer.status] || STATUS_META.draft
   const fullUrl = buildOfferUrl(offer.invite_token)
@@ -549,8 +551,18 @@ export function OfferDetailModal({ offer, onClose, onChanged }) {
             <div style={{ marginBottom: 18, padding: 12, border: '1px solid var(--brd)', borderRadius: 10 }}>
               <div style={{ fontWeight: 600, marginBottom: 6 }}>Sent back by the owner</div>
               {offer.approval_note && <div style={{ fontSize: '.88rem', marginBottom: 10 }}>{offer.approval_note}</div>}
-              <div style={{ fontSize: '.8rem', color: 'var(--gray)', marginBottom: 10 }}>Cancel this offer and make a new one with the changes, or send it again as it is.</div>
-              <button className="btn btn-ghost" onClick={resubmit} disabled={apprBusy}><Send size={14} style={{ marginRight: 6 }} />Send for approval again</button>
+              <div style={{ fontSize: '.8rem', color: 'var(--gray)', marginBottom: 10 }}>Edit the offer with the changes, or send it again as it is.</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn-y" onClick={() => setEditOpen(true)} disabled={apprBusy}><Pencil size={14} style={{ marginRight: 6 }} />Edit offer</button>
+                <button className="btn btn-ghost" onClick={resubmit} disabled={apprBusy}><Send size={14} style={{ marginRight: 6 }} />Send for approval again</button>
+              </div>
+              {editOpen && (
+                <SendOfferModal
+                  editOffer={offer}
+                  onClose={() => { setEditOpen(false); onChanged?.(); onClose() }}
+                  onCreated={() => onChanged?.()}
+                />
+              )}
             </div>
           )}
 

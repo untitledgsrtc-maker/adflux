@@ -40,8 +40,10 @@ function Field({ label, required, error, hint, children }) {
   )
 }
 
-export function SendOfferModal({ onClose, onCreated, prefill }) {
-  const { createOffer, markSent } = useOffers()
+// Phase 681 - editOffer: an offer the owner sent back (status 'draft'). The same form opens
+// filled in; saving updates that offer and sends it to the owner again.
+export function SendOfferModal({ onClose, onCreated, prefill, editOffer = null }) {
+  const { createOffer, updateOffer, markSent } = useOffers()
 
   // Phase 329 — candidate phone, passed by the Recruit card (HRCandidatesV2) so the
   // WhatsApp share opens THAT candidate's chat. 91 + last 10 digits; fewer than 10
@@ -71,6 +73,24 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
     segment_access:              'PRIVATE',
     allow_ta: false, allow_da: false, allow_hotel: false, allow_other: true,
     min_calls: '', min_quotes: '', min_followups: '', min_meetings: '',
+    ...(editOffer ? (() => {
+      const o = editOffer
+      const v = (x, d = '') => (x === null || x === undefined ? d : String(x))
+      return {
+        candidate_name: v(o.candidate_name), candidate_email: v(o.candidate_email),
+        position: v(o.position, 'Sales Person'), territory: v(o.territory),
+        joining_date: v(o.joining_date), fixed_salary_monthly: v(o.fixed_salary_monthly),
+        incentive_sales_multiplier: v(o.incentive_sales_multiplier, '5'),
+        incentive_new_client_rate: v(o.incentive_new_client_rate, '0.05'),
+        incentive_renewal_rate: v(o.incentive_renewal_rate, '0.02'),
+        incentive_flat_bonus: v(o.incentive_flat_bonus, '10000'),
+        place: v(o.place, 'Vadodara'), manager_id: v(o.manager_id),
+        segment_access: v(o.segment_access, 'PRIVATE'),
+        allow_ta: !!o.allow_ta, allow_da: !!o.allow_da, allow_hotel: !!o.allow_hotel, allow_other: o.allow_other !== false,
+        min_calls: Number(o.min_calls) ? String(o.min_calls) : '', min_quotes: Number(o.min_quotes) ? String(o.min_quotes) : '',
+        min_followups: Number(o.min_followups) ? String(o.min_followups) : '', min_meetings: Number(o.min_meetings) ? String(o.min_meetings) : '',
+      }
+    })() : {}),
   })
   const [errors, setErrors]       = useState({})
   const [saving, setSaving]       = useState(false)
@@ -100,6 +120,13 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
     return () => { alive = false }
   }, [])
   const [managers, setManagers] = useState([])
+  // Phase 681 - an edited offer re-selects its designation by name (the offer keeps the name, not the id)
+  useEffect(() => {
+    if (!editOffer || !designations.length) return
+    const name = editOffer.designation_name || editOffer.position
+    const d = designations.find(x => x.name === name)
+    if (d) setForm(f => (f.designation_id ? f : { ...f, designation_id: d.id }))
+  }, [editOffer, designations])
 
   const picked = useMemo(
     () => designations.find(d => d.id === form.designation_id) || null,
@@ -193,14 +220,14 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
     setServerError('')
     // Phase 669 - an offer sent from the Hiring page (no candidate picked) is linked to the
     // Recruit card with the same email, so the card shows the offer and Convert marks it hired.
-    let candidateId = prefill?.candidate_id || null
-    if (!candidateId) {
+    let candidateId = editOffer ? (editOffer.candidate_id || null) : (prefill?.candidate_id || null)
+    if (!candidateId && !editOffer) {
       const { data: c } = await supabase.from('hr_candidates').select('id')
         .ilike('email', form.candidate_email.trim().replace(/[%_\\]/g, '\\$&')).is('converted_user_id', null)
         .order('created_at', { ascending: false }).limit(1).maybeSingle()
       candidateId = c?.id || null
     }
-    const { data, error } = await createOffer({
+    const payload = {
       candidate_name:              form.candidate_name.trim(),
       candidate_email:             form.candidate_email.trim().toLowerCase(),
       position:                    form.position.trim() || picked?.name || 'Sales Person',
@@ -230,11 +257,14 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
       min_calls: Number(form.min_calls) || 0, min_quotes: Number(form.min_quotes) || 0, min_followups: Number(form.min_followups) || 0,
       min_meetings: Number(form.min_meetings) || 0,
       candidate_id:                candidateId,
-    })
+    }
+    const { data, error } = editOffer
+      ? await updateOffer(editOffer.id, { ...payload, status: 'pending_approval' })
+      : await createOffer(payload)
     setSaving(false)
 
     if (error) {
-      setServerError(error.message || 'Failed to create offer')
+      setServerError(error.message || (editOffer ? 'Failed to save the offer' : 'Failed to create offer'))
       return
     }
 
@@ -379,11 +409,17 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
     <div className="mo" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="md">
         <div className="md-h">
-          <div className="md-t">Send Offer</div>
+          <div className="md-t">{editOffer ? 'Edit offer' : 'Send Offer'}</div>
           <button className="md-x" onClick={onClose}><X size={18} /></button>
         </div>
 
         <div className="md-b">
+          {editOffer?.approval_note && (
+            <div style={{ border: '1px solid var(--brd)', borderRadius: 10, padding: '11px 14px', fontSize: '.85rem', marginBottom: 14 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Owner's note</div>
+              {editOffer.approval_note}
+            </div>
+          )}
           {serverError && (
             <div style={{
               background: 'rgba(229,57,53,.08)',
@@ -587,7 +623,7 @@ export function SendOfferModal({ onClose, onCreated, prefill }) {
         <div className="md-f">
           <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="btn btn-y" onClick={handleCreate} disabled={saving}>
-            {saving ? 'Saving…' : 'Send for approval'}
+            {saving ? 'Saving…' : editOffer ? 'Send for approval again' : 'Send for approval'}
           </button>
         </div>
       </div>
