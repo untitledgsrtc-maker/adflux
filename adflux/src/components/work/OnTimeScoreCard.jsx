@@ -11,6 +11,13 @@ export const MIN_TASKS = 3
 
 export function monthStartISO() { return istTodayISO().slice(0, 8) + '01' }
 
+// Phase 666 - whose variable pay is the on-time score (mirrors monthly_score):
+// the work team always; HR, Accounts and Office Admin from December 2026.
+export function paidOnTime(role) {
+  if (role === 'staff') return true
+  return ['hr', 'accounts', 'office_admin'].includes(role) && monthStartISO() >= '2026-12-01'
+}
+
 // shared fetch: { counted, onTime, pct, cap, earned } or null
 export async function loadOnTime(userId) {
   const { data, error } = await supabase.rpc('monthly_score', { p_user_id: userId, p_month_start: monthStartISO() })

@@ -1,7 +1,7 @@
 // src/pages/v2/TeamWorkV2.jsx - Phase 365. The head / admin view of the Work module:
 // Overview, Tasks board, People (live timers + who is on the timeclock), Clients, Timeline,
 // Hours & cost (cost = admin + accounts only), Approvals (added-later time).
-import { OnTimeCell } from '../../components/work/OnTimeScoreCard'
+import { OnTimeCell, paidOnTime } from '../../components/work/OnTimeScoreCard'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { Plus, Loader2, Check, X, AlertTriangle, Clock, Users, Repeat, Moon, Pencil, GitMerge, Archive, ArchiveRestore, Building2, Calendar, Trash2 } from 'lucide-react'
@@ -559,7 +559,7 @@ function PeopleTab({ members, users, nameOf, runBy, byPerson, projName, now, isA
                 </div>
                 <div className="wk-pp-foot">
                   <span className="wk-sm">{open} open {open === 1 ? 'task' : 'tasks'}</span>
-                  {isAdmin && u.role === 'staff' && <OnTimeCell userId={m.user_id} />}
+                  {isAdmin && paidOnTime(u.role) && <OnTimeCell userId={m.user_id} />}
                   <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                     {isAdmin && (
                       <>

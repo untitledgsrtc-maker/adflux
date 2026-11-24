@@ -20,7 +20,7 @@ import WorkBoard from '../../components/work/WorkBoard'
 import NewTaskModal from '../../components/work/NewTaskModal'
 import PostponeModal from '../../components/work/PostponeModal'
 import TaskDetailModal from '../../components/work/TaskDetailModal'
-import OnTimeScoreCard from '../../components/work/OnTimeScoreCard'
+import OnTimeScoreCard, { paidOnTime } from '../../components/work/OnTimeScoreCard'
 import CoachActions from '../../components/coach/CoachActions'
 import UserAvatar from '../../components/common/UserAvatar'
 import WorkCalendar from '../../components/work/WorkCalendar'
@@ -337,7 +337,7 @@ export default function MyWorkV2() {
                 </div>
               </div>
               <div className="wk-c12 wk-trio">
-                  {profile?.role === 'staff' && <OnTimeScoreCard userId={uid} />}
+                  {paidOnTime(profile?.role) && <OnTimeScoreCard userId={uid} />}
                   <div className="wk-card flush">
                     <div className="wk-list">
                       {[['/work-profile', User, 'My profile'], ['/my-offer', CalendarX, 'Leave request'], ['/my-performance', FileText, 'Salary slips']].map(([to, Ic, label]) => (

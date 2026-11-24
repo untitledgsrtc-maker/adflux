@@ -116,7 +116,10 @@ BEGIN
     v_var_cap := v_var_cap * v_factor;
   END IF;
 
-  IF v_role = 'staff' THEN
+  -- Phase 666 (owner 2026-11-24): HR, Accounts and Office Admin move onto the same on-time
+  -- rule from December 2026. Earlier months keep 'no score = full variable', so paid months never move.
+  IF v_role = 'staff'
+     OR (v_role IN ('hr', 'accounts', 'office_admin') AND p_month_start >= DATE '2026-12-01') THEN
     -- Phase 414 (owner 2026-10-19): the WORK TEAM's variable = tasks finished ON TIME (work_ontime_stats).
     -- >= 85% on time -> full cap; < 60% -> 0; in between linear. Fewer than 3 counted tasks -> full cap
     -- (not enough to judge). avg_score_pct / working_days report on-time % / counted tasks.
@@ -170,6 +173,7 @@ NOTIFY pgrst, 'reload schema';
 --   pg_get_functiondef(p.oid) LIKE '%v_avg > 75%'                 AS rule3_above75_full,
 --   pg_get_functiondef(p.oid) LIKE '%v_avg < 50%'                 AS sub50_zero_variable,
 --   pg_get_functiondef(p.oid) LIKE '%work_ontime_stats%'          AS work_staff_ontime,
+--   pg_get_functiondef(p.oid) LIKE '%''office_admin'') AND p_month_start >= DATE ''2026-12-01''%' AS office_ontime_666,
 --   pg_get_functiondef(p.oid) LIKE '%daily_performance%'          AS reads_daily_perf,
 --   pg_get_functiondef(p.oid) LIKE '%staff_incentive_profiles%'   AS reads_salary_profile
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
