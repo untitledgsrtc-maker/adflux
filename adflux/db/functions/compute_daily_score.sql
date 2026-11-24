@@ -69,6 +69,10 @@
 --                             Owner decision 2026-10-12. Re-score of past Sept+ leave days =
 --                             supabase_phase358_leave_score_and_oct2.sql.
 --
+--      • Phase 665 (24 Nov 2026) - sales meeting target reads daily_targets.min_meetings
+--                             (active row; blank/0 -> old JSONB 'meetings' -> 5, so nobody's
+--                             target changes until HR edits it). Agency is no longer scored
+--                             (added to the not-scored early return; agency salary is 0).
 --      • Sales head (23 Nov 2026, Phase 658) - a user with team_role 'sales_manager' who has
 --                             at least one active rep (users.manager_id = him) is scored on his TEAM,
 --                             not his own meetings: score_pct = the average score_pct of his active
@@ -177,7 +181,8 @@ BEGIN
   -- the monthly average became 0 -> variable wiped. Ops pay is written ONLY by
   -- the ops_uptime_to_daily_performance trigger. Sales/telecaller/agency/admin
   -- are unchanged (they fall through).
-  IF v_role IN ('operation_executive', 'operation_head', 'hr', 'accounts', 'office_staff', 'staff') THEN
+  -- Phase 665 (owner 2026-11-24): agency is not scored either (no score, no meeting target).
+  IF v_role IN ('operation_executive', 'operation_head', 'hr', 'accounts', 'office_staff', 'staff', 'agency') THEN
     RETURN;
   END IF;
 
@@ -231,7 +236,15 @@ BEGIN
     v_target   := COALESCE(v_target, 50);
     v_activity := 'call';
   ELSE
-    v_target   := COALESCE((v_targets->>'meetings')::int, 5);
+    -- Phase 665 (owner 2026-11-24): the sales meeting target is editable per person in
+    -- daily_targets.min_meetings (active row). Blank/0 falls back to the old JSONB value,
+    -- then 5, so everyone not edited keeps exactly today's target.
+    SELECT NULLIF(dt.min_meetings, 0)
+      INTO v_target
+      FROM daily_targets dt
+     WHERE dt.user_id = p_user_id AND dt.effective_to IS NULL
+     LIMIT 1;
+    v_target   := COALESCE(v_target, (v_targets->>'meetings')::int, 5);
     v_activity := 'meeting';
   END IF;
 
@@ -330,7 +343,7 @@ GRANT EXECUTE ON FUNCTION public.compute_daily_score(uuid, date) TO authenticate
 NOTIFY pgrst, 'reload schema';
 
 -- ============================================================================
--- VERIFY / TRIPWIRE — read-only, run any time. All ten must be TRUE.
+-- VERIFY / TRIPWIRE — read-only, run any time. All twelve must be TRUE.
 -- A FALSE means an older copy of compute_daily_score was re-run and stripped a
 -- locked fix → re-run this file to restore the canonical version.
 -- ============================================================================
@@ -346,6 +359,8 @@ NOTIFY pgrst, 'reload schema';
 --   (pg_get_functiondef(p.oid) LIKE '%l.status = ''approved''%'
 --     AND pg_get_functiondef(p.oid) LIKE '%is_half_day, false) = false%'
 --     AND pg_get_functiondef(p.oid) LIKE '%DATE ''2026-09-01''%')            AS has_358_leave_excl,
---   pg_get_functiondef(p.oid) LIKE '%No team score yet%'                   AS has_658_head_team_score
+--   pg_get_functiondef(p.oid) LIKE '%No team score yet%'                   AS has_658_head_team_score,
+--   pg_get_functiondef(p.oid) LIKE '%dt.min_meetings%'                     AS has_665_meeting_target,
+--   pg_get_functiondef(p.oid) LIKE '%''staff'', ''agency'')%'               AS has_665_agency_unscored
 -- FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 -- WHERE n.nspname = 'public' AND p.proname = 'compute_daily_score';

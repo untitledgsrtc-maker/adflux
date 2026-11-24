@@ -41,6 +41,16 @@ const SEGMENTS = [
   { v: 'ALL',        label: 'Both (Private + Government)' },
 ]
 
+// Phase 665 - which daily targets a designation is scored on (mirrors compute_daily_score):
+// telecaller = calls/day, sales = meetings/day, any head = team average, rest = not scored.
+function designationTargetKind(d) {
+  if (!d) return 'none'
+  if (d.team_role === 'sales_manager') return 'team'
+  if (d.auth_role === 'telecaller') return 'telecaller'
+  if (d.auth_role === 'sales') return 'sales'
+  return 'none'
+}
+
 export default function HRNewUserV2() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -81,6 +91,7 @@ export default function HRNewUserV2() {
     min_calls:         0,
     min_quotes:        0,
     min_followups:     0,
+    min_meetings:      0,
     // Phase 57 — per-user expense kind toggles. Snap from
     // designation default; HR overrides per-user.
     allow_ta:          false,
@@ -133,13 +144,17 @@ export default function HRNewUserV2() {
     if (!form.designation_id) return
     const d = designations.find(x => x.id === form.designation_id)
     if (!d) return
+    // Phase 665 - only scored roles carry daily targets (see designationTargetKind).
+    const kind = designationTargetKind(d)
+    const scored = kind === 'telecaller' || kind === 'sales'
     setForm(f => ({
       ...f,
       has_incentive:  d.has_incentive,
       variable_pct:   d.default_variable_pct || 0,
-      min_calls:      d.default_min_calls || 0,
-      min_quotes:     d.default_min_quotes || 0,
-      min_followups:  d.default_min_followups || 0,
+      min_calls:      kind === 'telecaller' ? (d.default_min_calls || 50) : 0,
+      min_quotes:     scored ? (d.default_min_quotes || 0) : 0,
+      min_followups:  scored ? (d.default_min_followups || 0) : 0,
+      min_meetings:   kind === 'sales' ? 5 : 0,
       // Phase 57 — pull the 4 expense flags from the designation
       // defaults. HR can override the checkboxes after this snap.
       allow_ta:       !!d.default_allow_ta,
@@ -155,6 +170,7 @@ export default function HRNewUserV2() {
     () => designations.find(x => x.id === form.designation_id),
     [designations, form.designation_id]
   )
+  const targetKind = designationTargetKind(pickedDesignation)
 
   // Section 47 latch wrapper. The latch is taken synchronously before the first
   // await (the confirm dialogs below) and released on EVERY exit path.
@@ -338,14 +354,15 @@ export default function HRNewUserV2() {
     }
 
     // 3. INSERT daily_targets (only when at least one target is non-zero).
-    if (form.min_calls > 0 || form.min_quotes > 0 || form.min_followups > 0) {
+    if (form.min_calls > 0 || form.min_quotes > 0 || form.min_followups > 0 || form.min_meetings > 0) {
       const { error: tgtErr } = await supabase
         .from('daily_targets')
         .insert([{
           user_id:               userRow.id,
-          min_calls:             Number(form.min_calls) || 0,
-          min_quotes:            Number(form.min_quotes) || 0,
-          min_followups:         Number(form.min_followups) || 0,
+          min_calls:             Math.max(0, Math.round(Number(form.min_calls) || 0)),
+          min_quotes:            Math.max(0, Math.round(Number(form.min_quotes) || 0)),
+          min_followups:         Math.max(0, Math.round(Number(form.min_followups) || 0)),
+          ...(Number(form.min_meetings) > 0 ? { min_meetings: Math.round(Number(form.min_meetings)) } : {}),
           effective_from:        form.join_date,
         }])
       if (tgtErr) console.warn('[hr-create] target insert failed:', tgtErr.message)
@@ -559,10 +576,27 @@ export default function HRNewUserV2() {
               Has incentive
             </label>
             <FormField label="Variable %" v={form.variable_pct} onChange={v => set('variable_pct', v)} type="number" />
-            <FormField label="Min calls / day" v={form.min_calls} onChange={v => set('min_calls', v)} type="number" />
-            <FormField label="Min quotes / wk" v={form.min_quotes} onChange={v => set('min_quotes', v)} type="number" />
-            <FormField label="Min follow-ups" v={form.min_followups} onChange={v => set('min_followups', v)} type="number" />
+            {targetKind === 'telecaller' && (
+              <FormField label="Min calls / day (scored)" v={form.min_calls} onChange={v => set('min_calls', v)} type="number" />
+            )}
+            {targetKind === 'sales' && (
+              <FormField label="Min meetings / day (scored)" v={form.min_meetings} onChange={v => set('min_meetings', v)} type="number" />
+            )}
+            {(targetKind === 'telecaller' || targetKind === 'sales') && (<>
+              <FormField label="Min quotes / wk" v={form.min_quotes} onChange={v => set('min_quotes', v)} type="number" />
+              <FormField label="Min follow-ups" v={form.min_followups} onChange={v => set('min_followups', v)} type="number" />
+            </>)}
           </div>
+          {targetKind === 'team' && (
+            <div style={{ marginTop: 10, fontSize: 13, color: 'var(--text-muted)' }}>
+              Team heads are scored on their team's average - no personal daily target.
+            </div>
+          )}
+          {targetKind === 'none' && pickedDesignation && (
+            <div style={{ marginTop: 10, fontSize: 13, color: 'var(--text-muted)' }}>
+              This role is not scored - no daily targets needed.
+            </div>
+          )}
 
           {/* Phase 57 — per-user expense kind toggles. Snap defaults
               from designation; HR overrides per rep (e.g. specific

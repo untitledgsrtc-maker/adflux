@@ -55,6 +55,16 @@ import { istCurrentMonthYM, istCurrentMonthLabel, istTodayISO } from '../../util
 // Roles whose pages are Work/ops/HR/accounts, not sales: sales KPI + incentive sections are hidden for them.
 const WORK_ONLY_ROLES = ['staff', 'operation_executive', 'operation_head', 'hr', 'accounts']
 
+// Phase 665 - which targets a person is scored on (mirrors compute_daily_score):
+// telecaller = calls/day, sales = meetings/day, any head = team average, rest = not scored.
+function targetKind(u) {
+  if (!u) return 'none'
+  if (u.team_role === 'sales_manager') return 'team'
+  if (u.role === 'telecaller') return 'telecaller'
+  if (u.role === 'sales') return 'sales'
+  return 'none'
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────
 function fmtINR(n) {
   if (n == null || !Number.isFinite(Number(n))) return '—'
@@ -249,30 +259,59 @@ function RepPerformanceCard({ userId }) {
 // ─── KPI targets edit modal ────────────────────────────────────────
 // Small in-line modal to flip the rep's daily_targets row. Admin /
 // co_owner only. UPSERT pattern — creates if missing.
-function EditTargetsModal({ userId, current, onClose, onSaved }) {
-  const [minCalls, setMinCalls]               = useState(current?.min_calls ?? 50)
+function EditTargetsModal({ userId, kind, current, fallbackMeetings, onClose, onSaved }) {
+  const isTC = kind === 'telecaller'
+  const [minCalls, setMinCalls]               = useState(isTC ? (current?.min_calls || 50) : (current ? (current.min_calls ?? 0) : 0))
   const [minConnect, setMinConnect]           = useState(current?.min_connect_pct ?? 30)
   const [minQualWk, setMinQualWk]             = useState(current?.min_qualified_weekly ?? 5)
-  const [minMeetings, setMinMeetings]         = useState(current?.min_meetings ?? 5)
+  const [minMeetings, setMinMeetings]         = useState(current?.min_meetings || fallbackMeetings || 5)
   const [saving, setSaving]                   = useState(false)
 
   async function handleSave() {
+    // Phase 665 - validate BEFORE touching the database: whole numbers, 0 or more,
+    // connect % at most 100, and the scored target at least 1 (0 or less would wreck the score).
+    const whole = (v) => /^\d+$/.test(String(v).trim())
+    const fields = isTC ? [minCalls, minConnect, minQualWk] : [minMeetings, minCalls]
+    if (!fields.every(whole)) { toastError(new Error('Invalid number'), 'Use whole numbers, 0 or more.'); return }
+    if (isTC && Number(minConnect) > 100) { toastError(new Error('Invalid number'), 'Connect % must be 100 or less.'); return }
+    if (Number(isTC ? minCalls : minMeetings) < 1) { toastError(new Error('Invalid number'), isTC ? 'Calls per day must be at least 1.' : 'Meetings per day must be at least 1.'); return }
     setSaving(true)
+    // Carry the other target columns over from the current row so a save here never
+    // wipes quotes / follow-up targets set elsewhere.
+    const { id: curId, created_at: _c, updated_at: _u, ...keep } = current || {}
+    const today = istTodayISO()
     const payload = {
+      ...keep,
       user_id:                userId,
-      min_calls:              safeNum(minCalls, 50),
-      min_connect_pct:        safeNum(minConnect, 30),
-      min_qualified_weekly:   safeNum(minQualWk, 5),
-      min_meetings:           safeNum(minMeetings, 5),
-      effective_from:         istTodayISO(),
+      min_calls:              Number(minCalls),
+      effective_from:         today,
       effective_to:           null,
     }
-    // Close any prior open row (effective_to = today) so history is preserved.
-    await supabase.from('daily_targets')
-      .update({ effective_to: istTodayISO() })
-      .eq('user_id', userId)
-      .is('effective_to', null)
-    const { error } = await supabase.from('daily_targets').insert([payload])
+    if (isTC) {
+      payload.min_connect_pct      = Number(minConnect)
+      payload.min_qualified_weekly = Number(minQualWk)
+    } else {
+      payload.min_meetings         = Number(minMeetings)
+    }
+    let error
+    if (curId && current.effective_from >= today) {
+      // Row started today or later (same-day re-save, or a hire whose join date is ahead):
+      // edit it in place - closing it with today's date would break its date window.
+      const { effective_from: _f, ...changes } = payload
+      ;({ error } = await supabase.from('daily_targets').update(changes).eq('id', curId))
+    } else {
+      // Close the prior open row (history kept), then add the new one. If the add fails,
+      // re-open the old row so the person never ends up with no targets.
+      const closeRes = await supabase.from('daily_targets')
+        .update({ effective_to: today })
+        .eq('user_id', userId)
+        .is('effective_to', null)
+      if (closeRes.error) { setSaving(false); toastError(closeRes.error, 'Could not save targets.'); return }
+      ;({ error } = await supabase.from('daily_targets').insert([payload]))
+      if (error && curId) {
+        await supabase.from('daily_targets').update({ effective_to: null }).eq('id', curId)
+      }
+    }
     setSaving(false)
     if (error) {
       toastError(error, 'Could not save targets.')
@@ -298,12 +337,14 @@ function EditTargetsModal({ userId, current, onClose, onSaved }) {
         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>
           Edit KPI targets
         </div>
-        {[
-          ['Min calls / day',        minCalls,   setMinCalls],
-          ['Min connect %',          minConnect, setMinConnect],
-          ['Min qualified / week',   minQualWk,  setMinQualWk],
-          ['Min meetings / day',     minMeetings,setMinMeetings],
-        ].map(([label, value, setter]) => (
+        {(isTC ? [
+          ['Min calls / day (scored)', minCalls,   setMinCalls],
+          ['Min connect %',            minConnect, setMinConnect],
+          ['Min qualified / week',     minQualWk,  setMinQualWk],
+        ] : [
+          ['Min meetings / day (scored)', minMeetings, setMinMeetings],
+          ['Calls / day (guide only, 0 = none)', minCalls, setMinCalls],
+        ]).map(([label, value, setter]) => (
           <div key={label} style={{ marginBottom: 12 }}>
             <label style={{
               display: 'block', fontSize: 12, fontWeight: 600,
@@ -556,11 +597,11 @@ export default function RepProfileV2() {
         // hr_acceptance_note + joined acceptor name for the HR
         // sign-off section.
         supabase.from('users')
-          .select('id, name, email, role, team_role, manager_id, segment_access, city, is_active, profile_image_url, manager:manager_id(id, name), hr_accepted_at, hr_accepted_by, hr_acceptance_note, hr_accepter:hr_accepted_by(id, name)')
+          .select('id, name, email, role, team_role, daily_targets, manager_id, segment_access, city, is_active, profile_image_url, manager:manager_id(id, name), hr_accepted_at, hr_accepted_by, hr_acceptance_note, hr_accepter:hr_accepted_by(id, name)')
           .eq('id', userId)
           .maybeSingle(),
         supabase.from('daily_targets')
-          .select('min_calls, min_connect_pct, min_qualified_weekly, min_meetings, effective_from, effective_to')
+          .select('*')
           .eq('user_id', userId)
           .is('effective_to', null)
           .maybeSingle(),
@@ -789,9 +830,10 @@ export default function RepProfileV2() {
     )
   }
 
-  const callsTargetDay   = targets?.min_calls            ?? (user.role === 'telecaller' ? 50 : 20)
+  const tKind            = targetKind(user)
+  const callsTargetDay   = targets?.min_calls            || (user.role === 'telecaller' ? 50 : 20)
   const qualTargetWeek   = targets?.min_qualified_weekly ?? 5
-  const meetingsTarget   = targets?.min_meetings         ?? (user.role === 'telecaller' ? 0 : 5)
+  const meetingsTarget   = user.role === 'telecaller' ? 0 : (targets?.min_meetings || Number(user.daily_targets?.meetings) || 5)
 
   return (
     <div className="v2d-rep-profile" style={{ maxWidth: 1100, margin: '0 auto' }}>
@@ -956,7 +998,7 @@ export default function RepProfileV2() {
         sub={targets?.effective_from
           ? `Effective from ${new Date(targets.effective_from).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
           : 'No targets row — using defaults. Set explicit targets.'}
-        action={
+        action={(tKind === 'sales' || tKind === 'telecaller') &&
           <button onClick={() => setEditTargetsOpen(true)} style={{
             background: 'transparent', border: '1px solid var(--v2-line, var(--border))',
             color: 'var(--v2-ink-1, var(--text))', borderRadius: 10,
@@ -971,10 +1013,17 @@ export default function RepProfileV2() {
           display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
           gap: 12,
         }}>
-          <Tile label="Min calls / day"      value={callsTargetDay} />
-          <Tile label="Min connect %"        value={`${targets?.min_connect_pct ?? 30}%`} />
-          <Tile label="Min qualified / week" value={qualTargetWeek} />
-          <Tile label="Min meetings / day"   value={meetingsTarget || '—'} />
+          {tKind === 'telecaller' && (<>
+            <Tile label="Min calls / day (scored)" value={callsTargetDay} />
+            <Tile label="Min connect %"        value={`${targets?.min_connect_pct ?? 30}%`} />
+            <Tile label="Min qualified / week" value={qualTargetWeek} />
+          </>)}
+          {tKind === 'sales' && (<>
+            <Tile label="Min meetings / day (scored)" value={meetingsTarget} />
+            <Tile label="Calls / day (guide only)" value={targets?.min_calls || '—'} />
+          </>)}
+          {tKind === 'team' && <Tile label="Score" value="Team average" sub="No personal target" />}
+          {tKind === 'none' && <Tile label="Score" value="Not scored" sub="No daily target for this role" />}
         </div>
       </SectionCard>
 
@@ -1190,6 +1239,8 @@ export default function RepProfileV2() {
       {editTargetsOpen && (
         <EditTargetsModal
           userId={user.id}
+          kind={targetKind(user)}
+          fallbackMeetings={Number(user.daily_targets?.meetings) || 5}
           current={targets}
           onClose={() => setEditTargetsOpen(false)}
           onSaved={loadAll}
