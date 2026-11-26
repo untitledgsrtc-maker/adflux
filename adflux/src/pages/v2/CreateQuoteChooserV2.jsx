@@ -183,7 +183,11 @@ export default function CreateQuoteChooserV2() {
           desc="Newspaper, hoarding, cinema, mall, digital, radio. Free-form line items with rates. For everything that isn't LED screens."
           chips={[
             { text: 'Free-form rates', accent: true },
-            { text: 'Newspaper · Hoarding · Cinema · Mall · Digital' },
+            { text: 'Newspaper' },
+            { text: 'Hoarding' },
+            { text: 'Cinema' },
+            { text: 'Mall' },
+            { text: 'Digital' },
           ]}
         />
       </div>

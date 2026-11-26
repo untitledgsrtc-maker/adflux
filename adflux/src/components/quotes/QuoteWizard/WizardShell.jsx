@@ -504,7 +504,7 @@ export function WizardShell({ renewalOf = null, editOf = null, prefill = null })
                 fields + city list, so reps don't retype 80% of
                 identical content. Hidden in edit / renewal modes. */}
             {!isEdit && !renewalOf && profile?.id && (
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ padding: '16px 16px 0' }}>
                 <button
                   type="button"
                   disabled={copying}

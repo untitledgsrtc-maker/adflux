@@ -2052,7 +2052,7 @@
 .v2d input[type="search"],
 .v2d select,
 .v2d textarea {
-  background: var(--v2-surface-2);
+  background: var(--v2-surface-2, var(--v2-bg-2)); /* surface-2 is only defined under .v2 */
   border: 1.5px solid var(--v2-surface-3, #475569);
   color: var(--v2-ink-0);
   border-radius: 8px; padding: 10px 12px;
