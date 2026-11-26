@@ -272,6 +272,7 @@
 /* Duration: label on top, then box + quick chips + days box on one line,
    on its own row so the other fields line up beside each other. */
 .ccr-field--duration {
+  order: -1; /* first, so Screens joins the rate fields on one row */
   flex-basis: 100%;
   flex-direction: row;
   flex-wrap: wrap;
