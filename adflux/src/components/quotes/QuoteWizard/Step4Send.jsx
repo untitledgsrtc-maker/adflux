@@ -176,7 +176,7 @@ export function Step4Send({ quote, cities, subtotal, gst_amount, total_amount, o
       </div>
 
       {toastMsg && (
-        <div style={{ background: 'rgba(76,175,80,.1)', border: '1px solid rgba(76,175,80,.3)', borderRadius: 8, padding: '12px 16px', marginTop: 16, fontSize: '.82rem', color: '#81c784' }}>
+        <div style={{ background: 'var(--success-soft)', border: '1px solid var(--success)', borderRadius: 10, padding: '12px 16px', marginTop: 16, fontSize: 13, color: 'var(--success)' }}>
           {toastMsg}
         </div>
       )}

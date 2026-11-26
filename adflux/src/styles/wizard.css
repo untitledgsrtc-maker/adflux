@@ -508,6 +508,7 @@
 }
 
 .review-city-info {
+  min-width: 0;
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -528,6 +529,8 @@
 
 .review-city-rates {
   text-align: right;
+  flex-shrink: 0;       /* keep 'Listed: Rs X/mo' on one line on phone */
+  white-space: nowrap;
 }
 
 .review-listed {
