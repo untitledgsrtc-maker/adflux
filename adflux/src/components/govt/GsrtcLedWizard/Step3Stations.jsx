@@ -299,8 +299,7 @@ export function Step3Stations({ data, onChange }) {
 
         {/* Header row */}
         <div
-          className="govt-list__row govt-list__row--head"
-          style={{ gridTemplateColumns: '24px 1fr 50px 60px 64px 64px 64px 78px 110px' }}
+          className="govt-list__row govt-list__row--head gsrtc-row"
         >
           <span></span>
           <span>Station</span>
@@ -339,11 +338,8 @@ export function Step3Stations({ data, onChange }) {
           return (
             <div
               key={s.id}
-              className="govt-list__row"
-              style={{
-                gridTemplateColumns: '24px 1fr 50px 60px 64px 64px 64px 78px 110px',
-                opacity: isChecked ? 1 : 0.55,
-              }}
+              className="govt-list__row gsrtc-row"
+              style={{ opacity: isChecked ? 1 : 0.55 }}
             >
               <span className="govt-list__check">
                 <input type="checkbox" checked={isChecked} onChange={() => toggle(s.id)} />
@@ -370,58 +366,66 @@ export function Step3Stations({ data, onChange }) {
                   </button>
                 )}
               </span>
-              <span style={{ textAlign: 'center' }}>
+              <span className="gsrtc-cell" data-label="Cat" style={{ textAlign: 'center' }}>
                 <span className={`govt-pill govt-pill--${s.category}`}>{s.category}</span>
               </span>
-              <span className="govt-list__pct">{s.screens_count}</span>
-              <input
-                type="number"
-                min="1"
-                placeholder={String(DEFAULT_DAILY)}
-                value={ov.daily_spots_override ?? ''}
-                onChange={e => setOverride(s.id, 'daily_spots_override', e.target.value)}
-                disabled={!isChecked}
-                className="govt-input-cell"
-                style={{ maxWidth: 70, textAlign: 'right' }}
-              />
+              <span className="govt-list__pct gsrtc-cell" data-label="Screens">{s.screens_count}</span>
+              <span className="gsrtc-cell" data-label="Daily">
+                <input
+                  type="number"
+                  min="1"
+                  placeholder={String(DEFAULT_DAILY)}
+                  value={ov.daily_spots_override ?? ''}
+                  onChange={e => setOverride(s.id, 'daily_spots_override', e.target.value)}
+                  disabled={!isChecked}
+                  className="govt-input-cell"
+                  style={{ maxWidth: 70, textAlign: 'right' }}
+                />
+              </span>
               {/* Phase 247.4 — spot duration is a 10–60s dropdown; the rate is
                   per 10s slot so 20/30/40s multiply the cost ×2/×3/×4. Picking
                   the default (10) stores null = "no override". */}
-              <select
-                value={String(ov.spot_duration_sec_override ?? DEFAULT_DURATION)}
-                onChange={e => setOverride(s.id, 'spot_duration_sec_override', e.target.value === String(DEFAULT_DURATION) ? '' : e.target.value)}
-                disabled={!isChecked}
-                className="govt-input-cell"
-                style={{ maxWidth: 70, textAlign: 'right' }}
-              >
-                {[10, 20, 30, 40, 50, 60].map(v => (
-                  <option key={v} value={String(v)}>{v}s</option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min="1"
-                placeholder={String(DEFAULT_DAYS)}
-                value={ov.days_override ?? ''}
-                onChange={e => setOverride(s.id, 'days_override', e.target.value)}
-                disabled={!isChecked}
-                className="govt-input-cell"
-                style={{ maxWidth: 70, textAlign: 'right' }}
-              />
+              <span className="gsrtc-cell" data-label="Spot">
+                <select
+                  value={String(ov.spot_duration_sec_override ?? DEFAULT_DURATION)}
+                  onChange={e => setOverride(s.id, 'spot_duration_sec_override', e.target.value === String(DEFAULT_DURATION) ? '' : e.target.value)}
+                  disabled={!isChecked}
+                  className="govt-input-cell"
+                  style={{ maxWidth: 70, textAlign: 'right' }}
+                >
+                  {[10, 20, 30, 40, 50, 60].map(v => (
+                    <option key={v} value={String(v)}>{v}s</option>
+                  ))}
+                </select>
+              </span>
+              <span className="gsrtc-cell" data-label="Days">
+                <input
+                  type="number"
+                  min="1"
+                  placeholder={String(DEFAULT_DAYS)}
+                  value={ov.days_override ?? ''}
+                  onChange={e => setOverride(s.id, 'days_override', e.target.value)}
+                  disabled={!isChecked}
+                  className="govt-input-cell"
+                  style={{ maxWidth: 70, textAlign: 'right' }}
+                />
+              </span>
               {/* Phase 195 — per-slot rate. Placeholder = the master DAVP grade
                   rate; type a value to override it for this proposal only. */}
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder={String(Number(s.davp_per_slot_rate) || 0)}
-                value={ov.rate_override ?? ''}
-                onChange={e => setOverride(s.id, 'rate_override', e.target.value)}
-                disabled={!isChecked}
-                className="govt-input-cell"
-                style={{ maxWidth: 70, textAlign: 'right' }}
-              />
-              <span className="govt-list__qty">
+              <span className="gsrtc-cell" data-label="Rate">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder={String(Number(s.davp_per_slot_rate) || 0)}
+                  value={ov.rate_override ?? ''}
+                  onChange={e => setOverride(s.id, 'rate_override', e.target.value)}
+                  disabled={!isChecked}
+                  className="govt-input-cell"
+                  style={{ maxWidth: 70, textAlign: 'right' }}
+                />
+              </span>
+              <span className="govt-list__qty gsrtc-cell" data-label="Monthly">
                 {isChecked ? `₹${formatINREnglish(v.monthly)}` : '—'}
               </span>
             </div>

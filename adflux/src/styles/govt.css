@@ -729,6 +729,40 @@
 }
 .govt-input-cell:focus { outline: none; border-color: var(--accent); }
 
+/* GSRTC station rows (Step 3). Computer: one 9-column line. Phone: a small
+   card - tick + name, then Cat / Screens / Monthly, then Daily / Spot / Days /
+   Rate, each with its own label (data-label). */
+.govt-list__row.gsrtc-row { grid-template-columns: 24px 1fr 50px 60px 64px 64px 64px 78px 110px; }
+.gsrtc-cell { text-align: right; min-width: 0; }
+@media (max-width: 600px) {
+  .govt-list__row--head.gsrtc-row { display: none; }
+  .govt-list__row.gsrtc-row {
+    grid-template-columns: 22px repeat(4, minmax(0, 1fr));
+    row-gap: 8px;
+    align-items: end;
+  }
+  .gsrtc-row > :nth-child(1) { grid-column: 1; grid-row: 1; align-self: center; }
+  .gsrtc-row > :nth-child(2) { grid-column: 2 / -1; grid-row: 1; }
+  .gsrtc-row > :nth-child(3) { grid-column: 2; grid-row: 2; }
+  .gsrtc-row > :nth-child(4) { grid-column: 3; grid-row: 2; }
+  .gsrtc-row > :nth-child(9) { grid-column: 4 / -1; grid-row: 2; }
+  .gsrtc-row > :nth-child(5) { grid-column: 2; grid-row: 3; }
+  .gsrtc-row > :nth-child(6) { grid-column: 3; grid-row: 3; }
+  .gsrtc-row > :nth-child(7) { grid-column: 4; grid-row: 3; }
+  .gsrtc-row > :nth-child(8) { grid-column: 5; grid-row: 3; }
+  .gsrtc-cell { text-align: left !important; }
+  .gsrtc-cell::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 3px;
+  }
+  .gsrtc-cell .govt-input-cell { max-width: none !important; }
+}
+
 /* Wide form variant — Companies / Signers / Documents tabs in Master
    plus the Edit-template modal. Removes the 90px cap and left-aligns.
    Owner spec (4 May 2026): "UI not good" — the narrow-cell width was
