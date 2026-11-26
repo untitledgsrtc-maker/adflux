@@ -24,6 +24,7 @@ import { buildSettlementMap } from '../../utils/settlement'
 import UserAvatar from '../../components/common/UserAvatar'
 import { initials, formatCompact, todayISO } from '../../utils/formatters'
 import { thisMonth } from '../../utils/period'
+import { wonDate } from '../../utils/wonDate'
 import { PeriodPicker } from '../../components/v2/PeriodPicker'
 import '../../styles/v2.css'
 
@@ -73,7 +74,7 @@ export default function SalesDashboardDesktop() {
 
     const [qRes, pRes, fRes, msRes, histRes, profRes, settingsRes, dtRes, fDoneRes] = await Promise.all([
       supabase.from('quotes')
-        .select('id, quote_number, client_name, client_company, subtotal, total_amount, status, revenue_type, created_at, updated_at, created_by, campaign_start_date, campaign_end_date')
+        .select('id, quote_number, client_name, client_company, subtotal, total_amount, status, revenue_type, created_at, updated_at, won_at, created_by, campaign_start_date, campaign_end_date')
         .eq('created_by', uid)
         .order('created_at', { ascending: false }),
       supabase.from('payments')
@@ -293,7 +294,7 @@ export default function SalesDashboardDesktop() {
 
     const wonValue = quotes.filter(q => q.status === 'won')
                            .filter(q => {
-                             const ts = q.updated_at || q.created_at || ''
+                             const ts = wonDate(q)  // real won date; a later payment bumps updated_at
                              return ts >= monthStartIso && ts < monthEndIso
                            })
                            .reduce((s, q) => s + (q.total_amount || 0), 0)

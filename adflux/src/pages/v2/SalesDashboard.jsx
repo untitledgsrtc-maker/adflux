@@ -27,6 +27,7 @@ import { buildSettlementMap } from '../../utils/settlement'
 import UserAvatar from '../../components/common/UserAvatar'
 import { thisMonthISO, initials, todayISO } from '../../utils/formatters'
 import { fetchAllPages } from '../../utils/fetchAllPages'
+import { wonDate } from '../../utils/wonDate'
 // Phase 31O — V2AppShell mounts ProposedIncentiveCard now; this file
 // no longer needs the import.
 import '../../styles/v2.css'
@@ -62,7 +63,7 @@ export default function SalesDashboardV2() {
 
     const [qRes, pRes, fRes, msRes, histRes, profRes, settingsRes] = await Promise.all([
       supabase.from('quotes')
-        .select('id, quote_number, client_name, client_company, subtotal, total_amount, status, revenue_type, created_at, updated_at, created_by, campaign_start_date, campaign_end_date')
+        .select('id, quote_number, client_name, client_company, subtotal, total_amount, status, revenue_type, created_at, updated_at, won_at, created_by, campaign_start_date, campaign_end_date')
         .eq('created_by', uid)
         .order('created_at', { ascending: false }),
       supabase.from('payments')
@@ -236,7 +237,7 @@ export default function SalesDashboardV2() {
 
     // KPIs
     const wonValue = quotes.filter(q => q.status === 'won')
-                           .filter(q => (q.updated_at || q.created_at || '').slice(0,7) === monthKey)
+                           .filter(q => wonDate(q).slice(0,7) === monthKey)  // real won date; a later payment bumps updated_at
                            .reduce((s,q) => s + (q.total_amount || 0), 0)
     // Quotes Sent: count + total ₹ value so the dashboard surfaces the
     // headline "how much have I sent" figure alongside the raw count.
