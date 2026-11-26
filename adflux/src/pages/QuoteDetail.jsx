@@ -537,7 +537,7 @@ export default function QuoteDetail() {
   return (
     <div className="page">
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+      <div className="qd-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/quotes')}>
           <ArrowLeft size={15} /> Back
         </button>
@@ -796,7 +796,7 @@ export default function QuoteDetail() {
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: 'var(--y)', lineHeight: 1 }}>
               {formatCurrency(quote.total_amount)}
             </div>
-            <div style={{ fontSize: '.72rem', color: 'var(--gray)', marginTop: 3 }}>incl. GST</div>
+            <div style={{ fontSize: 12, color: 'var(--gray)', marginTop: 3 }}>incl. GST</div>
 
             {/* Status badge + dropdown */}
             <div style={{ position: 'relative', display: 'inline-block', marginTop: 8 }}>
@@ -879,7 +879,7 @@ export default function QuoteDetail() {
                 { icon: <FileText size={13} />, label: 'GSTIN', val: quote.client_gst },
               ].filter(f => f.val).map((f, i) => (
                 <div key={i}>
-                  <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
                     {f.icon} {f.label}
                   </div>
                   <div style={{ fontSize: '.88rem', fontWeight: 600 }}>{f.val}</div>
@@ -906,7 +906,7 @@ export default function QuoteDetail() {
                 { label: 'Locations', val: `${cities.length} Cit${cities.length !== 1 ? 'ies' : 'y'}` },
               ].map((f, i) => (
                 <div key={i}>
-                  <div style={{ fontSize: '.68rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>{f.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>{f.label}</div>
                   <div style={{ fontSize: '.88rem', fontWeight: 600 }}>{f.val}</div>
                 </div>
               ))}

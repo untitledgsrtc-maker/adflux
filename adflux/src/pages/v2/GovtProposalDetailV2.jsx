@@ -13,11 +13,12 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Send, CheckCircle2, XCircle, Paperclip, Plus, Trash2,
   CreditCard, Upload, Download, FileText, Lock, Loader2, MessageCircle, Calendar,
-  Mail,
+  Mail, AlertTriangle, RefreshCw,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { openExternalUrl, openEmail } from '../../utils/openExternal'
 import { GovtProposalRenderer } from '../../components/govt/GovtProposalRenderer'
+import { FitToWidth } from '../../components/govt/FitToWidth'
 import { useAuth } from '../../hooks/useAuth'
 import { useAuthStore } from '../../store/authStore'
 import { usePayments } from '../../hooks/usePayments'
@@ -1736,7 +1737,7 @@ export default function GovtProposalDetailV2() {
 
       {signer && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
           margin: '12px 0', fontSize: 12,
           color: 'var(--text-muted)',
         }}>
@@ -1759,11 +1760,12 @@ export default function GovtProposalDetailV2() {
               if (!error) setQuote(data)
             }}
             className="govt-input-cell"
-            style={{ maxWidth: 220 }}
+            style={{ maxWidth: 220, flex: '1 1 140px' }}
           />
           {quote.locked_proposal_pdf_url && (
-            <span style={{ color: 'var(--warning)', fontSize: 12 }}>
-              ⚠ Letter PDF already locked — changes affect future renders only, not the snapshot.
+            <span style={{ color: 'var(--warning)', fontSize: 12, flexBasis: '100%', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+              <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+              Letter PDF already locked — changes affect future renders only, not the snapshot.
             </span>
           )}
         </div>
@@ -1771,15 +1773,19 @@ export default function GovtProposalDetailV2() {
 
       {/* Wrap the renderer in a ref'd container — html2canvas captures
           this exact node when generating the locked PDF on Mark Sent. */}
-      <div ref={rendererRef}>
-        <GovtProposalRenderer
-          template={template}
-          data={renderedData}
-          signer={effectiveSigner}
-          mediaType={quote.media_type}
-          company={company}
-        />
-      </div>
+      {/* FitToWidth only zooms the on-screen preview on phone; the PDF path
+          clones rendererRef into its own 794px wrapper, so it is unaffected. */}
+      <FitToWidth>
+        <div ref={rendererRef}>
+          <GovtProposalRenderer
+            template={template}
+            data={renderedData}
+            signer={effectiveSigner}
+            mediaType={quote.media_type}
+            company={company}
+          />
+        </div>
+      </FitToWidth>
 
       {/* Locked PDF status — shows once a snapshot exists so the user
           knows the sent version is frozen. */}
@@ -1828,7 +1834,7 @@ export default function GovtProposalDetailV2() {
             >
               {regeneratingLocked
                 ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Regenerating…</>
-                : <>↻ Regenerate</>}
+                : <><RefreshCw size={12} /> Regenerate</>}
             </button>
           )}
         </div>
@@ -1862,8 +1868,8 @@ export default function GovtProposalDetailV2() {
           return (
             <div
               key={`${c.template_id || 'custom'}-${idx}`}
-              className="govt-list__row"
-              style={{ gridTemplateColumns: '28px 1.2fr 1.6fr 80px 28px', alignItems: 'center' }}
+              className="govt-list__row att-row"
+              style={{ alignItems: 'center' }}
             >
               <span className="govt-list__check">
                 <input
@@ -2020,8 +2026,8 @@ export default function GovtProposalDetailV2() {
         })}
         {/* Add-custom row — matches the 5-column grid above */}
         <div
-          className="govt-list__row"
-          style={{ gridTemplateColumns: '28px 1.2fr 1.6fr 80px 28px', alignItems: 'center' }}
+          className="govt-list__row att-row"
+          style={{ alignItems: 'center' }}
         >
           <span></span>
           <input
