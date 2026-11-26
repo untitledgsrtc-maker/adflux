@@ -488,6 +488,25 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
 .lead-radio-grp .opt.on.pos { background: var(--success); color: white;             border-color: var(--success); }
 .lead-radio-grp .opt.on.neg { background: var(--danger);  color: white;             border-color: var(--danger); }
 
+/* New Lead option C: source chips + folded 'More details' (owner 26-11-2026) */
+.lead-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.lead-chip {
+  padding: 8px 14px; min-height: 36px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface-2); color: var(--text-muted);
+  font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.lead-chip:hover { border-color: var(--border-strong); color: var(--text); }
+.lead-chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.lead-chip:focus-visible, .lead-more-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lead-more-toggle {
+  width: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 14px 16px; min-height: 48px;
+  background: transparent; border: 0; color: var(--text);
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left;
+}
+.lead-more-hint { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--text-subtle); }
+
 /* ─── Mobile (Sales /work flow + Telecaller mobile) ─── */
 .m-screen {
   background: var(--bg); color: var(--text);

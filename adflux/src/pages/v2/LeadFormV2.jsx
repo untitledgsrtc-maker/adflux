@@ -16,7 +16,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { confirmDialog } from '../../components/v2/ConfirmDialog' // Phase 181 — post-meeting Start Presentation
-import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap, Camera, MapPin } from 'lucide-react'
+import { ArrowLeft, Loader2, Save, Flame, Snowflake, Zap, Camera, MapPin, ChevronDown } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { hasRealWord } from '../../utils/leadName'
 import { useAuthStore } from '../../store/authStore'
@@ -29,6 +29,9 @@ import MeetingLocationBlock from '../../components/leads/MeetingLocationBlock'
 import { checkMeetingLocation } from '../../utils/meetingLocation'
 import { guessIndustry } from '../../utils/industryGuess'
 import { findLeadByPhone } from '../../utils/leadDedup'
+
+// First-screen source chips (the full SOURCES list sits behind 'More…').
+const QUICK_SOURCES = ['Manual', 'Referral', 'Walk-in', 'Field Meeting', 'Website']
 
 const SOURCES = [
   'IndiaMart', 'Justdial', 'Cronberry WABA', 'Excel Upload',
@@ -113,6 +116,9 @@ export default function LeadFormV2() {
   // Google listing pin of the picked company (Phase 535). The meeting must be logged within 100 m of it.
   const [placePin, setPlacePin] = useState(null)   // { lat, lng } | null
   const [locBlock, setLocBlock] = useState(null)   // set when the rep is too far from the pin
+  // Option C (owner 26-11-2026): rarely filled fields fold under 'More details'.
+  const [showMore, setShowMore] = useState(false)
+  const [allSources, setAllSources] = useState(false)
 
   async function checkPhoneDup(p) {
     setDupLead(null)
@@ -426,43 +432,25 @@ export default function LeadFormV2() {
           line ("Have / a / business / card?"). Now the icon+text take
           the full first row and the Scan/Upload buttons take the second
           row on phones, side-by-side on desktop. */}
-      <div className="lead-card" style={{
-        marginBottom: 14,
-        padding: '14px 16px',
-        background: 'var(--accent-soft, rgba(255,230,0,0.06))',
-        border: '1px dashed var(--accent, #FFE600)',
-        display: 'grid',
-        gridTemplateColumns: '1fr',
-        gap: 10,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Camera size={20} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-              Have a business card?
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              Snap or upload a photo — we'll fill the form for you.
-            </div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-          <PhotoCapture
-            buttonLabel="Scan card"
-            onFieldsExtracted={(fields) => {
-              setForm(prev => ({
-                ...prev,
-                name:        prev.name        || fields.name        || '',
-                company:     prev.company     || fields.company     || '',
-                designation: prev.designation || fields.designation || fields.role || '',
-                phone:       prev.phone       || fields.phone       || '',
-                email:       prev.email       || fields.email       || '',
-                city:        prev.city        || fields.city        || '',
-                website:     prev.website     || fields.website     || '',
-              }))
-            }}
-          />
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        <Camera size={16} style={{ color: 'var(--accent)' }} />
+        <span style={{ fontSize: 13, color: 'var(--text-muted)', flex: 1, minWidth: 150 }}>Have a business card? Scan it to fill the form.</span>
+        <PhotoCapture
+          buttonLabel="Scan card"
+          onFieldsExtracted={(fields) => {
+            setForm(prev => ({
+              ...prev,
+              name:        prev.name        || fields.name        || '',
+              company:     prev.company     || fields.company     || '',
+              designation: prev.designation || fields.designation || fields.role || '',
+              phone:       prev.phone       || fields.phone       || '',
+              email:       prev.email       || fields.email       || '',
+              city:        prev.city        || fields.city        || '',
+              website:     prev.website     || fields.website     || '',
+            }))
+            if (fields.designation || fields.role || fields.email || fields.website) setShowMore(true)
+          }}
+        />
       </div>
 
       {/* Phase 33D.6 + 34Z.30 + 260 — duplicate-phone warning.
@@ -511,22 +499,9 @@ export default function LeadFormV2() {
         )
       })()}
 
-      {/* ─── Identity ─── */}
+      {/* ─── Lead (option C, owner 26-11-2026): the fields reps fill every time ─── */}
       <div className="lead-card" style={{ marginBottom: 14 }}>
-        <div className="lead-card-head"><div className="lead-card-title">Identity</div></div>
-        <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          {/* Phase 33D.3 — locked field set (11 May 2026):
-                Company* / Person* / Designation / Mobile* / Email /
-                City* / Website. Govt segment exempts phone (tender
-                leads have only a department email). */}
-          {/* Phase 35 PR 2.5 — mics dropped from Identity fields per
-              owner: OCR business-card scan already fills these, and
-              double mic-on-every-field added visual noise. Voice
-              still available on the Notes textarea below where
-              free-text actually benefits from dictation. */}
-          {/* Type 3+ letters, pick the Google listing, and company / phone / city / website
-              fill in (only where still empty). A picked phone also runs the existing
-              duplicate-lead check. Both Add Lead and Log Meeting. */}
+        <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
           <div>
             <label className="lead-fld-label">Company *</label>
             <PlaceSuggest
@@ -550,7 +525,6 @@ export default function LeadFormV2() {
             />
           </div>
           <Field label="Person name *"  value={form.name}        onChange={v => set('name', v)}        placeholder="e.g. Dr. Mehta" />
-          <Field label="Designation"    value={form.designation} onChange={v => set('designation', v)} placeholder="e.g. Marketing Manager" />
           <Field
             label={form.segment === 'GOVERNMENT' ? 'Phone' : 'Mobile *'}
             value={form.phone}
@@ -558,9 +532,6 @@ export default function LeadFormV2() {
             onBlur={() => checkPhoneDup(form.phone)}
             placeholder="98XXXXXXXX or +91 98XXXXXXXX"
           />
-          <Field label="Email"          value={form.email}       onChange={v => set('email', v)}       placeholder="name@company.com" type="email" />
-          {/* Phase 34Z.11 — city typeahead bound to cities master so
-              reps stop creating "Anand" / "Anad" / "Adam" spellings. */}
           <div>
             <label className="lead-fld-label">City *</label>
             <CityAutocomplete
@@ -569,25 +540,25 @@ export default function LeadFormV2() {
               placeholder="Type to search — e.g. Vadodara"
             />
           </div>
-          <Field label="Website"        value={form.website}     onChange={v => set('website', v)}     placeholder="www.example.com" />
-        </div>
-      </div>
 
-      {/* ─── Classification ─── */}
-      <div className="lead-card" style={{ marginBottom: 14 }}>
-        <div className="lead-card-head"><div className="lead-card-title">Classification</div></div>
-        <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div>
+          {/* Source as one-tap chips; the common ones first, the rest behind 'More'. */}
+          <div style={{ gridColumn: '1 / -1' }}>
             <label className="lead-fld-label">Source *</label>
-            <select className="lead-inp" value={form.source} onChange={e => set('source', e.target.value)}>
-              {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <div className="lead-chip-row">
+              {(allSources ? SOURCES : SOURCES.filter(x => QUICK_SOURCES.includes(x) || x === form.source)).map(x => (
+                <button type="button" key={x}
+                  className={`lead-chip${form.source === x ? ' on' : ''}`}
+                  aria-pressed={form.source === x}
+                  onClick={() => set('source', x)}>{x}</button>
+              ))}
+              {!allSources && (
+                <button type="button" className="lead-chip" onClick={() => setAllSources(true)}>More…</button>
+              )}
+            </div>
           </div>
+
           <div>
             <label className="lead-fld-label">Segment *</label>
-            {/* Phase 34Z.21 — segment lock-down. Reps without GOVERNMENT
-                access only see Private (and vice-versa). Owner: "He has
-                private only but still he can add in government lead." */}
             <div className="lead-radio-grp">
               {canGovt && (
                 <span
@@ -612,21 +583,6 @@ export default function LeadFormV2() {
               )}
             </div>
           </div>
-          <Field label="Industry" value={form.industry} onChange={v => set('industry', v)} placeholder="Healthcare, Retail, …" />
-        </div>
-      </div>
-
-      {/* ─── Money + temperature ─── */}
-      <div className="lead-card" style={{ marginBottom: 14 }}>
-        <div className="lead-card-head"><div className="lead-card-title">Money &amp; temperature</div></div>
-        <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <Field
-            label="Expected value (₹)"
-            value={form.expected_value}
-            onChange={v => set('expected_value', v)}
-            placeholder="3,80,000"
-            type="number"
-          />
           <div>
             <label className="lead-fld-label">Heat</label>
             <div className="lead-radio-grp">
@@ -650,43 +606,26 @@ export default function LeadFormV2() {
               </span>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* ─── Ownership ─── */}
-      <div className="lead-card" style={{ marginBottom: 14 }}>
-        <div className="lead-card-head"><div className="lead-card-title">Ownership</div></div>
-        <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div>
-            <label className="lead-fld-label">Assigned to {!isManager ? '(you)' : ''}</label>
-            <select
-              className="lead-inp"
-              value={form.assigned_to}
-              onChange={e => set('assigned_to', e.target.value)}
-              disabled={!isManager}
-            >
-              <option value="">— unassigned —</option>
-              {reps.map(r => (
-                <option key={r.id} value={r.id}>
-                  {r.name}{r.city ? ` · ${r.city}` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="lead-fld-label">Telecaller {isTelecaller ? '(you)' : ''}</label>
-            <select
-              className="lead-inp"
-              value={form.telecaller_id}
-              onChange={e => set('telecaller_id', e.target.value)}
-              disabled={!isManager && !isTelecaller}
-            >
-              <option value="">— none —</option>
-              {telecallers.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
+          {isManager && (
+            <div style={{ gridColumn: '1 / -1' }}>
+            <div>
+              <label className="lead-fld-label">Assigned to</label>
+              <select
+                className="lead-inp"
+                value={form.assigned_to}
+                onChange={e => set('assigned_to', e.target.value)}
+              >
+                <option value="">— unassigned —</option>
+                {reps.map(r => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}{r.city ? ` · ${r.city}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -705,6 +644,44 @@ export default function LeadFormV2() {
           />
         </div>
       )}
+
+      {/* ─── More details (optional, folded) ─── */}
+      <div className="lead-card" style={{ marginBottom: 14 }}>
+        <button type="button" className="lead-more-toggle" aria-expanded={showMore} onClick={() => setShowMore(v => !v)}>
+          <ChevronDown size={16} style={{ transform: showMore ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+          More details <span style={{ color: 'var(--text-subtle)', fontWeight: 400 }}>(optional)</span>
+          {!showMore && <span className="lead-more-hint">Designation · Email · Website · Industry · Value · Telecaller</span>}
+        </button>
+        {showMore && (
+          <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
+            <Field label="Designation"    value={form.designation} onChange={v => set('designation', v)} placeholder="e.g. Marketing Manager" />
+            <Field label="Email"          value={form.email}       onChange={v => set('email', v)}       placeholder="name@company.com" type="email" />
+            <Field label="Website"        value={form.website}     onChange={v => set('website', v)}     placeholder="www.example.com" />
+            <Field label="Industry" value={form.industry} onChange={v => set('industry', v)} placeholder="Healthcare, Retail, …" />
+            <Field
+              label="Expected value (₹)"
+              value={form.expected_value}
+              onChange={v => set('expected_value', v)}
+              placeholder="3,80,000"
+              type="number"
+            />
+          <div>
+            <label className="lead-fld-label">Telecaller {isTelecaller ? '(you)' : ''}</label>
+            <select
+              className="lead-inp"
+              value={form.telecaller_id}
+              onChange={e => set('telecaller_id', e.target.value)}
+              disabled={!isManager && !isTelecaller}
+            >
+              <option value="">— none —</option>
+              {telecallers.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+          </div>
+        )}
+      </div>
 
       {locBlock && (
         <MeetingLocationBlock
