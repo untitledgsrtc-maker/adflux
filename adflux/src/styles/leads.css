@@ -343,6 +343,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   color: var(--text); flex: 1; min-width: 0; font: inherit;
   align-self: stretch;   /* whole pill height is tappable (input was 19px tall) */
 }
+.lead-search { padding-block: 0; min-height: 40px; }
 /* Phone: the rep filter buttons stay on one swipeable line instead of
    wrapping to ~9 rows above the lead list. Inline flex-wrap needs !important. */
 @media (max-width: 720px) {
