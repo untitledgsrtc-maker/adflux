@@ -810,3 +810,10 @@ textarea.govt-input-cell--wide {
   .att-row > :nth-child(4) { grid-column: 2 / -1; grid-row: 3; }
 }
 
+/* Phone: govt tables (district allocation, master lists) fit 340px instead of
+   cutting off the last column. */
+@media (max-width: 600px) {
+  .govt-table th, .govt-table td { padding: 8px 6px; font-size: 13px; }
+  .govt-table th { letter-spacing: .03em; }
+}
+
