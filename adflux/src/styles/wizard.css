@@ -284,6 +284,46 @@
 .ccr-field--duration .ccr-label { flex-basis: 100%; }
 .ccr-field--duration .ccr-input { width: 90px; }
 
+/* Phase 696: compact city rows. Default: stacked fields with labels.
+   When the city list is at least 760px wide: one line per city, labels once
+   in .ccr-head (container query, so laptops with the sidebar stack too). */
+.campaign-cities { container-type: inline-size; container-name: ccr; }
+.ccr-head { display: none; }
+.ccr-compact .campaign-city-controls.ccr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+.ccr-compact .ccr-input,
+.ccr-compact .ccr-select { width: 100%; min-width: 0; box-sizing: border-box; }
+.ccr-compact .ccr-duration { flex: 1; min-width: 0; }
+.ccr-compact .ccr-days { width: 64px; flex: 0 0 64px; }
+.ccr-input--warn { border-color: var(--warning) !important; }
+.ccr-compact .ccr-field:has(.ccr-duration) { grid-column: span 2; }
+@container ccr (min-width: 760px) {
+  .ccr-head,
+  .ccr-compact {
+    display: grid;
+    grid-template-columns: minmax(110px, 1.4fr) 72px 150px 100px 76px 86px minmax(84px, 1fr) 30px;
+    gap: 8px;
+    align-items: center;
+  }
+  .ccr-head {
+    padding: 0 15px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+  .ccr-compact { padding: 8px 14px; }
+  .ccr-compact .campaign-city-controls.ccr-grid { display: contents; }
+  .ccr-compact .ccr-label { display: none; }
+  .ccr-compact .ccr-total { padding-bottom: 0; }
+  .ccr-compact .ccr-field:has(.ccr-duration) { grid-column: auto; }
+}
+
 .ccr-total {
   font-size: 14px;
   font-weight: 700;

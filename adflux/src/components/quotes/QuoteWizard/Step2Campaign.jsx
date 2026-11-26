@@ -1,8 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { Search, Plus, Trash2, ChevronLeft, ChevronRight, ChevronDown, Layers, Monitor, X, Lock } from 'lucide-react'
+import { Search, Plus, Trash2, ChevronLeft, ChevronRight, ChevronDown, Layers, Monitor, X } from 'lucide-react'
 import { confirmDialog } from '../../v2/ConfirmDialog'
 import { useCities } from '../../../hooks/useCities'
-import { useAuth } from '../../../hooks/useAuth'
 import { formatCurrency } from '../../../utils/formatters'
 import { calcCampaignTotal, monthsForDays, hasDays } from '../../../utils/quoteDuration'
 
@@ -43,7 +42,6 @@ const DEFAULT_SLOTS_PER_DAY = 100
 
 export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
   const { cities, fetchCities } = useCities()
-  const { isAdmin } = useAuth()
   const [search, setSearch] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [error, setError] = useState('')
@@ -111,12 +109,22 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
 
   function removeCity(cityId) {
     onChange(selectedCities.filter(sc => sc.city.id !== cityId))
+    dropCustom(cityId)
     // Drop its tick too, so re-adding the city later doesn't come back pre-ticked.
     setPicked(prev => {
       if (!prev.has(cityId)) return prev
       const next = new Set(prev); next.delete(cityId); return next
     })
   }
+
+  // Cities where the rep just picked 'Days…' and has not typed days yet.
+  // Saved odd day counts (not 7 / 15) show as 'Days…' straight from the data.
+  const [customDays, setCustomDays] = useState(() => new Set())
+  const dropCustom = id => setCustomDays(prev => {
+    if (!prev.has(id)) return prev
+    const n = new Set(prev); n.delete(id); return n
+  })
+  const isCustomDays = sc => customDays.has(sc.city.id) || (hasDays(sc) && !QUICK_DAYS.includes(Number(sc.duration_days)))
 
   function updateEntry(cityId, field, value) {
     onChange(
@@ -147,19 +155,6 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
         return u
       })
     )
-  }
-
-  // Clamp duration on blur so pasted/typed values like 0, 13, or
-  // empty strings don't poison the state. Using blur (not change) so
-  // the user can clear the input while editing.
-  function clampDuration(cityId, raw) {
-    // Phase 407: in days mode the months box is not the source of truth - tabbing through it must not turn 15 days into 1 month.
-    if (hasDays(selectedCities.find(sc => sc.city.id === cityId))) return
-    let n = Number(raw)
-    if (!Number.isFinite(n) || n < MIN_MONTHS) n = MIN_MONTHS
-    if (n > MAX_MONTHS) n = MAX_MONTHS
-    n = Math.round(n)
-    updateEntry(cityId, 'duration_months', n)
   }
 
   // Phase 331 — apply the filled bulk boxes to ALL cities in ONE onChange
@@ -234,7 +229,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
         if (!bulkAll && !picked.has(sc.city.id)) return sc
         const u = { ...sc }
         if (rate !== null)  u.offered_rate = rate
-        if (dur !== null)   { u.duration_months = dur; u.duration_days = days }   // months pick clears days
+        if (dur !== null)   { u.duration_months = dur; u.duration_days = days; dropCustom(sc.city.id) }   // months pick clears days
         if (sec !== null)   u.slot_seconds = sec
         if (slots !== null) {
           u.slots_per_day = slots
@@ -326,7 +321,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                   </div>
                   <div className="campaign-city-controls">
                     <div className="ccr-field">
-                      <label className="ccr-label ccr-label--accent">Offered (₹)</label>
+                      <label className="ccr-label ccr-label--accent">Price (₹)</label>
                       <input
                         type="number"
                         min="0"
@@ -422,9 +417,14 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
             </div>
           )}
 
+          <div className="ccr-head" aria-hidden="true">
+            <span>City</span>
+            <span>Screens</span><span>Duration</span>
+            <span className="ccr-label--accent">Price (₹)</span><span>Sec</span><span>Slots/day</span><span>Total</span><span />
+          </div>
           {selectedCities.map(sc => {
             return (
-              <div key={sc.city.id} className="campaign-city-row">
+              <div key={sc.city.id} className="campaign-city-row ccr-compact">
                 <div className="campaign-city-name">
                   {/* Bulk panel open: the whole name area is one tap target that
                       ticks/unticks the city (an 18px box alone is too small on a phone). */}
@@ -455,142 +455,71 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                   </label>
                 </div>
 
-                <div className="campaign-city-controls">
+                <div className="campaign-city-controls ccr-grid">
                   <div className="ccr-field">
                     <label className="ccr-label">Screens</label>
                     <input
                       type="number"
                       min="1"
                       className="ccr-input"
+                      aria-label={`Screens for ${sc.city.name}`}
                       value={sc.screens}
                       onChange={e => updateEntry(sc.city.id, 'screens', Number(e.target.value) || 1)}
                     />
                   </div>
 
-                  {/* Duration: free 1–12 input plus quick-pick pills.
-                      The input is the source of truth; pills just
-                      write into it. No bulk discount applied. */}
-                  <div className="ccr-field ccr-field--duration">
-                    <label className="ccr-label">Duration (months)</label>
-                    <input
-                      type="number"
-                      min={MIN_MONTHS}
-                      max={MAX_MONTHS}
-                      step="1"
-                      className="ccr-input"
-                      value={hasDays(sc) ? '' : sc.duration_months}
-                      placeholder={hasDays(sc) ? 'using days' : undefined}
-                      onChange={e => updateEntry(sc.city.id, 'duration_months', e.target.value)}
-                      onBlur={e => clampDuration(sc.city.id, e.target.value)}
-                      title="Any value 1 to 12"
-                    />
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: 4,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      {QUICK_DURATIONS.map(m => {
-                        const active = !hasDays(sc) && Number(sc.duration_months) === m
-                        return (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() => updateEntry(sc.city.id, 'duration_months', m)}
-                            style={{
-                              fontSize: 12,
-                              padding: '2px 8px',
-                              borderRadius: 999,
-                              border: active
-                                ? '1px solid var(--v2-yellow, #fbc42d)'
-                                : '1px solid rgba(255,255,255,.15)',
-                              background: active
-                                ? 'rgba(251,196,45,.15)'
-                                : 'transparent',
-                              color: active
-                                ? 'var(--v2-yellow, #fbc42d)'
-                                : 'rgba(255,255,255,.6)',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                            }}
-                          >
-                            {m}mo
-                          </button>
-                        )
-                      })}
-                      {QUICK_DAYS.map(dn => {
-                        const active = Number(sc.duration_days) === dn
-                        return (
-                          <button
-                            key={`d${dn}`}
-                            type="button"
-                            onClick={() => setDays(sc.city.id, dn)}
-                            style={{
-                              fontSize: 12,
-                              padding: '2px 8px',
-                              borderRadius: 999,
-                              border: active ? '1px solid var(--v2-yellow, #FFE600)' : '1px solid rgba(255,255,255,.15)',
-                              background: active ? 'rgba(255,230,0,.15)' : 'transparent',
-                              color: active ? 'var(--v2-yellow, #FFE600)' : 'rgba(255,255,255,.6)',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                            }}
-                          >
-                            {dn}d
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <input
-                      type="number"
-                      min={1}
-                      max={MAX_DAYS}
-                      step="1"
-                      className="ccr-input"
-                      placeholder="or days"
-                      aria-label="Duration in days"
-                      value={sc.duration_days || ''}
-                      onChange={e => setDays(sc.city.id, e.target.value)}
-                      title="Any number of days, 1 to 365. The rate stays per screen per month."
-                    />
-                  </div>
-
+                  {/* Duration: one dropdown (1-12 months, 7 / 15 days, or custom days).
+                      Same updateEntry / setDays writers as before. */}
                   <div className="ccr-field">
-                    <label className="ccr-label">
-                      Listed (₹)
-                      {!isAdmin && (
-                        <Lock
-                          size={10}
-                          style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.6 }}
-                          aria-label="Admin-only"
+                    <label className="ccr-label">Duration</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <select
+                        className="ccr-select ccr-duration"
+                        aria-label={`Duration for ${sc.city.name}`}
+                        value={
+                          isCustomDays(sc)
+                            ? 'custom'
+                            : hasDays(sc) ? `d${sc.duration_days}` : `m${sc.duration_months}`
+                        }
+                        onChange={e => {
+                          const v = e.target.value
+                          if (v === 'custom') { setCustomDays(prev => new Set(prev).add(sc.city.id)); return }
+                          dropCustom(sc.city.id)
+                          if (v[0] === 'd') setDays(sc.city.id, Number(v.slice(1)))
+                          else updateEntry(sc.city.id, 'duration_months', Number(v.slice(1)))
+                        }}
+                      >
+                        {Array.from({ length: MAX_MONTHS - MIN_MONTHS + 1 }, (_, i) => MIN_MONTHS + i).map(m => (
+                          <option key={m} value={`m${m}`}>{m} mo</option>
+                        ))}
+                        {QUICK_DAYS.map(dn => <option key={dn} value={`d${dn}`}>{dn} days</option>)}
+                        <option value="custom">Days…</option>
+                      </select>
+                      {isCustomDays(sc) && (
+                        <input
+                          type="number"
+                          min={1}
+                          max={MAX_DAYS}
+                          step="1"
+                          className={`ccr-input ccr-days${hasDays(sc) ? '' : ' ccr-input--warn'}`}
+                          placeholder="days"
+                          aria-label={`Days for ${sc.city.name}`}
+                          value={sc.duration_days || ''}
+                          onChange={e => setDays(sc.city.id, e.target.value)}
+                          title="Any number of days, 1 to 365. The rate stays per screen per month."
                         />
                       )}
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="ccr-input"
-                      value={sc.listed_rate}
-                      readOnly={!isAdmin}
-                      disabled={!isAdmin}
-                      onChange={e => updateEntry(sc.city.id, 'listed_rate', Number(e.target.value))}
-                      title={!isAdmin ? 'Listed rate can only be changed by admin' : ''}
-                      style={!isAdmin ? { opacity: 0.7, cursor: 'not-allowed' } : undefined}
-                    />
+                    </div>
                   </div>
 
-                  {/* Offered (₹) — primary editable field per row.
-                      Styled with accent border + tinted fill + bold
-                      value so it pops against the locked LISTED
-                      input sitting next to it. Field discovery was
-                      the #1 sales-team complaint on mobile. */}
+                  {/* Price per screen: the one price the rep types. Yellow so it stands out. */}
                   <div className="ccr-field">
-                    <label className="ccr-label ccr-label--accent">Offered (₹)</label>
+                    <label className="ccr-label ccr-label--accent">Price (₹)</label>
                     <input
                       type="number"
                       min="0"
                       className="ccr-input ccr-input--accent"
+                      aria-label={`Price per screen for ${sc.city.name}`}
                       value={sc.offered_rate}
                       onChange={e => updateEntry(sc.city.id, 'offered_rate', Number(e.target.value))}
                     />
@@ -605,6 +534,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                     <label className="ccr-label">Slot Sec</label>
                     <select
                       className="ccr-select"
+                      aria-label={`Ad seconds for ${sc.city.name}`}
                       value={sc.slot_seconds || DEFAULT_SLOT_SECONDS}
                       onChange={e => updateEntry(sc.city.id, 'slot_seconds', Number(e.target.value))}
                     >
@@ -623,6 +553,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                       type="number"
                       min="1"
                       className="ccr-input"
+                      aria-label={`Slots per day for ${sc.city.name}`}
                       value={sc.slots_per_day ?? DEFAULT_SLOTS_PER_DAY}
                       onChange={e => updateEntry(sc.city.id, 'slots_per_day', Number(e.target.value) || DEFAULT_SLOTS_PER_DAY)}
                       title="Spots delivered per screen per day (default 100)"
@@ -637,6 +568,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                   <button
                     className="ccr-remove"
                     onClick={() => removeCity(sc.city.id)}
+                    aria-label={`Remove ${sc.city.name}`}
                     title="Remove"
                   >
                     <Trash2 size={14} />
