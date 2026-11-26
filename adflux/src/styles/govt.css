@@ -449,6 +449,8 @@
 @media (max-width: 600px) {
   .govt-list__row { grid-template-columns: 22px minmax(0, 1fr) 46px 72px; gap: 6px; padding: 10px; }
   .govt-list__name-gu { display: block; margin-left: 0; }
+  .govt-list__name { overflow-wrap: anywhere; }
+  .govt-list__pct { font-size: 12px; }
 }
 
 /* Summary panel — appears in review steps */
