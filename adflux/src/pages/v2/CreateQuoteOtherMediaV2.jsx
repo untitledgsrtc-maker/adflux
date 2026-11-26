@@ -348,15 +348,15 @@ export default function CreateQuoteOtherMediaV2() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
           <div className="fg" style={{ marginBottom: 0 }}>
             <label>Name <span style={{ color: '#f87171' }}>*</span></label>
-            <input value={client.name} onChange={e => setClient(c => ({ ...c, name: e.target.value }))} />
+            <input type="text" value={client.name} onChange={e => setClient(c => ({ ...c, name: e.target.value }))} />
           </div>
           <div className="fg" style={{ marginBottom: 0 }}>
             <label>Company</label>
-            <input value={client.company} onChange={e => setClient(c => ({ ...c, company: e.target.value }))} />
+            <input type="text" value={client.company} onChange={e => setClient(c => ({ ...c, company: e.target.value }))} />
           </div>
           <div className="fg" style={{ marginBottom: 0 }}>
             <label>Phone</label>
-            <input value={client.phone} onChange={e => setClient(c => ({ ...c, phone: e.target.value }))} />
+            <input type="tel" value={client.phone} onChange={e => setClient(c => ({ ...c, phone: e.target.value }))} />
           </div>
           <div className="fg" style={{ marginBottom: 0 }}>
             <label>Email</label>
@@ -364,11 +364,11 @@ export default function CreateQuoteOtherMediaV2() {
           </div>
           <div className="fg" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
             <label>Address</label>
-            <input value={client.address} onChange={e => setClient(c => ({ ...c, address: e.target.value }))} />
+            <input type="text" value={client.address} onChange={e => setClient(c => ({ ...c, address: e.target.value }))} />
           </div>
           <div className="fg" style={{ marginBottom: 0 }}>
             <label>GSTIN</label>
-            <input value={client.gstin} onChange={e => setClient(c => ({ ...c, gstin: e.target.value }))} placeholder="24XXXXXXXXX1Z5" />
+            <input type="text" value={client.gstin} onChange={e => setClient(c => ({ ...c, gstin: e.target.value }))} placeholder="24XXXXXXXXX1Z5" />
           </div>
         </div>
       </div>
@@ -426,6 +426,7 @@ export default function CreateQuoteOtherMediaV2() {
                 {/* Media: free-text input wired to a <datalist> backed by master.
                     Reps can pick from the dropdown OR type a one-off name. */}
                 <input
+                  type="text"
                   list={dlId}
                   placeholder="Media (e.g. Newspaper)"
                   value={l.media_type_name}
@@ -438,6 +439,7 @@ export default function CreateQuoteOtherMediaV2() {
                 </datalist>
 
                 <input
+                  type="text"
                   placeholder="Description (e.g. Times of India full page · Vadodara · 19 Sep)"
                   value={l.description}
                   onChange={e => setLine(i, { description: e.target.value })}
@@ -451,6 +453,7 @@ export default function CreateQuoteOtherMediaV2() {
                   style={{ textAlign: 'right' }}
                 />
                 <input
+                  type="text"
                   placeholder="Unit"
                   value={l.unit}
                   onChange={e => setLine(i, { unit: e.target.value })}
