@@ -215,7 +215,7 @@
 }
 
 .ccr-input {
-  width: 80px;
+  width: 110px;
   padding: 7px 9px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -268,6 +268,18 @@
   outline: none;
   cursor: pointer;
 }
+
+/* Duration: label on top, then box + quick chips + days box on one line,
+   on its own row so the other fields line up beside each other. */
+.ccr-field--duration {
+  flex-basis: 100%;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ccr-field--duration .ccr-label { flex-basis: 100%; }
+.ccr-field--duration .ccr-input { width: 90px; }
 
 .ccr-total {
   font-size: 14px;
@@ -695,9 +707,19 @@
     gap: 8px;
   }
 
-  .ccr-input {
-    width: 70px;
+  /* Phone: fields in an even 3-column grid, boxes fill their cell. */
+  .campaign-city-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
   }
+  .campaign-city-controls .ccr-input,
+  .campaign-city-controls .ccr-select {
+    width: 100%;
+    min-width: 0;
+  }
+  .ccr-field--duration { grid-column: 1 / -1; }
+  .ccr-field--duration .ccr-input { width: 90px; }
 
   .review-grid {
     grid-template-columns: 1fr;

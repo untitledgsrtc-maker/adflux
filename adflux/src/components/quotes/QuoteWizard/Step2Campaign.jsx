@@ -337,7 +337,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                       />
                     </div>
 
-                    <div className="ccr-field">
+                    <div className="ccr-field ccr-field--duration">
                       <label className="ccr-label">Duration (months)</label>
                       <input
                         type="number"
@@ -349,7 +349,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                         value={bulk.duration_months}
                         onChange={e => { setBulk(b => ({ ...b, duration_months: e.target.value })); setBulkNote('') }}
                       />
-                      <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                         {QUICK_DURATIONS.map(m => {
                           const active = Number(bulk.duration_months) === m
                           return (
@@ -375,8 +375,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                         max={MAX_DAYS}
                         step="1"
                         className="ccr-input"
-                        style={{ marginTop: 6 }}
-                        placeholder="or days (e.g. 15)"
+                        placeholder="or days"
                         aria-label="Bulk duration in days"
                         value={bulk.duration_days}
                         onChange={e => { setBulk(b => ({ ...b, duration_days: e.target.value })); setBulkNote('') }}
@@ -471,7 +470,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                   {/* Duration: free 1–12 input plus quick-pick pills.
                       The input is the source of truth; pills just
                       write into it. No bulk discount applied. */}
-                  <div className="ccr-field">
+                  <div className="ccr-field ccr-field--duration">
                     <label className="ccr-label">Duration (months)</label>
                     <input
                       type="number"
@@ -489,7 +488,6 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                       style={{
                         display: 'flex',
                         gap: 4,
-                        marginTop: 4,
                         flexWrap: 'wrap',
                       }}
                     >
@@ -550,8 +548,7 @@ export function Step2Campaign({ selectedCities, onChange, onBack, onNext }) {
                       max={MAX_DAYS}
                       step="1"
                       className="ccr-input"
-                      style={{ marginTop: 6 }}
-                      placeholder="or number of days"
+                      placeholder="or days"
                       aria-label="Duration in days"
                       value={sc.duration_days || ''}
                       onChange={e => setDays(sc.city.id, e.target.value)}
