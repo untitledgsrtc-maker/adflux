@@ -483,6 +483,8 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   color: var(--text-muted);
   font-size: 12px; text-align: center;
   cursor: pointer; font-weight: 500;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;  /* icon + word on one line */
+  min-height: 40px;
 }
 .lead-radio-grp .opt.on     { background: var(--accent);  color: var(--accent-fg); border-color: var(--accent); }
 .lead-radio-grp .opt.on.pos { background: var(--success); color: white;             border-color: var(--success); }

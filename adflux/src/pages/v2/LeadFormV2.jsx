@@ -501,7 +501,7 @@ export default function LeadFormV2() {
 
       {/* ─── Lead (option C, owner 26-11-2026): the fields reps fill every time ─── */}
       <div className="lead-card" style={{ marginBottom: 14 }}>
-        <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
+        <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: 14 }}>
           <div>
             <label className="lead-fld-label">Company *</label>
             <PlaceSuggest
@@ -653,7 +653,7 @@ export default function LeadFormV2() {
           {!showMore && <span className="lead-more-hint">Designation · Email · Website · Industry · Value · Telecaller</span>}
         </button>
         {showMore && (
-          <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
+          <div className="lead-card-pad" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: 14 }}>
             <Field label="Designation"    value={form.designation} onChange={v => set('designation', v)} placeholder="e.g. Marketing Manager" />
             <Field label="Email"          value={form.email}       onChange={v => set('email', v)}       placeholder="name@company.com" type="email" />
             <Field label="Website"        value={form.website}     onChange={v => set('website', v)}     placeholder="www.example.com" />
