@@ -413,66 +413,78 @@ export default function CreateQuoteOtherMediaV2() {
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="om-lines">
+          <div className="om-line om-line--head" aria-hidden="true">
+            <span>Media</span><span>Description</span><span style={{ textAlign: 'right' }}>Qty</span>
+            <span>Unit</span><span style={{ textAlign: 'right' }}>Rate (₹)</span><span style={{ textAlign: 'right' }}>Amount</span><span />
+          </div>
           {lines.map((l, i) => {
             const lineTotal = (Number(l.qty) || 0) * (Number(l.unit_rate) || 0)
             const dlId = `media-options-${i}`
             return (
-              <div key={i} style={{
-                display: 'grid',
-                gridTemplateColumns: '180px 1fr 70px 80px 110px 110px 28px',
-                gap: 8, alignItems: 'center',
-              }}>
+              <div key={i} className="om-line">
                 {/* Media: free-text input wired to a <datalist> backed by master.
                     Reps can pick from the dropdown OR type a one-off name. */}
-                <input
-                  type="text"
-                  list={dlId}
-                  placeholder="Media (e.g. Newspaper)"
-                  value={l.media_type_name}
-                  onChange={e => setLineMedia(i, e.target.value)}
-                />
-                <datalist id={dlId}>
-                  {mediaTypes.map(m => (
-                    <option key={m.name} value={m.name} />
-                  ))}
-                </datalist>
+                <label className="om-cell om-cell--media" data-label="Media">
+                  <input
+                    type="text"
+                    list={dlId}
+                    placeholder="Media (e.g. Newspaper)"
+                    value={l.media_type_name}
+                    onChange={e => setLineMedia(i, e.target.value)}
+                  />
+                  <datalist id={dlId}>
+                    {mediaTypes.map(m => (
+                      <option key={m.name} value={m.name} />
+                    ))}
+                  </datalist>
+                </label>
 
-                <input
-                  type="text"
-                  placeholder="Description (e.g. Times of India full page · Vadodara · 19 Sep)"
-                  value={l.description}
-                  onChange={e => setLine(i, { description: e.target.value })}
-                />
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="Qty"
-                  value={l.qty}
-                  onChange={e => setLine(i, { qty: e.target.value })}
-                  style={{ textAlign: 'right' }}
-                />
-                <input
-                  type="text"
-                  placeholder="Unit"
-                  value={l.unit}
-                  onChange={e => setLine(i, { unit: e.target.value })}
-                />
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="Rate ₹"
-                  value={l.unit_rate}
-                  onChange={e => setLine(i, { unit_rate: e.target.value })}
-                  style={{ textAlign: 'right' }}
-                />
-                <div style={{ fontFamily: 'var(--v2-display)', fontWeight: 600, textAlign: 'right' }}>
+                <label className="om-cell om-cell--desc" data-label="Description">
+                  <input
+                    type="text"
+                    placeholder="Description (e.g. Times of India full page · Vadodara · 19 Sep)"
+                    value={l.description}
+                    onChange={e => setLine(i, { description: e.target.value })}
+                  />
+                </label>
+                <label className="om-cell" data-label="Qty">
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Qty"
+                    value={l.qty}
+                    onChange={e => setLine(i, { qty: e.target.value })}
+                    style={{ textAlign: 'right' }}
+                  />
+                </label>
+                <label className="om-cell" data-label="Unit">
+                  <input
+                    type="text"
+                    placeholder="Unit"
+                    value={l.unit}
+                    onChange={e => setLine(i, { unit: e.target.value })}
+                  />
+                </label>
+                <label className="om-cell" data-label="Rate (₹)">
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Rate ₹"
+                    value={l.unit_rate}
+                    onChange={e => setLine(i, { unit_rate: e.target.value })}
+                    style={{ textAlign: 'right' }}
+                  />
+                </label>
+                <div className="om-amount" style={{ fontFamily: 'var(--v2-display)', fontWeight: 600, textAlign: 'right' }}>
                   ₹{lineTotal.toLocaleString('en-IN')}
                 </div>
                 <button
                   type="button"
+                  className="om-del"
                   onClick={() => removeLine(i)}
                   style={{ background: 'transparent', border: 'none', color: 'var(--v2-ink-2)', cursor: 'pointer' }}
+                  aria-label={`Remove line ${i + 1}`}
                   title="Remove line"
                 >
                   <Trash2 size={14} />
@@ -482,9 +494,9 @@ export default function CreateQuoteOtherMediaV2() {
           })}
         </div>
 
-        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--v2-ink-2)' }}>
-          <Newspaper size={11} style={{ verticalAlign: '-1px', marginRight: 4 }} />
-          Media options are managed in <strong>Master → Media Types</strong>. Pick from the list or type a one-off name.
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--v2-ink-2)', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+          <Newspaper size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>Media options are managed in <strong>Master → Media Types</strong>. Pick from the list or type a one-off name.</span>
         </div>
       </div>
 
