@@ -212,7 +212,9 @@ export function Step4Districts({ data, onChange }) {
                     onChange={e => setOverride(d.id, e.target.value)}
                     onClick={e => e.stopPropagation()}
                     style={{
-                      width: 80,
+                      width: '100%',
+                      maxWidth: 80,
+                      boxSizing: 'border-box',
                       textAlign: 'right',
                       background: isOver ? 'rgba(255,193,7,.08)' : 'var(--surface-2)',
                       border: `1px solid ${isOver ? 'rgba(255,193,7,.4)' : 'var(--surface-3)'}`,

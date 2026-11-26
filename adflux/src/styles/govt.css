@@ -280,7 +280,7 @@
 }
 
 /* Form fields */
-.govt-field { display: flex; flex-direction: column; margin-bottom: 16px; }
+.govt-field { display: flex; flex-direction: column; margin-bottom: 16px; min-width: 0; }
 .govt-field__label {
   font-size: 12px;
   font-weight: 600;
@@ -299,6 +299,9 @@
   font-family: inherit;
   font-size: 14px;
   padding: 10px 12px;
+  min-width: 0;          /* date / long signer names must not push past the card on phone */
+  max-width: 100%;
+  box-sizing: border-box;
   transition: border var(--transition);
 }
 .govt-field__input:focus,
@@ -313,12 +316,12 @@
 
 .govt-field-row {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 @media (min-width: 600px) {
-  .govt-field-row--2 { grid-template-columns: 1fr 1fr; }
-  .govt-field-row--3 { grid-template-columns: 1fr 1fr 1fr; }
+  .govt-field-row--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .govt-field-row--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 /* Step nav buttons */
@@ -366,9 +369,11 @@
   padding: 18px 22px;
   margin-bottom: 16px;
 }
-.govt-qty__input {
+.govt-qty__input,
+.v2d .govt-qty .govt-qty__input { /* beats the .v2d typed-input rule */
   background: transparent;
   border: none;
+  padding: 0;
   color: var(--text);
   font-family: var(--font-display);
   font-size: 36px;
@@ -419,6 +424,8 @@
 
 .govt-list__bulk {
   display: flex;
+  flex-wrap: wrap;      /* search + Select all / none wrap on phone */
+  align-items: center;
   gap: 10px;
   padding: 12px 14px;
   background: var(--surface-3);
@@ -435,6 +442,14 @@
   font-size: 12px;
 }
 .govt-list__bulk button:hover { color: var(--text); border-color: var(--border-strong); }
+
+/* Phone: the 4-column district row (tick, name, share %, qty) must fit 340px,
+   so the qty box stays on screen. Rows that set their own columns inline
+   (GSRTC stations, proposal detail) are unaffected. */
+@media (max-width: 600px) {
+  .govt-list__row { grid-template-columns: 22px minmax(0, 1fr) 46px 72px; gap: 6px; padding: 10px; }
+  .govt-list__name-gu { display: block; margin-left: 0; }
+}
 
 /* Summary panel — appears in review steps */
 .govt-summary {

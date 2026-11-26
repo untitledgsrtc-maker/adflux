@@ -300,7 +300,7 @@ export function Step3Stations({ data, onChange }) {
         {/* Header row */}
         <div
           className="govt-list__row govt-list__row--head"
-          style={{ gridTemplateColumns: '24px 1fr 50px 60px 78px 78px 78px 78px 110px' }}
+          style={{ gridTemplateColumns: '24px 1fr 50px 60px 64px 64px 64px 78px 110px' }}
         >
           <span></span>
           <span>Station</span>

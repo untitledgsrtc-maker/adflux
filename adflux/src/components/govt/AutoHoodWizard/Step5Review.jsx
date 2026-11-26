@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { GovtProposalRenderer } from '../GovtProposalRenderer'
+import { FitToWidth } from '../FitToWidth'
 import { useAutoMasters, useSigners } from '../../../hooks/useGovtMasters'
 import { distributeAutoHoodQuantity } from '../../../utils/distributeQuantity'
 
@@ -98,13 +99,15 @@ export function Step5Review({ data }) {
         Sent. Either way the proposal lands in the Quotes list.
       </p>
 
-      <GovtProposalRenderer
-        template={template}
-        data={rendered}
-        signer={signer}
-        mediaType="AUTO_HOOD"
-        company={company}
-      />
+      <FitToWidth>
+        <GovtProposalRenderer
+          template={template}
+          data={rendered}
+          signer={signer}
+          mediaType="AUTO_HOOD"
+          company={company}
+        />
+      </FitToWidth>
 
       <div className="govt-summary">
         <div className="govt-summary__row">

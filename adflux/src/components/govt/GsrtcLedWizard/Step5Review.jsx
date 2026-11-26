@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { GovtProposalRenderer } from '../GovtProposalRenderer'
+import { FitToWidth } from '../FitToWidth'
 import { useGsrtcStations, useSigners } from '../../../hooks/useGovtMasters'
 
 export function Step5ReviewGsrtc({ data }) {
@@ -95,13 +96,15 @@ export function Step5ReviewGsrtc({ data }) {
         Final preview of the GSRTC LED proposal letter.
       </p>
 
-      <GovtProposalRenderer
-        template={template}
-        data={rendered}
-        signer={signer}
-        mediaType="GSRTC_LED"
-        company={company}
-      />
+      <FitToWidth>
+        <GovtProposalRenderer
+          template={template}
+          data={rendered}
+          signer={signer}
+          mediaType="GSRTC_LED"
+          company={company}
+        />
+      </FitToWidth>
 
       <div className="govt-summary">
         <div className="govt-summary__row">
