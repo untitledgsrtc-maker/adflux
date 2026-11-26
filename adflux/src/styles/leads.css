@@ -217,7 +217,7 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
    border weight to 1.5px so the box is unambiguous in dark theme.
    Same fix applied below for select / textarea / global v2 inputs. */
 .lead-inp {
-  background: var(--surface-2);
+  background: var(--v2-bg-2, var(--surface-2)); /* same fill as typed .v2d inputs */
   border: 1.5px solid var(--border-strong, #475569);
   color: var(--text);
   border-radius: 8px;
