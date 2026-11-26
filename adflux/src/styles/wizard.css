@@ -291,7 +291,7 @@
 .ccr-head { display: none; }
 .ccr-compact .campaign-city-controls.ccr-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr)); /* Screens | Duration x2, then Price | Sec | Slots */
   gap: 10px;
   align-items: end;
 }
