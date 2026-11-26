@@ -1013,7 +1013,7 @@ export default function LeadsV2() {
           more than one rep with leads. Click a chip → filter the list
           to that rep's leads. Click the active chip again to clear. */}
       {(isPrivileged || showTeam) && distinctReps.length > 1 && (
-        <div style={{
+        <div className="lead-filter-rep-chips" style={{
           display: 'flex', gap: 8, flexWrap: 'wrap',
           marginBottom: 10, alignItems: 'center',
         }}>
