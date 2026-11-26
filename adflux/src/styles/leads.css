@@ -372,6 +372,12 @@ details.tc-accordion[open] > summary.lead-card-head .tc-acc-chev { transform: ro
   vertical-align: middle;
 }
 .lead-table tr:hover td { background: var(--surface-2); cursor: pointer; }
+/* Laptops: 13 columns need less padding so more of the table fits before the
+   card scrolls sideways (all columns stay reachable by scrolling). */
+@media (min-width: 861px) and (max-width: 1440px) {
+  .lead-table th, .lead-table td { padding: 9px 8px; }
+  .lead-table th { letter-spacing: .06em; }
+}
 .lead-table .name-cell { display: flex; align-items: center; gap: 10px; }
 .lead-table .name-cell .name    { font-weight: 500; }
 .lead-table .name-cell .company { font-size:12px; color: var(--text-subtle); }

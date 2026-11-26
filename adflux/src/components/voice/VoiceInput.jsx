@@ -198,6 +198,7 @@ export default function VoiceInput({
           title={state === 'recording' ? 'Stop recording' : 'Speak'}
           style={{
             width: 44,
+            minHeight: 44,   /* multiline boxes align it to the top, so it shrank to the icon (16px) */
             background: state === 'recording'
               ? 'var(--danger, #EF4444)'
               : 'var(--accent, #FFE600)',

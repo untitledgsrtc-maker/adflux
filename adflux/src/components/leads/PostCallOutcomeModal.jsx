@@ -77,9 +77,9 @@ function parseCallIntent(rawText) {
       || /नहीं चाहिए|नहीं\s?चाहिए|दिलचस्पी नहीं|मना|नहीं\s?लेना/.test(text)) {
     out.outcome = 'negative'
   }
-  // Neutral — maybe, think, callback later
+  // Maybe / think / later -> 'Call later' (the Maybe tile was removed).
   if (!out.outcome && /\b(maybe|think|considering|callback|call back|try again|later|baad me|बाद|પછી|વિચાર|sochenge|sochna|will see|let me know)\b/.test(text)) {
-    out.outcome = 'neutral'
+    out.outcome = 'callback'
   }
 
   // Days offset -----------------------------------------------------
@@ -211,7 +211,8 @@ function istNowPlusHoursDateTime(hours) {
 
 const OUTCOMES = [
   { value: 'positive', label: 'Good',       sub: 'Wants quote / more info', tone: 'success' },
-  { value: 'neutral',  label: 'Maybe',      sub: 'Try again in a few days', tone: 'warn' },
+  // Maybe ('neutral') removed from the picker on owner request (26-11-2026);
+  // 'neutral' stays a valid saved value (old rows, Nurture saves as neutral).
   // Phase 45.3 — new "Call later" outcome. Distinct from Maybe so
   // we can capture "they want a callback" as a real signal (vs
   // generic Maybe = "not sure yet"). When picked, auto-fills
@@ -305,7 +306,7 @@ export default function PostCallOutcomeModal({
     }
   }, [open])
 
-  // Phase 45.1 + 45.3 — smart default. outcome='neutral' (Maybe) or
+  // Phase 45.1 + 45.3 — smart default. outcome='neutral' (legacy Maybe, tile removed 26-11-2026) or
   // outcome='callback' (Call later) both default next-action to
   // "call back in 2 hours". Only fires if rep hasn't manually picked.
   // The call_back_2h chip's own auto-snap then fills customDate=today
@@ -405,7 +406,7 @@ export default function PostCallOutcomeModal({
   async function handleSave() {
     if (savingRef.current || saving) return
     if (!outcome) {
-      toastError(new Error('Pick an outcome'), 'Tap Good / Maybe / Lost first.')
+      toastError(new Error('Pick an outcome'), 'Tap an outcome first.')
       return
     }
     // Phase 110 — block a follow-up scheduled in the PAST. The date input
@@ -829,7 +830,7 @@ export default function PostCallOutcomeModal({
                   on narrow screens. */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',  /* 4 tiles = 2 x 2 */
                 gap: 8,
               }}>
                 {OUTCOMES.map(o => {

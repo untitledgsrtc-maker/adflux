@@ -255,7 +255,7 @@ const styles = {
     letterSpacing: '0.02em',
   },
   sub: {
-    fontSize: 11, color: 'var(--v2-ink-2, var(--text-muted))',
+    fontSize: 12, color: 'var(--v2-ink-2, var(--text-muted))',
     marginTop: 2,
   },
   filters: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
@@ -331,12 +331,12 @@ const styles = {
     position: 'absolute', top: -18, left: '50%',
     transform: 'translateX(-50%)',
     fontFamily: 'var(--v2-display, "Space Grotesk", system-ui, sans-serif)',
-    fontSize: 10, fontWeight: 700,
+    fontSize: 11, fontWeight: 700,   /* 11 not 12: 3-digit counts over ~20px bars must not touch */
     color: 'var(--v2-ink-0, var(--text))',
     whiteSpace: 'nowrap',
   },
   dayLabel: {
-    fontSize: 10,
+    fontSize: 12,
     color: 'var(--v2-ink-2, var(--text-muted))',
     fontWeight: 600, letterSpacing: '0.06em',
     textTransform: 'uppercase',
